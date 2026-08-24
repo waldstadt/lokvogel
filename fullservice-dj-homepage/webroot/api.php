@@ -145,28 +145,28 @@ function seed(PDO $p): void {
   ] as [$k, $v]) $p->prepare('insert into settings (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
 
   foreach ([
-    ['hero', '{"title":"DJ Lauschgift","subtitle":"Hochzeits-DJ & Event-DJ | Deutschlandweit","text":"23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Buchbar deutschlandweit – von Dortmund über Düsseldorf bis München.","cta":"Jetzt unverbindlich anfragen","image":""}'],
-    ['about', '{"title":"Über mich","text":"Nach über 23 Jahren ist jede Hochzeit, jede Gartenparty und jede Firmenfeier eine neue Herausforderung und nicht mit der Party davor vergleichbar – das ist mein persönliches Geheimnis für eine richtig gute Feier. Was mich auszeichnet: meine ruhige, unaufdringliche Art. Ich stelle mich nicht in den Mittelpunkt, sondern lese den Raum und spiele genau den richtigen Song.","image":""}'],
-    ['services', '{"title":"Leistungen","text":"Vom Sektempfang bis zum letzten Gast: Ich bringe nicht nur Musik mit, sondern auch Tontechnik für die freie Trauung, dezentes Licht passend zu eurer Location – und einen Plan B für jeden Fall.","image":""}'],
-    ['prices', '{"title":"Preise","text":"Eine Feier mit DJ Lauschgift beginnt bei 1.200 €. Eine feste Obergrenze gibt es nicht – Dauer und Technikumfang bestimmen den Preis. Ihr bekommt ein individuelles Angebot mit konkreten Vorschlägen zu Dauer und Equipment, zugeschnitten auf Location, Gästezahl und Ablauf.","from":1200}'],
-    ['rental', '{"title":"Technik mieten","text":"Hochwertige Licht- und Tontechnik direkt aus meinem Lager in Hemer – vom System für Redenbeiträge bis zu LED-Spots für die Raumdeko, auf Wunsch mit Aufbau. Preise gelten für einen Miettag (24 Stunden), Folgetage 50 % des Grundpreises."}'],
+    ['hero', '{"title":"DJ Lauschgift","subtitle":"DJ für Hochzeiten, Geburtstage & Firmenfeiern","text":"Ich bin Markus – seit 23 Jahren DJ für Hochzeiten, Geburtstage und Firmenfeiern. Keine Show um meine Person, kein Programm von der Stange: Ich lese den Raum und spiele das, was eure Gäste auf die Tanzfläche bringt.","cta":"Unverbindlich anfragen","image":""}'],
+    ['about', '{"title":"Musik ist mein Ding. Der Mittelpunkt gehört euch.","text":"Nach 23 Jahren hinter den Decks ist jede Feier immer noch anders – und genau das macht es aus. Ich bin kein DJ, der sich selbst inszeniert: Ich lese den Raum, spiele den richtigen Song zur richtigen Zeit und bleibe den ganzen Abend ansprechbar für euch und eure Gäste. Und weil ich ein echter Technik-Mensch bin, stehen Ton und Licht bei mir auf einem Niveau, das man sonst von deutlich größeren Produktionen kennt.","image":""}'],
+    ['services', '{"title":"Was ich für euch tue","text":"Vom Sektempfang bis zum letzten Song: Musik, Ton für die freie Trauung, dezentes Licht passend zur Location – und ein Plan B für alle Fälle. Ihr feiert, ich kümmere mich um den Rest.","image":""}'],
+    ['prices', '{"title":"Was kostet das?","text":"Nach oben entscheiden Dauer, Location und Technikumfang – nicht mein Tagesgefühl. Ihr bekommt ein individuelles Angebot mit konkreten Vorschlägen zu Dauer und Equipment, zugeschnitten auf eure Feier.","from":1200}'],
+    ['rental', '{"title":"Technik mieten – direkt aus Hemer","text":"Profi-Ton und -Licht aus meinem Lager in Hemer – von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko. Auf Wunsch mit Aufbau."}'],
     ['contact', '{"title":"Kontakt","phone":"01523 6439373","email":"","address":"Büttmecker Weg 35c, 58675 Hemer","instagram":"","whatsapp":""}'],
-    ['theme', '{"preset":"dark-gold","primary":"#c9a227","bg":"#0d0d0f","font":"Inter"}'],
+    ['theme', '{"preset":"koralle","primary":"#ff6f5b","bg":"#0f1012","font":"Space Grotesk"}'],
     ['seo', '{"title":"DJ Lauschgift – Hochzeits-DJ & Event-DJ | Deutschlandweit","description":"DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer."}'],
   ] as [$k, $v]) $p->prepare('insert into site_content (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
 
   $faqs = [
-    [1,'Spielst du Musikwünsche?','Ja – Musikwünsche von euch und euren Gästen gehören dazu. Vorab besprechen wir, was auf jeden Fall laufen soll und was gar nicht.'],
-    [2,'Wie läuft die Buchung ab?','Anfrage über das Formular oder telefonisch, dann kurzes Kennenlerngespräch, individuelles Angebot – und mit der Bestätigung ist euer Termin fest reserviert.'],
-    [3,'Was passiert, wenn du krank wirst?','Für den Notfall gibt es einen Plan B: ein Netzwerk erfahrener Kollegen, die mit meinen Unterlagen und eurer Musikvorbereitung einspringen können.'],
-    [4,'Wie lange brauchst du für den Aufbau?','Je nach Umfang der Technik in der Regel 60–120 Minuten. Der Aufbau ist rechtzeitig vor Eintreffen der Gäste abgeschlossen.'],
+    [1,'Spielst du Musikwünsche?','Ja, klar – Wünsche von euch und euren Gästen gehören dazu. Vorab besprechen wir, was auf jeden Fall laufen soll und was gar nicht.'],
+    [2,'Wie läuft die Buchung ab?','Anfrage über das Formular oder telefonisch, dann ein kurzes Kennenlerngespräch, ein klares Angebot – und mit eurer Bestätigung ist der Termin fest reserviert.'],
+    [3,'Was passiert, wenn du krank wirst?','Dafür gibt es den Plan B: ein Netzwerk erfahrener Kollegen, die mit meinen Unterlagen und eurer Musikvorbereitung einspringen können. Eure Feier findet statt.'],
+    [4,'Wie lange brauchst du für den Aufbau?','Je nach Technikumfang 60 bis 120 Minuten. Aufgebaut wird, bevor eure Gäste kommen – versprochen.'],
   ];
   foreach ($faqs as [$s,$q,$a]) $ins('faq', ['sort'=>$s,'question'=>$q,'answer'=>$a,'public'=>1]);
 
   $packs = [
-    [1,'Hochzeit','Vom Sektempfang bis zum letzten Gast',1200,'["Kennenlerngespräch & Musikplanung","Ton für freie Trauung","Dezentes Ambiente-Licht","Plan B / Backup-Technik"]'],
-    [2,'Geburtstag & private Feier','Party genau nach eurem Geschmack',900,'["Musik nach euren Wünschen","Professionelle PA (Seeburg Acoustic Line)","Lichtsetup passend zur Location"]'],
-    [3,'Firmenfeier','Souverän von Empfang bis Party',1200,'["Dezente Hintergrundmusik & Party","Mikrofon/Ton für Reden","Abstimmung mit Eventplanung"]'],
+    [1,'Hochzeit','Vom Sektempfang bis zum letzten Song',1200,'["Kennenlerngespräch & Musikplanung","Ton für die freie Trauung","Dezentes Licht passend zur Location","Plan B & Backup-Technik inklusive"]'],
+    [2,'Geburtstag & private Feier','Eure Party, euer Sound',900,'["Musik nach euren Wünschen","Profi-PA (Seeburg Acoustic Line)","Licht, das zur Stimmung passt"]'],
+    [3,'Firmenfeier','Vom Empfang bis zur Party souverän',1200,'["Hintergrundmusik & Partyprogramm","Mikrofon & Ton für Reden","Enge Abstimmung mit eurer Planung"]'],
   ];
   foreach ($packs as [$s,$t,$sub,$pr,$f])
     $ins('packages', ['sort'=>$s,'title'=>$t,'subtitle'=>$sub,'price_from'=>$pr,'price_note'=>'ab','features'=>$f,'public'=>1]);
