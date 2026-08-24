@@ -3,52 +3,52 @@
 Neuaufbau der DJ-Lauschgift-Webseite mit umfangreichem Backoffice:
 CRM, Kommunikations-Timeline, Buchungen, Angebote, Rechnungen
 (inkl. Abschlags-/Schlussrechnungen), Technik-Verleih und Statistiken —
-komplett selbst gehostet, ohne laufende Software-Abokosten (Orientierung: bookitup,
-aber mit Homepage-Integration und Technik-Logistik).
+**komplett self-hosted auf dem eigenen Webspace** (läuft auf All-Inkl &
+jedem PHP-8-Hosting), keine externen Dienste, keine laufenden Abokosten.
+Orientierung: bookitup, aber mit Homepage-Integration und Technik-Logistik.
 
 ## Struktur
 
 ```
 fullservice-dj-homepage/
-├── public/index.html     Öffentliche Homepage (Hero, Über mich, Pakete,
-│                         Preise, Technik mieten, FAQ, Anfrage-Formular)
-├── admin/admin.html      Backoffice (Login, Dashboard, Anfragen, CRM,
-│                         Buchungen+Kalender, Angebote, Rechnungen,
-│                         Technik, Statistik, Website-CMS, Einstellungen)
-└── supabase/schema.sql   Datenbankschema inkl. RLS-Policies & Startdaten
+└── webroot/              ← kompletten Inhalt per FTP hochladen
+    ├── index.html        Öffentliche Homepage (Hero, Über mich, Pakete,
+    │                     Preise, Technik mieten, FAQ, Anfrage-Formular)
+    ├── admin.html        Backoffice (Login, Dashboard, Anfragen, CRM,
+    │                     Buchungen+Kalender, Angebote, Rechnungen,
+    │                     Technik, Statistik, Website-CMS, Einstellungen)
+    └── api.php           Backend: eine PHP-Datei mit SQLite-Datenbank,
+                          Login, REST-API und Bild-Upload
 ```
 
-Beide HTML-Dateien sind eigenständig — kein Build-Prozess, kein Framework
-(gleiche Philosophie wie lokvogel.de).
+Beim ersten Aufruf legt `api.php` selbstständig an:
+- `data/dj.sqlite` — die Datenbank inkl. Startinhalten (per `.htaccess` gegen
+  Direktzugriff gesperrt)
+- `uploads/` — hochgeladene Website-Fotos
 
-## Setup (einmalig, ~15 Minuten)
+## Installation (auf All-Inkl o. ä., ~5 Minuten)
 
-1. **Supabase-Projekt anlegen** auf [supabase.com](https://supabase.com)
-   — Region **EU (Frankfurt)** wählen (DSGVO).
-2. **Schema einspielen:** SQL Editor öffnen → Inhalt von
-   `supabase/schema.sql` einfügen → Run. Legt alle Tabellen, Policies,
-   den Storage-Bucket `media` und die Start-Inhalte an.
-3. **Admin-Nutzer anlegen:** Dashboard → Authentication → Users →
-   "Add user" (E-Mail + Passwort). Unter Authentication → Providers →
-   Email die Registrierung ("Enable sign ups") **deaktivieren**, damit
-   sich niemand sonst registrieren kann.
-4. **Keys eintragen:** Dashboard → Settings → API. `Project URL` und
-   `anon/publishable key` jeweils oben in `public/index.html` und
-   `admin/admin.html` bei `SUPA_URL` / `SUPA_KEY` eintragen.
-5. **Hosting:** Beide Dateien auf beliebigen Static-Host legen
-   (z. B. bestehendes Webhosting, Netlify, Cloudflare Pages).
-   `public/index.html` → lauschgift.net, `admin/admin.html` z. B. unter
-   `/admin/` (die URL genügt als Schutz nicht — der Login schon, da alle
-   Daten serverseitig per Row Level Security nur mit Login lesbar sind).
+1. **Hochladen:** Inhalt von `webroot/` per FTP in das Zielverzeichnis der
+   Domain legen (z. B. `/lauschgift.net/`). PHP 8.x im KAS aktivieren,
+   falls nicht ohnehin Standard.
+2. **Admin-Konto anlegen:** `https://deine-domain/admin.html` aufrufen und
+   mit Wunsch-E-Mail + Passwort (min. 8 Zeichen) anmelden — **die erste
+   Anmeldung legt das Konto an.** Deshalb direkt nach dem Upload machen.
+3. Fertig. Homepage läuft unter `index.html`, alle Inhalte pflegst du im
+   Backoffice unter „Inhalte“.
+
+**Backup:** einfach `data/dj.sqlite` und den `uploads/`-Ordner per FTP
+herunterladen — das ist der komplette Datenbestand.
 
 ## Zugriffsmodell / Datenschutz
 
-- Die Homepage (anon key) kann **nur** Website-Inhalte lesen und neue
-  Anfragen **einfügen** — Kundendaten, Buchungen und Rechnungen sind ohne
-  Login serverseitig nicht abrufbar (Row Level Security).
-- Das Backoffice arbeitet nur mit gültigem Supabase-Auth-Login.
-- Fotos liegen im öffentlichen Storage-Bucket `media` (nur für
-  Website-Bilder gedacht — keine Kundendokumente dort ablegen).
+- Ohne Login liefert die API **nur** Website-Inhalte (Texte, Pakete, FAQ,
+  öffentliche Verleih-Artikel) und nimmt neue Anfragen entgegen.
+  Kundendaten, Buchungen und Rechnungen sind ohne Login nicht abrufbar.
+- Backoffice-Login: Passwort-Hash (bcrypt) serverseitig, Token 12 h gültig.
+- Alle Daten liegen ausschließlich auf deinem eigenen Webspace (DSGVO:
+  kein Drittlands-Transfer, kein externer Auftragsverarbeiter außer dem
+  Hoster, mit dem ohnehin ein AV-Vertrag besteht).
 
 ## Funktionsumfang v1
 
@@ -73,7 +73,7 @@ Beide HTML-Dateien sind eigenständig — kein Build-Prozess, kein Framework
   DJ-Gage und zugeordneter Technik automatisch vorbefüllt.
 - **Statistik:** Umsatz pro Monat/Jahr, Angebots-Annahmequote,
   Ø-Rechnungswert, Aufträge nach Anlass, Anfrage-Quellen.
-- **Website-CMS:** Alle Texte, Fotos (Upload in Supabase Storage),
+- **Website-CMS:** Alle Texte, Fotos (Upload auf den eigenen Server),
   Leistungspakete, FAQ, Verleih-Artikel, Kontaktdaten, SEO und
   Farbschema (Presets + freie Farbwahl) — Änderungen sind sofort live.
 
