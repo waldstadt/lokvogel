@@ -157,10 +157,7 @@ function seed(PDO $p): void {
         ['title' => 'Geburtstag', 'scope' => 'Abendparty ca. 6 Stunden, kompakte Ton- und Lichttechnik', 'price' => 'ca. 1.000 €'],
         ['title' => 'Firmenfeier', 'scope' => 'Empfang, Reden-Ton und Party bis Mitternacht', 'price' => 'ca. 1.350 €'],
       ],
-      'specials' => [
-        ['title' => 'Tagsüber feiern?', 'text' => 'Für Veranstaltungen am Tag – z. B. Empfänge, Brunch oder Firmenevents am Vormittag und Nachmittag – gibt es Sonderkonditionen. Einfach im Formular erwähnen.'],
-        ['title' => 'Unter der Woche?', 'text' => 'Montag bis Donnerstag ist meine Auslastung geringer – das gebe ich als Sonderkondition gerne an euch weiter. Fragt einfach mit eurem Wunschtermin an.'],
-      ],
+      'note' => 'Das gilt für klassische Abendveranstaltungen am Wochenende. Tagsüber oder unter der Woche – etwa donnerstags von 12 bis 18 Uhr – kalkuliere ich deutlich günstiger. Fragt einfach mit eurem Termin an.',
     ], JSON_UNESCAPED_UNICODE)],
     ['guarantee', '{"title":"Schon ausgebucht? Ihr steht trotzdem nicht ohne DJ da.","text":"Wenn ich an eurem Termin keine Zeit habe – oder merke, dass ich nicht der richtige DJ für eure Feier bin – schlage ich euch bis zu fünf Kollegen vor, die wirklich zu euch passen. Das läuft über meine Partner-Agentur DJ Bande aus Münster. Wichtig: Die Preise auf dieser Seite gelten nur für mich selbst – vermittelte Kollegen kalkulieren eigenständig, ihre Konditionen können abweichen. Und Transparenz gehört dazu: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision (Details in den AGB)."}'],
     ['rental', '{"title":"Technik mieten","text":"Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung."}'],
