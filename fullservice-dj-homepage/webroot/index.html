@@ -252,6 +252,7 @@ footer a:hover{color:var(--acc)}
     </div>
     <div class="ex-grid" id="exGrid"></div>
     <p class="ex-note reveal">Wichtig: Das sind <b style="color:var(--txt)">Preisbeispiele aus echten Feiern</b>, damit ihr vorab einschätzen könnt, in welchem Bereich ihr unterwegs seid – keine festen Pakete. Euer Angebot wird immer individuell nach Stunden und Technikaufwand kalkuliert.</p>
+    <div class="ex-grid" id="spGrid" style="margin-top:26px"></div>
   </div>
 </section>
 
@@ -391,6 +392,16 @@ function renderExamples(list){
   }).join('');
 }
 renderExamples(EXAMPLES);
+var SPECIALS=[
+  {title:'Tagsüber feiern?',text:'Für Veranstaltungen am Tag – z. B. Empfänge, Brunch oder Firmenevents am Vormittag und Nachmittag – gibt es Sonderkonditionen. Einfach im Formular erwähnen.'},
+  {title:'Unter der Woche?',text:'Montag bis Donnerstag ist meine Auslastung geringer – das gebe ich als Sonderkondition gerne an euch weiter. Fragt einfach mit eurem Wunschtermin an.'}
+];
+function renderSpecials(list){
+  document.getElementById('spGrid').innerHTML=list.map(function(s){
+    return '<div class="ex reveal vis" style="border-color:rgba(255,111,91,.35)"><div class="xk" style="color:var(--acc)">Sonderkondition</div><h4>'+esc(s.title)+'</h4><p style="margin-bottom:0">'+esc(s.text||'')+'</p></div>';
+  }).join('');
+}
+renderSpecials(SPECIALS);
 
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
@@ -444,6 +455,7 @@ function applyContent(rows){
     if(c.prices.from)document.getElementById('priceFrom').textContent=euro(c.prices.from);
     if(c.prices.text)document.getElementById('priceText').textContent=c.prices.text;
     if(c.prices.examples&&c.prices.examples.length)renderExamples(c.prices.examples);
+    if(c.prices.specials&&c.prices.specials.length)renderSpecials(c.prices.specials);
   }
   if(c.tech_teaser){
     if(c.tech_teaser.title)document.getElementById('rentTitle').textContent=c.tech_teaser.title;
