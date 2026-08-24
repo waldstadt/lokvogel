@@ -148,7 +148,16 @@ function seed(PDO $p): void {
     ['hero', '{"title":"DJ Lauschgift","subtitle":"DJ für Hochzeiten, Geburtstage & Firmenfeiern","text":"Ich bin Markus – seit 23 Jahren DJ für Hochzeiten, Geburtstage und Firmenfeiern. Keine Show um meine Person, kein Programm von der Stange: Ich lese den Raum und spiele das, was eure Gäste auf die Tanzfläche bringt.","cta":"Unverbindlich anfragen","image":""}'],
     ['about', '{"title":"Musik ist mein Ding. Der Mittelpunkt gehört euch.","text":"Nach 23 Jahren hinter den Decks ist jede Feier immer noch anders – und genau das macht es aus. Ich bin kein DJ, der sich selbst inszeniert: Ich lese den Raum, spiele den richtigen Song zur richtigen Zeit und bleibe den ganzen Abend ansprechbar für euch und eure Gäste. Und weil ich ein echter Technik-Mensch bin, stehen Ton und Licht bei mir auf einem Niveau, das man sonst von deutlich größeren Produktionen kennt.","image":""}'],
     ['services', '{"title":"Das bekommt ihr","text":"Vom Sektempfang bis zum letzten Song: Musik, Ton für die freie Trauung, dezentes Licht passend zur Location – und ein Plan B für alle Fälle. Ihr feiert, ich kümmere mich um den Rest.","image":""}'],
-    ['prices', '{"title":"Was kostet das?","text":"Ob Hochzeit, Geburtstag oder Firmenfeier, spielt für den Preis keine Rolle – bei mir zahlt niemand einen „Hochzeitsaufschlag“. Ich rechne nach Auslastung, Arbeitsstunden und Technikaufwand. Ihr bekommt ein individuelles Angebot mit klaren Posten, zugeschnitten auf eure Feier.","from":1200}'],
+    ['prices', json_encode([
+      'title' => 'Was kostet das?',
+      'text' => 'Ob Hochzeit, Geburtstag oder Firmenfeier, spielt für den Preis keine Rolle – bei mir zahlt niemand einen „Hochzeitsaufschlag“. Ich rechne nach Auslastung, Arbeitsstunden und Technikaufwand. Ihr bekommt ein individuelles Angebot mit klaren Posten, zugeschnitten auf eure Feier.',
+      'from' => 1200,
+      'examples' => [
+        ['title' => 'Hochzeit', 'scope' => 'Sektempfang bis offenes Ende, Ton für die freie Trauung, dezentes Licht', 'price' => 'ca. 1.550 €'],
+        ['title' => 'Geburtstag', 'scope' => 'Abendparty ca. 6 Stunden, kompakte Ton- und Lichttechnik', 'price' => 'ca. 1.000 €'],
+        ['title' => 'Firmenfeier', 'scope' => 'Empfang, Reden-Ton und Party bis Mitternacht', 'price' => 'ca. 1.350 €'],
+      ],
+    ], JSON_UNESCAPED_UNICODE)],
     ['guarantee', '{"title":"Schon ausgebucht? Ihr steht trotzdem nicht ohne DJ da.","text":"Wenn ich an eurem Termin keine Zeit habe – oder merke, dass ich nicht der richtige DJ für eure Feier bin – schlage ich euch bis zu fünf Kollegen vor, die wirklich zu euch passen. Das läuft über meine Partner-Agentur DJ Bande aus Münster. Transparenz gehört dazu: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision (Details in den AGB)."}'],
     ['rental', '{"title":"Technik mieten – direkt aus Hemer","text":"Profi-Ton und -Licht aus meinem Lager in Hemer – von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko. Auf Wunsch mit Aufbau."}'],
     ['contact', '{"title":"Kontakt","phone":"01523 6439373","email":"","address":"Büttmecker Weg 35c, 58675 Hemer","instagram":"","whatsapp":""}'],
