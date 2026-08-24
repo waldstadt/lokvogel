@@ -340,6 +340,14 @@ th.num{text-align:right}
           <label>Überschrift</label><input id="cGTitle">
           <label>Text</label><textarea id="cGText" style="min-height:90px"></textarea>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('guarantee')">Speichern</button></div></div>
+        <div class="card"><h3>Technik-Seite (technik.html)</h3>
+          <label>Hero-Unterzeile</label><input id="cThSub">
+          <label>Hero-Text</label><textarea id="cThText"></textarea>
+          <label>Mietpark-Titel</label><input id="cThRentTitle">
+          <label>Mietpark-Text</label><textarea id="cThRentText" style="min-height:46px"></textarea>
+          <label>Teaser auf der DJ-Seite (Titel)</label><input id="cThTeaTitle">
+          <label>Teaser auf der DJ-Seite (Text)</label><textarea id="cThTeaText" style="min-height:46px"></textarea>
+          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('tech')">Speichern</button></div></div>
         <div class="card"><h3>Kontaktdaten (öffentlich)</h3>
           <label>Telefon</label><input id="cCtPhone">
           <label>E-Mail</label><input id="cCtMail">
@@ -1202,6 +1210,12 @@ function renderCms(){
   document.getElementById('cCtAddr').value=g('contact','address');
   document.getElementById('cSeoTitle').value=g('seo','title');
   document.getElementById('cSeoDesc').value=g('seo','description');
+  document.getElementById('cThSub').value=g('tech_hero','subtitle');
+  document.getElementById('cThText').value=g('tech_hero','text');
+  document.getElementById('cThRentTitle').value=g('rental','title');
+  document.getElementById('cThRentText').value=g('rental','text');
+  document.getElementById('cThTeaTitle').value=g('tech_teaser','title');
+  document.getElementById('cThTeaText').value=g('tech_teaser','text');
   document.getElementById('cGTitle').value=g('guarantee','title');
   document.getElementById('cGText').value=g('guarantee','text');
   document.getElementById('cLegImp').value=g('legal','impressum');
@@ -1238,6 +1252,12 @@ function saveContent(key){
   if(key==='contact')val={title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
   if(key==='seo')val={title:v('cSeoTitle'),description:v('cSeoDesc')};
   if(key==='guarantee')val={title:v('cGTitle'),text:v('cGText')};
+  if(key==='tech'){
+    upsertContent('tech_hero',{subtitle:v('cThSub'),text:v('cThText')});
+    upsertContent('rental',{title:v('cThRentTitle'),text:v('cThRentText')});
+    upsertContent('tech_teaser',{title:v('cThTeaTitle'),text:v('cThTeaText')});
+    return;
+  }
   if(key==='legal')val={impressum:document.getElementById('cLegImp').value,datenschutz:document.getElementById('cLegDs').value,agb:document.getElementById('cLegAgb').value};
   upsertContent(key,val);
 }
