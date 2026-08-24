@@ -33,18 +33,18 @@ const JSON_COLS = [
   'packages' => ['features'], 'customers' => ['tags'],
 ];
 const BOOL_COLS = [
-  'packages' => ['public'], 'faq' => ['public'],
+  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'],
   'equipment' => ['public','rentable'],
   'booking_equipment' => ['out_done','back_done'],
   'communications' => ['followup_done'],
   'documents' => ['is_small_business'],
 ];
-const TABLES = ['settings','site_content','packages','faq','equipment','inquiries',
+const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
-const PUBLIC_READ   = ['site_content','packages','faq','equipment'];
+const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations'];
 const INQUIRY_FIELDS = ['name','email','phone','event_type','event_date','location','guests','message'];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -94,6 +94,9 @@ create table equipment (id text primary key, sort integer default 0, name text n
   category text, description text, image_url text, day_rate real default 0, followup_pct integer default 50,
   qty_total integer default 1, rentable integer default 1, public integer default 1,
   status text default 'aktiv', notes text, created_at text);
+create table locations (id text primary key, sort integer default 0, name text not null,
+  city text, region text, description text, image_url text, website text,
+  public integer default 1, created_at text);
 create table inquiries (id text primary key, name text not null, email text, phone text,
   event_type text, event_date text, location text, guests text, message text,
   status text default 'neu', customer_id text, created_at text);
@@ -192,6 +195,11 @@ function seed(PDO $p): void {
 
   $ins('equipment', ['sort'=>1,'name'=>'Nebelmaschine klein','slug'=>'nebelmaschine-klein','category'=>'Effekt',
     'description'=>'Kompakte Nebelmaschine inkl. Fluid – ideal für Partykeller und kleine Räume.','day_rate'=>25,'qty_total'=>1]);
+
+  /* Beispiel-Location als Vorlage — erst nach Bearbeitung auf 'öffentlich' stellen */
+  $ins('locations', ['sort'=>1,'name'=>'Beispiel-Location (bitte ersetzen)','city'=>'Musterstadt','region'=>'NRW',
+    'description'=>'Kurz beschreiben, warum du dort so gerne auflegst und was das Team besonders gut macht.',
+    'website'=>'','public'=>0]);
 }
 
 /* ---------- Auth ---------- */

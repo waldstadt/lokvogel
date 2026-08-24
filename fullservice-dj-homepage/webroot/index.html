@@ -281,6 +281,17 @@ footer a:hover{color:var(--acc)}
   </div>
 </section>
 
+<section id="locations" style="display:none">
+  <div class="wrap">
+    <div class="reveal vis">
+      <div class="kicker">Location-Empfehlungen</div>
+      <h2 id="locTitle">Orte, an denen ich besonders gerne auflege</h2>
+      <p class="lead" id="locText">Deutschlandweit gibt es Locations, mit denen die Zusammenarbeit einfach herausragend läuft – eingespielte Teams, gute Technik-Bedingungen, tolle Räume. Diese Häuser empfehle ich aus voller Überzeugung.</p>
+    </div>
+    <div class="rent-grid" id="locGrid"></div>
+  </div>
+</section>
+
 <section id="faq">
   <div class="wrap">
     <div class="reveal">
@@ -484,6 +495,20 @@ function closeLegal(){document.getElementById('legalBg').style.display='none';do
 sfetch('site_content?select=key,value').then(applyContent).catch(function(){});
 sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderPacks(r)}).catch(function(){});
 sfetch('faq?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderFaq(r)}).catch(function(){});
+sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
+  if(!r.length)return;
+  document.getElementById('locGrid').innerHTML=r.map(function(l){
+    var img=l.image_url?' style="background-image:url(\''+esc(l.image_url)+'\')"':'';
+    var icon=l.image_url?'':'📍';
+    var meta=[l.city,l.region].filter(Boolean).join(' · ');
+    return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
+      (meta?'<div class="rc">'+esc(meta)+'</div>':'')+
+      '<h4>'+esc(l.name)+'</h4><p>'+esc(l.description||'')+'</p>'+
+      (l.website?'<a href="'+esc(l.website)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600">Zur Location ↗</a>':'')+
+      '</div></div>';
+  }).join('');
+  document.getElementById('locations').style.display='';
+}).catch(function(){});
 
 /* ===== Anfrage-Formular ===== */
 document.getElementById('inqForm').addEventListener('submit',function(ev){
