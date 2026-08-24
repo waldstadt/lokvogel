@@ -409,10 +409,9 @@ th.num{text-align:right}
 
 <script>
 /* ============================================================
-   Konfiguration — nach Supabase-Setup eintragen (wie index.html)
+   Backend: api.php liegt im selben Verzeichnis (SQLite, self-hosted)
    ============================================================ */
-var SUPA_URL='';
-var SUPA_KEY='';
+var API='api.php';
 
 /* ===== Basis ===== */
 var TOKEN=null,S={},CACHE={};
@@ -425,9 +424,9 @@ function custName(c){if(!c)return '–';return c.company?c.company+(c.last_name?
 
 function api(path,opts){
   opts=opts||{};
-  var h={apikey:SUPA_KEY,Authorization:'Bearer '+(TOKEN||SUPA_KEY),'Content-Type':'application/json'};
+  var h={Authorization:'Bearer '+(TOKEN||''),'Content-Type':'application/json'};
   if(opts.prefer)h.Prefer=opts.prefer;
-  return fetch(SUPA_URL+'/rest/v1/'+path,{method:opts.method||'GET',headers:h,body:opts.body?JSON.stringify(opts.body):undefined})
+  return fetch(API+'/rest/'+path,{method:opts.method||'GET',headers:h,body:opts.body?JSON.stringify(opts.body):undefined})
     .then(function(r){
       if(r.status===401){logout();throw new Error('Sitzung abgelaufen – bitte neu anmelden.')}
       if(!r.ok)return r.text().then(function(t){throw new Error(t||('HTTP '+r.status))});
@@ -438,18 +437,21 @@ function api(path,opts){
 /* ===== Auth ===== */
 document.getElementById('loginForm').addEventListener('submit',function(e){
   e.preventDefault();
-  if(!SUPA_URL||!SUPA_KEY){showErr('Supabase ist noch nicht konfiguriert (SUPA_URL/SUPA_KEY in admin.html eintragen).');return}
-  fetch(SUPA_URL+'/auth/v1/token?grant_type=password',{
-    method:'POST',headers:{apikey:SUPA_KEY,'Content-Type':'application/json'},
+  fetch(API+'/auth/login',{
+    method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({email:document.getElementById('liEmail').value,password:document.getElementById('liPass').value})
   }).then(function(r){return r.json()}).then(function(j){
-    if(j.access_token){TOKEN=j.access_token;sessionStorage.setItem('lg_tok',TOKEN);enter()}
-    else showErr(j.error_description||j.msg||'Anmeldung fehlgeschlagen.');
+    if(j.access_token){
+      TOKEN=j.access_token;sessionStorage.setItem('lg_tok',TOKEN);
+      if(j.first_run)setTimeout(function(){toast('Willkommen! Dein Admin-Konto wurde angelegt. ✓')},600);
+      enter();
+    }
+    else showErr(j.error||'Anmeldung fehlgeschlagen.');
   }).catch(function(err){showErr(err.message)});
 });
 function showErr(m){var e=document.getElementById('liErr');e.textContent=m;e.style.display='block'}
 function logout(){TOKEN=null;sessionStorage.removeItem('lg_tok');document.getElementById('appView').classList.remove('v');document.getElementById('loginView').style.display='flex'}
-if(!SUPA_URL)document.getElementById('liHint').textContent='Hinweis: Supabase-Projekt anlegen, schema.sql ausführen, dann SUPA_URL & SUPA_KEY in dieser Datei eintragen und einen Nutzer unter Authentication → Users anlegen.';
+document.getElementById('liHint').textContent='Erste Anmeldung? Einfach Wunsch-E-Mail und Passwort (min. 8 Zeichen) eingeben – das Admin-Konto wird dabei angelegt.';
 
 function enter(){
   document.getElementById('loginView').style.display='none';
@@ -457,7 +459,7 @@ function enter(){
   loadAll();
 }
 var saved=sessionStorage.getItem('lg_tok');
-if(saved&&SUPA_URL){TOKEN=saved;enter()}
+if(saved){TOKEN=saved;enter()}
 
 /* ===== Navigation ===== */
 document.querySelectorAll('#nav a').forEach(function(a){a.addEventListener('click',function(){showPage(a.dataset.pg)})});
@@ -1224,11 +1226,13 @@ function upsertContent(key,val){
 function uploadImg(inp,targetId){
   var f=inp.files[0];if(!f)return;
   var name=Date.now()+'-'+f.name.toLowerCase().replace(/[^a-z0-9.]+/g,'-');
-  fetch(SUPA_URL+'/storage/v1/object/media/'+name,{
-    method:'POST',headers:{apikey:SUPA_KEY,Authorization:'Bearer '+TOKEN,'Content-Type':f.type},body:f
+  fetch(API+'/storage/'+encodeURIComponent(name),{
+    method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:f
   }).then(function(r){
     if(!r.ok)throw new Error('Upload fehlgeschlagen ('+r.status+')');
-    document.getElementById(targetId).value=SUPA_URL+'/storage/v1/object/public/media/'+name;
+    return r.json();
+  }).then(function(j){
+    document.getElementById(targetId).value=j.url;
     toast('Bild hochgeladen ✓ — jetzt Speichern klicken.');
   }).catch(function(e){toast(e.message,1)});
   inp.value='';

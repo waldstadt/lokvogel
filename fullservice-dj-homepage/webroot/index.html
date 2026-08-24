@@ -277,9 +277,8 @@ footer a:hover{color:var(--acc)}
 </footer>
 
 <script>
-/* ===== Supabase-Konfiguration: nach dem Setup eintragen ===== */
-var SUPA_URL='';           // z.B. https://xxxx.supabase.co
-var SUPA_KEY='';           // publishable / anon key
+/* ===== Backend: api.php liegt im selben Verzeichnis ===== */
+var API='api.php';
 
 document.getElementById('year').textContent=new Date().getFullYear();
 
@@ -343,9 +342,9 @@ function renderFaq(list){
 }
 renderPacks(FALLBACK.packages);renderRent(FALLBACK.equipment);renderFaq(FALLBACK.faq);
 
-/* ===== Supabase laden (überschreibt Fallbacks) ===== */
+/* ===== Inhalte vom Server laden (überschreibt Fallbacks) ===== */
 function sfetch(path){
-  return fetch(SUPA_URL+'/rest/v1/'+path,{headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY}})
+  return fetch(API+'/rest/'+path)
     .then(function(r){if(!r.ok)throw new Error(r.status);return r.json()});
 }
 function applyContent(rows){
@@ -390,12 +389,10 @@ function applyContent(rows){
     if(c.seo.description){var m=document.querySelector('meta[name=description]');if(m)m.content=c.seo.description}
   }
 }
-if(SUPA_URL&&SUPA_KEY){
-  sfetch('site_content?select=key,value').then(applyContent).catch(function(){});
-  sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderPacks(r)}).catch(function(){});
-  sfetch('equipment?select=*&public=eq.true&rentable=eq.true&status=eq.aktiv&order=sort').then(function(r){if(r.length)renderRent(r)}).catch(function(){});
-  sfetch('faq?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderFaq(r)}).catch(function(){});
-}
+sfetch('site_content?select=key,value').then(applyContent).catch(function(){});
+sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderPacks(r)}).catch(function(){});
+sfetch('equipment?select=*&public=eq.true&rentable=eq.true&status=eq.aktiv&order=sort').then(function(r){if(r.length)renderRent(r)}).catch(function(){});
+sfetch('faq?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderFaq(r)}).catch(function(){});
 
 /* ===== Anfrage-Formular ===== */
 document.getElementById('inqForm').addEventListener('submit',function(ev){
@@ -407,15 +404,10 @@ document.getElementById('inqForm').addEventListener('submit',function(ev){
     location:f.location.value.trim(),message:f.message.value.trim()
   };
   if(!data.name||!data.email){msg.className='form-msg err';msg.textContent='Bitte Name und E-Mail angeben.';return}
-  if(!SUPA_URL||!SUPA_KEY){
-    msg.className='form-msg err';
-    msg.textContent='Das Formular ist noch nicht angebunden – bitte ruft mich direkt an: '+document.getElementById('cPhone').textContent;
-    return;
-  }
   btn.disabled=true;btn.textContent='Wird gesendet …';
-  fetch(SUPA_URL+'/rest/v1/inquiries',{
+  fetch(API+'/rest/inquiries',{
     method:'POST',
-    headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY,'Content-Type':'application/json',Prefer:'return=minimal'},
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify(data)
   }).then(function(r){
     if(!r.ok)throw new Error('HTTP '+r.status);
