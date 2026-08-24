@@ -334,6 +334,10 @@ th.num{text-align:right}
           <label>„ab“-Preis (€)</label><input type="number" id="cPriceFrom">
           <label>Text</label><textarea id="cPriceText"></textarea>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('prices')">Speichern</button></div></div>
+        <div class="card"><h3>Garantie / DJ-Vermittlung</h3>
+          <label>Überschrift</label><input id="cGTitle">
+          <label>Text</label><textarea id="cGText" style="min-height:90px"></textarea>
+          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('guarantee')">Speichern</button></div></div>
         <div class="card"><h3>Kontaktdaten (öffentlich)</h3>
           <label>Telefon</label><input id="cCtPhone">
           <label>E-Mail</label><input id="cCtMail">
@@ -347,6 +351,11 @@ th.num{text-align:right}
           <label>Seitentitel</label><input id="cSeoTitle">
           <label>Beschreibung</label><textarea id="cSeoDesc" style="min-height:46px"></textarea>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('seo')">Speichern</button></div></div>
+        <div class="card"><h3>Rechtstexte</h3>
+          <label>Impressum</label><textarea id="cLegImp" style="min-height:90px"></textarea>
+          <label>Datenschutzerklärung</label><textarea id="cLegDs" style="min-height:90px"></textarea>
+          <label>AGB (inkl. Vermittlungsklausel DJ Bande)</label><textarea id="cLegAgb" style="min-height:90px"></textarea>
+          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('legal')">Speichern</button></div></div>
       </div>
     </div>
   </div>
@@ -1190,6 +1199,11 @@ function renderCms(){
   document.getElementById('cCtAddr').value=g('contact','address');
   document.getElementById('cSeoTitle').value=g('seo','title');
   document.getElementById('cSeoDesc').value=g('seo','description');
+  document.getElementById('cGTitle').value=g('guarantee','title');
+  document.getElementById('cGText').value=g('guarantee','text');
+  document.getElementById('cLegImp').value=g('legal','impressum');
+  document.getElementById('cLegDs').value=g('legal','datenschutz');
+  document.getElementById('cLegAgb').value=g('legal','agb');
   var th=c.theme||{};
   document.getElementById('thPrimary').value=th.primary||'#c9a227';
   document.getElementById('thBg').value=th.bg||'#0d0d0f';
@@ -1216,6 +1230,8 @@ function saveContent(key){
   if(key==='prices')val={title:'Preise',from:Number(v('cPriceFrom'))||null,text:v('cPriceText')};
   if(key==='contact')val={title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
   if(key==='seo')val={title:v('cSeoTitle'),description:v('cSeoDesc')};
+  if(key==='guarantee')val={title:v('cGTitle'),text:v('cGText')};
+  if(key==='legal')val={impressum:document.getElementById('cLegImp').value,datenschutz:document.getElementById('cLegDs').value,agb:document.getElementById('cLegAgb').value};
   upsertContent(key,val);
 }
 function upsertContent(key,val){

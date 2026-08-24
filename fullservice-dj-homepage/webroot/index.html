@@ -191,7 +191,7 @@ footer a:hover{color:var(--acc)}
   <div class="wrap">
     <div class="reveal">
       <div class="kicker">Leistungen</div>
-      <h2 id="servTitle">Was ich für euch tue</h2>
+      <h2 id="servTitle">Das bekommt ihr</h2>
       <p class="lead" id="servText">Vom Sektempfang bis zum letzten Song: Musik, Ton für die freie Trauung, dezentes Licht passend zur Location – und ein Plan B für alle Fälle. Ihr feiert, ich kümmere mich um den Rest.</p>
     </div>
     <div class="pack-grid" id="packGrid"></div>
@@ -234,9 +234,21 @@ footer a:hover{color:var(--acc)}
     <div class="price-strip reveal">
       <div>
         <h3>Eine Feier mit mir beginnt bei <span style="color:var(--acc)" id="priceFrom">1.200&nbsp;€</span></h3>
-        <p id="priceText">Nach oben entscheiden Dauer, Location und Technikumfang – nicht mein Tagesgefühl. Ihr bekommt ein individuelles Angebot mit konkreten Vorschlägen zu Dauer und Equipment, zugeschnitten auf eure Feier.</p>
+        <p id="priceText">Ob Hochzeit, Geburtstag oder Firmenfeier, spielt für den Preis keine Rolle – bei mir zahlt niemand einen „Hochzeitsaufschlag“. Ich rechne nach Auslastung, Arbeitsstunden und Technikaufwand. Ihr bekommt ein individuelles Angebot mit klaren Posten, zugeschnitten auf eure Feier.</p>
       </div>
       <a href="#anfrage" class="btn">Angebot anfragen</a>
+    </div>
+  </div>
+</section>
+
+<section id="garantie">
+  <div class="wrap">
+    <div class="price-strip reveal" style="background:linear-gradient(120deg,rgba(255,111,91,.06),transparent 55%),var(--card)">
+      <div>
+        <div class="kicker" style="margin-bottom:10px">Die Lauschgift-Garantie</div>
+        <h3 id="gTitle">Schon ausgebucht? Ihr steht trotzdem nicht ohne DJ da.</h3>
+        <p id="gText">Wenn ich an eurem Termin keine Zeit habe – oder merke, dass ich nicht der richtige DJ für eure Feier bin – schlage ich euch bis zu fünf Kollegen vor, die wirklich zu euch passen. Das läuft über meine Partner-Agentur DJ Bande aus Münster. Transparenz gehört dazu: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision (Details in den AGB).</p>
+      </div>
     </div>
   </div>
 </section>
@@ -310,9 +322,19 @@ footer a:hover{color:var(--acc)}
       <span class="wm" style="font-size:16px">lauschgift<i>.</i></span>
     </a>
     <div>© <span id="year"></span> Markus Jankowski · Hemer</div>
-    <div><a href="#" onclick="alert('Impressum wird im Backoffice gepflegt.');return false">Impressum</a> &nbsp;·&nbsp; <a href="#" onclick="alert('Datenschutzerklärung wird im Backoffice gepflegt.');return false">Datenschutz</a></div>
+    <div><a onclick="openLegal('impressum')">Impressum</a> &nbsp;·&nbsp; <a onclick="openLegal('datenschutz')">Datenschutz</a> &nbsp;·&nbsp; <a onclick="openLegal('agb')">AGB</a></div>
   </div>
 </footer>
+
+<div id="legalBg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;overflow-y:auto;padding:40px 16px" onclick="if(event.target===this)closeLegal()">
+  <div style="max-width:760px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:36px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h3 class="gro" id="legalTitle" style="font-size:22px"></h3>
+      <button onclick="closeLegal()" style="background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer">✕</button>
+    </div>
+    <div id="legalBody" style="white-space:pre-wrap;font-size:14px;color:var(--mut);line-height:1.75"></div>
+  </div>
+</div>
 
 <script>
 /* ===== Backend: api.php liegt im selben Verzeichnis ===== */
@@ -330,9 +352,9 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
 /* ===== Fallback-Inhalte (werden vom Server überschrieben) ===== */
 var FALLBACK={
   packages:[
-    {title:'Hochzeit',subtitle:'Vom Sektempfang bis zum letzten Song',price_from:1200,price_note:'ab',features:['Kennenlerngespräch & Musikplanung','Ton für die freie Trauung','Dezentes Licht passend zur Location','Plan B & Backup-Technik inklusive']},
-    {title:'Geburtstag & private Feier',subtitle:'Eure Party, euer Sound',price_from:900,price_note:'ab',features:['Musik nach euren Wünschen','Profi-PA (Seeburg Acoustic Line)','Licht, das zur Stimmung passt']},
-    {title:'Firmenfeier',subtitle:'Vom Empfang bis zur Party souverän',price_from:1200,price_note:'ab',features:['Hintergrundmusik & Partyprogramm','Mikrofon & Ton für Reden','Enge Abstimmung mit eurer Planung']}
+    {title:'Hochzeit',subtitle:'Vom Sektempfang bis zum letzten Song',features:['Kennenlerngespräch & Musikplanung','Ton für die freie Trauung','Dezentes Licht passend zur Location','Plan B & Backup-Technik inklusive']},
+    {title:'Geburtstag & private Feier',subtitle:'Eure Party, euer Sound',features:['Musik nach euren Wünschen','Profi-PA (Seeburg Acoustic Line)','Licht, das zur Stimmung passt']},
+    {title:'Firmenfeier',subtitle:'Vom Empfang bis zur Party souverän',features:['Hintergrundmusik & Partyprogramm','Mikrofon & Ton für Reden','Enge Abstimmung mit eurer Planung']}
   ],
   equipment:[
     {name:'Nebelmaschine klein',category:'Effekt',description:'Kompakte Nebelmaschine inkl. Fluid – ideal für kleine Räume.',day_rate:25}
@@ -341,9 +363,11 @@ var FALLBACK={
     {question:'Spielst du Musikwünsche?',answer:'Ja, klar – Wünsche von euch und euren Gästen gehören dazu. Vorab besprechen wir, was auf jeden Fall laufen soll und was gar nicht.'},
     {question:'Wie läuft die Buchung ab?',answer:'Anfrage über das Formular oder telefonisch, dann ein kurzes Kennenlerngespräch, ein klares Angebot – und mit eurer Bestätigung ist der Termin fest reserviert.'},
     {question:'Was passiert, wenn du krank wirst?',answer:'Dafür gibt es den Plan B: ein Netzwerk erfahrener Kollegen, die mit meinen Unterlagen und eurer Musikvorbereitung einspringen können. Eure Feier findet statt.'},
-    {question:'Wie lange brauchst du für den Aufbau?',answer:'Je nach Technikumfang 60 bis 120 Minuten. Aufgebaut wird, bevor eure Gäste kommen – versprochen.'}
+    {question:'Wie lange brauchst du für den Aufbau?',answer:'Je nach Technikumfang 60 bis 120 Minuten. Aufgebaut wird, bevor eure Gäste kommen – versprochen.'},
+    {question:'Was ist, wenn du an unserem Termin schon ausgebucht bist?',answer:'Dann lasse ich euch nicht hängen: Über meine Partner-Agentur DJ Bande aus Münster schlage ich euch bis zu fünf Kollegen vor, die zu eurer Feier passen. Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision – das steht so auch transparent in den AGB.'}
   ]
 };
+var LEGAL={};
 
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
@@ -423,11 +447,24 @@ function applyContent(rows){
     document.documentElement.style.setProperty('--acc',c.theme.primary);
     if(c.theme.bg)document.documentElement.style.setProperty('--bg',c.theme.bg);
   }
+  if(c.guarantee){
+    if(c.guarantee.title)document.getElementById('gTitle').textContent=c.guarantee.title;
+    if(c.guarantee.text)document.getElementById('gText').textContent=c.guarantee.text;
+  }
+  if(c.legal)LEGAL=c.legal;
   if(c.seo){
     if(c.seo.title)document.title=c.seo.title;
     if(c.seo.description){var m=document.querySelector('meta[name=description]');if(m)m.content=c.seo.description}
   }
 }
+var LEGAL_TITLES={impressum:'Impressum',datenschutz:'Datenschutzerklärung',agb:'AGB'};
+function openLegal(key){
+  document.getElementById('legalTitle').textContent=LEGAL_TITLES[key]||key;
+  document.getElementById('legalBody').textContent=LEGAL[key]||'Dieser Text wird gerade überarbeitet. Bei Fragen ruft mich gerne direkt an.';
+  document.getElementById('legalBg').style.display='block';
+  document.body.style.overflow='hidden';
+}
+function closeLegal(){document.getElementById('legalBg').style.display='none';document.body.style.overflow=''}
 sfetch('site_content?select=key,value').then(applyContent).catch(function(){});
 sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderPacks(r)}).catch(function(){});
 sfetch('equipment?select=*&public=eq.true&rentable=eq.true&status=eq.aktiv&order=sort').then(function(r){if(r.length)renderRent(r)}).catch(function(){});
