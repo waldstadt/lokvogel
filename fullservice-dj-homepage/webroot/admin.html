@@ -404,6 +404,9 @@ th.num{text-align:right}
         <div class="card"><h3>Leistungspakete <button class="btn sm" style="float:right" onclick="openPackModal()">+ Paket</button></h3><div id="packList" class="sml"></div></div>
         <div class="card"><h3>FAQ <button class="btn sm" style="float:right" onclick="openFaqModal()">+ Frage</button></h3><div id="faqAdminList" class="sml"></div></div>
         <div class="card"><h3>Location-Empfehlungen <button class="btn sm" style="float:right" onclick="openLocModal()">+ Location</button></h3><div id="locAdminList" class="sml"></div></div>
+        <div class="card"><h3>Freunde &amp; Empfehlungen <button class="btn sm" style="float:right" onclick="openFriendModal()">+ Empfehlung</button></h3>
+          <div class="mut sml" style="margin-bottom:8px">Fotografen, Musiker, Planer, Kollegen — erscheinen auf der DJ-Homepage. Gegenseitige Verlinkung hilft beim Google-Ranking.</div>
+          <div id="friendAdminList" class="sml"></div></div>
         <div class="card"><h3>Bewertungen <button class="btn sm" style="float:right" onclick="openRevModal()">+ Bewertung</button></h3>
           <label>Google-Bewertungslink (am besten der „Rezension schreiben“-Link — wird auch in Mails verwendet)</label><input id="cRevGoogle" placeholder="https://g.page/r/…">
           <label>DJ-Bande-Profil (URL, nur zum Lesen verlinkt — Bewertungen sammelt die Agentur selbst)</label><input id="cRevBande" placeholder="https://www.dj-bande.de/…">
@@ -1799,7 +1802,7 @@ function renderCms(){
   document.getElementById('themeRow').innerHTML=THEMES.map(function(t){
     return '<span class="theme-sw'+(th.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+t.n+'" onclick="pickTheme(\''+t.n+'\')"></span>';
   }).join('')+'<span class="sml mut" style="margin-left:8px">Preset wählen oder Farben frei einstellen</span>';
-  renderPackAdmin();renderFaqAdmin();reloadLocs();
+  renderPackAdmin();renderFaqAdmin();reloadLocs();reloadFriends();
 }
 function pickTheme(name){
   var t=THEMES.find(function(x){return x.n===name});
@@ -1932,6 +1935,33 @@ function saveLoc(id){
     .then(function(){closeModal();toast('Gespeichert ✓');reloadLocs()}).catch(function(e){toast(e.message,1)});
 }
 function reloadLocs(){api('locations?select=*&order=sort').then(function(r){CACHE.locations=r||[];renderLocAdmin()})}
+function renderFriendAdmin(){
+  document.getElementById('friendAdminList').innerHTML=(CACHE.friends||[]).map(function(f){
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openFriendModal(\''+f.id+'\')">'+esc(f.name)+'</a> '+
+    (f.category?'<span class="mut">'+esc(f.category)+'</span> ':'')+
+    (f.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</div>';
+  }).join('')||'<span class="mut">Noch keine Empfehlungen.</span>';
+}
+function openFriendModal(id){
+  var f=id?(CACHE.friends||[]).find(function(x){return x.id===id}):{};f=f||{};
+  openModal(id?'Empfehlung bearbeiten':'Neue Empfehlung',
+    '<div class="grid2"><div><label>Name *</label><input id="frName" value="'+esc(f.name||'')+'"></div>'+
+    '<div><label>Kategorie</label><input id="frCat" value="'+esc(f.category||'')+'" placeholder="z. B. Fotografie, Sängerin, Hochzeitsplanung"></div></div>'+
+    '<label>Warum empfehle ich sie/ihn? (kurz)</label><textarea id="frDesc">'+esc(f.description||'')+'</textarea>'+
+    '<div class="grid2"><div><label>Website</label><input id="frWeb" value="'+esc(f.website||'')+'" placeholder="https://…"></div>'+
+    '<div><label>Sortierung</label><input type="number" id="frSort" value="'+(f.sort||0)+'"></div></div>'+
+    '<label style="margin-top:12px"><input type="checkbox" id="frPub" style="width:auto;margin-right:6px" '+(f.public!==false&&f.public!==0?'checked':'')+'>Auf Homepage anzeigen</label>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveFriend(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delRow(\'friends\',\''+id+'\',reloadFriends)">Löschen</button>':'')+'</div>');
+}
+function saveFriend(id){
+  if(!v('frName')){toast('Name fehlt.',1);return}
+  var body={name:v('frName'),category:v('frCat'),description:v('frDesc'),website:v('frWeb'),
+    sort:Number(v('frSort'))||0,public:document.getElementById('frPub').checked};
+  (id?api('friends?id=eq.'+id,{method:'PATCH',body:body}):api('friends',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Gespeichert ✓');reloadFriends()}).catch(function(e){toast(e.message,1)});
+}
+function reloadFriends(){api('friends?select=*&order=sort').then(function(r){CACHE.friends=r||[];renderFriendAdmin()})}
 function renderCmsReload(){
   Promise.all([api('packages?select=*&order=sort'),api('faq?select=*&order=sort')]).then(function(r){
     CACHE.packages=r[0]||[];CACHE.faq=r[1]||[];renderPackAdmin();renderFaqAdmin()});

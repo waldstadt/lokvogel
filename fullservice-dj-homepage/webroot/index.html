@@ -315,6 +315,17 @@ footer a:hover{color:var(--acc)}
   </div>
 </section>
 
+<section id="freunde" style="display:none">
+  <div class="wrap">
+    <div class="reveal vis">
+      <div class="kicker">Freunde &amp; Empfehlungen</div>
+      <h2>Leute, für die ich meine Hand ins Feuer lege</h2>
+      <p class="lead">Fotografie, Musik, Planung, Technik – mit diesen Menschen arbeite ich seit Jahren zusammen. Wenn ihr noch jemanden sucht: Hier werdet ihr gut behandelt.</p>
+    </div>
+    <div class="rent-grid" id="friendGrid"></div>
+  </div>
+</section>
+
 <section id="faq">
   <div class="wrap">
     <div class="reveal">
@@ -553,6 +564,17 @@ sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
       '</div></div>';
   }).join('');
   document.getElementById('locations').style.display='';
+}).catch(function(){});
+sfetch('friends?select=*&public=eq.true&order=sort').then(function(r){
+  if(!r.length)return;
+  document.getElementById('friendGrid').innerHTML=r.map(function(f){
+    return '<div class="rent reveal vis"><div class="rb">'+
+      (f.category?'<div class="rc">'+esc(f.category)+'</div>':'')+
+      '<h4>'+esc(f.name)+'</h4><p>'+esc(f.description||'')+'</p>'+
+      (f.website?'<a href="'+esc(f.website)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600">Zur Website ↗</a>':'')+
+      '</div></div>';
+  }).join('');
+  document.getElementById('freunde').style.display='';
 }).catch(function(){});
 
 /* ===== Anfrage-Formular ===== */

@@ -147,6 +147,7 @@ footer a:hover{color:var(--acc)}
       <a href="#mieten">Technik mieten</a>
       <a href="#techniker">Techniker buchen</a>
       <a href="#partner">Für Kollegen</a>
+      <a href="#workshops">Workshops</a>
       <a href="#konditionen">Konditionen</a>
       <a href="index.html" class="switch">🎧 Zur DJ-Seite</a>
       <a href="#anfrage" class="btn small">Anfragen</a>
@@ -284,6 +285,38 @@ footer a:hover{color:var(--acc)}
   </div>
 </section>
 
+<section id="workshops">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="kicker">Workshops</div>
+      <h2>Tontechnik-Workshops für DJs &amp; Musiker</h2>
+      <p class="lead">Du legst auf oder machst Musik – aber die Anlage bleibt eine Blackbox? In meinen Workshops lernst du an echtem Profi-Equipment, warum es brummt, pfeift oder matschig klingt – und wie du das selbst in den Griff bekommst.</p>
+    </div>
+    <div class="duo">
+      <div class="card reveal">
+        <h3>Das lernst du</h3>
+        <ul>
+          <li>Gain-Struktur: sauberer Pegel vom Player bis zur Endstufe</li>
+          <li>Rückkopplung verstehen und verhindern – bevor es pfeift</li>
+          <li>Anlage an den Raum anpassen: Aufstellung, EQ, Delay</li>
+          <li>Der schwierige Raum: niedrige Decke, harte Wände, enge Ecken</li>
+          <li>Troubleshooting: Brummen, Rauschen, Aussetzer systematisch finden</li>
+        </ul>
+      </div>
+      <div class="card reveal">
+        <h3>So läuft's</h3>
+        <ul>
+          <li>Kleine Gruppen – jeder steht selbst am Pult</li>
+          <li>Echtes Profi-Equipment (u. a. Seeburg Acoustic Line) statt Folien</li>
+          <li>Regelmäßige Termine in Hemer – auch als Team- oder Einzeltermin</li>
+          <li>Für DJs, Bands, Singer-Songwriter und alle, die es wissen wollen</li>
+        </ul>
+        <div style="margin-top:18px"><a class="btn" href="#anfrage" onclick="pickWorkshop()">Nächsten Termin anfragen</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="konditionen">
   <div class="wrap">
     <div class="reveal">
@@ -327,6 +360,7 @@ footer a:hover{color:var(--acc)}
             <select name="event_type">
               <option>Technik mieten</option>
               <option>Techniker inkl. Technik buchen</option>
+              <option>Workshop besuchen</option>
               <option>Beratung / Sonstiges</option>
             </select>
           </div>
@@ -476,6 +510,11 @@ function openLegal(key){
 }
 function closeLegal(){document.getElementById('legalBg').style.display='none';document.body.style.overflow=''}
 
+function pickWorkshop(){
+  var f=document.getElementById('inqForm');
+  if(f&&f.event_type)f.event_type.value='Workshop besuchen';
+  if(f&&f.message&&!f.message.value)f.message.value='Ich interessiere mich für den nächsten Tontechnik-Workshop. ';
+}
 function pickAnlass(cardId,label){
   var f=document.getElementById('inqForm');
   if(f&&f.message&&!f.message.value)f.message.value='Anlass: '+label+' — ';

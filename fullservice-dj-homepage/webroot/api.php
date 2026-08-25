@@ -35,7 +35,7 @@ const JSON_COLS = [
   'products' => ['bundle'], 'bookings' => ['rider'], 'rental_contracts' => ['snapshot'],
 ];
 const BOOL_COLS = [
-  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'],
+  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'], 'friends' => ['public'],
   'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
   'bookings' => ['review_requested'],
   'equipment' => ['public','rentable'],
@@ -45,11 +45,11 @@ const BOOL_COLS = [
 ];
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
-  'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts'];
+  'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
-const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews'];
+const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends'];
 const INQUIRY_FIELDS = ['name','email','phone','event_type','event_date','location','guests','message'];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -146,7 +146,16 @@ function upgrade(PDO $p): void {
   if ($v < 8) {
     try { $p->exec(rentalContractsDdl()); } catch (PDOException $e) {}
   }
-  $p->exec('PRAGMA user_version=8');
+  if ($v < 9) {
+    try { $p->exec(friendsDdl()); } catch (PDOException $e) {}
+  }
+  $p->exec('PRAGMA user_version=9');
+}
+
+function friendsDdl(): string {
+  return "create table if not exists friends (id text primary key, sort integer default 0,
+    name text not null, category text, description text, website text,
+    public integer default 1, created_at text)";
 }
 
 function rentalContractsDdl(): string {
@@ -238,6 +247,7 @@ create table document_items (id text primary key,
   discount_value real default 0, discount_type text default 'pct');
 SQL);
   $p->exec(rentalContractsDdl());
+  $p->exec(friendsDdl());
   seed($p);
 }
 
