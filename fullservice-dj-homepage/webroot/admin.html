@@ -384,8 +384,9 @@ th.num{text-align:right}
         <div class="card"><h3>FAQ <button class="btn sm" style="float:right" onclick="openFaqModal()">+ Frage</button></h3><div id="faqAdminList" class="sml"></div></div>
         <div class="card"><h3>Location-Empfehlungen <button class="btn sm" style="float:right" onclick="openLocModal()">+ Location</button></h3><div id="locAdminList" class="sml"></div></div>
         <div class="card"><h3>Bewertungen <button class="btn sm" style="float:right" onclick="openRevModal()">+ Bewertung</button></h3>
-          <label>Google-Bewertungslink (am besten der „Rezension schreiben“-Link aus dem Unternehmensprofil)</label><input id="cRevGoogle" placeholder="https://g.page/r/…">
-          <label>Kurzfazit (z. B. „Ø 5,0 ★ aus 87 Google-Bewertungen“)</label><input id="cRevTagline">
+          <label>Google-Bewertungslink (am besten der „Rezension schreiben“-Link — wird auch in Mails verwendet)</label><input id="cRevGoogle" placeholder="https://g.page/r/…">
+          <label>DJ-Bande-Profil (URL, nur zum Lesen verlinkt — Bewertungen sammelt die Agentur selbst)</label><input id="cRevBande" placeholder="https://www.dj-bande.de/…">
+          <label>Kurzfazit (z. B. „Ø 5,0 ★ aus 87 Bewertungen“)</label><input id="cRevTagline">
           <div style="margin:10px 0"><button class="btn sm" onclick="saveContent('reviews')">Links speichern</button></div>
           <div id="revAdminList" class="sml"></div>
           <div class="mut sml" style="margin-top:8px">Tipp: Bewertungen wörtlich mit Name nur übernehmen, wenn der Kunde zugestimmt hat — sonst kürzen/anonymisieren (z. B. „Lisa H.“).</div></div>
@@ -1437,6 +1438,7 @@ function renderCms(){
   document.getElementById('cGTitle').value=g('guarantee','title');
   document.getElementById('cGText').value=g('guarantee','text');
   document.getElementById('cRevGoogle').value=g('reviews','google_url');
+  document.getElementById('cRevBande').value=g('reviews','djbande_url');
   document.getElementById('cRevTagline').value=g('reviews','tagline');
   renderRevAdmin();
   document.getElementById('cLegImp').value=g('legal','impressum');
@@ -1474,7 +1476,7 @@ function saveContent(key){
   if(key==='contact')val={title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
   if(key==='seo')val={title:v('cSeoTitle'),description:v('cSeoDesc')};
   if(key==='guarantee')val={title:v('cGTitle'),text:v('cGText')};
-  if(key==='reviews')val={google_url:v('cRevGoogle'),tagline:v('cRevTagline')};
+  if(key==='reviews')val={google_url:v('cRevGoogle'),djbande_url:v('cRevBande'),tagline:v('cRevTagline')};
   if(key==='tech'){
     upsertContent('tech_hero',{subtitle:v('cThSub'),text:v('cThText')});
     upsertContent('rental',{title:v('cThRentTitle'),text:v('cThRentText')});
@@ -1766,7 +1768,7 @@ function openRevModal(id){
     '<div><label>Anlass</label><input id="rvType" value="'+esc(r.event_type||'')+'" placeholder="Hochzeit"></div>'+
     '<div><label>Sterne (1–5)</label><input type="number" min="1" max="5" id="rvRating" value="'+(r.rating||5)+'"></div></div>'+
     '<label>Text *</label><textarea id="rvText" style="min-height:90px">'+esc(r.text||'')+'</textarea>'+
-    '<div class="grid3"><div><label>Quelle</label><select id="rvSource"><option value="google">Google</option><option value="direkt">Direkt / E-Mail</option></select></div>'+
+    '<div class="grid3"><div><label>Quelle</label><select id="rvSource"><option value="google">Google</option><option value="dj-bande">Partner-Agentur (DJ Bande)</option><option value="direkt">Direkt / E-Mail</option></select></div>'+
     '<div><label>Datum (z. B. „Juli 2026“)</label><input id="rvDate" value="'+esc(r.review_date||'')+'"></div>'+
     '<div><label>Sortierung</label><input type="number" id="rvSort" value="'+(r.sort||0)+'"></div></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="rvPub" style="width:auto;margin-right:6px" '+(r.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
