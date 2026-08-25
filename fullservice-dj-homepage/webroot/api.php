@@ -40,7 +40,7 @@ const BOOL_COLS = [
   'documents' => ['is_small_business'],
 ];
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
-  'customers','communications','bookings','booking_equipment','documents','document_items'];
+  'customers','communications','bookings','booking_equipment','documents','document_items','email_templates'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -126,6 +126,8 @@ create table documents (id text primary key, doc_type text not null, number text
   tax_rate real default 19, is_small_business integer default 0, intro_text text, outro_text text,
   total_net real default 0, total_tax real default 0, total_gross real default 0,
   deposit_deducted real default 0, sent_at text, paid_at text, created_at text, updated_at text);
+create table email_templates (id text primary key, sort integer default 0, name text not null,
+  subject text, body text, created_at text);
 create table document_items (id text primary key,
   document_id text not null references documents(id) on delete cascade,
   pos integer default 1, description text not null, qty real default 1, unit text, unit_price real default 0);
@@ -195,6 +197,81 @@ function seed(PDO $p): void {
 
   $ins('equipment', ['sort'=>1,'name'=>'Nebelmaschine klein','slug'=>'nebelmaschine-klein','category'=>'Effekt',
     'description'=>'Kompakte Nebelmaschine inkl. Fluid – ideal für Partykeller und kleine Räume.','day_rate'=>25,'qty_total'=>1]);
+
+  /* E-Mail-Antwortvorlagen — Platzhalter: {vorname} {name} {datum} {anlass} {ort} */
+  $tpls = [
+    [1, 'Hochzeit – Erstantwort', 'Eure Hochzeit am {datum} – Rückmeldung von DJ Lauschgift',
+"Hallo {vorname},
+
+vielen Dank für eure Anfrage – wie schön, dass ihr heiratet!
+
+Die gute Nachricht zuerst: Euer Termin am {datum} ist bei mir aktuell noch frei, und ich halte ihn euch die nächsten Tage unverbindlich fest.
+
+Damit ich euch ein passendes Angebot machen kann, würde ich euch gerne kurz kennenlernen – am einfachsten telefonisch (15–20 Minuten reichen völlig). Dabei klären wir:
+– den groben Ablauf eures Tages (freie Trauung? Sektempfang? Party bis wann?)
+– eure Location und die Gästezahl
+– eure Musikrichtung – und was auf keinen Fall laufen darf
+
+Danach bekommt ihr von mir ein Angebot mit klaren Posten für Dauer und Technik. Keine versteckten Kosten, versprochen.
+
+Wann erreiche ich euch am besten? Oder ruft mich einfach direkt an.
+
+Viele Grüße
+Markus Jankowski – DJ Lauschgift"],
+    [2, 'Geburtstag / private Feier – Erstantwort', 'Eure Feier am {datum} – Rückmeldung von DJ Lauschgift',
+"Hallo {vorname},
+
+danke für eure Anfrage – klingt nach einer richtig guten Party!
+
+Euer Wunschtermin am {datum} ist bei mir aktuell noch frei. Kleiner Tipp vorab: Falls eure Feier tagsüber oder unter der Woche stattfindet, kann ich deutlich günstiger kalkulieren – das besprechen wir gerne im Detail.
+
+Am einfachsten telefonieren wir einmal kurz (15 Minuten reichen), dann klären wir Location, Gästezahl, Uhrzeiten und eure Musikrichtung – und ihr bekommt direkt danach ein klares Angebot.
+
+Wann passt es euch am besten?
+
+Viele Grüße
+Markus Jankowski – DJ Lauschgift"],
+    [3, 'Firmenfeier – Erstantwort', 'Ihre Veranstaltung am {datum} – Rückmeldung von DJ Lauschgift',
+"Guten Tag {name},
+
+vielen Dank für Ihre Anfrage zu Ihrer Firmenveranstaltung am {datum}.
+
+Der Termin ist bei mir aktuell noch verfügbar. Gerne stimme ich mich kurz mit Ihnen (oder Ihrer Eventplanung) zum Ablauf ab – vom dezenten Empfang über Ton für Redebeiträge bis zum Partyprogramm. Auf dieser Basis erhalten Sie ein transparentes Angebot mit klar ausgewiesenen Posten für Dauer und Technik.
+
+Für Veranstaltungen unter der Woche oder tagsüber kalkuliere ich übrigens spürbar günstiger.
+
+Wann darf ich Sie am besten anrufen?
+
+Mit freundlichen Grüßen
+Markus Jankowski – DJ Lauschgift"],
+    [4, 'Technik-Anfrage – Erstantwort', 'Eure Technik-Anfrage – Lauschgift Veranstaltungstechnik',
+"Hallo {vorname},
+
+danke für eure Anfrage!
+
+Kurz zu den Konditionen: Ein Miettag entspricht 24 Stunden ab Übergabe, jeder weitere Tag kostet 50 % des Grundpreises. Abholung nach Terminabsprache an meinem Lager in Hemer (mit kurzer Einweisung) – auf Wunsch liefere ich auch, baue auf und wieder ab.
+
+Damit ich euch Verfügbarkeit und Preis nennen kann, brauche ich nur noch:
+– den genauen Zeitraum (Abholung/Rückgabe bzw. Veranstaltungsdatum)
+– welche Geräte ihr braucht – oder was ihr vorhabt, dann berate ich euch
+– ob ihr Lieferung/Aufbau wünscht (dann bitte Ort angeben)
+
+Viele Grüße
+Markus Jankowski – Lauschgift Veranstaltungstechnik"],
+    [5, 'Termin belegt – DJ-Bande-Vermittlung', 'Euer Termin am {datum} – ich habe trotzdem eine Lösung für euch',
+"Hallo {vorname},
+
+vielen Dank für eure Anfrage – und erstmal die weniger gute Nachricht: An eurem Termin am {datum} bin ich leider bereits gebucht.
+
+Aber ich lasse euch nicht hängen. Über meine Partner-Agentur DJ Bande aus Münster kann ich euch bis zu fünf Kollegen vorschlagen, die zu eurer Feier passen – DJs, die ich kenne und hinter denen ich stehe. Zur Transparenz: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision; für euch entstehen dadurch keine zusätzlichen Kosten, und die Preise vereinbart ihr direkt mit dem jeweiligen DJ.
+
+Wenn ihr das möchtet, gebt mir einfach kurz Bescheid – dann leite ich eure Eckdaten (Termin, Ort, Anlass) mit eurem Einverständnis weiter und ihr bekommt zeitnah Vorschläge.
+
+Viele Grüße
+Markus Jankowski – DJ Lauschgift"],
+  ];
+  foreach ($tpls as [$s,$n,$sub,$b])
+    $ins('email_templates', ['sort'=>$s,'name'=>$n,'subject'=>$sub,'body'=>$b]);
 
   /* Beispiel-Location als Vorlage — erst nach Bearbeitung auf 'öffentlich' stellen */
   $ins('locations', ['sort'=>1,'name'=>'Beispiel-Location (bitte ersetzen)','city'=>'Musterstadt','region'=>'NRW',

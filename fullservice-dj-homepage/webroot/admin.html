@@ -152,6 +152,7 @@ th.num{text-align:right}
       <a data-pg="inq">📥 Anfragen <span class="cnt-b" id="inqBadge" style="display:none">0</span></a>
       <a data-pg="cust">👥 Kunden</a>
       <a data-pg="book">📅 Buchungen</a>
+      <a data-pg="tpl">✉️ Vorlagen</a>
       <div class="grp">Finanzen</div>
       <a data-pg="quotes">📝 Angebote</a>
       <a data-pg="inv">🧾 Rechnungen</a>
@@ -236,6 +237,13 @@ th.num{text-align:right}
         <div id="bdEquip" class="sml mut">Keine Technik zugeordnet.</div></div>
     </div>
     <div class="card"><h3>Dokumente zu diesem Auftrag</h3><div id="bdDocs" class="sml mut">–</div></div>
+  </div>
+
+  <!-- E-MAIL-VORLAGEN -->
+  <div class="pg" id="pg-tpl">
+    <div class="phead"><div><div class="pt">E-Mail-Vorlagen</div><div class="ps">Antwort-Bausteine für Anfragen — Platzhalter: {vorname} {name} {datum} {anlass} {ort}</div></div>
+      <button class="btn" onclick="openTplModal()">+ Neue Vorlage</button></div>
+    <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Betreff</th><th class="num">Sortierung</th></tr></thead><tbody id="tplRows"></tbody></table></div>
   </div>
 
   <!-- ANGEBOTE -->
@@ -505,19 +513,20 @@ function loadAll(){
     api('site_content?select=*'),
     api('packages?select=*&order=sort'),
     api('faq?select=*&order=sort'),
-    api('communications?select=*&order=occurred_at.desc')
+    api('communications?select=*&order=occurred_at.desc'),
+    api('email_templates?select=*&order=sort')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
     CACHE.documents=r[4]||[];CACHE.equipment=r[5]||[];CACHE.be=r[6]||[];
     CACHE.content={};(r[7]||[]).forEach(function(x){CACHE.content[x.key]=x.value});
-    CACHE.packages=r[8]||[];CACHE.faq=r[9]||[];CACHE.comms=r[10]||[];
+    CACHE.packages=r[8]||[];CACHE.faq=r[9]||[];CACHE.comms=r[10]||[];CACHE.tpls=r[11]||[];
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
 }
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
-  renderEq();renderCms();renderSet();initStats();
+  renderEq();renderCms();renderSet();initStats();renderTpls();
 }
 
 /* ===== Dashboard ===== */
@@ -546,7 +555,7 @@ function renderDash(){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openCustDetail(\''+c.customer_id+'\')">'+esc(custName(cu))+'</a> <span class="mut">'+esc(c.subject||c.channel)+' · fällig '+dt(c.followup_at)+'</span> <a class="sml" onclick="markFollowDone(\''+c.id+'\')">✓ erledigt</a></div>';
   }).join('')||'Nichts fällig. 👍';
   document.getElementById('dashInq').innerHTML=newInq.slice(0,6).map(function(i){
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="showPage(\'inq\')">'+esc(i.name)+'</a> <span class="mut">'+esc(i.event_type||'')+' '+(i.event_date?('· '+dt(i.event_date)):'')+'</span></div>';
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="viewInq(\''+i.id+'\')">'+esc(i.name)+'</a> <span class="mut">'+esc(i.event_type||'')+' '+(i.event_date?('· '+dt(i.event_date)):'')+'</span></div>';
   }).join('')||'Keine neuen Anfragen.';
   document.getElementById('dashOpenInv').innerHTML=openInv.slice(0,6).map(function(d){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> <span class="mut">'+esc(custName(d.customers))+' · '+euro(d.total_gross)+(d.due_date?' · fällig '+dt(d.due_date):'')+'</span></div>';
@@ -572,8 +581,13 @@ function viewInq(id){
     '<div class="sml"><b>Kontakt:</b> '+esc(i.email||'–')+' · '+esc(i.phone||'–')+'<br>'+
     '<b>Anlass:</b> '+esc(i.event_type||'–')+' · <b>Datum:</b> '+dt(i.event_date)+' · <b>Ort:</b> '+esc(i.location||'–')+'<br><br>'+
     '<div style="white-space:pre-wrap;background:var(--bg);border:1px solid var(--bdr);padding:10px">'+esc(i.message||'(keine Nachricht)')+'</div></div>'+
+    '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--bdr)">'+
+    '<label>Antworten mit Vorlage</label>'+
+    '<div style="display:flex;gap:8px"><select id="replyTpl">'+
+    (CACHE.tpls||[]).map(function(t){return '<option value="'+t.id+'">'+esc(t.name)+'</option>'}).join('')+
+    '</select><button class="btn" style="white-space:nowrap" onclick="composeReply(\''+i.id+'\')">✍️ Verfassen</button></div></div>'+
     '<div style="margin-top:14px">'+
-    (i.customer_id?'':'<button class="btn" onclick="inqToCust(\''+i.id+'\')">→ In CRM übernehmen</button> ')+
+    (i.customer_id?'':'<button class="btn g" onclick="inqToCust(\''+i.id+'\')">→ In CRM übernehmen</button> ')+
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'erledigt\')">Erledigt</button> '+
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'archiviert\')">Archivieren</button></div>');
 }
@@ -1404,6 +1418,64 @@ function saveNumbering(){
     api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'numbering',value:n}}),
     api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'defaults',value:d}})
   ]).then(function(){S.numbering=n;S.defaults=d;toast('Gespeichert ✓')}).catch(function(e){toast(e.message,1)});
+}
+
+/* ===== E-Mail-Vorlagen ===== */
+function renderTpls(){
+  document.getElementById('tplRows').innerHTML=(CACHE.tpls||[]).map(function(t){
+    return '<tr class="click" onclick="openTplModal(\''+t.id+'\')"><td><b>'+esc(t.name)+'</b></td><td class="sml mut">'+esc(t.subject||'')+'</td><td class="num">'+(t.sort||0)+'</td></tr>';
+  }).join('')||'<tr><td colspan="3" class="mut">Noch keine Vorlagen.</td></tr>';
+}
+function openTplModal(id){
+  var t=id?(CACHE.tpls||[]).find(function(x){return x.id===id}):{};t=t||{};
+  openModal(id?'Vorlage bearbeiten':'Neue Vorlage',
+    '<div class="grid2"><div><label>Name *</label><input id="tName" value="'+esc(t.name||'')+'"></div>'+
+    '<div><label>Sortierung</label><input type="number" id="tSort" value="'+(t.sort||0)+'"></div></div>'+
+    '<label>Betreff</label><input id="tSubject" value="'+esc(t.subject||'')+'">'+
+    '<label>Text</label><textarea id="tBody" style="min-height:260px">'+esc(t.body||'')+'</textarea>'+
+    '<div class="sml mut" style="margin-top:6px">Platzhalter: {vorname} {name} {datum} {anlass} {ort} — werden beim Antworten automatisch aus der Anfrage gefüllt.</div>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveTpl(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delRow(\'email_templates\',\''+id+'\',reloadTpls)">Löschen</button>':'')+'</div>');
+}
+function saveTpl(id){
+  if(!v('tName')){toast('Name fehlt.',1);return}
+  var body={name:v('tName'),sort:Number(v('tSort'))||0,subject:v('tSubject'),body:document.getElementById('tBody').value};
+  (id?api('email_templates?id=eq.'+id,{method:'PATCH',body:body}):api('email_templates',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Gespeichert ✓');reloadTpls()}).catch(function(e){toast(e.message,1)});
+}
+function reloadTpls(){api('email_templates?select=*&order=sort').then(function(r){CACHE.tpls=r||[];renderTpls()})}
+
+/* Antwort aus Anfrage verfassen */
+function fillTpl(text,i){
+  var parts=(i.name||'').trim().split(/\s+/);
+  var map={
+    '{vorname}':parts[0]||i.name||'','{name}':i.name||'',
+    '{datum}':i.event_date?dt(i.event_date):'eurem Wunschtermin',
+    '{anlass}':i.event_type||'eurer Feier','{ort}':i.location||''
+  };
+  return (text||'').replace(/\{vorname\}|\{name\}|\{datum\}|\{anlass\}|\{ort\}/g,function(m){return map[m]});
+}
+function composeReply(inqId){
+  var i=CACHE.inquiries.find(function(x){return x.id===inqId});if(!i)return;
+  var tplId=v('replyTpl');
+  var t=(CACHE.tpls||[]).find(function(x){return x.id===tplId});if(!t){toast('Bitte Vorlage wählen.',1);return}
+  if(i.status==='neu')api('inquiries?id=eq.'+inqId,{method:'PATCH',body:{status:'in_bearbeitung'}})
+    .then(function(){i.status='in_bearbeitung';renderInq();renderDash()});
+  openModal('Antwort an '+esc(i.name)+(i.email?' <span class="mut sml">('+esc(i.email)+')</span>':''),
+    '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
+    '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(fillTpl(t.body,i))+'</textarea>'+
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
+    '<button class="btn" onclick="copyReply()">📋 Text kopieren</button>'+
+    (i.email?'<button class="btn g" onclick="mailReply(\''+esc(i.email)+'\')">✉️ Im Mail-Programm öffnen</button>':'')+
+    '</div><div class="sml mut" style="margin-top:8px">Tipp: Vor dem Senden prüfen, ob der Termin wirklich frei ist — die Vorlage geht davon aus.</div>');
+}
+function copyReply(){
+  var txt='Betreff: '+v('rSubject')+'\n\n'+document.getElementById('rBody').value;
+  navigator.clipboard.writeText(txt).then(function(){toast('Kopiert ✓ — jetzt ins Mail-Programm einfügen.')})
+    .catch(function(){toast('Kopieren nicht möglich — Text bitte manuell markieren.',1)});
+}
+function mailReply(email){
+  location.href='mailto:'+email+'?subject='+encodeURIComponent(v('rSubject'))+'&body='+encodeURIComponent(document.getElementById('rBody').value);
 }
 
 /* ===== Modal-Helfer ===== */
