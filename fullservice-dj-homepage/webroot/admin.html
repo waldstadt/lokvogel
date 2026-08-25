@@ -617,7 +617,7 @@ function renderWsAdmin(){
     list.map(function(w){
       var b=wsBooked(w.id),wl=wsWaitlist(w.id);
       return '<tr><td>'+dt(w.event_date)+(w.start_time?' '+w.start_time.slice(0,5):'')+'</td>'+
-      '<td><a onclick="openWsDetail(\''+w.id+'\')">'+esc(w.title)+'</a></td>'+
+      '<td><a onclick="openWsDetail(\''+w.id+'\')">'+(w.audience==='dj'?'🎧 ':w.audience==='live'?'🎤 ':'')+esc(w.title)+'</a></td>'+
       '<td class="num">'+(w.price_net!=null?euro(w.price_net):'–')+'</td>'+
       '<td class="num">'+b+' / '+(w.capacity||0)+(b>=(w.capacity||0)?' <span class="b red">voll</span>':'')+
       (wl?' <span class="b blue">+'+wl+' WL</span>':'')+'</td>'+
@@ -628,7 +628,11 @@ function renderWsAdmin(){
 function openWsModal(id){
   var w=id?(CACHE.wsEvents||[]).find(function(x){return x.id===id}):{};w=w||{};
   openModal(id?'Termin bearbeiten':'Neuer Workshop-Termin',
-    '<label>Titel *</label><input id="wTitle" value="'+esc(w.title||'Tontechnik-Workshop für DJs & Musiker')+'">'+
+    '<div class="grid2"><div><label>Kurs-Schiene *</label><select id="wAud" onchange="wsAudPreset()">'+
+    '<option value="dj"'+(w.audience==='dj'?' selected':'')+'>🎧 DJs & Alleinunterhalter</option>'+
+    '<option value="live"'+(w.audience==='live'?' selected':'')+'>🎤 Livemusik (Gesang, Band)</option>'+
+    '<option value=""'+(!w.audience?' selected':'')+'>Offen / gemischt</option></select></div>'+
+    '<div><label>Titel *</label><input id="wTitle" value="'+esc(w.title||'')+'" placeholder="wird je Schiene vorgeschlagen"></div></div>'+
     '<label>Kurzbeschreibung</label><input id="wDesc" value="'+esc(w.description||'')+'" placeholder="z. B. Grundlagen: Gain, EQ, Feedback — Praxis am Pult">'+
     '<div class="grid3"><div><label>Datum *</label><input type="date" id="wDate" value="'+(w.event_date||'')+'"></div>'+
     '<div><label>Beginn</label><input type="time" id="wStart" value="'+(w.start_time||'')+'"></div>'+
@@ -640,9 +644,20 @@ function openWsModal(id){
     '<div style="margin-top:14px"><button class="btn" onclick="saveWs(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'workshop_events\',\''+id+'\',reloadWs)">Löschen</button>':'')+'</div>');
 }
+var WS_PRESETS={
+  dj:{title:'Tontechnik für DJs & Alleinunterhalter',desc:'Signalkette, Aufbau, Gain & Troubleshooting — Praxis am eigenen Setup'},
+  live:{title:'Tontechnik für Livemusik',desc:'Brummen, Monitor-Feedback, Mikrofon & Soundcheck — für Gesang, Gitarre & Band'}
+};
+function wsAudPreset(){
+  var p=WS_PRESETS[v('wAud')];if(!p)return;
+  var t=document.getElementById('wTitle'),d=document.getElementById('wDesc');
+  if(!t.value)t.value=p.title;
+  if(!d.value)d.value=p.desc;
+}
 function saveWs(id){
+  if(v('wAud')&&!v('wTitle'))wsAudPreset();
   if(!v('wTitle')||!v('wDate')){toast('Titel und Datum fehlen.',1);return}
-  var body={title:v('wTitle'),description:v('wDesc'),event_date:v('wDate'),start_time:v('wStart')||null,end_time:v('wEnd')||null,
+  var body={title:v('wTitle'),description:v('wDesc'),audience:v('wAud'),event_date:v('wDate'),start_time:v('wStart')||null,end_time:v('wEnd')||null,
     price_net:v('wPrice')?Number(v('wPrice')):null,capacity:Number(v('wCap'))||8,location:v('wLoc'),
     public:document.getElementById('wPub').checked};
   if(!id)body.created_at=new Date().toISOString();

@@ -294,26 +294,29 @@ footer a:hover{color:var(--acc)}
     </div>
     <div class="duo">
       <div class="card reveal">
-        <h3>Das lernst du</h3>
+        <h3>🎧 Kurs für DJs &amp; Alleinunterhalter</h3>
+        <p>Für mobile DJs, die ihre Anlage selbst aufstellen und anschließen – mit eigener oder gemieteter Technik. Und für alle, die wissen wollen, wie es hinter ihrem Mischpult weitergeht.</p>
         <ul>
-          <li>Gain-Struktur: sauberer Pegel vom Player bis zur Endstufe</li>
-          <li>Rückkopplung verstehen und verhindern – bevor es pfeift</li>
-          <li>Anlage an den Raum anpassen: Aufstellung, EQ, Delay</li>
-          <li>Der schwierige Raum: niedrige Decke, harte Wände, enge Ecken</li>
-          <li>Troubleshooting: Brummen, Rauschen, Aussetzer systematisch finden</li>
+          <li>Die Signalkette verstehen: vom Pult bis zur Box</li>
+          <li>Anlage selbst aufbauen, anschließen und einpegeln</li>
+          <li>Gain-Struktur: sauberer Pegel statt Verzerren am Limit</li>
+          <li>Der schwierige Raum: Aufstellung, EQ, niedrige Decken</li>
+          <li>Troubleshooting: Brummen, Rauschen, Aussetzer finden</li>
         </ul>
       </div>
       <div class="card reveal">
-        <h3>So läuft's</h3>
+        <h3>🎤 Kurs für Livemusik</h3>
+        <p>Für Sängerinnen und Sänger, Singer-Songwriter (klassisch Gesang &amp; Gitarre) und Bandmitglieder, die verstehen wollen, was da auf der Bühne eigentlich passiert.</p>
         <ul>
-          <li>Kleine Gruppen – jeder steht selbst am Pult</li>
-          <li>Echtes Profi-Equipment (u. a. Seeburg Acoustic Line) statt Folien</li>
-          <li>Regelmäßige Termine in Hemer – auch als Team- oder Einzeltermin</li>
-          <li>Für DJs, Bands, Singer-Songwriter und alle, die es wissen wollen</li>
+          <li>Warum brummt die Gitarre – und wie kriegt man es weg?</li>
+          <li>Warum pfeift der Monitor? Rückkopplung verstehen &amp; verhindern</li>
+          <li>Mikrofon &amp; Stimme: Abstand, Winkel, der richtige Sound</li>
+          <li>Der kleine Bühnenaufbau: Gesang, Gitarre, Monitor – selbst gemacht</li>
+          <li>Soundcheck, der den Namen verdient – in 15 Minuten</li>
         </ul>
-        <div style="margin-top:18px" id="wsFallback"><a class="btn" href="#anfrage" onclick="pickWorkshop()">Nächsten Termin anfragen</a></div>
       </div>
     </div>
+    <p class="rent-note reveal" style="margin-top:20px">Kleine Gruppen, echtes Profi-Equipment (u. a. Seeburg Acoustic Line), Termine in Hemer. <span id="wsFallback"><a href="#anfrage" onclick="pickWorkshop()">Kein Termin ausgeschrieben? Einfach anfragen →</a></span></p>
     <div id="wsTermine" style="display:none;margin-top:36px">
       <h3 style="font-size:20px;margin-bottom:6px">Nächste Termine</h3>
       <p class="lead" style="font-size:14px">Platz reservieren, Bezahlung vor Ort oder per Rechnung – du bekommst eine Bestätigung von mir.</p>
@@ -549,8 +552,10 @@ function loadWorkshops(){
     WS=list;
     document.getElementById('wsGrid').innerHTML=list.map(function(w,i){
       var full=w.free<=0;
+      var aud=w.audience==='dj'?'🎧 DJs & Alleinunterhalter':(w.audience==='live'?'🎤 Livemusik':'');
       return '<div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 20px">'+
         '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:6px">'+wsDate(w)+'</div>'+
+        (aud?'<div style="display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:12px;padding:3px 10px;color:var(--mut);margin-bottom:8px">'+aud+'</div>':'')+
         '<h4 style="font-size:16px;margin-bottom:6px">'+esc(w.title)+'</h4>'+
         (w.description?'<p style="font-size:13px;color:var(--mut);margin-bottom:10px">'+esc(w.description)+'</p>':'')+
         '<div style="font-size:13px;color:var(--mut);margin-bottom:12px">'+(w.location?esc(w.location)+' · ':'')+
@@ -565,7 +570,7 @@ function loadWorkshops(){
     '<p style="font-size:13px;color:var(--mut);margin-bottom:12px">Ab 3 Personen mache ich auch einen Sondertermin nur für eure Gruppe — Band, DJ-Crew oder Verein, Inhalte nach euren Themen.</p>'+
     '<div><button class="btn ghost small" onclick="pickSondertermin()">Sondertermin anfragen</button></div></div>';
     document.getElementById('wsTermine').style.display='';
-    document.getElementById('wsFallback').innerHTML='<a class="btn ghost" href="#anfrage" onclick="pickWorkshop()">Kein Termin passt? Anfragen</a>';
+    document.getElementById('wsFallback').innerHTML='<a href="#wsTermine">Die nächsten Termine stehen unten ↓</a>';
   }).catch(function(){});
 }
 var wsWl=false;

@@ -159,13 +159,16 @@ function upgrade(PDO $p): void {
     "alter table workshop_signups add column q_challenge text",
     "alter table workshop_signups add column q_goal text",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
-  $p->exec('PRAGMA user_version=11');
+  if ($v < 12) {
+    try { $p->exec("alter table workshop_events add column audience text default ''"); } catch (PDOException $e) {}
+  }
+  $p->exec('PRAGMA user_version=12');
 }
 
 function workshopsDdl(): array {
   return [
     "create table if not exists workshop_events (id text primary key, sort integer default 0,
-      title text not null, description text, event_date text not null, start_time text, end_time text,
+      title text not null, description text, audience text default '', event_date text not null, start_time text, end_time text,
       location text, price_net real, capacity integer default 8, public integer default 0, created_at text)",
     "create table if not exists workshop_signups (id text primary key,
       workshop_id text not null references workshop_events(id) on delete cascade,
@@ -873,7 +876,7 @@ function handlePortal(string $path, string $method, $body): never {
       from workshop_events w where w.public = 1 and w.event_date >= date('now')
       order by w.event_date, w.start_time")->fetchAll();
     out(array_map(fn($w) => [
-      'id' => $w['id'], 'title' => $w['title'], 'description' => $w['description'],
+      'id' => $w['id'], 'title' => $w['title'], 'description' => $w['description'], 'audience' => $w['audience'] ?? '',
       'event_date' => $w['event_date'], 'start_time' => $w['start_time'], 'end_time' => $w['end_time'],
       'location' => $w['location'], 'price_net' => $w['price_net'],
       'free' => max(0, (int)$w['capacity'] - (int)$w['booked']),
