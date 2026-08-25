@@ -123,3 +123,22 @@ postet sie nur noch auf Instagram). Timing-Logik:
   gleiche Installation, ein Backoffice.
 - To-do Seite: technik.html oben zielgruppen-orientiert einleiten
   („Für wen") statt direkt mit dem Mietkatalog zu starten.
+
+## Neuer Leistungsbereich: Festinstallation + Wartung (Idee 2026-08-25)
+
+- Zielgruppe: Schulen, Vereine, Bars/Kneipen, „die es ordentlich haben
+  wollen" — dieselbe Nische wie Verleih, nur dauerhaft. Wiederkehrender
+  Wochentags-Umsatz über Wartungsverträge.
+- Rechtlich (vor Bewerbung mit HWK Südwestfalen abklären, formlos):
+  - Frei: Montage, Signal-/Lautsprecherkabel, steckerfertiger Anschluss,
+    Einmessen/DSP, Einweisung, Reinigung/Pflege/Firmware.
+  - Tabu ohne Handwerksrolle: Arbeiten am Hausstromnetz (Festanschlüsse,
+    Unterverteilung) → Elektro-Partnerbetrieb einbinden.
+  - DGUV-V3-Geräteprüfung nur durch Elektrofachkraft; Option: Lehrgang
+    „Elektrofachkraft für festgelegte Tätigkeiten" (HWK-Kurs, kein Meister)
+    → Prüf-Teil selbst anbieten = USP im Wartungsvertrag.
+- Seite: dritte Säule auf technik.html („Festinstallation & Wartung")
+  erst NACH HWK-Klärung bauen; Wording: „steckerfertig installiert,
+  Elektroarbeiten am Hausnetz durch Partnerbetrieb".
+- Angebots-Idee: Wartungsvertrag als Produkt im Katalog (jährlich/halb-
+  jährlich, Pauschale) — planbar, kündigt Kundenbindung an.
