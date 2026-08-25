@@ -311,7 +311,27 @@ footer a:hover{color:var(--acc)}
           <li>Regelmäßige Termine in Hemer – auch als Team- oder Einzeltermin</li>
           <li>Für DJs, Bands, Singer-Songwriter und alle, die es wissen wollen</li>
         </ul>
-        <div style="margin-top:18px"><a class="btn" href="#anfrage" onclick="pickWorkshop()">Nächsten Termin anfragen</a></div>
+        <div style="margin-top:18px" id="wsFallback"><a class="btn" href="#anfrage" onclick="pickWorkshop()">Nächsten Termin anfragen</a></div>
+      </div>
+    </div>
+    <div id="wsTermine" style="display:none;margin-top:36px">
+      <h3 style="font-size:20px;margin-bottom:6px">Nächste Termine</h3>
+      <p class="lead" style="font-size:14px">Platz reservieren, Bezahlung vor Ort oder per Rechnung – du bekommst eine Bestätigung von mir.</p>
+      <div id="wsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:20px"></div>
+      <div id="wsForm" style="display:none;max-width:560px;margin-top:26px;background:var(--card);border:1px solid var(--acc);border-radius:14px;padding:26px 24px">
+        <h3 style="font-size:17px;margin-bottom:4px" id="wsFormTitle"></h3>
+        <div class="msg" id="wsMsg" style="display:none"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div><label>Name *</label><input id="wsName"></div>
+          <div><label>E-Mail *</label><input id="wsMail" type="email"></div>
+          <div><label>Telefon</label><input id="wsPhone"></div>
+          <div><label>Plätze</label><select id="wsSeats"><option>1</option><option>2</option><option>3</option></select></div>
+        </div>
+        <label>Nachricht (optional)</label><input id="wsNote" placeholder="z. B. Ich lege mit XDJ auf / spiele in einer Band …">
+        <div style="margin-top:16px;display:flex;gap:10px">
+          <button class="btn" id="wsSend" onclick="sendWs()">Platz verbindlich reservieren</button>
+          <button class="btn ghost" onclick="document.getElementById('wsForm').style.display='none'">Abbrechen</button>
+        </div>
       </div>
     </div>
   </div>
@@ -510,6 +530,58 @@ function openLegal(key){
 }
 function closeLegal(){document.getElementById('legalBg').style.display='none';document.body.style.overflow=''}
 
+var WS=[],wsSel=null;
+function euro2(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
+function wsDate(w){
+  var d=new Date(w.event_date).toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'long',year:'numeric'});
+  var t=[w.start_time,w.end_time].filter(Boolean).map(function(x){return x.slice(0,5)}).join('–');
+  return d+(t?' · '+t+' Uhr':'');
+}
+function loadWorkshops(){
+  fetch(API+'/portal/workshops').then(function(r){return r.json()}).then(function(list){
+    if(!Array.isArray(list)||!list.length)return;
+    WS=list;
+    document.getElementById('wsGrid').innerHTML=list.map(function(w,i){
+      var full=w.free<=0;
+      return '<div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 20px">'+
+        '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:6px">'+wsDate(w)+'</div>'+
+        '<h4 style="font-size:16px;margin-bottom:6px">'+esc(w.title)+'</h4>'+
+        (w.description?'<p style="font-size:13px;color:var(--mut);margin-bottom:10px">'+esc(w.description)+'</p>':'')+
+        '<div style="font-size:13px;color:var(--mut);margin-bottom:12px">'+(w.location?esc(w.location)+' · ':'')+
+        (w.price_net!=null?euro2(w.price_net)+' p. P. · ':'')+
+        (full?'<b style="color:var(--mut2)">ausgebucht</b>':'<b style="color:var(--acc)">'+w.free+' Plätze frei</b>')+'</div>'+
+        (full?'':'<button class="btn small" onclick="openWsForm('+i+')">Platz reservieren</button>')+
+        '</div>';
+    }).join('');
+    document.getElementById('wsTermine').style.display='';
+    document.getElementById('wsFallback').innerHTML='<a class="btn ghost" href="#anfrage" onclick="pickWorkshop()">Kein Termin passt? Anfragen</a>';
+  }).catch(function(){});
+}
+function openWsForm(i){
+  wsSel=WS[i];
+  document.getElementById('wsFormTitle').textContent=wsSel.title+' — '+wsDate(wsSel);
+  var m=document.getElementById('wsMsg');m.style.display='none';
+  var f=document.getElementById('wsForm');f.style.display='';
+  f.scrollIntoView({behavior:'smooth',block:'center'});
+}
+function sendWs(){
+  var m=document.getElementById('wsMsg'),btn=document.getElementById('wsSend');
+  var name=document.getElementById('wsName').value.trim(),mail=document.getElementById('wsMail').value.trim();
+  if(!name||!mail){m.style.display='block';m.className='msg err';m.textContent='Bitte Name und E-Mail angeben.';return}
+  btn.disabled=true;
+  fetch(API+'/portal/workshops/'+wsSel.id+'/signup',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name,email:mail,phone:document.getElementById('wsPhone').value.trim(),
+      seats:Number(document.getElementById('wsSeats').value)||1,message:document.getElementById('wsNote').value.trim()})})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s>=400)throw new Error(res.j.error||'Anmeldung fehlgeschlagen.');
+      m.style.display='block';m.className='msg ok';
+      m.textContent='Platz reserviert ✓ Du bekommst eine Bestätigung per E-Mail. Bezahlung vor Ort oder per Rechnung.';
+      loadWorkshops();
+    }).catch(function(e){m.style.display='block';m.className='msg err';m.textContent=e.message})
+    .finally(function(){btn.disabled=false});
+}
+loadWorkshops();
 function pickWorkshop(){
   var f=document.getElementById('inqForm');
   if(f&&f.event_type)f.event_type.value='Workshop besuchen';

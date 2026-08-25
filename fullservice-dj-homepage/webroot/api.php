@@ -36,6 +36,7 @@ const JSON_COLS = [
 ];
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'], 'friends' => ['public'],
+  'workshop_events' => ['public'],
   'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
   'bookings' => ['review_requested'],
   'equipment' => ['public','rentable'],
@@ -45,7 +46,8 @@ const BOOL_COLS = [
 ];
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
-  'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends'];
+  'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
+  'workshop_events','workshop_signups'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -149,7 +151,22 @@ function upgrade(PDO $p): void {
   if ($v < 9) {
     try { $p->exec(friendsDdl()); } catch (PDOException $e) {}
   }
-  $p->exec('PRAGMA user_version=9');
+  if ($v < 10) {
+    foreach (workshopsDdl() as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+  }
+  $p->exec('PRAGMA user_version=10');
+}
+
+function workshopsDdl(): array {
+  return [
+    "create table if not exists workshop_events (id text primary key, sort integer default 0,
+      title text not null, description text, event_date text not null, start_time text, end_time text,
+      location text, price_net real, capacity integer default 8, public integer default 0, created_at text)",
+    "create table if not exists workshop_signups (id text primary key,
+      workshop_id text not null references workshop_events(id) on delete cascade,
+      name text not null, email text, phone text, seats integer default 1, message text,
+      status text default 'angemeldet', created_at text)",
+  ];
 }
 
 function friendsDdl(): string {
@@ -248,6 +265,7 @@ create table document_items (id text primary key,
 SQL);
   $p->exec(rentalContractsDdl());
   $p->exec(friendsDdl());
+  foreach (workshopsDdl() as $sql) $p->exec($sql);
   seed($p);
 }
 
@@ -841,6 +859,42 @@ function handlePortal(string $path, string $method, $body): never {
       ->execute([uuid(), $r['cust_id'], $r['booking_id'], 'note', 'in', 'Mietvertrag digital unterschrieben',
         'Mietvertrag zur Buchung am '.$r['event_date'].' wurde online unterschrieben von: '.$name.'. Ausweiskopien (Vorder-/Rückseite) liegen geschützt im System.', now(), now()]);
     out(['ok' => true], 201);
+  }
+  /* Workshops: öffentliche Termine mit freien Plätzen, Anmeldung mit Kapazitätsprüfung */
+  if ($path === 'portal/workshops' && $method === 'GET') {
+    $rows = $p->query("select w.*, coalesce((select sum(s.seats) from workshop_signups s
+        where s.workshop_id = w.id and s.status = 'angemeldet'), 0) as booked
+      from workshop_events w where w.public = 1 and w.event_date >= date('now')
+      order by w.event_date, w.start_time")->fetchAll();
+    out(array_map(fn($w) => [
+      'id' => $w['id'], 'title' => $w['title'], 'description' => $w['description'],
+      'event_date' => $w['event_date'], 'start_time' => $w['start_time'], 'end_time' => $w['end_time'],
+      'location' => $w['location'], 'price_net' => $w['price_net'],
+      'free' => max(0, (int)$w['capacity'] - (int)$w['booked']),
+    ], $rows));
+  }
+  if (preg_match('#^portal/workshops/([a-f0-9-]{30,40})/signup$#', $path, $m) && $method === 'POST') {
+    $st = $p->prepare("select w.*, coalesce((select sum(s.seats) from workshop_signups s
+        where s.workshop_id = w.id and s.status = 'angemeldet'), 0) as booked
+      from workshop_events w where w.id = ? and w.public = 1");
+    $st->execute([$m[1]]);
+    $w = $st->fetch();
+    if (!$w) fail('Dieser Workshop-Termin wurde nicht gefunden.', 404);
+    $name = mb_substr(trim((string)($body['name'] ?? '')), 0, 120);
+    $email = mb_substr(trim((string)($body['email'] ?? '')), 0, 160);
+    if ($name === '' || $email === '') fail('Name und E-Mail erforderlich.');
+    $seats = max(1, min(5, (int)($body['seats'] ?? 1)));
+    $free = max(0, (int)$w['capacity'] - (int)$w['booked']);
+    if ($seats > $free) fail($free ? ($free === 1 ? 'Für diesen Termin ist nur noch 1 Platz frei.' : "Für diesen Termin sind nur noch $free Plätze frei.") : 'Dieser Termin ist leider ausgebucht.', 409);
+    $dup = $p->prepare("select count(*) from workshop_signups where workshop_id = ? and email = ? and status = 'angemeldet'");
+    $dup->execute([$w['id'], $email]);
+    if ((int)$dup->fetchColumn()) fail('Mit dieser E-Mail-Adresse bist du für diesen Termin schon angemeldet.', 409);
+    $p->prepare('insert into workshop_signups (id, workshop_id, name, email, phone, seats, message, status, created_at)
+        values (?,?,?,?,?,?,?,?,?)')
+      ->execute([uuid(), $w['id'], $name, $email,
+        mb_substr(trim((string)($body['phone'] ?? '')), 0, 60), $seats,
+        mb_substr(trim((string)($body['message'] ?? '')), 0, 2000), 'angemeldet', now()]);
+    out(['ok' => true, 'free' => $free - $seats], 201);
   }
   /* Partner-Registrierung (DJs, Bands, Musiker, Techniker) */
   if ($path === 'portal/partner' && $method === 'POST') {

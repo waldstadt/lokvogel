@@ -348,6 +348,8 @@ th.num{text-align:right}
       <button class="btn" onclick="openEqModal()">+ Neuer Artikel</button></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Heute im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
     <div class="card"><h3>Miet-Partner (DJs, Bands, Musiker, Techniker) <span class="mut sml" style="font-weight:400">— registrieren sich über die Technik-Seite, du schaltest frei und teilst den Code mit</span></h3><div id="partnerList" class="sml"></div></div>
+    <div class="card"><h3>Workshop-Termine <span class="mut sml" style="font-weight:400">— buchbar auf der Technik-Seite, Bezahlung vor Ort oder per Rechnung</span> <button class="btn sm" style="float:right" onclick="openWsModal()">+ Termin</button></h3>
+      <div id="wsAdminList" class="sml"></div></div>
   </div>
 
   <!-- CMS -->
@@ -584,7 +586,9 @@ function loadAll(){
     api('upsells?select=*&order=sort'),
     api('reviews?select=*&order=sort'),
     api('products?select=*&order=sort'),
-    api('partners?select=*&order=created_at.desc')
+    api('partners?select=*&order=created_at.desc'),
+    api('workshop_events?select=*&order=event_date'),
+    api('workshop_signups?select=*&order=created_at.desc')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -593,13 +597,81 @@ function loadAll(){
     CACHE.packages=r[8]||[];CACHE.faq=r[9]||[];CACHE.comms=r[10]||[];CACHE.tpls=r[11]||[];
     CACHE.docEvents=r[12]||[];CACHE.forms=r[13]||[];CACHE.formTpls=r[14]||[];CACHE.upsells=r[15]||[];
     CACHE.reviews=r[16]||[];CACHE.products=r[17]||[];CACHE.partners=r[18]||[];
+    CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
 }
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
   renderEq();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
-  renderProducts();renderPartners();
+  renderProducts();renderPartners();renderWsAdmin();
+}
+/* ===== Workshop-Termine & Anmeldungen ===== */
+function wsBooked(wid){return (CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===wid&&s.status==='angemeldet'})
+  .reduce(function(a,s){return a+(Number(s.seats)||1)},0)}
+function renderWsAdmin(){
+  var list=CACHE.wsEvents||[];
+  document.getElementById('wsAdminList').innerHTML=list.length?('<table><thead><tr><th>Datum</th><th>Titel</th><th class="num">Preis p. P.</th><th class="num">Belegt</th><th>Sichtbar</th><th></th></tr></thead><tbody>'+
+    list.map(function(w){
+      var b=wsBooked(w.id);
+      return '<tr><td>'+dt(w.event_date)+(w.start_time?' '+w.start_time.slice(0,5):'')+'</td>'+
+      '<td><a onclick="openWsDetail(\''+w.id+'\')">'+esc(w.title)+'</a></td>'+
+      '<td class="num">'+(w.price_net!=null?euro(w.price_net):'–')+'</td>'+
+      '<td class="num">'+b+' / '+(w.capacity||0)+(b>=(w.capacity||0)?' <span class="b red">voll</span>':'')+'</td>'+
+      '<td>'+(w.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</td>'+
+      '<td><a onclick="openWsModal(\''+w.id+'\')">Bearbeiten</a></td></tr>';
+    }).join('')+'</tbody></table>'):'<span class="mut">Noch keine Termine — lege den ersten an, dann erscheint er buchbar auf der Technik-Seite.</span>';
+}
+function openWsModal(id){
+  var w=id?(CACHE.wsEvents||[]).find(function(x){return x.id===id}):{};w=w||{};
+  openModal(id?'Termin bearbeiten':'Neuer Workshop-Termin',
+    '<label>Titel *</label><input id="wTitle" value="'+esc(w.title||'Tontechnik-Workshop für DJs & Musiker')+'">'+
+    '<label>Kurzbeschreibung</label><input id="wDesc" value="'+esc(w.description||'')+'" placeholder="z. B. Grundlagen: Gain, EQ, Feedback — Praxis am Pult">'+
+    '<div class="grid3"><div><label>Datum *</label><input type="date" id="wDate" value="'+(w.event_date||'')+'"></div>'+
+    '<div><label>Beginn</label><input type="time" id="wStart" value="'+(w.start_time||'')+'"></div>'+
+    '<div><label>Ende</label><input type="time" id="wEnd" value="'+(w.end_time||'')+'"></div></div>'+
+    '<div class="grid3"><div><label>Preis p. P. netto (€)</label><input type="number" step="0.01" id="wPrice" value="'+(w.price_net!=null?w.price_net:'')+'"></div>'+
+    '<div><label>Plätze</label><input type="number" id="wCap" value="'+(w.capacity||8)+'"></div>'+
+    '<div><label>Ort</label><input id="wLoc" value="'+esc(w.location||'Lager Hemer, Büttmecker Weg 35c')+'"></div></div>'+
+    '<label style="margin-top:12px"><input type="checkbox" id="wPub" style="width:auto;margin-right:6px" '+(w.public?'checked':'')+'>Auf der Technik-Seite buchbar anzeigen</label>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveWs(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delRow(\'workshop_events\',\''+id+'\',reloadWs)">Löschen</button>':'')+'</div>');
+}
+function saveWs(id){
+  if(!v('wTitle')||!v('wDate')){toast('Titel und Datum fehlen.',1);return}
+  var body={title:v('wTitle'),description:v('wDesc'),event_date:v('wDate'),start_time:v('wStart')||null,end_time:v('wEnd')||null,
+    price_net:v('wPrice')?Number(v('wPrice')):null,capacity:Number(v('wCap'))||8,location:v('wLoc'),
+    public:document.getElementById('wPub').checked};
+  if(!id)body.created_at=new Date().toISOString();
+  (id?api('workshop_events?id=eq.'+id,{method:'PATCH',body:body}):api('workshop_events',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Gespeichert ✓');reloadWs()}).catch(function(e){toast(e.message,1)});
+}
+function openWsDetail(id){
+  var w=(CACHE.wsEvents||[]).find(function(x){return x.id===id});if(!w)return;
+  var sg=(CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===id});
+  var rows=sg.map(function(s){
+    return '<tr'+(s.status!=='angemeldet'?' style="opacity:.45"':'')+'><td>'+esc(s.name)+'</td>'+
+    '<td>'+esc(s.email||'')+(s.phone?'<br><span class="mut">'+esc(s.phone)+'</span>':'')+'</td>'+
+    '<td class="num">'+(s.seats||1)+'</td><td>'+esc(s.message||'')+'</td>'+
+    '<td>'+(s.status==='angemeldet'
+      ?'<a onclick="wsCancel(\''+s.id+'\',\''+id+'\')" style="color:var(--red)">stornieren</a>'
+      :'<span class="mut">storniert</span>')+'</td></tr>';
+  }).join('');
+  openModal('Teilnehmer — '+esc(w.title)+' am '+dt(w.event_date),
+    '<div class="sml mut" style="margin-bottom:10px">Belegt: <b style="color:var(--wh)">'+wsBooked(id)+' / '+(w.capacity||0)+'</b>'+
+    (w.price_net!=null?' · Preis p. P.: '+euro(w.price_net):'')+' — Bezahlung vor Ort oder per Rechnung.</div>'+
+    (sg.length?('<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Kontakt</th><th class="num">Plätze</th><th>Nachricht</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>')
+      :'<span class="mut">Noch keine Anmeldungen.</span>'));
+}
+function wsCancel(sid,wid){
+  if(!confirm('Anmeldung stornieren? Der Platz wird wieder frei.'))return;
+  api('workshop_signups?id=eq.'+sid,{method:'PATCH',body:{status:'storniert'}})
+    .then(function(){toast('Storniert ✓');return api('workshop_signups?select=*&order=created_at.desc')})
+    .then(function(r){CACHE.wsSignups=r||[];renderWsAdmin();openWsDetail(wid)}).catch(function(e){toast(e.message,1)});
+}
+function reloadWs(){
+  Promise.all([api('workshop_events?select=*&order=event_date'),api('workshop_signups?select=*&order=created_at.desc')])
+    .then(function(r){CACHE.wsEvents=r[0]||[];CACHE.wsSignups=r[1]||[];renderWsAdmin()});
 }
 
 /* ===== Dashboard ===== */
