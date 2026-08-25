@@ -238,6 +238,7 @@ th.num{text-align:right}
       <button class="btn sm" onclick="createDocFromBooking('rechnung')">→ Rechnung</button>
       <button class="btn g sm" onclick="createLieferschein()">📋 Lieferschein</button>
       <button class="btn g sm" onclick="printMietvertrag()">📄 Mietvertrag</button>
+      <button class="btn g sm" onclick="openDigitalRental()">✍ Mietvertrag digital</button>
       <button class="btn r sm" onclick="openStornoModal()">⚠ Storno</button></div></div>
     <div class="grid2" style="gap:16px;align-items:start">
       <div class="card"><h3>Details</h3><div id="bdData" class="sml"></div></div>
@@ -1512,11 +1513,12 @@ function printLieferschein(d,list){
   '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift — Rückgabe</div></div></div></div>';
   window.print();
 }
-function printMietvertrag(){
-  var b=curBook,list=bookEquipList(b);
+function printMietvertrag(rc){
+  var b=curBook,snap=rc&&rc.snapshot?rc.snapshot:null;
+  var list=snap?snap.items:bookEquipList(b);
   if(!list.length){toast('Keine Technik zugeordnet — der Mietvertrag listet die Mietsachen aus dem Auftrag.',1);return}
   var comp=S.company||{},cust=CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
-  var days=rentDays(b);
+  var days=snap?snap.days:rentDays(b);
   var total=list.reduce(function(s,it){return s+it.price},0);
   var rows=list.map(function(it,i){
     return '<tr><td style="padding:7px;border-bottom:1px solid #ddd">'+(i+1)+'</td>'+
@@ -1524,7 +1526,10 @@ function printMietvertrag(){
     '<td style="padding:7px;border-bottom:1px solid #ddd;text-align:right">'+it.qty+'</td>'+
     '<td style="padding:7px;border-bottom:1px solid #ddd;text-align:right">'+euro(it.price)+'</td></tr>';
   }).join('');
-  var terms=(S.rental_contract&&S.rental_contract.text)||'';
+  var terms=snap?(snap.terms||''):((S.rental_contract&&S.rental_contract.text)||'');
+  var mieterSig=rc&&rc.status==='unterschrieben'
+    ?'<div style="flex:1"><img src="'+rc.signature+'" style="max-height:60px;display:block;margin-bottom:2px"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">'+esc(rc.signed_name)+' — digital unterschrieben am '+dt(rc.signed_at)+' (Ausweiskopie liegt vor)</div></div>'
+    :'<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift Mieter</div></div>';
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:11px;line-height:1.55">'+
   '<div style="font-size:18px;font-weight:700;margin-bottom:16px">Mietvertrag über Veranstaltungstechnik</div>'+
@@ -1538,10 +1543,67 @@ function printMietvertrag(){
   '<tbody>'+rows+'</tbody><tfoot><tr><td colspan="3" style="padding:7px;text-align:right;font-weight:700">Gesamtmiete netto</td><td style="padding:7px;text-align:right;font-weight:700">'+euro(total)+'</td></tr></tfoot></table>'+
   '<p style="color:#555;margin-bottom:16px">zzgl. gesetzlicher Umsatzsteuer, sofern ausgewiesen. Abrechnung gemäß zugehörigem Angebot bzw. Rechnung.</p>'+
   '<div style="white-space:pre-wrap;margin-bottom:26px">'+esc(terms)+'</div>'+
-  '<div style="display:flex;gap:40px;margin-top:36px">'+
+  '<div style="display:flex;gap:40px;margin-top:36px;align-items:flex-end">'+
   '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift Vermieter</div></div>'+
-  '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift Mieter</div></div></div></div>';
+  mieterSig+'</div></div>';
   window.print();
+}
+
+/* ===== Digitaler Mietvertrag (Portal-Link, Ausweis, Unterschrift) ===== */
+function openDigitalRental(){
+  var b=curBook,cust=CACHE.customers.find(function(c){return c.id===b.customer_id});
+  if(!cust){toast('Kunde nicht gefunden.',1);return}
+  if(!bookEquipList(b).length){toast('Keine Technik zugeordnet — bitte erst Mietsachen zuordnen.',1);return}
+  var ensureZip=cust.zip?Promise.resolve():(function(){
+    var z=prompt('Der Kunde hat noch keine PLZ hinterlegt — sie dient als Login fürs Portal.\nPLZ des Kunden:');
+    if(!z)return Promise.reject(new Error('Ohne PLZ kein Kundenlink.'));
+    return api('customers?id=eq.'+cust.id,{method:'PATCH',body:{zip:z.trim()}}).then(function(){cust.zip=z.trim()});
+  })();
+  ensureZip.then(function(){return api('rental_contracts?booking_id=eq.'+b.id)})
+  .then(function(rows){
+    if(rows&&rows.length)return rows[0];
+    var t=hexToken()+hexToken().slice(0,16);
+    return api('rental_contracts',{method:'POST',prefer:'return=representation',
+      body:{booking_id:b.id,token:t,status:'offen'}}).then(function(r){return r[0]});
+  }).then(showRentalModal).catch(function(e){toast(e.message,1)});
+}
+function showRentalModal(rc){
+  window._mvRc=rc;
+  var url=portalUrl('mv',rc.token);
+  var html='<div class="sml mut" style="margin-bottom:10px">Der Kunde öffnet den Link auf Smartphone oder Tablet, fotografiert seinen Ausweis (Vorder- und Rückseite) und unterschreibt direkt auf dem Display — geht auch vor Ort auf deinem iPad. Login: seine Postleitzahl.</div>';
+  if(rc.status==='unterschrieben'){
+    html+='<div style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px">✅ <b>Unterschrieben</b> am '+dt(rc.signed_at)+' von '+esc(rc.signed_name)+'</div>'+
+    '<img src="'+rc.signature+'" alt="Unterschrift" style="background:#fff;border-radius:8px;max-width:100%;max-height:110px;display:block;margin-bottom:12px">'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+    (rc.id_front?'<button class="btn g sm" onclick="viewIdFile(\''+rc.id_front+'\')">🪪 Ausweis Vorderseite</button>':'')+
+    (rc.id_back?'<button class="btn g sm" onclick="viewIdFile(\''+rc.id_back+'\')">🪪 Ausweis Rückseite</button>':'')+
+    '<button class="btn sm" onclick="closeModal();printMietvertrag(window._mvRc)">🖨 Vertrag drucken</button>'+
+    ((rc.id_front||rc.id_back)?'<button class="btn r sm" onclick="purgeIdFiles()">Ausweisfotos löschen</button>':'')+'</div>'+
+    '<div class="mut sml" style="margin-top:10px">DSGVO: Die Ausweisfotos dienen nur der Absicherung der Vermietung — nach vollständiger, unbeschädigter Rückgabe hier löschen.</div>';
+  }else{
+    html+='<label>Kundenlink</label><input value="'+url+'" readonly onclick="this.select()">'+
+    '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'+
+    '<button class="btn sm" onclick="navigator.clipboard.writeText(\''+url+'\');toast(\'Link kopiert ✓\')">📋 Link kopieren</button>'+
+    '<a class="btn g sm" href="'+url+'" target="_blank" style="text-decoration:none">↗ Öffnen (z. B. auf dem iPad)</a></div>'+
+    '<div class="mut sml" style="margin-top:10px">Status: noch nicht unterschrieben. Sobald der Kunde abschließt, erscheint hier Unterschrift + Ausweiskopie, und in der Kunden-Timeline landet ein Eintrag.</div>';
+  }
+  openModal('Digitaler Mietvertrag — '+dt(curBook.event_date),html);
+}
+function viewIdFile(name){
+  fetch('api.php/idfile/'+name,{headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){if(!r.ok)throw new Error('Datei nicht gefunden (evtl. schon gelöscht).');return r.blob()})
+    .then(function(bl){window.open(URL.createObjectURL(bl),'_blank')})
+    .catch(function(e){toast(e.message,1)});
+}
+function purgeIdFiles(){
+  var rc=window._mvRc;
+  if(!confirm('Ausweisfotos endgültig löschen?\nNur nach vollständiger, unbeschädigter Rückgabe der Mietsachen.'))return;
+  Promise.all([rc.id_front,rc.id_back].filter(Boolean).map(function(n){
+    return fetch('api.php/idfile/'+n,{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}});
+  })).then(function(){
+    return api('rental_contracts?id=eq.'+rc.id,{method:'PATCH',body:{id_front:null,id_back:null}});
+  }).then(function(){rc.id_front=null;rc.id_back=null;toast('Ausweisfotos gelöscht ✓');showRentalModal(rc)})
+  .catch(function(e){toast(e.message,1)});
 }
 
 /* ===== Druck / PDF ===== */

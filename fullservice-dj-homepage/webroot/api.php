@@ -32,7 +32,7 @@ const JSON_COLS = [
   'settings' => ['value'], 'site_content' => ['value'],
   'packages' => ['features'], 'customers' => ['tags'],
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
-  'products' => ['bundle'], 'bookings' => ['rider'],
+  'products' => ['bundle'], 'bookings' => ['rider'], 'rental_contracts' => ['snapshot'],
 ];
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'],
@@ -45,7 +45,7 @@ const BOOL_COLS = [
 ];
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
-  'doc_events','form_templates','forms','upsells','reviews','products','partners'];
+  'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -143,7 +143,18 @@ function upgrade(PDO $p): void {
   if ($v < 7) {
     try { $p->exec("alter table bookings add column rider text"); } catch (PDOException $e) {}
   }
-  $p->exec('PRAGMA user_version=7');
+  if ($v < 8) {
+    try { $p->exec(rentalContractsDdl()); } catch (PDOException $e) {}
+  }
+  $p->exec('PRAGMA user_version=8');
+}
+
+function rentalContractsDdl(): string {
+  return "create table if not exists rental_contracts (id text primary key,
+    booking_id text not null references bookings(id) on delete cascade,
+    token text unique, status text default 'offen', snapshot text,
+    signed_name text, signature text, id_front text, id_back text,
+    signed_at text, created_at text)";
 }
 
 function rentalContractDefault(): string {
@@ -226,6 +237,7 @@ create table document_items (id text primary key,
   pos integer default 1, description text not null, note text, qty real default 1, unit text, unit_price real default 0,
   discount_value real default 0, discount_type text default 'pct');
 SQL);
+  $p->exec(rentalContractsDdl());
   seed($p);
 }
 
@@ -269,7 +281,7 @@ function seed(PDO $p): void {
     ['seo', '{"title":"DJ Lauschgift – Hochzeits-DJ & Event-DJ | Deutschlandweit","description":"DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer."}'],
     ['legal', json_encode([
       'impressum' => "Angaben gemäß § 5 DDG\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\n\nTelefon: 01523 6439373\nE-Mail: (bitte im Backoffice ergänzen)\n\nUmsatzsteuer: (Steuernummer / USt-IdNr. bitte im Backoffice ergänzen)\n\nVerantwortlich für den Inhalt: Markus Jankowski (Anschrift wie oben)",
-      'datenschutz' => "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer, Telefon 01523 6439373.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n4. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n5. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: bitte nach juristischer Prüfung ergänzen.",
+      'datenschutz' => "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer, Telefon 01523 6439373.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n4. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n5. Digitaler Mietvertrag und Ausweiskopie\nBei der Vermietung von Veranstaltungstechnik könnt ihr den Mietvertrag digital abschließen. Dabei werden eure Unterschrift sowie – mit eurer ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 20 PAuswG) – Fotos der Vorder- und Rückseite eures Personalausweises verarbeitet und in einem zugriffsgeschützten Bereich des eigenen Servers gespeichert. Nicht benötigte Angaben dürft ihr vor dem Fotografieren schwärzen. Die Ausweiskopien dienen ausschließlich der Absicherung des Mietverhältnisses und werden nach vollständiger Rückgabe der Mietsachen gelöscht.\n\n6. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: bitte nach juristischer Prüfung ergänzen.",
       'agb' => "Allgemeine Geschäftsbedingungen (AGB)\n\n1. Geltungsbereich\nDiese AGB gelten ausschließlich für Verträge über DJ-Leistungen und Technikvermietung, die unmittelbar mit Markus Jankowski (DJ Lauschgift), Büttmecker Weg 35c, 58675 Hemer, geschlossen werden.\n\nSie gelten nicht für Verträge, die der Auftraggeber mit anderen DJs schließt – etwa nach einer Empfehlung bzw. Vermittlung über die Partner-Agentur (vgl. Ziffer 6) oder direkt mit dem jeweiligen DJ. Für solche Verträge gelten allein die Bedingungen des jeweiligen DJs bzw. der Agentur; der Auftragnehmer ist an diesen Verträgen nicht beteiligt und übernimmt für deren Inhalt und Erfüllung keine Haftung.\n\n2. Angebot und Vertragsschluss\nAngebote sind freibleibend. Der Vertrag kommt mit schriftlicher Bestätigung (auch per E-Mail) zustande. Erst mit der Bestätigung ist der Termin verbindlich reserviert.\n\n3. Preise\nDie Vergütung richtet sich nach Auslastung, Arbeitsstunden und technischem Aufwand der jeweiligen Veranstaltung; eine Unterscheidung nach Anlass (z. B. Hochzeit, Geburtstag, Firmenfeier) findet nicht statt. Alle Posten werden im Angebot ausgewiesen.\n\n4. Ausfall des Auftragnehmers und Ersatz (Plan B)\nFällt der Auftragnehmer aus (z. B. durch Krankheit), verpflichtet er sich, sich im Rahmen seiner Möglichkeiten um einen geeigneten Ersatz-DJ aus seinem Kollegen-Netzwerk zu bemühen und diesen dem Auftraggeber unverzüglich vorzuschlagen.\n\nDer Vorschlag ist für den Auftraggeber unverbindlich: Er kann frei entscheiden, ob er den vorgeschlagenen Ersatz-DJ beauftragt oder vom Vertrag zurücktritt. Bei Rücktritt werden bereits geleistete Zahlungen vollständig erstattet; weitergehende Ansprüche bestehen nur bei Vorsatz oder grober Fahrlässigkeit.\n\nEntscheidet sich der Auftraggeber für den Ersatz-DJ, kommt der Vertrag über dessen Leistung direkt mit dem Ersatz-DJ zustande. Wichtig: Der Ersatz-DJ rechnet zu seinen eigenen Preisen ab – der Endpreis kann daher vom ursprünglich vereinbarten Preis abweichen. Auch der Leistungsumfang, insbesondere die mitgeführte Ton- und Lichttechnik, kann vom Angebot des Auftragnehmers abweichen. Bereits an den Auftragnehmer geleistete Zahlungen werden in diesem Fall erstattet bzw. verrechnet.\n\n5. Stornierung durch den Auftraggeber\nSagt der Auftraggeber die Veranstaltung ab, kann kurzfristig in der Regel kein Ersatzauftrag mehr angenommen werden – insbesondere innerhalb von sechs Wochen vor dem Termin ist eine Neubelegung praktisch ausgeschlossen. Daher gilt folgende pauschale Ausfallvergütung (jeweils bezogen auf die vereinbarte Nettovergütung):\n– Absage bis 6 Monate vor dem Termin: 20 %\n– Absage bis 3 Monate vor dem Termin: 40 %\n– Absage bis 6 Wochen vor dem Termin: 60 %\n– Absage weniger als 6 Wochen vor dem Termin: 80 %\n– Absage weniger als 7 Tage vor dem Termin oder Nichtabnahme: 90 %\nErsparte Aufwendungen (z. B. nicht anfallende Fahrtkosten sowie stornierbare Übernachtungskosten) werden angerechnet und von der Ausfallvergütung abgezogen. Dem Auftraggeber bleibt der Nachweis unbenommen, dass kein oder ein wesentlich geringerer Schaden entstanden ist. Gelingt es dem Auftragnehmer, für den Termin einen gleichwertigen Ersatzauftrag anzunehmen, entfällt die Ausfallvergütung bis auf bereits entstandene Kosten. Maßgeblich für die Staffel ist der Zugang der Absage in Textform.\n\nUmbuchung auf einen Ersatztermin: Einigen sich beide Seiten auf einen Ersatztermin, kann der Auftragnehmer anstelle der Ausfallvergütung eine reduzierte Umbuchungspauschale ansetzen; bereits entstandene Kosten (z. B. nicht stornierbare Auslagen) werden zusätzlich berechnet. Die Umbuchung ist eine reine Kulanzregelung des Auftragnehmers: Ein Anspruch auf einen Ersatztermin oder auf eine reduzierte Pauschale besteht nicht. Ob und zu welchen Konditionen umgebucht wird, entscheidet der Auftragnehmer frei im Einzelfall – insbesondere abhängig von seiner Verfügbarkeit am Wunschtermin, davon, ob der ursprüngliche Termin anderweitig belegt werden kann, und vom Buchungswert des Ersatztermins.\n\n6. DJ-Vermittlung über Partner-Agentur\nIst der Auftragnehmer am gewünschten Termin verhindert oder kommt eine Zusammenarbeit aus anderen Gründen nicht zustande, kann er dem Interessenten auf Wunsch bis zu fünf passende DJs vorschlagen. Diese Empfehlung ist eine reine Vermittlungsleistung des Auftragnehmers und für den Interessenten kostenlos – sie wird ihm nicht in Rechnung gestellt.\n\nDie Vermittlung erfolgt über die Partner-Agentur DJ Bande (Münster). Der Vertrag über die DJ-Leistung kommt ausschließlich zwischen dem Interessenten und dem vermittelten DJ bzw. der Agentur zustande; die Abrechnung der DJ-Leistung erfolgt nicht über den Auftragnehmer. Die Vermittlungsleistung finanziert sich dadurch, dass der Auftragnehmer für eine erfolgreich zustande gekommene Vermittlung eine Aufwandsentschädigung (Provision) von der Agentur bzw. dem vermittelten DJ erhält. Für den Interessenten entstehen dadurch keine zusätzlichen Kosten. Die auf dieser Website genannten Preise und Preisbeispiele gelten ausschließlich für Leistungen des Auftragnehmers selbst; vermittelte DJs kalkulieren ihre Vergütung eigenständig, deren Konditionen können abweichen.\n\n7. Widerrufsrecht\nBei der Buchung von DJ- und Veranstaltungstechnik-Leistungen für einen bestimmten Termin besteht kein Widerrufsrecht. Gemäß § 312g Abs. 2 Nr. 9 BGB ist das Widerrufsrecht ausgeschlossen bei Verträgen zur Erbringung von Dienstleistungen im Zusammenhang mit Freizeitbetätigungen, wenn der Vertrag für die Erbringung einen spezifischen Termin oder Zeitraum vorsieht. Jede Buchung ist daher rechtsverbindlich und verpflichtet zur Abnahme und Bezahlung der Leistung.\n\nSofern eine Buchung im Einzelfall nicht unter § 312g Abs. 2 Nr. 9 BGB fallen sollte, gilt für Verbraucher: Sie haben das Recht, binnen vierzehn Tagen ab Vertragsschluss diesen Vertrag ohne Angabe von Gründen zu widerrufen. Der Widerruf ist zu richten an: Markus Jankowski, Büttmecker Weg 35c, 58675 Hemer (oder per E-Mail an die im Impressum genannte Adresse).\n\n8. Technikvermietung\nMietpreise gelten pro Miettag (24 Stunden); jeder Folgetag wird mit 50 % des Grundpreises berechnet. Der Mieter haftet für Verlust und Beschädigung der Mietsachen ab Übergabe bis zur Rückgabe.\n\n9. Zahlungsbedingungen\nRechnungen sind, sofern nicht anders vereinbart, innerhalb von 14 Tagen ohne Abzug zahlbar. Bei Buchungen kann eine Abschlagszahlung vereinbart werden.\n\n10. Schlussbestimmungen\nEs gilt deutsches Recht. Sollten einzelne Bestimmungen unwirksam sein, bleibt der Vertrag im Übrigen wirksam.\n\nStand: bitte nach juristischer Prüfung ergänzen.",
     ], JSON_UNESCAPED_UNICODE)],
   ] as [$k, $v]) $p->prepare('insert into site_content (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
@@ -669,6 +681,50 @@ function portalDoc(string $token, string $plz): array {
   return $d;
 }
 
+function portalRental(string $token, string $plz): array {
+  $p = db();
+  if (!preg_match('/^[a-f0-9]{24,64}$/', $token)) fail('Ungültiger Link.', 404);
+  $st = $p->prepare('select r.*, b.event_date, b.end_date, b.title,
+      c.id as cust_id, c.first_name, c.last_name, c.company, c.street, c.zip, c.city
+    from rental_contracts r join bookings b on b.id = r.booking_id
+    join customers c on c.id = b.customer_id where r.token = ?');
+  $st->execute([$token]);
+  $r = $st->fetch();
+  if (!$r) fail('Dieser Mietvertrag wurde nicht gefunden oder der Link ist abgelaufen.', 404);
+  if (trim($plz) === '' || trim($plz) !== trim((string)$r['zip'])) {
+    usleep(500000);
+    out(['need' => 'plz'], 401);
+  }
+  return $r;
+}
+function rentalDays(array $b): int {
+  if (empty($b['end_date']) || $b['end_date'] <= $b['event_date']) return 1;
+  return (int)round((strtotime($b['end_date']) - strtotime($b['event_date'])) / 86400) + 1;
+}
+function rentalItems(PDO $p, array $b): array {
+  $days = rentalDays($b);
+  $st = $p->prepare('select be.qty, be.price_override, e.name, e.day_rate, e.followup_pct
+    from booking_equipment be join equipment e on e.id = be.equipment_id where be.booking_id = ?');
+  $st->execute([$b['booking_id']]);
+  $items = [];
+  foreach ($st->fetchAll() as $x) {
+    $base = (float)($x['day_rate'] ?? 0);
+    $price = $x['price_override'] !== null ? (float)$x['price_override']
+      : ($base + ($days - 1) * $base * ((float)($x['followup_pct'] ?? 50) / 100)) * (int)$x['qty'];
+    $items[] = ['name' => $x['name'], 'qty' => (int)$x['qty'], 'price' => round($price, 2)];
+  }
+  return $items;
+}
+/* data:image-URL prüfen und dekodieren (Unterschrift, Ausweisfotos) */
+function decodeDataUrl(string $s, array $allowed, int $max): ?array {
+  if (!preg_match('#^data:image/(png|jpeg|webp);base64,#', $s, $m)) return null;
+  if (!in_array($m[1], $allowed)) return null;
+  $bin = base64_decode(substr($s, strpos($s, ',') + 1), true);
+  if ($bin === false || strlen($bin) > $max || strlen($bin) < 100) return null;
+  if (@getimagesizefromstring($bin) === false) return null;
+  return ['bin' => $bin, 'ext' => $m[1] === 'jpeg' ? 'jpg' : $m[1]];
+}
+
 function handlePortal(string $path, string $method, $body): never {
   $p = db();
   if (preg_match('#^portal/offer/([a-f0-9]+)$#', $path, $m) && $method === 'GET') {
@@ -729,6 +785,52 @@ function handlePortal(string $path, string $method, $body): never {
       }
       out(['ok' => true], 201);
     }
+  }
+  /* Digitaler Mietvertrag: ansehen, Ausweis hochladen, unterschreiben */
+  if (preg_match('#^portal/rental/([a-f0-9]+)$#', $path, $m) && $method === 'GET') {
+    $r = portalRental($m[1], (string)($_GET['plz'] ?? ''));
+    $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+    $terms = json_decode($p->query("select value from settings where key='rental_contract'")->fetchColumn() ?: '{}', true);
+    out([
+      'status' => $r['status'], 'signed_at' => $r['signed_at'], 'signed_name' => $r['signed_name'],
+      'customer' => ['name' => trim($r['company'] ?: trim($r['first_name'].' '.$r['last_name'])),
+        'street' => $r['street'], 'zip_city' => trim($r['zip'].' '.$r['city'])],
+      'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city'])),
+      'booking' => ['title' => $r['title'], 'event_date' => $r['event_date'], 'end_date' => $r['end_date'],
+        'days' => rentalDays($r)],
+      'items' => rentalItems($p, $r),
+      'terms' => (string)($terms['text'] ?? ''),
+    ]);
+  }
+  if (preg_match('#^portal/rental/([a-f0-9]+)/sign$#', $path, $m) && $method === 'POST') {
+    $r = portalRental($m[1], (string)($body['plz'] ?? ''));
+    if ($r['status'] === 'unterschrieben') fail('Dieser Mietvertrag wurde bereits unterschrieben.', 409);
+    if (empty($body['consent'])) fail('Bitte der Ausweiskopie zustimmen.');
+    $name = mb_substr(trim((string)($body['signed_name'] ?? '')), 0, 120);
+    if ($name === '') fail('Bitte den vollständigen Namen eintragen.');
+    $sig = decodeDataUrl((string)($body['signature'] ?? ''), ['png'], 400 * 1024);
+    if (!$sig) fail('Die Unterschrift fehlt oder ist ungültig.');
+    $front = decodeDataUrl((string)($body['id_front'] ?? ''), ['jpeg','png','webp'], 3 * 1024 * 1024);
+    $back  = decodeDataUrl((string)($body['id_back'] ?? ''),  ['jpeg','png','webp'], 3 * 1024 * 1024);
+    if (!$front || !$back) fail('Bitte Vorder- und Rückseite des Ausweises fotografieren.');
+    $dir = DATA_DIR . '/ids';
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    $ff = $r['id'] . '-front.' . $front['ext'];
+    $fb = $r['id'] . '-back.' . $back['ext'];
+    file_put_contents("$dir/$ff", $front['bin']);
+    file_put_contents("$dir/$fb", $back['bin']);
+    $terms = json_decode($p->query("select value from settings where key='rental_contract'")->fetchColumn() ?: '{}', true);
+    $snapshot = json_encode(['items' => rentalItems($p, $r), 'days' => rentalDays($r),
+      'event_date' => $r['event_date'], 'end_date' => $r['end_date'],
+      'terms' => (string)($terms['text'] ?? '')], JSON_UNESCAPED_UNICODE);
+    $p->prepare("update rental_contracts set status='unterschrieben', signed_name=?, signature=?,
+        id_front=?, id_back=?, signed_at=?, snapshot=? where id=?")
+      ->execute([$name, (string)$body['signature'], $ff, $fb, now(), $snapshot, $r['id']]);
+    $p->prepare('insert into communications (id,customer_id,booking_id,channel,direction,subject,content,occurred_at,created_at)
+        values (?,?,?,?,?,?,?,?,?)')
+      ->execute([uuid(), $r['cust_id'], $r['booking_id'], 'note', 'in', 'Mietvertrag digital unterschrieben',
+        'Mietvertrag zur Buchung am '.$r['event_date'].' wurde online unterschrieben von: '.$name.'. Ausweiskopien (Vorder-/Rückseite) liegen geschützt im System.', now(), now()]);
+    out(['ok' => true], 201);
   }
   /* Partner-Registrierung (DJs, Bands, Musiker, Techniker) */
   if ($path === 'portal/partner' && $method === 'POST') {
@@ -803,6 +905,18 @@ try {
     handleRest($m[1], $method, $q, $body, $prefer);
   }
   if (preg_match('#^storage/(.+)$#', $path, $m) && $method === 'POST') handleUpload($m[1]);
+  /* Ausweisfotos: liegen geschützt in data/ids, Abruf/Löschung nur angemeldet */
+  if (preg_match('#^idfile/([a-f0-9-]{30,50}-(?:front|back)\.(?:jpg|png|webp))$#', $path, $m)) {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $f = DATA_DIR . '/ids/' . $m[1];
+    if ($method === 'DELETE') { @unlink($f); out(['ok' => true]); }
+    if ($method === 'GET') {
+      if (!is_file($f)) fail('Datei nicht gefunden.', 404);
+      $ext = pathinfo($f, PATHINFO_EXTENSION);
+      header('Content-Type: ' . ($ext === 'jpg' ? 'image/jpeg' : 'image/' . $ext));
+      readfile($f); exit;
+    }
+  }
   fail('Unbekannter Endpunkt.', 404);
 } catch (PDOException $e) {
   fail('Datenbankfehler: ' . $e->getMessage(), 500);
