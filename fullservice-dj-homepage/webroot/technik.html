@@ -329,7 +329,13 @@ footer a:hover{color:var(--acc)}
           <div><label>E-Mail *</label><input id="wsMail" type="email"></div>
           <div><label>Telefon</label><input id="wsPhone"></div>
           <div><label>Plätze</label><select id="wsSeats"><option>1</option><option>2</option><option>3</option></select></div>
+          <div><label>Straße &amp; Hausnummer *</label><input id="wsStreet" autocomplete="street-address"></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:10px">
+            <div><label>PLZ *</label><input id="wsZip" inputmode="numeric" autocomplete="postal-code"></div>
+            <div><label>Ort *</label><input id="wsCity" autocomplete="address-level2"></div>
+          </div>
         </div>
+        <div class="sml" style="color:var(--mut2);margin-top:6px">Die Anschrift brauche ich für deine Rechnung — sie kommt direkt nach der Buchung per E-Mail, zahlbar per Überweisung. Mit Zahlungseingang ist dein Platz fix.</div>
         <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
           <div class="sml" style="color:var(--mut);margin-bottom:4px">Drei kurze Fragen, damit ich den Workshop auf euch zuschneiden kann:</div>
           <label>Was machst du musikalisch? *</label><input id="wsQ1" placeholder="z. B. Ich lege Techno mit XDJ auf / spiele Gitarre in einer Coverband …">
@@ -593,12 +599,15 @@ function sendWs(){
   function err(t){m.style.display='block';m.className='msg err';m.innerHTML=t}
   var name=document.getElementById('wsName').value.trim(),mail=document.getElementById('wsMail').value.trim();
   if(!name||!mail){err('Bitte Name und E-Mail angeben.');return}
+  var street=document.getElementById('wsStreet').value.trim(),zip=document.getElementById('wsZip').value.trim(),city=document.getElementById('wsCity').value.trim();
+  if(wsSel.price_net>0&&(!street||!zip||!city)){err('Bitte Anschrift angeben (Straße, PLZ, Ort) — sie wird für die Rechnung benötigt.');return}
   var q1=document.getElementById('wsQ1').value.trim(),q2=document.getElementById('wsQ2').value.trim(),q3=document.getElementById('wsQ3').value.trim();
   if(!q1||!q2||!q3){err('Bitte beantworte kurz die drei Fragen — so kann ich den Workshop auf euch zuschneiden.');return}
   btn.disabled=true;
   fetch(API+'/portal/workshops/'+wsSel.id+'/signup',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({name:name,email:mail,phone:document.getElementById('wsPhone').value.trim(),
       seats:Number(document.getElementById('wsSeats').value)||1,message:document.getElementById('wsNote').value.trim(),
+      street:street,zip:zip,city:city,
       q_music:q1,q_challenge:q2,q_goal:q3,waitlist:wsWl})})
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
@@ -608,9 +617,14 @@ function sendWs(){
       }
       if(res.s>=400)throw new Error(res.j.error||'Anmeldung fehlgeschlagen.');
       m.style.display='block';m.className='msg ok';
+      var inv=res.j.invoice;
       m.textContent=res.j.status==='warteliste'
-        ?'Du stehst auf der Warteliste ✓ Wird ein Platz frei, melde ich mich sofort bei dir.'
-        :'Platz reserviert ✓ Du bekommst eine Bestätigung per E-Mail. Bezahlung vor Ort oder per Rechnung.';
+        ?'Du stehst auf der Warteliste ✓ Wird ein Platz frei, melde ich mich sofort bei dir — bezahlt wird erst dann.'
+        :(inv&&inv.mailed
+          ?'Platz reserviert ✓ Deine Rechnung '+inv.number+' ist unterwegs an '+mail+' — mit Link zum Ansehen und als PDF. Mit Zahlungseingang ist dein Platz fix.'
+          :(inv
+            ?'Platz reserviert ✓ Deine Rechnung '+inv.number+' ist erstellt — du bekommst sie in Kürze per E-Mail. Mit Zahlungseingang ist dein Platz fix.'
+            :'Platz reserviert ✓ Du bekommst eine Bestätigung per E-Mail.'));
       loadWorkshops();
     }).catch(function(e){err(esc(e.message))})
     .finally(function(){btn.disabled=false});

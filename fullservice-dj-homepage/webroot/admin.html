@@ -673,6 +673,8 @@ function openWsDetail(id){
     var badge=s.status==='warteliste'?'<span class="b blue">Warteliste</span>':(s.status==='storniert'?'<span class="b grey">storniert</span>':'<span class="b green">angemeldet</span>');
     var qa=[['Musikalisch',s.q_music],['Herausforderung',s.q_challenge],['Ziel',s.q_goal]]
       .filter(function(x){return x[1]}).map(function(x){return '<div><span class="mut">'+x[0]+':</span> '+esc(x[1])+'</div>'}).join('');
+    var invDoc=s.invoice_id?(CACHE.documents||[]).find(function(d){return d.id===s.invoice_id}):null;
+    if(invDoc)qa+='<div style="margin-top:4px"><span class="mut">Rechnung:</span> <a onclick="closeModal();openDocEditor(\''+invDoc.id+'\')">'+esc(invDoc.number)+'</a> <span class="b '+docBadge(invDoc.status)+'">'+invDoc.status+'</span></div>';
     return '<tr'+(s.status==='storniert'?' style="opacity:.45"':'')+'><td>'+esc(s.name)+'<br>'+badge+'</td>'+
     '<td>'+esc(s.email||'')+(s.phone?'<br><span class="mut">'+esc(s.phone)+'</span>':'')+'</td>'+
     '<td class="num">'+(s.seats||1)+'</td>'+
@@ -696,12 +698,21 @@ function wsPromote(sid,wid){
   var free=(w.capacity||0)-wsBooked(wid);
   if((s.seats||1)>free&&!confirm('Achtung: Der Termin hat nur noch '+free+' freie Plätze — nachrücken lassen und überbuchen?'))return;
   api('workshop_signups?id=eq.'+sid,{method:'PATCH',body:{status:'angemeldet'}})
-    .then(function(){toast('Nachgerückt ✓ — kurze Bestätigungs-Mail an den Teilnehmer nicht vergessen.');
-      return api('workshop_signups?select=*&order=created_at.desc')})
+    .then(function(){
+      return fetch('api.php/workshop/'+sid+'/invoice',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}})
+        .then(function(r){return r.json()}).catch(function(){return {}});
+    })
+    .then(function(inv){
+      if(inv&&inv.ok)toast(inv.mailed?('Nachgerückt ✓ Rechnung '+inv.number+' wurde automatisch gemailt.')
+        :('Nachgerückt ✓ Rechnung '+inv.number+' erstellt — Mailversand prüfen/manuell senden.'));
+      else toast('Nachgerückt ✓ (keine Rechnung: '+((inv&&inv.reason)||'siehe Termin-Preis')+')');
+      refreshDocs();
+      return api('workshop_signups?select=*&order=created_at.desc');
+    })
     .then(function(r){CACHE.wsSignups=r||[];renderWsAdmin();openWsDetail(wid)}).catch(function(e){toast(e.message,1)});
 }
 function wsCancel(sid,wid){
-  if(!confirm('Anmeldung stornieren? Der Platz wird wieder frei.'))return;
+  if(!confirm('Anmeldung stornieren? Der Platz wird wieder frei.\nFalls schon eine Rechnung existiert: bitte im Rechnungs-Bereich stornieren bzw. gutschreiben.'))return;
   api('workshop_signups?id=eq.'+sid,{method:'PATCH',body:{status:'storniert'}})
     .then(function(){toast('Storniert ✓');return api('workshop_signups?select=*&order=created_at.desc')})
     .then(function(r){CACHE.wsSignups=r||[];renderWsAdmin();openWsDetail(wid)}).catch(function(e){toast(e.message,1)});

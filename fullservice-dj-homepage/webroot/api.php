@@ -162,7 +162,13 @@ function upgrade(PDO $p): void {
   if ($v < 12) {
     try { $p->exec("alter table workshop_events add column audience text default ''"); } catch (PDOException $e) {}
   }
-  $p->exec('PRAGMA user_version=12');
+  if ($v < 13) foreach ([
+    "alter table workshop_signups add column street text",
+    "alter table workshop_signups add column zip text",
+    "alter table workshop_signups add column city text",
+    "alter table workshop_signups add column invoice_id text",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+  $p->exec('PRAGMA user_version=13');
 }
 
 function workshopsDdl(): array {
@@ -174,6 +180,7 @@ function workshopsDdl(): array {
       workshop_id text not null references workshop_events(id) on delete cascade,
       name text not null, email text, phone text, seats integer default 1, message text,
       q_music text, q_challenge text, q_goal text,
+      street text, zip text, city text, invoice_id text,
       status text default 'angemeldet', created_at text)",
   ];
 }
@@ -762,6 +769,122 @@ function decodeDataUrl(string $s, array $allowed, int $max): ?array {
   return ['bin' => $bin, 'ext' => $m[1] === 'jpeg' ? 'jpg' : $m[1]];
 }
 
+/* Mail über den eigenen Server (All-Inkl: PHP mail() nutzt den Domain-Mailserver).
+   Absender = Firmen-E-Mail aus den Einstellungen; ohne die wird nicht versendet. */
+function sendMailSafe(string $to, string $subject, string $bodyText): bool {
+  $comp = json_decode(db()->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+  $from = trim((string)($comp['email'] ?? ''));
+  if ($from === '' || !filter_var($from, FILTER_VALIDATE_EMAIL) || !filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
+  $fromName = preg_replace('/[\r\n"]+/', '', (string)($comp['name'] ?? 'Lauschgift'));
+  $headers = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$from>\r\n" .
+             "Reply-To: $from\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit";
+  return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $bodyText, $headers);
+}
+
+function baseUrl(): string {
+  $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+  $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+  $dir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/'), '/');
+  return ($https ? 'https' : 'http') . "://$host$dir";
+}
+
+/* Erstellt (einmalig) die Rechnung zu einer Workshop-Anmeldung und mailt den Portal-Link. */
+function workshopInvoice(PDO $p, string $signupId): array {
+  $st = $p->prepare('select s.*, w.title as w_title, w.event_date as w_date, w.price_net as w_price
+    from workshop_signups s join workshop_events w on w.id = s.workshop_id where s.id = ?');
+  $st->execute([$signupId]);
+  $s = $st->fetch();
+  if (!$s) return ['ok' => false, 'reason' => 'Anmeldung nicht gefunden.'];
+  if ($s['invoice_id']) {
+    $n = $p->prepare('select number from documents where id = ?'); $n->execute([$s['invoice_id']]);
+    return ['ok' => true, 'number' => (string)$n->fetchColumn(), 'mailed' => false, 'existing' => true];
+  }
+  $price = (float)($s['w_price'] ?? 0);
+  $seats = max(1, (int)$s['seats']);
+  if ($price <= 0) return ['ok' => false, 'reason' => 'Kein Preis am Termin hinterlegt.'];
+  $get = fn($k) => json_decode($p->query("select value from settings where key='" . $k . "'")->fetchColumn() ?: '{}', true);
+  $comp = $get('company'); $defs = $get('defaults');
+
+  /* Kunde finden oder anlegen */
+  $cst = $p->prepare('select id, zip from customers where email = ? limit 1');
+  $cst->execute([$s['email']]);
+  $cust = $cst->fetch();
+  $parts = preg_split('/\s+/', trim($s['name']), 2);
+  if (!$cust) {
+    $cid = uuid();
+    $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, phone, street, zip, city, source, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?)')
+      ->execute([$cid, 'privat', 'kunde', $parts[0] ?? '', $parts[1] ?? '', $s['email'], $s['phone'],
+        $s['street'], $s['zip'], $s['city'], 'workshop', now()]);
+    $custZip = (string)$s['zip'];
+  } else {
+    $cid = $cust['id'];
+    $custZip = trim((string)$cust['zip']);
+    if ($custZip === '' && trim((string)$s['zip']) !== '') {
+      $p->prepare('update customers set zip = ?, street = coalesce(street, ?), city = coalesce(city, ?) where id = ?')
+        ->execute([$s['zip'], $s['street'], $s['city'], $cid]);
+      $custZip = (string)$s['zip'];
+    }
+  }
+
+  /* Nummernkreis fortschreiben + Rechnung anlegen (atomar) */
+  $p->beginTransaction();
+  try {
+    $numRow = $p->query("select value from settings where key='numbering'")->fetchColumn() ?: '{}';
+    $num = json_decode($numRow, true) ?: [];
+    $cfg = $num['rechnung'] ?? ['prefix' => 'RE-', 'next' => 1];
+    $number = $cfg['prefix'] . (($num['year_in_number'] ?? true) ? gmdate('Y') . '-' : '') . str_pad((string)$cfg['next'], 4, '0', STR_PAD_LEFT);
+    $cfg['next'] = (int)$cfg['next'] + 1;
+    $num['rechnung'] = $cfg;
+    $p->prepare("update settings set value = ?, updated_at = ? where key='numbering'")
+      ->execute([json_encode($num, JSON_UNESCAPED_UNICODE), now()]);
+
+    $small = !empty($comp['small_business']);
+    $rate = $small ? 0.0 : (float)($defs['tax_rate'] ?? 19);
+    $net = round($price * $seats, 2);
+    $tax = round($net * $rate / 100, 2);
+    $payDays = (int)($defs['payment_days'] ?? 14);
+    $due = gmdate('Y-m-d', time() + $payDays * 86400);
+    if ($s['w_date'] && $s['w_date'] > gmdate('Y-m-d') && $s['w_date'] < $due) $due = $s['w_date'];
+    $dTitle = $s['w_title'] . ' am ' . $s['w_date'];
+    $docId = uuid(); $token = bin2hex(random_bytes(24));
+    $p->prepare('insert into documents (id, share_token, doc_type, number, customer_id, status, doc_date, due_date,
+        tax_rate, is_small_business, intro_text, outro_text, total_net, total_tax, total_gross, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      ->execute([$docId, $token, 'rechnung', $number, $cid, 'entwurf', gmdate('Y-m-d'), $due,
+        $rate, $small ? 1 : 0,
+        'vielen Dank für deine Anmeldung zum Workshop „' . $s['w_title'] . '“. Mit Zahlungseingang ist dein Platz verbindlich reserviert.',
+        (string)($defs['invoice_outro'] ?? ''), $net, $tax, $net + $tax, now()]);
+    $p->prepare('insert into document_items (id, document_id, pos, description, qty, unit, unit_price)
+        values (?,?,?,?,?,?,?)')
+      ->execute([uuid(), $docId, 1, 'Workshop: ' . $dTitle . ' — Teilnahme', $seats, $seats > 1 ? 'Plätze' : 'Platz', $price]);
+    $p->prepare('update workshop_signups set invoice_id = ? where id = ?')->execute([$docId, $signupId]);
+    $p->commit();
+  } catch (Throwable $e) {
+    $p->rollBack();
+    return ['ok' => false, 'reason' => 'Rechnung konnte nicht erstellt werden.'];
+  }
+
+  /* Mail mit Portal-Link */
+  $portal = baseUrl() . '/portal.html?a=' . $token;
+  $bodyTxt = "Hallo " . ($parts[0] ?? $s['name']) . ",\n\n" .
+    "danke für deine Anmeldung zum Workshop „" . $s['w_title'] . "“ am " . $s['w_date'] . "!\n\n" .
+    "Hier ist deine Rechnung $number (" . number_format($net + $tax, 2, ',', '.') . " €):\n$portal\n" .
+    "Login: deine Postleitzahl ($custZip). Dort kannst du die Rechnung ansehen und als PDF speichern.\n\n" .
+    "Mit Zahlungseingang ist dein Platz verbindlich reserviert. Zahlbar bis $due per Überweisung — die Bankverbindung steht auf der Rechnung.\n\n" .
+    "Bis bald im Workshop!\n" . ($comp['owner'] ?? '') . "\n" . ($comp['name'] ?? '') .
+    ($comp['phone'] ?? '' ? "\n" . $comp['phone'] : '');
+  $mailed = sendMailSafe((string)$s['email'], "Rechnung $number — dein Workshop-Platz am " . $s['w_date'], $bodyTxt);
+  $p->prepare('update documents set status = ?, sent_at = ? where id = ?')
+    ->execute([$mailed ? 'versendet' : 'entwurf', $mailed ? now() : null, $docId]);
+  $p->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, created_at)
+      values (?,?,?,?,?,?,?,?)')
+    ->execute([uuid(), $cid, $mailed ? 'email' : 'note', 'out',
+      'Workshop-Rechnung ' . $number . ($mailed ? ' automatisch versendet' : ' erstellt (Mailversand fehlgeschlagen — bitte manuell senden)'),
+      'Workshop: ' . $dTitle . ' · ' . $seats . ' Platz/Plätze · ' . number_format($net + $tax, 2, ',', '.') . " €\nPortal-Link: $portal", now(), now()]);
+  return ['ok' => true, 'number' => $number, 'mailed' => $mailed, 'portal' => $portal];
+}
+
 function handlePortal(string $path, string $method, $body): never {
   $p = db();
   if (preg_match('#^portal/offer/([a-f0-9]+)$#', $path, $m) && $method === 'GET') {
@@ -898,19 +1021,31 @@ function handlePortal(string $path, string $method, $body): never {
     if ($seats > $free && !$wantWaitlist)
       fail($free ? ($free === 1 ? 'Für diesen Termin ist nur noch 1 Platz frei.' : "Für diesen Termin sind nur noch $free Plätze frei.") : 'Dieser Termin ist leider ausgebucht.', 409);
     $status = ($seats > $free) ? 'warteliste' : 'angemeldet';
+    $street = mb_substr(trim((string)($body['street'] ?? '')), 0, 160);
+    $zip = mb_substr(trim((string)($body['zip'] ?? '')), 0, 10);
+    $city = mb_substr(trim((string)($body['city'] ?? '')), 0, 80);
+    if ((float)($w['price_net'] ?? 0) > 0 && ($street === '' || $zip === '' || $city === ''))
+      fail('Bitte Anschrift angeben (Straße, PLZ, Ort) — sie wird für die Rechnung benötigt.');
     $dup = $p->prepare("select count(*) from workshop_signups where workshop_id = ? and email = ? and status in ('angemeldet','warteliste')");
     $dup->execute([$w['id'], $email]);
     if ((int)$dup->fetchColumn()) fail('Mit dieser E-Mail-Adresse bist du für diesen Termin schon angemeldet bzw. auf der Warteliste.', 409);
+    $sid = uuid();
     $p->prepare('insert into workshop_signups (id, workshop_id, name, email, phone, seats, message,
-        q_music, q_challenge, q_goal, status, created_at) values (?,?,?,?,?,?,?,?,?,?,?,?)')
-      ->execute([uuid(), $w['id'], $name, $email,
+        q_music, q_challenge, q_goal, street, zip, city, status, created_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      ->execute([$sid, $w['id'], $name, $email,
         mb_substr(trim((string)($body['phone'] ?? '')), 0, 60), $seats,
         mb_substr(trim((string)($body['message'] ?? '')), 0, 2000),
         mb_substr(trim((string)($body['q_music'] ?? '')), 0, 1000),
         mb_substr(trim((string)($body['q_challenge'] ?? '')), 0, 1000),
         mb_substr(trim((string)($body['q_goal'] ?? '')), 0, 1000),
-        $status, now()]);
-    out(['ok' => true, 'status' => $status, 'free' => max(0, $free - ($status === 'angemeldet' ? $seats : 0))], 201);
+        $street, $zip, $city, $status, now()]);
+    $inv = null;
+    if ($status === 'angemeldet') {
+      $r = workshopInvoice($p, $sid);
+      if (!empty($r['ok'])) $inv = ['number' => $r['number'], 'mailed' => !empty($r['mailed'])];
+    }
+    out(['ok' => true, 'status' => $status, 'invoice' => $inv,
+      'free' => max(0, $free - ($status === 'angemeldet' ? $seats : 0))], 201);
   }
   /* Partner-Registrierung (DJs, Bands, Musiker, Techniker) */
   if ($path === 'portal/partner' && $method === 'POST') {
@@ -985,6 +1120,11 @@ try {
     handleRest($m[1], $method, $q, $body, $prefer);
   }
   if (preg_match('#^storage/(.+)$#', $path, $m) && $method === 'POST') handleUpload($m[1]);
+  /* Rechnung zu einer Workshop-Anmeldung erzeugen + mailen (z. B. beim Nachrücken) — nur angemeldet */
+  if (preg_match('#^workshop/([a-f0-9-]{30,40})/invoice$#', $path, $m) && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    out(workshopInvoice(db(), $m[1]), 201);
+  }
   /* Ausweisfotos: liegen geschützt in data/ids, Abruf/Löschung nur angemeldet */
   if (preg_match('#^idfile/([a-f0-9-]{30,50}-(?:front|back)\.(?:jpg|png|webp))$#', $path, $m)) {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
