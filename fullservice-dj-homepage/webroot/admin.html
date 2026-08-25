@@ -1600,7 +1600,7 @@ function composeReply(inqId){
   if(i.status==='neu')api('inquiries?id=eq.'+inqId,{method:'PATCH',body:{status:'in_bearbeitung'}})
     .then(function(){i.status='in_bearbeitung';renderInq();renderDash()});
   if((t.body||'').indexOf('{fragebogen}')>=0){
-    var ft=(CACHE.formTpls||[]).find(function(x){return x.name.indexOf('DJ-Bande')>=0})||(CACHE.formTpls||[])[0];
+    var ft=(CACHE.formTpls||[]).find(function(x){return x.name.indexOf('Vorauswahl')>=0})||(CACHE.formTpls||[])[0];
     createForm(ft&&ft.id,inqId,i.customer_id||null,function(f){
       openCompose(i,t,portalUrl('f',f.token));
     });

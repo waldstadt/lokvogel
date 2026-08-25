@@ -26,6 +26,14 @@ auf die Seite).
   DJ-Bande-Vermittlung überführen (Portal-Ablehnen-Flow + Vorlage
   'Termin belegt' tun das bereits). Wichtig in der Kommunikation: Die
   Vorauswahl ist handverlesen und persönlich — keine anonyme Liste.
+- **Naming-Regel DJ Bande (fix):** Die DJ Bande wird kundenseitig NICHT
+  verlinkt und NICHT werblich genannt. Nach außen heißt es immer "mein
+  Partner-Netzwerk"; die Vorschläge/Angebotserstellung laufen über
+  Markus (er legt den Kunden selbst bei der DJ Bande an, sonst keine
+  Provision). Namentliche Nennung NUR wo rechtlich nötig: AGB §5,
+  Datenschutzerklärung §4 und in den Einwilligungstexten
+  (Portal-Checkbox, Fragebogen-Checkbox) — informierte Einwilligung
+  muss den Empfänger benennen.
 
 ## Für die Antwort-E-Mail (Vorlage im Backoffice bauen)
 

@@ -196,7 +196,7 @@ function seed(PDO $p): void {
       ],
       'note' => 'Das gilt für klassische Abendveranstaltungen am Wochenende in der Hauptsaison. Tagsüber, montags bis donnerstags oder im November, Januar, Februar und März kalkuliere ich deutlich günstiger. Fragt einfach mit eurem Termin an.',
     ], JSON_UNESCAPED_UNICODE)],
-    ['guarantee', '{"title":"Schon ausgebucht? Ihr steht trotzdem nicht ohne DJ da.","text":"Wenn ich an eurem Termin keine Zeit habe – oder merke, dass ich nicht der richtige DJ für eure Feier bin – schlage ich euch bis zu fünf Kollegen vor, die wirklich zu euch passen. Das läuft über meine Partner-Agentur DJ Bande aus Münster. Wichtig: Die Preise auf dieser Seite gelten nur für mich selbst – vermittelte Kollegen kalkulieren eigenständig, ihre Konditionen können abweichen. Und Transparenz gehört dazu: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision (Details in den AGB)."}'],
+    ['guarantee', '{"title":"Schon ausgebucht? Ihr steht trotzdem nicht ohne DJ da.","text":"Wenn ich an eurem Termin keine Zeit habe – oder merke, dass ich nicht der richtige DJ für eure Feier bin – wähle ich persönlich bis zu fünf Kollegen aus meinem Partner-Netzwerk aus, die wirklich zu euch passen. Keine anonyme Liste: Ich kenne die Kollegen und ihre Stärken, und ihr bekommt die Vorschläge direkt von mir. Wichtig: Die Preise auf dieser Seite gelten nur für mich selbst – empfohlene Kollegen kalkulieren eigenständig. Und Transparenz gehört dazu: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision (Details in den AGB)."}'],
     ['rental', '{"title":"Technik mieten","text":"Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung."}'],
     ['tech_hero', '{"subtitle":"Lauschgift Veranstaltungstechnik · Hemer","text":"Profi-Technik aus meinem Lager in Hemer: mieten und selbst abholen – oder mich gleich als Techniker inklusive Licht- und Tontechnik buchen. Ehrliche Beratung, faire Tagespreise, alles geprüft und einsatzbereit."}'],
     ['tech_teaser', '{"title":"Lauschgift Veranstaltungstechnik","text":"Ihr braucht keinen DJ, sondern Technik? Ton- und Lichttechnik zum Mieten direkt aus meinem Lager in Hemer – oder mich als Techniker inklusive Equipment. Das ist ein eigenes Gewerk mit eigener Seite."}'],
@@ -215,7 +215,7 @@ function seed(PDO $p): void {
     [2,'Wie läuft die Buchung ab?','Anfrage über das Formular oder telefonisch, dann ein kurzes Kennenlerngespräch, ein klares Angebot – und mit eurer Bestätigung ist der Termin fest reserviert.'],
     [3,'Was passiert, wenn du krank wirst?','Dafür gibt es den Plan B: ein Netzwerk erfahrener Kollegen, die mit meinen Unterlagen und eurer Musikvorbereitung einspringen können. Eure Feier findet statt.'],
     [4,'Wie lange brauchst du für den Aufbau?','Je nach Technikumfang 60 bis 120 Minuten. Aufgebaut wird, bevor eure Gäste kommen – versprochen.'],
-    [5,'Was ist, wenn du an unserem Termin schon ausgebucht bist?','Dann lasse ich euch nicht hängen: Über meine Partner-Agentur DJ Bande aus Münster schlage ich euch bis zu fünf Kollegen vor, die zu eurer Feier passen. Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision – das steht so auch transparent in den AGB.'],
+    [5,'Was ist, wenn du an unserem Termin schon ausgebucht bist?','Dann lasse ich euch nicht hängen: Ich wähle persönlich bis zu fünf Kollegen aus meinem Partner-Netzwerk aus, die zu eurer Feier passen – und ihr bekommt die Vorschläge direkt von mir. Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision, das steht so auch transparent in den AGB.'],
   ];
   foreach ($faqs as [$s,$q,$a]) $ins('faq', ['sort'=>$s,'question'=>$q,'answer'=>$a,'public'=>1]);
 
@@ -290,17 +290,17 @@ Damit ich euch Verfügbarkeit und Preis nennen kann, brauche ich nur noch:
 
 Viele Grüße
 Markus Jankowski – Lauschgift Veranstaltungstechnik"],
-    [5, 'Termin belegt – DJ-Bande-Vermittlung', 'Euer Termin am {datum} – ich habe trotzdem eine Lösung für euch',
+    [5, 'Termin belegt – DJ-Vermittlung', 'Euer Termin am {datum} – ich habe trotzdem eine Lösung für euch',
 "Hallo {vorname},
 
 vielen Dank für eure Anfrage – und erstmal die weniger gute Nachricht: An eurem Termin am {datum} bin ich leider bereits gebucht.
 
-Aber ich lasse euch nicht hängen – und ich schicke euch auch nicht einfach irgendeine Liste. Über meine Partner-Agentur DJ Bande aus Münster wähle ich persönlich bis zu fünf Kollegen aus, die wirklich zu eurer Feier passen: zu eurer Musikrichtung, eurer Location und der Art, wie ihr feiern wollt. Dafür kenne ich die Kollegen und ihre Stärken.
+Aber ich lasse euch nicht hängen – und ich schicke euch auch nicht einfach irgendeine Liste. Ich wähle persönlich bis zu fünf Kollegen aus meinem Partner-Netzwerk aus, die wirklich zu eurer Feier passen: zu eurer Musikrichtung, eurer Location und der Art, wie ihr feiern wollt. Ich kenne die Kollegen und ihre Stärken – und ihr bekommt die Vorschläge direkt von mir.
 
 Damit meine Vorauswahl sitzt, habe ich einen kurzen Online-Fragebogen für euch (keine 5 Minuten):
 {fragebogen}
 
-Zur Transparenz: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision; für euch entstehen dadurch keine zusätzlichen Kosten, und die Preise vereinbart ihr direkt mit dem jeweiligen DJ. Eure Angaben leite ich erst nach eurem Einverständnis weiter (das fragt der Bogen mit ab).
+Zur Transparenz: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision; für euch entstehen dadurch keine zusätzlichen Kosten, und die Preise vereinbart ihr direkt mit dem jeweiligen DJ. Eure Angaben gebe ich erst nach eurem Einverständnis weiter (das fragt der Bogen mit ab).
 
 Viele Grüße
 Markus Jankowski – DJ Lauschgift"],
@@ -318,8 +318,8 @@ Markus Jankowski – DJ Lauschgift"],
 
 function seedFormTemplates(PDO $p): void {
   $tpls = [
-    [1, 'DJ-Bande Vorauswahl',
-     "Damit ich euch nicht irgendwelche, sondern wirklich passende DJs vorschlagen kann, beantwortet mir bitte kurz diese Fragen – dauert keine 5 Minuten.",
+    [1, 'DJ-Vorauswahl für eure Feier',
+     "Damit ich euch nicht irgendwelche, sondern wirklich passende DJs vorschlagen kann, beantwortet mir bitte kurz diese Fragen – dauert keine 5 Minuten. Die Vorschläge bekommt ihr danach direkt von mir.",
      [
        ['label'=>'Anlass eurer Feier','type'=>'select','options'=>['Hochzeit','Geburtstag','Firmenfeier','Sonstiges']],
        ['label'=>'Datum der Feier','type'=>'text'],
