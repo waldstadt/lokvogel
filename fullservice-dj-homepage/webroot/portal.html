@@ -119,21 +119,41 @@ function submitPlz(){
   sessionStorage.setItem('portal_plz',PLZ);
   loadOffer();
 }
-var TYPE_NAME={angebot:'Angebot',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung'};
+var TYPE_NAME={angebot:'Angebot',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'};
+function lineTotal(it){
+  var g=(Number(it.qty)||0)*(Number(it.unit_price)||0);
+  var dd=Number(it.discount_value)||0;
+  if(!dd)return g;
+  return it.discount_type==='eur'?Math.max(0,g-dd):g*(1-Math.min(100,dd)/100);
+}
 function renderOffer(){
   var d=DOC.doc,items=DOC.items;
+  var brutto=d.price_mode==='brutto'&&!d.is_small_business;
+  var f=brutto?1+Number(d.tax_rate)/100:1;
   document.getElementById('foot').innerHTML=esc(DOC.company.name||'DJ Lauschgift')+' · '+esc(DOC.company.owner||'')+
     (DOC.company.phone?' · '+esc(DOC.company.phone):'');
   var rows=items.map(function(it,i){
     var info=it.note?'<span class="info">i</span><span class="tip">'+esc(it.note)+'</span>':'';
+    var rab=Number(it.discount_value)?'<div style="font-size:11px;color:var(--grn)">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):Number(it.discount_value)+' %')+'</div>':'';
     return '<tr><td class="num">'+(i+1)+'</td>'+
-      '<td class="pos-desc" onclick="this.classList.toggle(\'open\')">'+esc(it.description)+info+'</td>'+
+      '<td class="pos-desc" onclick="this.classList.toggle(\'open\')">'+esc(it.description)+info+rab+'</td>'+
       '<td class="num">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
-      '<td class="num">'+euro(it.qty*it.unit_price)+'</td></tr>';
+      '<td class="num">'+euro(lineTotal(it)*f)+'</td></tr>';
   }).join('');
-  var totals='<tr class="totals"><td colspan="3" class="num">Netto</td><td class="num">'+euro(d.total_net)+'</td></tr>';
-  if(!d.is_small_business)totals+='<tr class="totals"><td colspan="3" class="num">USt. '+Number(d.tax_rate)+' %</td><td class="num">'+euro(d.total_tax)+'</td></tr>';
-  totals+='<tr class="totals"><td colspan="3" class="num"><b>Gesamt</b></td><td class="num grand">'+euro(d.total_gross)+'</td></tr>';
+  var totals='';
+  var sub=items.reduce(function(s,it){return s+lineTotal(it)},0);
+  var dv=Number(d.discount_value)||0;
+  var disc=dv?(d.discount_type==='eur'?Math.min(sub,dv):sub*Math.min(100,dv)/100):0;
+  if(disc)totals+='<tr class="totals"><td colspan="3" class="num">Zwischensumme</td><td class="num">'+euro(sub*f)+'</td></tr>'+
+    '<tr class="totals"><td colspan="3" class="num" style="color:var(--grn)">Euer Rabatt'+(d.discount_type==='pct'?' ('+dv+' %)':'')+'</td><td class="num" style="color:var(--grn)">−'+euro(disc*f)+'</td></tr>';
+  if(brutto){
+    totals+='<tr class="totals"><td colspan="3" class="num"><b>Gesamt inkl. USt.</b></td><td class="num grand">'+euro(d.total_gross)+'</td></tr>'+
+      '<tr class="totals"><td colspan="3" class="num" style="color:var(--mut2)">darin enthaltene USt. '+Number(d.tax_rate)+' %</td><td class="num" style="color:var(--mut2)">'+euro(d.total_tax)+'</td></tr>';
+  }else{
+    totals+='<tr class="totals"><td colspan="3" class="num">Netto</td><td class="num">'+euro(d.total_net)+'</td></tr>';
+    if(!d.is_small_business)totals+='<tr class="totals"><td colspan="3" class="num">USt. '+Number(d.tax_rate)+' %</td><td class="num">'+euro(d.total_tax)+'</td></tr>';
+    totals+='<tr class="totals"><td colspan="3" class="num"><b>Gesamt</b></td><td class="num grand">'+euro(d.total_gross)+'</td></tr>';
+  }
   var decided=['angenommen','abgelehnt','bezahlt','storniert'].indexOf(d.status)>=0;
   var statusLine=d.status==='angenommen'?'<span class="status-b">✓ Angenommen — danke euch!</span>':
     (d.status==='abgelehnt'?'<span class="status-b" style="border-color:var(--mut2);color:var(--mut)">Abgelehnt</span>':'');
@@ -232,16 +252,30 @@ function askUpsell(id,btn){
 }
 function downloadPdf(){
   var d=DOC.doc,c=DOC.company;
+  var brutto=d.price_mode==='brutto'&&!d.is_small_business;
+  var f=brutto?1+Number(d.tax_rate)/100:1;
   var rows=DOC.items.map(function(it,i){
+    var rab=Number(it.discount_value)?'<div style="font-size:10px;color:#666">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):Number(it.discount_value)+' %')+'</div>':'';
     return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+(i+1)+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+
+    '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+
     (it.note?'<div style="font-size:10px;color:#666;margin-top:2px">'+esc(it.note)+'</div>':'')+'</td>'+
     '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+euro(it.qty*it.unit_price)+'</td></tr>';
+    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+euro(lineTotal(it)*f)+'</td></tr>';
   }).join('');
-  var totals='<tr><td colspan="3" style="text-align:right;padding:6px">Netto</td><td style="text-align:right;padding:6px">'+euro(d.total_net)+'</td></tr>';
-  if(!d.is_small_business)totals+='<tr><td colspan="3" style="text-align:right;padding:6px">USt. '+Number(d.tax_rate)+' %</td><td style="text-align:right;padding:6px">'+euro(d.total_tax)+'</td></tr>';
-  totals+='<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700">Gesamt</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(d.total_gross)+'</td></tr>';
+  var sub=DOC.items.reduce(function(s,it){return s+lineTotal(it)},0);
+  var dv=Number(d.discount_value)||0;
+  var disc=dv?(d.discount_type==='eur'?Math.min(sub,dv):sub*Math.min(100,dv)/100):0;
+  var totals='';
+  if(disc)totals+='<tr><td colspan="3" style="text-align:right;padding:6px">Zwischensumme</td><td style="text-align:right;padding:6px">'+euro(sub*f)+'</td></tr>'+
+    '<tr><td colspan="3" style="text-align:right;padding:6px">Rabatt'+(d.discount_type==='pct'?' ('+dv+' %)':'')+'</td><td style="text-align:right;padding:6px">−'+euro(disc*f)+'</td></tr>';
+  if(brutto){
+    totals+='<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700">Gesamtbetrag</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(d.total_gross)+'</td></tr>'+
+      '<tr><td colspan="3" style="text-align:right;padding:6px;color:#666">darin enthaltene USt. '+Number(d.tax_rate)+' %</td><td style="text-align:right;padding:6px;color:#666">'+euro(d.total_tax)+'</td></tr>';
+  }else{
+    totals+='<tr><td colspan="3" style="text-align:right;padding:6px">Netto</td><td style="text-align:right;padding:6px">'+euro(d.total_net)+'</td></tr>';
+    if(!d.is_small_business)totals+='<tr><td colspan="3" style="text-align:right;padding:6px">USt. '+Number(d.tax_rate)+' %</td><td style="text-align:right;padding:6px">'+euro(d.total_tax)+'</td></tr>';
+    totals+='<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700">Gesamt</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(d.total_gross)+'</td></tr>';
+  }
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-family:Inter,Arial,sans-serif;font-size:12px;line-height:1.55;color:#111">'+
   '<div style="display:flex;justify-content:space-between;margin-bottom:36px"><div>'+

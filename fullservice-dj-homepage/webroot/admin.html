@@ -236,6 +236,8 @@ th.num{text-align:right}
       <button class="btn g sm" onclick="createDocFromBooking('angebot')">→ Angebot</button>
       <button class="btn g sm" onclick="createDocFromBooking('abschlag')">→ Abschlagsrechnung</button>
       <button class="btn sm" onclick="createDocFromBooking('rechnung')">→ Rechnung</button>
+      <button class="btn g sm" onclick="createLieferschein()">📋 Lieferschein</button>
+      <button class="btn g sm" onclick="printMietvertrag()">📄 Mietvertrag</button>
       <button class="btn r sm" onclick="openStornoModal()">⚠ Storno</button></div></div>
     <div class="grid2" style="gap:16px;align-items:start">
       <div class="card"><h3>Details</h3><div id="bdData" class="sml"></div></div>
@@ -304,10 +306,16 @@ th.num{text-align:right}
       <div class="grid4">
         <div><label>Typ</label><select id="docType">
           <option value="angebot">Angebot</option><option value="rechnung">Rechnung</option>
-          <option value="abschlag">Abschlagsrechnung</option><option value="schluss">Schlussrechnung</option></select></div>
+          <option value="abschlag">Abschlagsrechnung</option><option value="schluss">Schlussrechnung</option>
+          <option value="lieferschein">Lieferschein</option></select></div>
         <div><label>USt. %</label><input type="number" id="docTax" step="0.1" value="19"></div>
+        <div><label>Preisanzeige für den Kunden</label><select id="docMode"><option value="netto">Netto + USt. ausgewiesen</option><option value="brutto">Brutto (inkl. USt.)</option></select></div>
         <div id="docDepWrap" style="display:none"><label>Verrechnete Abschläge (brutto €)</label><input type="number" id="docDep" step="0.01" value="0"></div>
-        <div></div>
+      </div>
+      <div class="grid4">
+        <div><label>Rabatt aufs Gesamtdokument</label><input type="number" step="0.01" id="docDiscVal" value="0"></div>
+        <div><label>Rabatt-Art</label><select id="docDiscType"><option value="pct">%</option><option value="eur">€ (netto)</option></select></div>
+        <div></div><div></div>
       </div>
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
     </div>
@@ -464,6 +472,11 @@ th.num{text-align:right}
             <div><label>Partner-Rabatt Technik-Miete (%)</label><input type="number" id="sPartnerPct"></div>
           </div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveNumbering()">Speichern</button></div>
+        </div>
+        <div class="card"><h3>Mietvertrag — Vertragsbedingungen</h3>
+          <textarea id="sRental" style="min-height:160px;font-size:11px"></textarea>
+          <div class="mut sml" style="margin-top:6px">Erscheint auf jedem gedruckten Mietvertrag (Buchungs-Detail → „📄 Mietvertrag“). Vor Livegang anwaltlich prüfen lassen.</div>
+          <div style="margin-top:12px"><button class="btn sm" onclick="saveRental()">Speichern</button></div>
         </div>
       </div>
     </div>
@@ -929,7 +942,7 @@ function delBook(id){if(!confirm('Buchung löschen?'))return;
   api('bookings?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();showPage('book');loadAll()}).catch(function(e){toast(e.message,1)})}
 
 /* ===== Dokumente (Angebote & Rechnungen) ===== */
-function docTypeName(t){return {angebot:'Angebot',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung'}[t]||t}
+function docTypeName(t){return {angebot:'Angebot',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'}[t]||t}
 function docBadge(st){return {entwurf:'grey',versendet:'blue',angenommen:'green',abgelehnt:'red',bezahlt:'green',ueberfaellig:'red',storniert:'red'}[st]||'grey'}
 function renderQuotes(){
   var list=CACHE.documents.filter(function(d){return d.doc_type==='angebot'});
@@ -943,7 +956,7 @@ function renderQuotes(){
   }).join('')||'<tr><td colspan="6" class="mut">Noch keine Angebote.</td></tr>';
 }
 function renderInv(){
-  var list=CACHE.documents.filter(function(d){return d.doc_type!=='angebot'});
+  var list=CACHE.documents.filter(function(d){return d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'});
   document.getElementById('invRows').innerHTML=list.map(function(d){
     return '<tr class="click" onclick="openDocEditor(\''+d.id+'\')"><td><b>'+esc(d.number)+'</b></td><td>'+docTypeName(d.doc_type)+'</td><td>'+dt(d.doc_date)+'</td>'+
     '<td>'+esc(custName(d.customers))+'</td><td class="num">'+euro(Number(d.total_gross)-Number(d.deposit_deducted||0))+'</td><td>'+dt(d.due_date)+'</td>'+
@@ -954,7 +967,8 @@ function renderInv(){
 var curDoc=null,curItems=[];
 function nextNumber(type){
   var n=S.numbering||{angebot:{prefix:'AN-',next:1},rechnung:{prefix:'RE-',next:1},year_in_number:true};
-  var kind=type==='angebot'?'angebot':'rechnung';
+  var kind=type==='angebot'?'angebot':(type==='lieferschein'?'lieferschein':'rechnung');
+  if(!n[kind])n[kind]={prefix:type==='lieferschein'?'LS-':'RE-',next:1};
   var cfg=n[kind];
   var num=cfg.prefix+(n.year_in_number?new Date().getFullYear()+'-':'')+String(cfg.next).padStart(4,'0');
   return {number:num,commit:function(){
@@ -979,7 +993,8 @@ function openDocEditor(id,newType){
       tax_rate:(S.company&&S.company.small_business)?0:(defs.tax_rate!=null?defs.tax_rate:19),
       is_small_business:!!(S.company&&S.company.small_business),
       intro_text:newType==='angebot'?(defs.quote_intro||''):'',outro_text:newType==='angebot'?'':(defs.invoice_outro||''),
-      deposit_deducted:0,customer_id:'',booking_id:null};
+      deposit_deducted:0,customer_id:'',booking_id:null,
+      price_mode:'netto',discount_value:0,discount_type:'pct'};
     var days=newType==='angebot'?(defs.quote_valid_days||30):(defs.payment_days||14);
     var d2=new Date();d2.setDate(d2.getDate()+days);
     curDoc[newType==='angebot'?'valid_until':'due_date']=d2.toISOString().slice(0,10);
@@ -1011,6 +1026,9 @@ function fillDocForm(){
   document.getElementById('docDate').value=d.doc_date||'';
   document.getElementById('docDate2').value=d.doc_type==='angebot'?(d.valid_until||''):(d.due_date||'');
   document.getElementById('docTax').value=d.is_small_business?0:d.tax_rate;
+  document.getElementById('docMode').value=d.price_mode||'netto';
+  document.getElementById('docDiscVal').value=d.discount_value||0;
+  document.getElementById('docDiscType').value=d.discount_type||'pct';
   document.getElementById('docDep').value=d.deposit_deducted||0;
   document.getElementById('docIntro').value=d.intro_text||'';
   document.getElementById('docOutro').value=d.outro_text||'';
@@ -1046,7 +1064,7 @@ function refreshDocs(){api('documents?select=*,customers(*)&order=created_at.des
 
 function renderItems(){
   document.getElementById('docItems').innerHTML=curItems.map(function(it,i){
-    var sum=(Number(it.qty)||0)*(Number(it.unit_price)||0);
+    var sum=lineTotal(it);
     return '<div style="margin-bottom:10px"><div class="it-row" style="margin-bottom:3px"><input value="'+(i+1)+'" disabled style="text-align:center">'+
     '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
     '<input type="number" step="0.5" value="'+it.qty+'" oninput="itSet('+i+',\'qty\',this.value)">'+
@@ -1054,28 +1072,48 @@ function renderItems(){
     '<input type="number" step="0.01" value="'+it.unit_price+'" oninput="itSet('+i+',\'unit_price\',this.value)">'+
     '<input value="'+euro(sum)+'" disabled class="num">'+
     '<a onclick="itDel('+i+')" style="color:var(--red)">✕</a></div>'+
-    '<div style="padding-left:42px;padding-right:34px"><input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="ℹ Erklärung für das Kundenportal (erscheint beim Drüberfahren) — optional" style="font-size:10px;padding:5px 8px;color:var(--gll)"></div></div>';
+    '<div style="padding-left:42px;padding-right:34px;display:flex;gap:6px">'+
+    '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="ℹ Erklärung für das Kundenportal (erscheint beim Drüberfahren) — optional" style="font-size:10px;padding:5px 8px;color:var(--gll)">'+
+    '<input type="number" step="0.01" value="'+(it.discount_value||0)+'" oninput="itSet('+i+',\'discount_value\',this.value)" title="Rabatt auf diese Position" style="width:74px;font-size:10px;padding:5px 8px" placeholder="Rabatt">'+
+    '<select onchange="itSet('+i+',\'discount_type\',this.value)" style="width:52px;font-size:10px;padding:5px 4px">'+
+    '<option value="pct"'+(it.discount_type!=='eur'?' selected':'')+'>%</option><option value="eur"'+(it.discount_type==='eur'?' selected':'')+'>€</option></select>'+
+    '</div></div>';
   }).join('');
   renderTotals();
 }
-function itSet(i,k,val){curItems[i][k]=(k==='qty'||k==='unit_price')?Number(val)||0:val;if(k!=='note')renderTotals()}
+function itSet(i,k,val){curItems[i][k]=(k==='qty'||k==='unit_price'||k==='discount_value')?Number(val)||0:val;if(k!=='note')renderTotals()}
+function lineTotal(it){
+  var g=(Number(it.qty)||0)*(Number(it.unit_price)||0);
+  var d=Number(it.discount_value)||0;
+  if(!d)return g;
+  return it.discount_type==='eur'?Math.max(0,g-d):g*(1-Math.min(100,d)/100);
+}
 function itDel(i){curItems.splice(i,1);renderItems()}
 function addItemRow(){curItems.push({pos:curItems.length+1,description:'',qty:1,unit:'Stk.',unit_price:0});renderItems()}
 function docCalc(){
-  var net=curItems.reduce(function(s,it){return s+(Number(it.qty)||0)*(Number(it.unit_price)||0)},0);
+  var sub=curItems.reduce(function(s,it){return s+lineTotal(it)},0);
+  var dv=Number(v('docDiscVal'))||0,dtp=v('docDiscType')||'pct';
+  var disc=dv?(dtp==='eur'?Math.min(sub,dv):sub*Math.min(100,dv)/100):0;
+  var net=sub-disc;
   var rate=Number(document.getElementById('docTax').value)||0;
   var tax=net*rate/100,gross=net+tax;
   var dep=Number(document.getElementById('docDep').value)||0;
-  return {net:net,tax:tax,gross:gross,rate:rate,dep:dep};
+  return {sub:sub,disc:disc,discVal:dv,discType:dtp,net:net,tax:tax,gross:gross,rate:rate,dep:dep};
 }
 function renderTotals(){
   var c=docCalc(),t=document.getElementById('docType').value;
-  var html='Netto: '+euro(c.net)+' &nbsp;·&nbsp; USt. '+c.rate+' %: '+euro(c.tax)+' &nbsp;·&nbsp; Brutto: <b>'+euro(c.gross)+'</b>';
+  var html='';
+  if(c.disc)html+='Zwischensumme: '+euro(c.sub)+' &nbsp;·&nbsp; Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+': −'+euro(c.disc)+'<br>';
+  html+='Netto: '+euro(c.net)+' &nbsp;·&nbsp; USt. '+c.rate+' %: '+euro(c.tax)+' &nbsp;·&nbsp; Brutto: <b>'+euro(c.gross)+'</b>';
+  if(v('docMode')==='brutto')html+='<br><span class="mut sml">Kundenansicht: Preise werden brutto (inkl. USt.) angezeigt</span>';
   if(t==='schluss'&&c.dep)html+='<br>abzgl. Abschläge: −'+euro(c.dep)+' &nbsp;·&nbsp; <b style="color:var(--wh)">Restbetrag: '+euro(c.gross-c.dep)+'</b>';
   document.getElementById('docTotals').innerHTML=html;
 }
 document.getElementById('docTax').addEventListener('input',renderTotals);
 document.getElementById('docDep').addEventListener('input',renderTotals);
+document.getElementById('docDiscVal').addEventListener('input',renderTotals);
+document.getElementById('docDiscType').addEventListener('change',renderTotals);
+document.getElementById('docMode').addEventListener('change',renderTotals);
 
 function saveDoc(){
   var custId=v('docCust');
@@ -1084,6 +1122,7 @@ function saveDoc(){
   var body={doc_type:type,customer_id:custId,booking_id:v('docBook')||null,doc_date:v('docDate'),
     tax_rate:c.rate,is_small_business:c.rate===0&&!!(S.company&&S.company.small_business),
     intro_text:v('docIntro'),outro_text:v('docOutro'),
+    price_mode:v('docMode'),discount_value:c.discVal,discount_type:c.discType,
     total_net:c.net,total_tax:c.tax,total_gross:c.gross,deposit_deducted:type==='schluss'?c.dep:0};
   body[type==='angebot'?'valid_until':'due_date']=v('docDate2')||null;
   var p;
@@ -1097,7 +1136,8 @@ function saveDoc(){
     var d=rows[0];curDoc.id=d.id;curDoc.number=d.number;curDoc.status=d.status;curDoc.doc_type=d.doc_type;
     return api('document_items?document_id=eq.'+d.id,{method:'DELETE'}).then(function(){
       var items=curItems.filter(function(it){return it.description}).map(function(it,i){
-        return {document_id:d.id,pos:i+1,description:it.description,note:it.note||null,qty:it.qty,unit:it.unit,unit_price:it.unit_price}});
+        return {document_id:d.id,pos:i+1,description:it.description,note:it.note||null,qty:it.qty,unit:it.unit,unit_price:it.unit_price,
+          discount_value:it.discount_value||0,discount_type:it.discount_type||'pct'}});
       return items.length?api('document_items',{method:'POST',body:items}):null;
     });
   }).then(function(){
@@ -1107,6 +1147,21 @@ function saveDoc(){
   }).catch(function(e){toast('Fehler: '+e.message,1)});
 }
 
+function askAbschlag(total,label,cb){
+  openModal('Abschlagsrechnung — Höhe festlegen',
+    '<div class="sml mut" style="margin-bottom:10px">Gesamtwert der Leistung: <b style="color:var(--wh)">'+euro(total)+' netto</b></div>'+
+    '<div class="grid2"><div><label>Art</label><select id="abType"><option value="pct">Prozent vom Gesamtwert</option><option value="eur">Pauschalbetrag (€ netto)</option></select></div>'+
+    '<div><label>Wert</label><input type="number" step="0.01" id="abVal" value="50"></div></div>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="confirmAbschlag('+total+',\''+esc(label).replace(/'/g,"\\'")+'\')">Übernehmen</button></div>');
+  window._abCb=cb;
+}
+function confirmAbschlag(total,label){
+  var t=v('abType'),val=Number(v('abVal'))||0;
+  var amount=t==='pct'?Math.round(total*val)/100:val;amount=t==='pct'?Math.round(total*val/100*100)/100:val;
+  var desc=t==='pct'?('Abschlagszahlung ('+val+' % von '+euro(total)+' netto) für '+label):('Abschlagszahlung (pauschal) für '+label);
+  closeModal();
+  if(window._abCb)window._abCb(amount,desc);
+}
 function createDocFromBooking(type){
   var b=curBook;if(!b)return;
   openDocEditor(null,type);
@@ -1121,12 +1176,15 @@ function createDocFromBooking(type){
       var price=x.price_override!=null?Number(x.price_override):rentPrice(eq,b)*x.qty;
       curItems.push({pos:curItems.length+1,description:'Technik-Miete: '+(eq.name||'?')+' ('+rentDays(b)+' Miettag'+(rentDays(b)>1?'e':'')+')',qty:x.qty,unit:'Stk.',unit_price:x.qty?price/x.qty:price});
     });
-    if(type==='abschlag'){
-      var total=curItems.reduce(function(s,it){return s+it.qty*it.unit_price},0);
-      curItems=[{pos:1,description:'Abschlagszahlung (50 %) für '+label,qty:1,unit:'pausch.',unit_price:Math.round(total*0.5*100)/100}];
-    }
     if(!curItems.length)curItems=[{pos:1,description:label,qty:1,unit:'pausch.',unit_price:0}];
     renderItems();
+    if(type==='abschlag'){
+      var total=curItems.reduce(function(s,it){return s+lineTotal(it)},0);
+      askAbschlag(total,label,function(amount,desc){
+        curItems=[{pos:1,description:desc,note:'Nach Zahlungseingang ist euer Termin verbindlich reserviert. Der Restbetrag folgt mit der Schlussrechnung nach der Veranstaltung.',qty:1,unit:'pausch.',unit_price:amount}];
+        renderItems();
+      });
+    }
   },80);
 }
 /* ===== Storno-Rechnung (Staffel gemäß AGB §5) ===== */
@@ -1282,8 +1340,12 @@ function docToInvoice(type){
     document.getElementById('docCust').value=src.customer_id;refreshBookOpts();
     document.getElementById('docBook').value=src.booking_id||'';
     if(type==='abschlag'){
-      var total=items.reduce(function(s,it){return s+it.qty*it.unit_price},0);
-      curItems=[{pos:1,description:'Abschlagszahlung (50 %) gemäß '+docTypeName(src.doc_type)+' '+src.number,qty:1,unit:'pausch.',unit_price:Math.round(total*0.5*100)/100}];
+      var total=items.reduce(function(s,it){return s+lineTotal(it)},0);
+      curItems=[];renderItems();
+      askAbschlag(total,'Auftrag gemäß '+docTypeName(src.doc_type)+' '+src.number,function(amount,desc){
+        curItems=[{pos:1,description:desc,note:'Nach Zahlungseingang ist der Termin verbindlich reserviert. Der Restbetrag folgt mit der Schlussrechnung.',qty:1,unit:'pausch.',unit_price:amount}];
+        renderItems();
+      });
     }else if(type==='schluss'){
       curItems=items.map(function(it){return {pos:it.pos,description:it.description,qty:it.qty,unit:it.unit,unit_price:it.unit_price}});
       var paidDeps=CACHE.documents.filter(function(d){return d.doc_type==='abschlag'&&d.status==='bezahlt'&&(d.booking_id&&d.booking_id===src.booking_id||d.parent_id===src.id)});
@@ -1295,22 +1357,114 @@ function docToInvoice(type){
   },80);
 }
 
+/* ===== Lieferschein & Mietvertrag ===== */
+function bookEquipList(b){
+  return CACHE.be.filter(function(x){return x.booking_id===b.id}).map(function(x){
+    var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};
+    return {name:eq.name||'?',qty:x.qty,price:x.price_override!=null?Number(x.price_override):rentPrice(eq,b)*x.qty,notes:x.notes};
+  });
+}
+function createLieferschein(){
+  var b=curBook,list=bookEquipList(b);
+  if(!list.length){toast('Keine Technik zugeordnet — erst Technik zum Auftrag hinzufügen.',1);return}
+  var nn=nextNumber('lieferschein');
+  api('documents',{method:'POST',prefer:'return=representation',body:{
+    doc_type:'lieferschein',number:nn.number,customer_id:b.customer_id,booking_id:b.id,status:'versendet',
+    doc_date:new Date().toISOString().slice(0,10),tax_rate:0,total_net:0,total_tax:0,total_gross:0
+  }}).then(function(rows){
+    return nn.commit().then(function(){return rows[0]});
+  }).then(function(d){
+    var items=list.map(function(it,i){return {document_id:d.id,pos:i+1,description:it.name,qty:it.qty,unit:'Stk.',unit_price:0,note:it.notes||null}});
+    return api('document_items',{method:'POST',body:items}).then(function(){return d});
+  }).then(function(d){
+    refreshDocs();openBookDetail(b.id);
+    printLieferschein(d,list);
+  }).catch(function(e){toast(e.message,1)});
+}
+function printLieferschein(d,list){
+  var b=curBook,comp=S.company||{},cust=CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
+  var rows=list.map(function(it,i){
+    return '<tr><td style="padding:8px;border-bottom:1px solid #ddd">'+(i+1)+'</td>'+
+    '<td style="padding:8px;border-bottom:1px solid #ddd">'+esc(it.name)+(it.notes?'<div style="font-size:10px;color:#666">'+esc(it.notes)+'</div>':'')+'</td>'+
+    '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:right">'+it.qty+'</td>'+
+    '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:center">☐</td>'+
+    '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:center">☐</td></tr>';
+  }).join('');
+  document.getElementById('printArea').innerHTML=
+  '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
+  '<div style="display:flex;justify-content:space-between;margin-bottom:30px"><div>'+
+  '<div style="font-size:20px;font-weight:700">'+esc(comp.name||'')+'</div><div style="color:#555">'+esc(comp.owner||'')+'</div></div>'+
+  '<div style="text-align:right;color:#555">'+esc(comp.street||'')+'<br>'+esc(comp.zip_city||'')+'<br>'+esc(comp.phone||'')+'</div></div>'+
+  '<div style="font-size:17px;font-weight:700;margin-bottom:4px">Lieferschein '+esc(d.number)+'</div>'+
+  '<div style="color:#555;margin-bottom:18px">Datum: '+dt(d.doc_date)+' · Auftrag: '+esc(b.title||b.event_type||'')+' am '+dt(b.event_date)+(b.venue_name?' · '+esc(b.venue_name):'')+'</div>'+
+  '<div style="margin-bottom:20px"><b>Empfänger:</b> '+esc(custName(cust))+(cust.street?', '+esc(cust.street)+', '+esc([cust.zip,cust.city].filter(Boolean).join(' ')):'')+'</div>'+
+  '<table style="width:100%;border-collapse:collapse;margin-bottom:24px"><thead><tr style="background:#f2f2f2">'+
+  '<th style="padding:8px;text-align:left">Pos</th><th style="padding:8px;text-align:left">Artikel</th><th style="padding:8px;text-align:right">Menge</th><th style="padding:8px">Übergeben</th><th style="padding:8px">Zurück</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+  '<p style="color:#555;font-size:11px;margin-bottom:34px">Der Empfänger bestätigt den Erhalt der aufgeführten Artikel in einwandfreiem, geprüftem Zustand. Für Vermietungen gelten Mietvertrag und AGB.</p>'+
+  '<div style="display:flex;gap:40px;margin-top:30px">'+
+  '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift — Übergabe</div></div>'+
+  '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift — Rückgabe</div></div></div></div>';
+  window.print();
+}
+function printMietvertrag(){
+  var b=curBook,list=bookEquipList(b);
+  if(!list.length){toast('Keine Technik zugeordnet — der Mietvertrag listet die Mietsachen aus dem Auftrag.',1);return}
+  var comp=S.company||{},cust=CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
+  var days=rentDays(b);
+  var total=list.reduce(function(s,it){return s+it.price},0);
+  var rows=list.map(function(it,i){
+    return '<tr><td style="padding:7px;border-bottom:1px solid #ddd">'+(i+1)+'</td>'+
+    '<td style="padding:7px;border-bottom:1px solid #ddd">'+esc(it.name)+'</td>'+
+    '<td style="padding:7px;border-bottom:1px solid #ddd;text-align:right">'+it.qty+'</td>'+
+    '<td style="padding:7px;border-bottom:1px solid #ddd;text-align:right">'+euro(it.price)+'</td></tr>';
+  }).join('');
+  var terms=(S.rental_contract&&S.rental_contract.text)||'';
+  document.getElementById('printArea').innerHTML=
+  '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:11px;line-height:1.55">'+
+  '<div style="font-size:18px;font-weight:700;margin-bottom:16px">Mietvertrag über Veranstaltungstechnik</div>'+
+  '<div style="display:flex;gap:30px;margin-bottom:18px">'+
+  '<div style="flex:1"><b>Vermieter</b><br>'+esc(comp.name||'')+'<br>'+esc(comp.owner||'')+'<br>'+esc(comp.street||'')+'<br>'+esc(comp.zip_city||'')+'</div>'+
+  '<div style="flex:1"><b>Mieter</b><br>'+esc(custName(cust))+'<br>'+esc(cust.street||'')+'<br>'+esc([cust.zip,cust.city].filter(Boolean).join(' '))+'<br>'+esc(cust.phone||'')+'</div></div>'+
+  '<div style="margin-bottom:14px"><b>Mietzeitraum:</b> '+dt(b.event_date)+(b.end_date?' bis '+dt(b.end_date):'')+' ('+days+' Miettag'+(days>1?'e':'')+', 1 Miettag = 24 Stunden ab Übergabe)'+
+  (b.venue_name?'<br><b>Einsatzort:</b> '+esc(b.venue_name):'')+'</div>'+
+  '<table style="width:100%;border-collapse:collapse;margin-bottom:6px"><thead><tr style="background:#f2f2f2">'+
+  '<th style="padding:7px;text-align:left">Pos</th><th style="padding:7px;text-align:left">Mietgegenstand</th><th style="padding:7px;text-align:right">Menge</th><th style="padding:7px;text-align:right">Mietpreis netto</th></tr></thead>'+
+  '<tbody>'+rows+'</tbody><tfoot><tr><td colspan="3" style="padding:7px;text-align:right;font-weight:700">Gesamtmiete netto</td><td style="padding:7px;text-align:right;font-weight:700">'+euro(total)+'</td></tr></tfoot></table>'+
+  '<p style="color:#555;margin-bottom:16px">zzgl. gesetzlicher Umsatzsteuer, sofern ausgewiesen. Abrechnung gemäß zugehörigem Angebot bzw. Rechnung.</p>'+
+  '<div style="white-space:pre-wrap;margin-bottom:26px">'+esc(terms)+'</div>'+
+  '<div style="display:flex;gap:40px;margin-top:36px">'+
+  '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift Vermieter</div></div>'+
+  '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift Mieter</div></div></div></div>';
+  window.print();
+}
+
 /* ===== Druck / PDF ===== */
 function printDoc(){
   var d=curDoc,c=docCalc(),comp=S.company||{};
   var cust=CACHE.customers.find(function(x){return x.id===v('docCust')})||{};
   var type=v('docType');
   var small=Number(document.getElementById('docTax').value)===0&&comp.small_business;
+  var brutto=v('docMode')==='brutto'&&!small;
+  var f=brutto?1+c.rate/100:1;
   var rows=curItems.filter(function(it){return it.description}).map(function(it,i){
+    var rab=Number(it.discount_value)?'<div style="font-size:10px;color:#666">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):it.discount_value+' %')+'</div>':'';
     return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+(i+1)+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+'</td>'+
+    '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+'</td>'+
     '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+it.qty+' '+esc(it.unit||'')+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(it.unit_price)+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(it.qty*it.unit_price)+'</td></tr>';
+    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(it.unit_price*f)+'</td>'+
+    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(lineTotal(it)*f)+'</td></tr>';
   }).join('');
-  var totals='<tr><td colspan="4" style="text-align:right;padding:6px">Netto</td><td style="text-align:right;padding:6px">'+euro(c.net)+'</td></tr>';
-  if(!small)totals+='<tr><td colspan="4" style="text-align:right;padding:6px">USt. '+c.rate+' %</td><td style="text-align:right;padding:6px">'+euro(c.tax)+'</td></tr>';
-  totals+='<tr><td colspan="4" style="text-align:right;padding:6px;font-weight:700">Gesamt</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(c.gross)+'</td></tr>';
+  var totals='';
+  if(c.disc)totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Zwischensumme</td><td style="text-align:right;padding:6px">'+euro(c.sub*f)+'</td></tr>'+
+    '<tr><td colspan="4" style="text-align:right;padding:6px">Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+'</td><td style="text-align:right;padding:6px">−'+euro(c.disc*f)+'</td></tr>';
+  if(brutto){
+    totals+='<tr><td colspan="4" style="text-align:right;padding:6px;font-weight:700">Gesamtbetrag</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(c.gross)+'</td></tr>'+
+      '<tr><td colspan="4" style="text-align:right;padding:6px;color:#666">darin enthaltene USt. '+c.rate+' %</td><td style="text-align:right;padding:6px;color:#666">'+euro(c.tax)+'</td></tr>';
+  }else{
+    totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Netto</td><td style="text-align:right;padding:6px">'+euro(c.net)+'</td></tr>';
+    if(!small)totals+='<tr><td colspan="4" style="text-align:right;padding:6px">USt. '+c.rate+' %</td><td style="text-align:right;padding:6px">'+euro(c.tax)+'</td></tr>';
+    totals+='<tr><td colspan="4" style="text-align:right;padding:6px;font-weight:700">Gesamt</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(c.gross)+'</td></tr>';
+  }
   if(type==='schluss'&&c.dep){
     totals+='<tr><td colspan="4" style="text-align:right;padding:6px">abzgl. erhaltener Abschläge</td><td style="text-align:right;padding:6px">−'+euro(c.dep)+'</td></tr>'+
     '<tr><td colspan="4" style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">Verbleibender Restbetrag</td><td style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">'+euro(c.gross-c.dep)+'</td></tr>';
@@ -1328,7 +1482,7 @@ function printDoc(){
   '<div style="text-align:right;color:#555">Datum: '+dt(v('docDate'))+(v('docDate2')?('<br>'+(type==='angebot'?'Gültig bis: ':'Zahlbar bis: ')+dt(v('docDate2'))):'')+'</div></div>'+
   (v('docIntro')?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(v('docIntro'))+'</p>':'')+
   '<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2">'+
-  '<th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Beschreibung</th><th style="padding:6px;text-align:right">Menge</th><th style="padding:6px;text-align:right">Einzel netto</th><th style="padding:6px;text-align:right">Gesamt netto</th></tr></thead>'+
+  '<th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Beschreibung</th><th style="padding:6px;text-align:right">Menge</th><th style="padding:6px;text-align:right">Einzel'+(brutto?' brutto':' netto')+'</th><th style="padding:6px;text-align:right">Gesamt'+(brutto?' brutto':' netto')+'</th></tr></thead>'+
   '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>'+
   (small?'<p style="color:#555;margin-bottom:12px">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>':'')+
   (v('docOutro')?'<p style="margin-bottom:20px;white-space:pre-wrap">'+esc(v('docOutro'))+'</p>':'')+
@@ -1639,6 +1793,12 @@ function renderSet(){
   document.getElementById('sINext').value=(n.rechnung&&n.rechnung.next)||1;
   document.getElementById('sPayDays').value=d.payment_days!=null?d.payment_days:14;
   document.getElementById('sValidDays').value=d.quote_valid_days!=null?d.quote_valid_days:30;
+  document.getElementById('sRental').value=(S.rental_contract&&S.rental_contract.text)||'';
+}
+function saveRental(){
+  var val={text:document.getElementById('sRental').value};
+  api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'rental_contract',value:val}})
+    .then(function(){S.rental_contract=val;toast('Mietvertrag-Bedingungen gespeichert ✓')}).catch(function(e){toast(e.message,1)});
 }
 function saveCompany(){
   var val={name:v('sName'),owner:v('sOwner'),street:v('sStreet'),zip_city:v('sZip'),phone:v('sPhone'),email:v('sMail'),

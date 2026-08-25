@@ -80,7 +80,7 @@ function db(): PDO {
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
   ]);
   $pdo->exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;');
-  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=5'); }
+  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=6'); }
   else upgrade($pdo);
   return $pdo;
 }
@@ -88,7 +88,7 @@ function db(): PDO {
 /* Schema-Upgrades für bereits vorhandene Datenbanken (idempotent) */
 function upgrade(PDO $p): void {
   $v = (int)$p->query('PRAGMA user_version')->fetchColumn();
-  if ($v >= 5) return;
+  if ($v >= 6) return;
   if ($v < 2) foreach ([
     "alter table documents add column share_token text",
     "alter table document_items add column note text",
@@ -129,7 +129,22 @@ function upgrade(PDO $p): void {
     ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
     if (!(int)$p->query("select count(*) from products")->fetchColumn()) seedProducts($p);
   }
-  $p->exec('PRAGMA user_version=5');
+  if ($v < 6) {
+    foreach ([
+      "alter table documents add column price_mode text default 'netto'",
+      "alter table documents add column discount_value real default 0",
+      "alter table documents add column discount_type text default 'pct'",
+      "alter table document_items add column discount_value real default 0",
+      "alter table document_items add column discount_type text default 'pct'",
+    ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+    try { $p->prepare("insert into settings (key,value,updated_at) values ('rental_contract',?,?)")
+      ->execute([json_encode(['text' => rentalContractDefault()], JSON_UNESCAPED_UNICODE), now()]); } catch (PDOException $e) {}
+  }
+  $p->exec('PRAGMA user_version=6');
+}
+
+function rentalContractDefault(): string {
+  return "§ 1 Mietgegenstand und Mietzeit\nVermietet werden die im Vertrag aufgeführten Geräte für den genannten Zeitraum. Ein Miettag entspricht 24 Stunden ab Übergabe; jeder weitere Tag wird mit 50 % des Tagespreises berechnet. Übergabe und Rückgabe erfolgen, sofern nicht anders vereinbart, am Lager des Vermieters in Hemer.\n\n§ 2 Zustand, Einweisung und Nutzung\nDie Geräte werden in geprüftem, funktionsfähigem Zustand übergeben; der Mieter erhält eine kurze Einweisung. Die Nutzung erfolgt sachgemäß und nur durch den Mieter bzw. von ihm beauftragte, eingewiesene Personen.\n\n§ 3 Haftung des Mieters\nDer Mieter haftet ab Übergabe bis zur Rückgabe für Verlust, Diebstahl und Beschädigung der Mietsachen in Höhe des Wiederbeschaffungswerts bzw. der Reparaturkosten. Mängel und Schäden sind unverzüglich zu melden.\n\n§ 4 Rückgabe\nDie Rückgabe erfolgt vollständig, gereinigt und ordnungsgemäß verpackt zum vereinbarten Zeitpunkt. Bei verspäteter Rückgabe wird je angefangenem Tag der Folgetagespreis berechnet.\n\n§ 5 Kaution\nEine vereinbarte Kaution wird bei vollständiger, unbeschädigter Rückgabe erstattet.\n\n§ 6 Schlussbestimmungen\nEs gelten ergänzend die AGB des Vermieters. Es gilt deutsches Recht.";
 }
 
 function migrate(PDO $p): void {
@@ -173,6 +188,7 @@ create table booking_equipment (id text primary key,
   qty integer default 1, price_override real, out_done integer default 0,
   back_done integer default 0, notes text);
 create table documents (id text primary key, share_token text, doc_type text not null, number text unique not null,
+  price_mode text default 'netto', discount_value real default 0, discount_type text default 'pct',
   customer_id text not null references customers(id) on delete restrict,
   booking_id text references bookings(id) on delete set null,
   parent_id text, status text default 'entwurf', doc_date text, valid_until text, due_date text,
@@ -204,7 +220,8 @@ create table forms (id text primary key, token text unique not null, title text 
   created_at text, submitted_at text);
 create table document_items (id text primary key,
   document_id text not null references documents(id) on delete cascade,
-  pos integer default 1, description text not null, note text, qty real default 1, unit text, unit_price real default 0);
+  pos integer default 1, description text not null, note text, qty real default 1, unit text, unit_price real default 0,
+  discount_value real default 0, discount_type text default 'pct');
 SQL);
   seed($p);
 }
@@ -219,7 +236,8 @@ function seed(PDO $p): void {
   };
   foreach ([
     ['company', '{"name":"DJ Lauschgift","owner":"Markus Jankowski","street":"Büttmecker Weg 35c","zip_city":"58675 Hemer","phone":"01523 6439373","email":"","website":"https://lauschgift.net","tax_id":"","vat_id":"","iban":"","bic":"","bank":"","small_business":false}'],
-    ['numbering', '{"angebot":{"prefix":"AN-","next":1},"rechnung":{"prefix":"RE-","next":1},"year_in_number":true}'],
+    ['numbering', '{"angebot":{"prefix":"AN-","next":1},"rechnung":{"prefix":"RE-","next":1},"lieferschein":{"prefix":"LS-","next":1},"year_in_number":true}'],
+    ['rental_contract', json_encode(['text' => rentalContractDefault()], JSON_UNESCAPED_UNICODE)],
     ['defaults', '{"tax_rate":19,"payment_days":14,"quote_valid_days":30,"quote_intro":"vielen Dank für Ihre Anfrage. Gerne biete ich Ihnen an:","invoice_outro":"Bitte überweisen Sie den Betrag unter Angabe der Rechnungsnummer auf das unten genannte Konto."}'],
   ] as [$k, $v]) $p->prepare('insert into settings (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
 
@@ -652,7 +670,7 @@ function handlePortal(string $path, string $method, $body): never {
   $p = db();
   if (preg_match('#^portal/offer/([a-f0-9]+)$#', $path, $m) && $method === 'GET') {
     $d = portalDoc($m[1], (string)($_GET['plz'] ?? ''));
-    $it = $p->prepare('select pos, description, note, qty, unit, unit_price from document_items where document_id = ? order by pos');
+    $it = $p->prepare('select pos, description, note, qty, unit, unit_price, discount_value, discount_type from document_items where document_id = ? order by pos');
     $it->execute([$d['id']]);
     $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
     $ups = [];
@@ -661,7 +679,8 @@ function handlePortal(string $path, string $method, $body): never {
         where active=1 and show_portal=1 order by sort')->fetchAll();
     out([
       'doc' => array_intersect_key($d, array_flip(['doc_type','number','status','doc_date','valid_until','due_date',
-        'tax_rate','is_small_business','intro_text','outro_text','total_net','total_tax','total_gross','deposit_deducted'])),
+        'tax_rate','is_small_business','intro_text','outro_text','total_net','total_tax','total_gross','deposit_deducted',
+        'price_mode','discount_value','discount_type'])),
       'customer' => trim(($d['company'] ? $d['company'] : ($d['first_name'].' '.$d['last_name']))),
       'items' => $it->fetchAll(),
       'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city','iban','bic','bank','tax_id'])),
