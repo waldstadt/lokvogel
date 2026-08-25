@@ -155,6 +155,7 @@ th.num{text-align:right}
       <a data-pg="tpl">✉️ Vorlagen</a>
       <a data-pg="forms">📋 Fragebögen</a>
       <div class="grp">Finanzen</div>
+      <a data-pg="prod">📦 Produkte</a>
       <a data-pg="quotes">📝 Angebote</a>
       <a data-pg="inv">🧾 Rechnungen</a>
       <a data-pg="stats">📈 Statistik</a>
@@ -260,6 +261,14 @@ th.num{text-align:right}
     <div class="card"><h3>Bogen-Vorlagen <button class="btn sm" style="float:right" onclick="openFtModal()">+ Vorlage</button></h3><div id="ftList" class="sml"></div></div>
   </div>
 
+  <!-- PRODUKTE -->
+  <div class="pg" id="pg-prod">
+    <div class="phead"><div><div class="pt">Produktkatalog</div><div class="ps">Artikel mit Nummern &amp; Kategorien — per „+ Artikel“ blitzschnell ins Angebot. Pakete bündeln mehrere Artikel zu einer Position.</div></div>
+      <button class="btn" onclick="openProdModal()">+ Neuer Artikel</button></div>
+    <input type="text" id="prodSearch" placeholder="Suchen (Nummer, Name, Kategorie) …" oninput="renderProducts()" style="margin-bottom:12px">
+    <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Name</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis netto</th><th>Typ</th><th>Status</th></tr></thead><tbody id="prodRows"></tbody></table></div>
+  </div>
+
   <!-- ANGEBOTE -->
   <div class="pg" id="pg-quotes">
     <div class="phead"><div><div class="pt">Angebote</div><div class="ps" id="qStats"></div></div>
@@ -302,7 +311,7 @@ th.num{text-align:right}
       </div>
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
     </div>
-    <div class="card"><h3>Positionen <span style="float:right"><button class="btn g sm" onclick="openUpsellPicker()">✨ + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button></span></h3>
+    <div class="card"><h3>Positionen <span style="float:right"><button class="btn g sm" onclick="openProductPicker()">📦 + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()">✨ + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button></span></h3>
       <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel netto</div><div>Gesamt</div><div></div></div>
       <div id="docItems"></div>
       <div class="totals" id="docTotals"></div>
@@ -326,7 +335,8 @@ th.num{text-align:right}
   <div class="pg" id="pg-tech">
     <div class="phead"><div><div class="pt">Technik</div><div class="ps">Bestand, Verleihpreise &amp; Homepage-Anzeige</div></div>
       <button class="btn" onclick="openEqModal()">+ Neuer Artikel</button></div>
-    <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th>Homepage</th><th>Status</th><th>Heute im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
+    <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Heute im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
+    <div class="card"><h3>Miet-Partner (DJs, Bands, Musiker, Techniker) <span class="mut sml" style="font-weight:400">— registrieren sich über die Technik-Seite, du schaltest frei und teilst den Code mit</span></h3><div id="partnerList" class="sml"></div></div>
   </div>
 
   <!-- CMS -->
@@ -419,10 +429,14 @@ th.num{text-align:right}
           <div><label>E-Mail</label><input id="sMail"></div>
         </div>
         <div class="grid2">
+          <div><label>Rechtsform</label><input id="sLegal" placeholder="Einzelunternehmen, GbR, GmbH …"></div>
+          <div></div>
+        </div>
+        <div class="grid2">
           <div><label>Steuernummer</label><input id="sTaxId"></div>
           <div><label>USt-IdNr. (optional)</label><input id="sVatId"></div>
         </div>
-        <label style="margin-top:12px"><input type="checkbox" id="sSmall" style="width:auto;margin-right:6px">Kleinunternehmer nach §19 UStG (keine USt. ausweisen)</label>
+        <label style="margin-top:12px"><input type="checkbox" id="sSmall" style="width:auto;margin-right:6px"><b>Umsatzsteuer AUS</b> — Kleinunternehmer nach §19 UStG: Dokumente werden ohne USt. erstellt, inkl. Pflichthinweis</label>
         <div style="margin-top:12px"><button class="btn sm" onclick="saveCompany()">Speichern</button></div>
       </div>
       <div>
@@ -444,6 +458,10 @@ th.num{text-align:right}
           <div class="grid2">
             <div><label>Zahlungsziel (Tage)</label><input type="number" id="sPayDays"></div>
             <div><label>Angebot gültig (Tage)</label><input type="number" id="sValidDays"></div>
+          </div>
+          <div class="grid2">
+            <div><label>USt.-Satz Standard (%)</label><input type="number" step="0.1" id="sTaxRate"></div>
+            <div><label>Partner-Rabatt Technik-Miete (%)</label><input type="number" id="sPartnerPct"></div>
           </div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveNumbering()">Speichern</button></div>
         </div>
@@ -541,7 +559,9 @@ function loadAll(){
     api('forms?select=*&order=created_at.desc'),
     api('form_templates?select=*&order=sort'),
     api('upsells?select=*&order=sort'),
-    api('reviews?select=*&order=sort')
+    api('reviews?select=*&order=sort'),
+    api('products?select=*&order=sort'),
+    api('partners?select=*&order=created_at.desc')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -549,13 +569,14 @@ function loadAll(){
     CACHE.content={};(r[7]||[]).forEach(function(x){CACHE.content[x.key]=x.value});
     CACHE.packages=r[8]||[];CACHE.faq=r[9]||[];CACHE.comms=r[10]||[];CACHE.tpls=r[11]||[];
     CACHE.docEvents=r[12]||[];CACHE.forms=r[13]||[];CACHE.formTpls=r[14]||[];CACHE.upsells=r[15]||[];
-    CACHE.reviews=r[16]||[];
+    CACHE.reviews=r[16]||[];CACHE.products=r[17]||[];CACHE.partners=r[18]||[];
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
 }
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
   renderEq();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
+  renderProducts();renderPartners();
 }
 
 /* ===== Dashboard ===== */
@@ -954,7 +975,8 @@ function openDocEditor(id,newType){
   }else{
     var defs=S.defaults||{};
     curDoc={id:null,doc_type:newType||'rechnung',number:'(wird beim Speichern vergeben)',status:'entwurf',
-      doc_date:new Date().toISOString().slice(0,10),tax_rate:defs.tax_rate!=null?defs.tax_rate:19,
+      doc_date:new Date().toISOString().slice(0,10),
+      tax_rate:(S.company&&S.company.small_business)?0:(defs.tax_rate!=null?defs.tax_rate:19),
       is_small_business:!!(S.company&&S.company.small_business),
       intro_text:newType==='angebot'?(defs.quote_intro||''):'',outro_text:newType==='angebot'?'':(defs.invoice_outro||''),
       deposit_deducted:0,customer_id:'',booking_id:null};
@@ -1365,10 +1387,11 @@ function renderEq(){
     }).reduce(function(s,x){return s+x.qty},0);
     return '<tr class="click" onclick="openEqModal(\''+e.id+'\')"><td><b>'+esc(e.name)+'</b></td><td>'+esc(e.category||'–')+'</td>'+
     '<td class="num">'+e.qty_total+'</td><td class="num">'+euro(e.day_rate)+'</td>'+
+    '<td class="num">'+(e.partner_rate!=null?euro(e.partner_rate):'<span class="mut">auto</span>')+'</td>'+
     '<td>'+(e.public&&e.rentable?'<span class="b green">sichtbar</span>':'<span class="b grey">verborgen</span>')+'</td>'+
     '<td><span class="b '+({aktiv:'green',wartung:'yel',inaktiv:'grey'}[e.status]||'grey')+'">'+e.status+'</span></td>'+
     '<td>'+(inUse?('<span class="b blue">'+inUse+' Stk. unterwegs</span>'):'–')+'</td></tr>';
-  }).join('')||'<tr><td colspan="7" class="mut">Noch keine Artikel.</td></tr>';
+  }).join('')||'<tr><td colspan="8" class="mut">Noch keine Artikel.</td></tr>';
 }
 function openEqModal(id){
   var e=id?CACHE.equipment.find(function(x){return x.id===id}):{};e=e||{};
@@ -1380,6 +1403,9 @@ function openEqModal(id){
     '<div><label>Folgetage %</label><input type="number" id="ePct" value="'+(e.followup_pct!=null?e.followup_pct:50)+'"></div>'+
     '<div><label>Bestand</label><input type="number" id="eQty" value="'+(e.qty_total||1)+'"></div>'+
     '<div><label>Status</label><select id="eStatus"><option>aktiv</option><option>wartung</option><option>inaktiv</option></select></div></div>'+
+    '<div class="grid2"><div><label>Partner-Preis €/Tag (leer = Rabatt % aus Einstellungen)</label><input type="number" step="0.01" id="ePartner" value="'+(e.partner_rate!=null?e.partner_rate:'')+'"></div>'+
+    '<div><label>Zubehör-Empfehlung („passt dazu“)</label><select id="eAddon"><option value="">–</option>'+
+    (CACHE.equipment||[]).filter(function(x){return x.id!==e.id}).map(function(x){return '<option value="'+x.id+'"'+(e.addon_id===x.id?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select></div></div>'+
     '<label>Bild</label><div style="display:flex;gap:8px"><input id="eImg" value="'+esc(e.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upEq" onchange="uploadImg(this,\'eImg\')"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">📤</button></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="ePub" style="width:auto;margin-right:6px" '+(e.public!==false?'checked':'')+'>Auf Homepage anzeigen (mietbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveEq(\''+(id||'')+'\')">Speichern</button>'+
@@ -1389,6 +1415,7 @@ function openEqModal(id){
 function saveEq(id){
   if(!v('eName')){toast('Name fehlt.',1);return}
   var body={name:v('eName'),category:v('eCat'),description:v('eDesc'),day_rate:Number(v('eRate'))||0,
+    partner_rate:v('ePartner')!==''?Number(v('ePartner')):null,addon_id:v('eAddon')||null,
     followup_pct:Number(v('ePct'))||50,qty_total:Number(v('eQty'))||1,status:v('eStatus'),
     image_url:v('eImg'),public:document.getElementById('ePub').checked,rentable:document.getElementById('ePub').checked,
     slug:v('eName').toLowerCase().replace(/[^a-z0-9äöüß]+/g,'-').replace(/^-|-$/g,'')};
@@ -1597,9 +1624,12 @@ function renderSet(){
   document.getElementById('sZip').value=c.zip_city||'';
   document.getElementById('sPhone').value=c.phone||'';
   document.getElementById('sMail').value=c.email||'';
+  document.getElementById('sLegal').value=c.legal_form||'';
   document.getElementById('sTaxId').value=c.tax_id||'';
   document.getElementById('sVatId').value=c.vat_id||'';
   document.getElementById('sSmall').checked=!!c.small_business;
+  document.getElementById('sTaxRate').value=d.tax_rate!=null?d.tax_rate:19;
+  document.getElementById('sPartnerPct').value=d.partner_discount_pct!=null?d.partner_discount_pct:20;
   document.getElementById('sBank').value=c.bank||'';
   document.getElementById('sIban').value=c.iban||'';
   document.getElementById('sBic').value=c.bic||'';
@@ -1612,7 +1642,7 @@ function renderSet(){
 }
 function saveCompany(){
   var val={name:v('sName'),owner:v('sOwner'),street:v('sStreet'),zip_city:v('sZip'),phone:v('sPhone'),email:v('sMail'),
-    tax_id:v('sTaxId'),vat_id:v('sVatId'),small_business:document.getElementById('sSmall').checked,
+    legal_form:v('sLegal'),tax_id:v('sTaxId'),vat_id:v('sVatId'),small_business:document.getElementById('sSmall').checked,
     bank:v('sBank'),iban:v('sIban'),bic:v('sBic'),website:(S.company&&S.company.website)||''};
   api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'company',value:val}})
     .then(function(){S.company=val;toast('Firmendaten gespeichert ✓')}).catch(function(e){toast(e.message,1)});
@@ -1620,6 +1650,7 @@ function saveCompany(){
 function saveNumbering(){
   var n={angebot:{prefix:v('sQPre'),next:Number(v('sQNext'))||1},rechnung:{prefix:v('sIPre'),next:Number(v('sINext'))||1},year_in_number:true};
   var d=S.defaults||{};d.payment_days=Number(v('sPayDays'))||14;d.quote_valid_days=Number(v('sValidDays'))||30;
+  d.tax_rate=Number(v('sTaxRate'))||19;d.partner_discount_pct=Number(v('sPartnerPct'))||20;
   Promise.all([
     api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'numbering',value:n}}),
     api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'defaults',value:d}})
@@ -1753,6 +1784,119 @@ function saveTpl(id){
     .then(function(){closeModal();toast('Gespeichert ✓');reloadTpls()}).catch(function(e){toast(e.message,1)});
 }
 function reloadTpls(){api('email_templates?select=*&order=sort').then(function(r){CACHE.tpls=r||[];renderTpls()})}
+
+/* ===== Produktkatalog ===== */
+function prodPrice(p){
+  if(p.price_net!=null)return Number(p.price_net);
+  return (p.bundle||[]).reduce(function(s,c){
+    var it=(CACHE.products||[]).find(function(x){return x.sku===c.sku});
+    return s+(it&&it.price_net!=null?Number(it.price_net):0)*(Number(c.qty)||1);
+  },0);
+}
+function renderProducts(){
+  var q=(v('prodSearch')||'').toLowerCase();
+  var list=(CACHE.products||[]).filter(function(p){
+    return !q||[p.sku,p.name,p.category].join(' ').toLowerCase().indexOf(q)>=0;
+  });
+  document.getElementById('prodRows').innerHTML=list.map(function(p){
+    var isBundle=(p.bundle||[]).length>0;
+    return '<tr class="click" onclick="openProdModal(\''+p.id+'\')"><td><b>'+esc(p.sku||'–')+'</b></td>'+
+    '<td>'+esc(p.name)+(p.description?'<br><span class="mut sml">'+esc(p.description.slice(0,80))+'…</span>':'')+'</td>'+
+    '<td>'+esc(p.category||'–')+'</td><td>'+esc(p.unit||'Stk.')+'</td>'+
+    '<td class="num">'+euro(prodPrice(p))+'</td>'+
+    '<td>'+(isBundle?'<span class="b gold">Paket ('+(p.bundle||[]).length+')</span>':'<span class="b grey">Artikel</span>')+'</td>'+
+    '<td>'+(p.active?'<span class="b green">aktiv</span>':'<span class="b grey">aus</span>')+'</td></tr>';
+  }).join('')||'<tr><td colspan="7" class="mut">Keine Artikel gefunden.</td></tr>';
+}
+function openProdModal(id){
+  var p=id?(CACHE.products||[]).find(function(x){return x.id===id}):{};p=p||{};
+  var bundleLines=(p.bundle||[]).map(function(c){return c.sku+' | '+(c.qty||1)}).join('\n');
+  openModal(id?'Artikel bearbeiten':'Neuer Artikel',
+    '<div class="grid3"><div><label>Artikelnummer *</label><input id="pSku" value="'+esc(p.sku||'')+'" placeholder="DJ-100"></div>'+
+    '<div><label>Kategorie</label><input id="pCat" value="'+esc(p.category||'')+'" placeholder="DJ-Leistung, Ton, Licht …"></div>'+
+    '<div><label>Sortierung</label><input type="number" id="pSort" value="'+(p.sort||0)+'"></div></div>'+
+    '<label>Name *</label><input id="pName" value="'+esc(p.name||'')+'">'+
+    '<label>Beschreibung (erscheint als Erklärung im Kundenportal)</label><textarea id="pDesc">'+esc(p.description||'')+'</textarea>'+
+    '<div class="grid2"><div><label>Einheit</label><input id="pUnit" value="'+esc(p.unit||'Stk.')+'"></div>'+
+    '<div><label>Preis netto (€) — bei Paketen leer = Summe der Bestandteile</label><input type="number" step="0.01" id="pPrice" value="'+(p.price_net!=null?p.price_net:'')+'"></div></div>'+
+    '<label>Paket-Bestandteile (eine Zeile je Artikel: Artikelnummer | Menge) — leer = normaler Artikel</label>'+
+    '<textarea id="pBundle" style="min-height:70px;font-size:11px" placeholder="DJ-100 | 1&#10;TON-200 | 1">'+esc(bundleLines)+'</textarea>'+
+    '<label style="margin-top:12px"><input type="checkbox" id="pActive" style="width:auto;margin-right:6px" '+(p.active!==false?'checked':'')+'>Aktiv (im „+ Artikel“-Picker sichtbar)</label>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveProd(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delRow(\'products\',\''+id+'\',reloadProds)">Löschen</button>':'')+'</div>');
+}
+function saveProd(id){
+  if(!v('pSku')||!v('pName')){toast('Artikelnummer und Name fehlen.',1);return}
+  var bundle=document.getElementById('pBundle').value.split('\n').map(function(l){
+    var parts=l.split('|').map(function(s){return s.trim()});
+    return parts[0]?{sku:parts[0].toUpperCase(),qty:Number(parts[1])||1}:null;
+  }).filter(Boolean);
+  var bad=bundle.filter(function(c){return !(CACHE.products||[]).some(function(x){return x.sku===c.sku})});
+  if(bad.length){toast('Unbekannte Artikelnummer im Paket: '+bad.map(function(b){return b.sku}).join(', '),1);return}
+  var body={sku:v('pSku').toUpperCase(),name:v('pName'),category:v('pCat'),description:v('pDesc'),
+    unit:v('pUnit')||'Stk.',price_net:v('pPrice')!==''?Number(v('pPrice')):null,
+    bundle:bundle,sort:Number(v('pSort'))||0,active:document.getElementById('pActive').checked};
+  (id?api('products?id=eq.'+id,{method:'PATCH',body:body}):api('products',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Gespeichert ✓');reloadProds()}).catch(function(e){toast('Fehler (Artikelnummer doppelt?): '+e.message,1)});
+}
+function reloadProds(){api('products?select=*&order=sort').then(function(r){CACHE.products=r||[];renderProducts()})}
+function openProductPicker(){
+  var list=(CACHE.products||[]).filter(function(p){return p.active});
+  if(!list.length){toast('Keine aktiven Artikel — unter Produkte anlegen.',1);return}
+  openModal('Artikel einfügen',
+    '<input type="text" id="ppSearch" placeholder="Suchen …" oninput="renderPicker()" style="margin-bottom:10px">'+
+    '<div id="ppList" style="max-height:420px;overflow-y:auto"></div>');
+  renderPicker();
+  document.getElementById('ppSearch').focus();
+}
+function renderPicker(){
+  var q=(v('ppSearch')||'').toLowerCase();
+  var list=(CACHE.products||[]).filter(function(p){
+    return p.active&&(!q||[p.sku,p.name,p.category].join(' ').toLowerCase().indexOf(q)>=0);
+  });
+  document.getElementById('ppList').innerHTML=list.map(function(p){
+    var isBundle=(p.bundle||[]).length>0;
+    return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:10px;align-items:center">'+
+    '<div><b>'+esc(p.sku)+'</b> '+esc(p.name)+' <span class="mut">'+euro(prodPrice(p))+' / '+esc(p.unit||'Stk.')+'</span>'+
+    (isBundle?' <span class="b gold">Paket</span>':'')+
+    '<div class="mut sml">'+esc((p.description||'').slice(0,90))+'</div></div>'+
+    '<button class="btn sm" onclick="insertProduct(\''+p.id+'\')">Einfügen</button></div>';
+  }).join('')||'<span class="mut sml">Nichts gefunden.</span>';
+}
+function insertProduct(id){
+  var p=(CACHE.products||[]).find(function(x){return x.id===id});if(!p)return;
+  var note=p.description||'';
+  if((p.bundle||[]).length){
+    var comps=p.bundle.map(function(c){
+      var it=(CACHE.products||[]).find(function(x){return x.sku===c.sku});
+      return (c.qty>1?c.qty+'× ':'')+(it?it.name:c.sku);
+    }).join(', ');
+    note=(note?note+' ':'')+'Enthalten: '+comps+'.';
+  }
+  curItems.push({pos:curItems.length+1,description:(p.sku?p.sku+' — ':'')+p.name,note:note,
+    qty:1,unit:p.unit||'Stk.',unit_price:prodPrice(p)});
+  closeModal();renderItems();toast('„'+p.name+'“ eingefügt ✓');
+}
+
+/* ===== Partner (Technik-Vermietung) ===== */
+function renderPartners(){
+  var el=document.getElementById('partnerList');if(!el)return;
+  var KIND={dj:'DJ',band:'Band',musiker:'Musiker',techniker:'Techniker'};
+  el.innerHTML=(CACHE.partners||[]).map(function(pt){
+    return '<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)"><b>'+esc(pt.name)+'</b> <span class="mut">'+(KIND[pt.kind]||pt.kind)+(pt.company?' · '+esc(pt.company):'')+' · '+esc(pt.email||'')+'</span> '+
+    (pt.status==='freigeschaltet'?
+      '<span class="b green">Code: '+esc(pt.code)+'</span> <a class="sml" onclick="navigator.clipboard.writeText(\''+esc(pt.code)+'\').then(function(){toast(\'Code kopiert ✓\')})">📋</a>':
+      '<span class="b gold">beantragt</span> <button class="btn sm" onclick="approvePartner(\''+pt.id+'\')">Freischalten</button>')+
+    ' <a onclick="delRow(\'partners\',\''+pt.id+'\',reloadPartners)" style="color:var(--red)">✕</a></div>';
+  }).join('')||'<span class="mut">Keine Partner-Anträge.</span>';
+}
+function approvePartner(id){
+  var code=Array.from(crypto.getRandomValues(new Uint8Array(4))).map(function(b){return b.toString(16).padStart(2,'0')}).join('').toUpperCase();
+  api('partners?id=eq.'+id,{method:'PATCH',body:{status:'freigeschaltet',code:code}})
+    .then(function(){toast('Freigeschaltet ✓ — Code: '+code+' (dem Partner mitteilen)');reloadPartners()})
+    .catch(function(e){toast(e.message,1)});
+}
+function reloadPartners(){api('partners?select=*&order=created_at.desc').then(function(r){CACHE.partners=r||[];renderPartners()})}
 
 /* ===== Bewertungen ===== */
 function renderRevAdmin(){

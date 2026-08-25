@@ -113,6 +113,14 @@ footer a:hover{color:var(--acc)}
 
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
 .reveal.vis{opacity:1;transform:none}
+.msg{padding:12px 14px;font-size:13px;margin-bottom:14px;display:none;border:1px solid;border-radius:9px}
+.msg.ok{display:block;border-color:#3d6b3d;background:rgba(60,120,60,.12);color:#9fd49f}
+.msg.err{display:block;border-color:#7a3535;background:rgba(150,60,60,.12);color:#e0a0a0}
+.rent .avail{font-size:11px;font-weight:600;margin-top:8px}
+.rent .avail.ok{color:#5aa05a}.rent .avail.no{color:#d05555}
+.rent .old{color:var(--mut2);text-decoration:line-through;font-weight:400;font-size:12px;margin-right:6px}
+.rent .addon{font-size:11px;color:var(--mut2);margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+.rent .addon b{color:var(--acc);font-weight:600}
 </style>
 </head>
 <body>
@@ -127,6 +135,7 @@ footer a:hover{color:var(--acc)}
     <div class="nav-links" id="nl">
       <a href="#mieten">Technik mieten</a>
       <a href="#techniker">Techniker buchen</a>
+      <a href="#partner">Für Kollegen</a>
       <a href="#konditionen">Konditionen</a>
       <a href="index.html" class="switch">🎧 Zur DJ-Seite</a>
       <a href="#anfrage" class="btn small">Anfragen</a>
@@ -159,6 +168,12 @@ footer a:hover{color:var(--acc)}
       <h2 id="rentTitle">Technik mieten</h2>
       <p class="lead" id="rentText">Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung.</p>
     </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:26px">
+      <div><label style="display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin-bottom:6px;font-weight:600">Von</label><input type="date" id="avFrom" style="margin:0;width:auto"></div>
+      <div><label style="display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin-bottom:6px;font-weight:600">Bis</label><input type="date" id="avTo" style="margin:0;width:auto"></div>
+      <button class="btn g" onclick="checkAvail()">Verfügbarkeit prüfen</button>
+      <span class="sub" id="partnerBadge"></span>
+    </div>
     <div class="rent-grid" id="rentGrid"></div>
     <p class="rent-note">Alle Preise netto pro Miettag. Verfügbarkeit fragt ihr am besten kurz per Formular oder Telefon an.</p>
   </div>
@@ -189,6 +204,36 @@ footer a:hover{color:var(--acc)}
           <li>Bühnen- und Tanzflächenlicht</li>
           <li>Auf- und Abbau inklusive</li>
         </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="partner">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="kicker">Für Kollegen</div>
+      <h2>DJs, Bands &amp; Musiker mieten günstiger</h2>
+      <p class="lead">Du stehst selbst auf der Bühne oder hinter den Decks? Dann registriere dich einmalig als Miet-Partner – nach der Freischaltung bekommst du einen Partner-Code und siehst hier deine vergünstigten Preise.</p>
+    </div>
+    <div class="duo">
+      <div class="card reveal">
+        <h3>Partner werden</h3>
+        <div class="msg" id="pMsg"></div>
+        <label>Name *</label><input id="pName">
+        <label>Ich bin …</label><select id="pKind"><option value="dj">DJ</option><option value="band">Band</option><option value="musiker">Musiker:in</option><option value="techniker">Techniker:in</option></select>
+        <label>Firma / Künstlername</label><input id="pCompany">
+        <label>E-Mail *</label><input id="pEmail" type="email">
+        <label>Telefon</label><input id="pPhone">
+        <div style="margin-top:14px"><button class="btn" id="pBtn" onclick="registerPartner()">Registrierung absenden</button></div>
+        <p style="font-size:12px;color:var(--mut2);margin-top:10px">Ich prüfe jede Anfrage persönlich und melde mich mit deinem Partner-Code.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Schon Partner? Code eingeben</h3>
+        <div class="msg" id="cMsg"></div>
+        <label>Partner-Code</label><input id="pCode" placeholder="z. B. 4F9A2B77" style="text-transform:uppercase">
+        <div style="margin-top:14px"><button class="btn g" onclick="checkPartner()">Partnerpreise anzeigen</button></div>
+        <p style="font-size:12px;color:var(--mut2);margin-top:10px">Mit gültigem Code werden oben im Mietpark automatisch deine vergünstigten Partnerpreise angezeigt.</p>
       </div>
     </div>
   </div>
@@ -284,23 +329,78 @@ function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
 var LEGAL={};
 
-var FALLBACK_EQ=[{name:'Nebelmaschine klein',category:'Effekt',description:'Kompakte Nebelmaschine inkl. Fluid – ideal für kleine Räume.',day_rate:25}];
-function renderRent(list){
-  document.getElementById('rentGrid').innerHTML=list.map(function(e){
+var EQ=[{name:'Nebelmaschine klein',category:'Effekt',description:'Kompakte Nebelmaschine inkl. Fluid – ideal für kleine Räume.',day_rate:25}];
+var PARTNER=JSON.parse(sessionStorage.getItem('lg_partner')||'null');
+var AVAIL={};
+function partnerPrice(e){
+  if(!PARTNER)return null;
+  if(e.partner_rate!=null)return Number(e.partner_rate);
+  return Math.round(Number(e.day_rate||0)*(100-PARTNER.discount_pct))/100;
+}
+function renderRent(){
+  document.getElementById('partnerBadge').innerHTML=PARTNER?('🤝 Partnerpreise aktiv für <b style="color:var(--txt)">'+esc(PARTNER.name)+'</b>'):'';
+  document.getElementById('rentGrid').innerHTML=EQ.map(function(e){
     var img=e.image_url?' style="background-image:url(\''+esc(e.image_url)+'\')"':'';
     var icon=e.image_url?'':'♪';
+    var pp=partnerPrice(e);
+    var price=pp!=null?'<span class="old">'+euro(e.day_rate||0)+'</span>'+euro(pp)+' <small>/ Miettag · Partnerpreis</small>':euro(e.day_rate||0)+' <small>/ Miettag</small>';
+    var av='';
+    if(e.id&&AVAIL[e.id]!=null){
+      av=AVAIL[e.id].available>0?'<div class="avail ok">✓ Im Zeitraum verfügbar ('+AVAIL[e.id].available+' von '+AVAIL[e.id].total+')</div>':
+        '<div class="avail no">✗ Im Zeitraum bereits vergeben</div>';
+    }
+    var addon='';
+    if(e.addon_id){
+      var a=EQ.find(function(x){return x.id===e.addon_id});
+      if(a)addon='<div class="addon">Passt dazu: <b>'+esc(a.name)+'</b> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag) — einfach mit anfragen.</div>';
+    }
     return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
       (e.category?'<div class="rc">'+esc(e.category)+'</div>':'')+
       '<h4>'+esc(e.name)+'</h4><p>'+esc(e.description||'')+'</p>'+
-      '<div class="rp">'+euro(e.day_rate||0)+' <small>/ Miettag</small></div></div></div>';
+      '<div class="rp">'+price+'</div>'+av+addon+'</div></div>';
   }).join('');
 }
-renderRent(FALLBACK_EQ);
+renderRent();
 
 function sfetch(path){
   return fetch(API+'/rest/'+path).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()});
 }
-sfetch('equipment?select=*&public=eq.true&rentable=eq.true&status=eq.aktiv&order=sort').then(function(r){if(r.length)renderRent(r)}).catch(function(){});
+sfetch('equipment?select=*&public=eq.true&rentable=eq.true&status=eq.aktiv&order=sort').then(function(r){if(r.length){EQ=r;renderRent()}}).catch(function(){});
+
+function checkAvail(){
+  var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
+  if(!from)return;
+  Promise.all(EQ.filter(function(e){return e.id}).map(function(e){
+    return fetch(API+'/portal/availability?eq='+e.id+'&from='+from+'&to='+to)
+      .then(function(r){return r.json()}).then(function(j){AVAIL[e.id]=j}).catch(function(){});
+  })).then(renderRent);
+}
+function registerPartner(){
+  var name=document.getElementById('pName').value.trim(),email=document.getElementById('pEmail').value.trim();
+  var m=document.getElementById('pMsg');
+  if(!name||!email){m.className='msg err';m.textContent='Bitte Name und E-Mail angeben.';return}
+  document.getElementById('pBtn').disabled=true;
+  fetch(API+'/portal/partner',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name,email:email,kind:document.getElementById('pKind').value,
+      company:document.getElementById('pCompany').value.trim(),phone:document.getElementById('pPhone').value.trim()})})
+    .then(function(r){if(!r.ok)throw new Error();
+      m.className='msg ok';m.textContent='Danke! Deine Registrierung ist eingegangen – du bekommst deinen Partner-Code, sobald ich sie geprüft habe.';
+    }).catch(function(){m.className='msg err';m.textContent='Senden fehlgeschlagen – bitte später erneut versuchen.';
+      document.getElementById('pBtn').disabled=false});
+}
+function checkPartner(){
+  var code=document.getElementById('pCode').value.trim().toUpperCase(),m=document.getElementById('cMsg');
+  if(!code){m.className='msg err';m.textContent='Bitte Code eingeben.';return}
+  fetch(API+'/portal/partner/'+encodeURIComponent(code))
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s!==200){m.className='msg err';m.textContent=res.j.error||'Code ungültig.';return}
+      PARTNER=res.j;sessionStorage.setItem('lg_partner',JSON.stringify(PARTNER));
+      m.className='msg ok';m.textContent='Willkommen, '+res.j.name+'! Deine Partnerpreise ('+res.j.discount_pct+' % Rabatt, sofern kein Festpreis hinterlegt) sind jetzt oben im Mietpark aktiv.';
+      renderRent();
+      document.getElementById('mieten').scrollIntoView({behavior:'smooth'});
+    }).catch(function(){m.className='msg err';m.textContent='Prüfung fehlgeschlagen – bitte später erneut versuchen.'});
+}
 sfetch('site_content?select=key,value').then(function(rows){
   var c={};rows.forEach(function(r){c[r.key]=r.value});
   if(c.tech_hero){

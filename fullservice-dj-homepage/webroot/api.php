@@ -32,10 +32,11 @@ const JSON_COLS = [
   'settings' => ['value'], 'site_content' => ['value'],
   'packages' => ['features'], 'customers' => ['tags'],
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
+  'products' => ['bundle'],
 ];
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'],
-  'upsells' => ['active','show_portal'], 'reviews' => ['public'],
+  'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
   'bookings' => ['review_requested'],
   'equipment' => ['public','rentable'],
   'booking_equipment' => ['out_done','back_done'],
@@ -44,7 +45,7 @@ const BOOL_COLS = [
 ];
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
-  'doc_events','form_templates','forms','upsells','reviews'];
+  'doc_events','form_templates','forms','upsells','reviews','products','partners'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -79,7 +80,7 @@ function db(): PDO {
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
   ]);
   $pdo->exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;');
-  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=4'); }
+  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=5'); }
   else upgrade($pdo);
   return $pdo;
 }
@@ -87,7 +88,7 @@ function db(): PDO {
 /* Schema-Upgrades für bereits vorhandene Datenbanken (idempotent) */
 function upgrade(PDO $p): void {
   $v = (int)$p->query('PRAGMA user_version')->fetchColumn();
-  if ($v >= 4) return;
+  if ($v >= 5) return;
   if ($v < 2) foreach ([
     "alter table documents add column share_token text",
     "alter table document_items add column note text",
@@ -115,7 +116,20 @@ function upgrade(PDO $p): void {
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   if ($v < 4) try { $p->prepare("insert into site_content (key,value,updated_at) values ('reviews',?,?)")
     ->execute(['{"google_url":"","djbande_url":"","tagline":""}', now()]); } catch (PDOException $e) {}
-  $p->exec('PRAGMA user_version=4');
+  if ($v < 5) {
+    foreach ([
+      "create table if not exists products (id text primary key, sku text unique, sort integer default 0,
+        category text, name text not null, description text, unit text default 'Stk.',
+        price_net real, bundle text default '[]', active integer default 1, created_at text)",
+      "create table if not exists partners (id text primary key, code text unique, name text not null,
+        company text, kind text default 'dj', email text, phone text, status text default 'beantragt',
+        notes text, created_at text)",
+      "alter table equipment add column partner_rate real",
+      "alter table equipment add column addon_id text",
+    ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+    if (!(int)$p->query("select count(*) from products")->fetchColumn()) seedProducts($p);
+  }
+  $p->exec('PRAGMA user_version=5');
 }
 
 function migrate(PDO $p): void {
@@ -132,7 +146,7 @@ create table faq (id text primary key, sort integer default 0, question text not
 create table equipment (id text primary key, sort integer default 0, name text not null, slug text,
   category text, description text, image_url text, day_rate real default 0, followup_pct integer default 50,
   qty_total integer default 1, rentable integer default 1, public integer default 1,
-  status text default 'aktiv', notes text, created_at text);
+  status text default 'aktiv', notes text, partner_rate real, addon_id text, created_at text);
 create table locations (id text primary key, sort integer default 0, name text not null,
   city text, region text, description text, image_url text, website text,
   public integer default 1, created_at text);
@@ -167,6 +181,12 @@ create table documents (id text primary key, share_token text, doc_type text not
   deposit_deducted real default 0, sent_at text, paid_at text, created_at text, updated_at text);
 create table email_templates (id text primary key, sort integer default 0, name text not null,
   subject text, body text, created_at text);
+create table products (id text primary key, sku text unique, sort integer default 0,
+  category text, name text not null, description text, unit text default 'Stk.',
+  price_net real, bundle text default '[]', active integer default 1, created_at text);
+create table partners (id text primary key, code text unique, name text not null, company text,
+  kind text default 'dj', email text, phone text, status text default 'beantragt',
+  notes text, created_at text);
 create table reviews (id text primary key, sort integer default 0, author text not null,
   event_type text, text text not null, rating integer default 5,
   source text default 'google', review_date text, public integer default 1, created_at text);
@@ -353,6 +373,7 @@ Markus Jankowski – DJ Lauschgift"],
 
   seedFormTemplates($p);
   seedUpsells($p);
+  seedProducts($p);
 
   /* Beispiel-Location als Vorlage — erst nach Bearbeitung auf 'öffentlich' stellen */
   $ins('locations', ['sort'=>1,'name'=>'Beispiel-Location (bitte ersetzen)','city'=>'Musterstadt','region'=>'NRW',
@@ -393,6 +414,28 @@ function seedFormTemplates(PDO $p): void {
     $p->prepare('insert into form_templates (id,sort,name,intro,fields) values (?,?,?,?,?)')
       ->execute([uuid(), $s, $n, $i, json_encode($f, JSON_UNESCAPED_UNICODE)]);
   }
+}
+
+function seedProducts(PDO $p): void {
+  $rows = [
+    ['DJ-100','DJ-Leistung','DJ-Abend Basis','DJ-Leistung bis 6 Stunden inkl. Musikplanung, Kennenlerngespräch, kompakter Ton- und Lichttechnik, Auf- und Abbau.','pausch.',1200],
+    ['DJ-110','DJ-Leistung','Zusätzliche DJ-Stunde','Verlängerung über den vereinbarten Zeitraum hinaus, je angefangene Stunde.','Std.',100],
+    ['TON-200','Ton','Ton für freie Trauung','Funkmikrofon und Lautsprecher für Trauredner sowie Musik-Einspielungen im Außenbereich, inkl. Backup-Akku.','pausch.',200],
+    ['LICHT-300','Licht','Ambiente-Licht Basis','Dezentes Grundlicht passend zur Location (Uplights, Tanzflächenlicht).','pausch.',150],
+    ['FAHRT-900','Nebenkosten','Anfahrt','Anfahrtspauschale je gefahrenem Kilometer (Hin- und Rückweg).','km',0.70],
+  ];
+  $ids = [];
+  foreach ($rows as [$sku,$cat,$n,$d,$u,$pr]) {
+    $id = uuid(); $ids[$sku] = $id;
+    $p->prepare('insert into products (id,sku,sort,category,name,description,unit,price_net,bundle,created_at) values (?,?,?,?,?,?,?,?,?,?)')
+      ->execute([$id,$sku,count($ids),$cat,$n,$d,$u,$pr,'[]',now()]);
+  }
+  /* Beispiel-Bundle: eine Position aus mehreren Artikeln */
+  $bundle = json_encode([
+    ['sku'=>'DJ-100','qty'=>1],['sku'=>'TON-200','qty'=>1],['sku'=>'LICHT-300','qty'=>1],
+  ]);
+  $p->prepare('insert into products (id,sku,sort,category,name,description,unit,price_net,bundle,created_at) values (?,?,?,?,?,?,?,?,?,?)')
+    ->execute([uuid(),'PAKET-500',9,'Pakete','Hochzeit Komplett','Rundum-sorglos: DJ-Abend Basis, Ton für die freie Trauung und Ambiente-Licht — als eine Position im Angebot.','pausch.',1450,$bundle,now()]);
 }
 
 function seedUpsells(PDO $p): void {
@@ -664,6 +707,43 @@ function handlePortal(string $path, string $method, $body): never {
       }
       out(['ok' => true], 201);
     }
+  }
+  /* Partner-Registrierung (DJs, Bands, Musiker, Techniker) */
+  if ($path === 'portal/partner' && $method === 'POST') {
+    $name = trim((string)($body['name'] ?? ''));
+    $email = trim((string)($body['email'] ?? ''));
+    if ($name === '' || $email === '') fail('Name und E-Mail erforderlich.');
+    $kind = in_array($body['kind'] ?? '', ['dj','band','musiker','techniker']) ? $body['kind'] : 'dj';
+    $p->prepare('insert into partners (id,name,company,kind,email,phone,status,created_at) values (?,?,?,?,?,?,?,?)')
+      ->execute([uuid(), mb_substr($name,0,120), mb_substr(trim((string)($body['company'] ?? '')),0,120),
+        $kind, mb_substr($email,0,160), mb_substr(trim((string)($body['phone'] ?? '')),0,60), 'beantragt', now()]);
+    out(['ok' => true], 201);
+  }
+  /* Partner-Code prüfen → Rabatt fürs Anzeigen der Partnerpreise */
+  if (preg_match('#^portal/partner/([a-zA-Z0-9]{6,32})$#', $path, $m) && $method === 'GET') {
+    $st = $p->prepare("select name, kind from partners where code=? and status='freigeschaltet'");
+    $st->execute([strtoupper($m[1])]);
+    $pt = $st->fetch();
+    if (!$pt) { usleep(400000); fail('Partner-Code ungültig oder noch nicht freigeschaltet.', 404); }
+    $defs = json_decode($p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true);
+    out(['ok' => true, 'name' => $pt['name'], 'discount_pct' => (float)($defs['partner_discount_pct'] ?? 20)]);
+  }
+  /* Verfügbarkeit eines Artikels im Zeitraum (gegen alle nicht stornierten Aufträge) */
+  if ($path === 'portal/availability' && $method === 'GET') {
+    $eq = (string)($_GET['eq'] ?? ''); $from = (string)($_GET['from'] ?? ''); $to = (string)($_GET['to'] ?? '');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) fail('Zeitraum fehlt.');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) $to = $from;
+    $st = $p->prepare("select qty_total from equipment where id=? and public=1 and status='aktiv'");
+    $st->execute([$eq]);
+    $total = $st->fetchColumn();
+    if ($total === false) fail('Artikel nicht gefunden.', 404);
+    $st = $p->prepare("select coalesce(sum(be.qty),0) from booking_equipment be
+      join bookings b on b.id = be.booking_id
+      where be.equipment_id = ? and b.status != 'storniert'
+        and b.event_date <= ? and coalesce(b.end_date, b.event_date) >= ?");
+    $st->execute([$eq, $to, $from]);
+    $used = (int)$st->fetchColumn();
+    out(['total' => (int)$total, 'available' => max(0, (int)$total - $used)]);
   }
   fail('Unbekannter Portal-Endpunkt.', 404);
 }
