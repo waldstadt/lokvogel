@@ -35,6 +35,14 @@ auf die Seite).
   (Portal-Checkbox, Fragebogen-Checkbox) — informierte Einwilligung
   muss den Empfänger benennen.
 
+- **Storno/Umbuchung (Entscheidung fix, 2026-08-25):** Staffel 20/40/60/
+  80/90 % nach Eingangsdatum der Absage (AGB §5). Umbuchung auf einen
+  Ersatztermin ist eine reine KULANZREGELUNG von Markus — kein Anspruch,
+  keine feste Verbindlichkeit. Einzelfallentscheidung nach: eigener
+  Verfügbarkeit am Wunschtermin, Neubesetzbarkeit des alten Termins,
+  Buchungswert des neuen Slots (Hauptsaison-Samstag vs. schwacher Slot).
+  Vorschlagswert im Assistenten: 50 % des Staffelbetrags, frei bis 0 €.
+
 ## Für die Antwort-E-Mail (Vorlage im Backoffice bauen)
 
 - Konkrete Sonderkonditions-Beträge je nach Termin (auf der Seite bewusst
