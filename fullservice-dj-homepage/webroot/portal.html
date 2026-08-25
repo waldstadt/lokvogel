@@ -55,6 +55,18 @@ th.num{text-align:right}
 footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
 .hidden{display:none}
 .fade{animation:f .5s ease}@keyframes f{from{opacity:0;transform:translateY(10px)}to{opacity:1}}
+.ups{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:14px}
+.up{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:18px}
+.up h4{font-size:15px;margin-bottom:5px}
+.up p{font-size:13px;color:var(--mut);margin-bottom:10px}
+.up .upp{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--acc);margin-bottom:10px}
+.up button{font-size:12px;padding:8px 14px}
+.up.asked{border-color:var(--grn)}
+#printArea{display:none}
+@media print{
+  body>.wrap{display:none!important}
+  #printArea{display:block!important;background:#fff;color:#111}
+}
 .chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--mut);margin:14px 0}
 .chk input{width:auto;margin-top:3px}
 </style>
@@ -68,6 +80,7 @@ footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
   <div id="app"><div class="card"><div class="sub">Wird geladen …</div></div></div>
   <footer id="foot"></footer>
 </div>
+<div id="printArea"></div>
 
 <script>
 var API='api.php';
@@ -126,14 +139,24 @@ function renderOffer(){
     (d.status==='abgelehnt'?'<span class="status-b" style="border-color:var(--mut2);color:var(--mut)">Abgelehnt</span>':'');
   app(
     '<div class="card"><div class="kicker">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+
-    '<h1>Hallo '+esc(DOC.customer)+'!</h1>'+
-    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until?' · gültig bis '+dt(d.valid_until):'')+'</p>'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
+    '<div><h1>Hallo '+esc(DOC.customer)+'!</h1>'+
+    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until?' · gültig bis '+dt(d.valid_until):'')+'</p></div>'+
+    '<button class="btn g" onclick="downloadPdf()">📄 Als PDF speichern</button></div>'+
     (statusLine?'<div style="margin-top:12px">'+statusLine+'</div>':'')+
     (d.intro_text?'<p style="margin-top:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
     '</div>'+
     '<div class="card"><table><thead><tr><th class="num">#</th><th>Leistung</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead>'+
     '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>'+
     '<p class="hint">💡 Tippt auf eine Position mit dem <b style="color:var(--acc)">i</b> – dort erkläre ich, was genau dahintersteckt.</p></div>'+
+    ((DOC.upsells&&DOC.upsells.length&&!decided)?
+      '<div class="card"><h3 style="margin-bottom:4px">Noch eine Schippe drauf? ✨</h3>'+
+      '<p class="sub">Beliebte Extras, die aus einer guten Feier eine unvergessliche machen. Interesse? Ein Klick genügt – ich melde mich mit Details.</p>'+
+      '<div class="ups">'+DOC.upsells.map(function(u){
+        return '<div class="up" id="up-'+u.id+'"><h4>'+esc(u.title)+'</h4><p>'+esc(u.description||'')+'</p>'+
+        '<div class="upp">+ '+euro(u.price_net)+' <small style="font-weight:400;color:var(--mut2)">zzgl. USt.</small></div>'+
+        '<button class="btn g" onclick="askUpsell(\''+u.id+'\',this)">Interessiert mich</button></div>';
+      }).join('')+'</div></div>':'')+
     (d.outro_text?'<div class="card"><p style="white-space:pre-wrap" class="sub">'+esc(d.outro_text)+'</p></div>':'')+
     '<div class="card" id="actionCard">'+
     (decided?
@@ -191,6 +214,48 @@ function sendAction(kind,msg,phone,cb){
     if(!r.ok)throw new Error();
     if(cb)cb();
   }).catch(function(){showMsg('aMsg','err','Senden fehlgeschlagen – bitte erneut versuchen oder ruft mich direkt an.')});
+}
+
+function askUpsell(id,btn){
+  var u=(DOC.upsells||[]).find(function(x){return x.id===id});if(!u)return;
+  sendAction('comment','Interesse an Extra: '+u.title+' (+ '+euro(u.price_net)+' netto)',null,function(){
+    btn.textContent='✓ Angefragt – ich melde mich!';btn.disabled=true;
+    document.getElementById('up-'+id).classList.add('asked');
+  });
+}
+function downloadPdf(){
+  var d=DOC.doc,c=DOC.company;
+  var rows=DOC.items.map(function(it,i){
+    return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+(i+1)+'</td>'+
+    '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+
+    (it.note?'<div style="font-size:10px;color:#666;margin-top:2px">'+esc(it.note)+'</div>':'')+'</td>'+
+    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
+    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+euro(it.qty*it.unit_price)+'</td></tr>';
+  }).join('');
+  var totals='<tr><td colspan="3" style="text-align:right;padding:6px">Netto</td><td style="text-align:right;padding:6px">'+euro(d.total_net)+'</td></tr>';
+  if(!d.is_small_business)totals+='<tr><td colspan="3" style="text-align:right;padding:6px">USt. '+Number(d.tax_rate)+' %</td><td style="text-align:right;padding:6px">'+euro(d.total_tax)+'</td></tr>';
+  totals+='<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700">Gesamt</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(d.total_gross)+'</td></tr>';
+  document.getElementById('printArea').innerHTML=
+  '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-family:Inter,Arial,sans-serif;font-size:12px;line-height:1.55;color:#111">'+
+  '<div style="display:flex;justify-content:space-between;margin-bottom:36px"><div>'+
+  '<div style="font-size:20px;font-weight:700">'+esc(c.name||'DJ Lauschgift')+'</div>'+
+  '<div style="color:#555">'+esc(c.owner||'')+'</div></div>'+
+  '<div style="text-align:right;color:#555">'+esc(c.street||'')+'<br>'+esc(c.zip_city||'')+'<br>'+esc(c.phone||'')+'<br>'+esc(c.email||'')+'</div></div>'+
+  '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px">'+
+  '<div style="font-size:17px;font-weight:700">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+
+  '<div style="text-align:right;color:#555">Für: '+esc(DOC.customer)+'<br>Datum: '+dt(d.doc_date)+
+  (d.valid_until?'<br>Gültig bis: '+dt(d.valid_until):'')+(d.due_date?'<br>Zahlbar bis: '+dt(d.due_date):'')+'</div></div>'+
+  (d.intro_text?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
+  '<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2">'+
+  '<th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Leistung</th><th style="padding:6px;text-align:right">Menge</th><th style="padding:6px;text-align:right">Gesamt netto</th></tr></thead>'+
+  '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>'+
+  (d.is_small_business?'<p style="color:#555;margin-bottom:12px">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>':'')+
+  (d.outro_text?'<p style="margin-bottom:20px;white-space:pre-wrap">'+esc(d.outro_text)+'</p>':'')+
+  '<div style="margin-top:36px;padding-top:10px;border-top:1px solid #ccc;font-size:10px;color:#666;display:flex;justify-content:space-between;gap:20px">'+
+  '<div>'+esc(c.name||'')+(c.tax_id?'<br>St.-Nr.: '+esc(c.tax_id):'')+'</div>'+
+  '<div>'+(c.bank?esc(c.bank)+'<br>':'')+(c.iban?'IBAN: '+esc(c.iban)+'<br>':'')+(c.bic?'BIC: '+esc(c.bic):'')+'</div>'+
+  '<div>'+esc(c.phone||'')+'<br>'+esc(c.email||'')+'</div></div></div>';
+  window.print();
 }
 
 /* ===================== FRAGEBOGEN ===================== */

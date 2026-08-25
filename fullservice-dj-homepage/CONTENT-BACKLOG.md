@@ -49,6 +49,41 @@ auf die Seite).
 - ✅ Kundenportal für Angebote gebaut (PLZ-Login, Hover-Erklärungen,
   Annehmen/Ablehnen/Kommentar/Rückruf, DJ-Bande-Opt-in bei Absage).
 
+## Upselling & Kundenbindung
+
+- ✅ Upsell-Extras gebaut (Spiegelkugel-Paket 249 €, Tonanlagen-Upgrade XL
+  149 €, Ambiente-Licht XL 129 €, Auf Wolken tanzen 99 € — Preise sind
+  Startwerte, von Markus anzupassen!). Erscheinen im Kundenportal unter
+  jedem offenen Angebot ("Interessiert mich"-Klick landet als
+  Portal-Aktivität im Dashboard) und per "+ Extra" im Angebots-Editor.
+  Hinweis Spiegelkugel: hoher Aufwand (Anhänger nötig) → Preis bewusst
+  hoch ansetzen.
+- **Naturalrabatt statt Preisnachlass** (Kundenbindung ohne echte
+  Kosten): Wenn ein Kunde verhandelt, keinen Rabatt geben, sondern ein
+  günstiges Extra "inklusive" dazulegen (z. B. Nebelmaschine, kleines
+  Licht-Upgrade, 30 Min. länger spielen). Umsetzung im Editor: Position
+  mit 0,00 € und Beschreibung "… – inklusive als Dankeschön" + Erklärung
+  im Hover. Kandidaten: Effekte mit geringen Grenzkosten, KEINE Extras
+  mit Anhänger-Logistik.
+- **Strategisches Ziel Arbeitszeit:** Weniger Samstag-16-bis-4-Uhr-Gigs,
+  mehr Technik-Aufbauten unter der Woche/tagsüber (Tonanlage, ggf.
+  Licht). Werbung und Kampagnen sollen gezielt auch den
+  Veranstaltungstechnik-Bereich pushen.
+
+## Saison-Kampagnen (geplant, noch nicht gebaut)
+
+Idee: Kampagnen-Minipages auf der Homepage (z. B. /aktion → Weihnachts-
+feier, Halloween, Abiball, Firmen-Sommerfest, Technik-Miete für
+Vereinsfeste) mit eigenem Text "Warum ich dafür der Richtige bin" und
+vorbelegtem Anfrageformular. Dazu passende Werbemittel über Canva
+(Canva-Anbindung ist in Claude verfügbar → Motive generieren, Markus
+postet sie nur noch auf Instagram). Timing-Logik:
+- Hochzeiten: werden 6–12 Monate im Voraus gebucht → Hochzeitswerbung
+  ganzjährig, verstärkt Winter (Verlobungszeit).
+- Weihnachtsfeiern: ab September wird es eng → Kampagne August–Oktober.
+- Halloween: September/Anfang Oktober.
+- Technikverleih: vor Karneval, Sommerfest-Saison, Vereinsfeste.
+
 ## Ideen für später (bewusst zurückgestellt, Seite schlank halten)
 
 - **Kurze Videos** einbinden, in denen Markus Dinge erklärt

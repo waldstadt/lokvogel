@@ -247,6 +247,7 @@ th.num{text-align:right}
     <div class="phead"><div><div class="pt">E-Mail-Vorlagen</div><div class="ps">Antwort-Bausteine für Anfragen — Platzhalter: {vorname} {name} {datum} {anlass} {ort}</div></div>
       <button class="btn" onclick="openTplModal()">+ Neue Vorlage</button></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Betreff</th><th class="num">Sortierung</th></tr></thead><tbody id="tplRows"></tbody></table></div>
+    <div class="card"><h3>Upsell-Extras <span class="mut sml" style="font-weight:400">— erscheinen im Kundenportal unter jedem Angebot und per „+ Extra“ im Editor</span> <button class="btn sm" style="float:right" onclick="openUpModal()">+ Extra</button></h3><div id="upList" class="sml"></div></div>
   </div>
 
   <!-- FRAGEBÖGEN -->
@@ -299,7 +300,7 @@ th.num{text-align:right}
       </div>
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
     </div>
-    <div class="card"><h3>Positionen <button class="btn sm" style="float:right" onclick="addItemRow()">+ Position</button></h3>
+    <div class="card"><h3>Positionen <span style="float:right"><button class="btn g sm" onclick="openUpsellPicker()">✨ + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button></span></h3>
       <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel netto</div><div>Gesamt</div><div></div></div>
       <div id="docItems"></div>
       <div class="totals" id="docTotals"></div>
@@ -529,20 +530,21 @@ function loadAll(){
     api('email_templates?select=*&order=sort'),
     api('doc_events?select=*&order=created_at.desc'),
     api('forms?select=*&order=created_at.desc'),
-    api('form_templates?select=*&order=sort')
+    api('form_templates?select=*&order=sort'),
+    api('upsells?select=*&order=sort')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
     CACHE.documents=r[4]||[];CACHE.equipment=r[5]||[];CACHE.be=r[6]||[];
     CACHE.content={};(r[7]||[]).forEach(function(x){CACHE.content[x.key]=x.value});
     CACHE.packages=r[8]||[];CACHE.faq=r[9]||[];CACHE.comms=r[10]||[];CACHE.tpls=r[11]||[];
-    CACHE.docEvents=r[12]||[];CACHE.forms=r[13]||[];CACHE.formTpls=r[14]||[];
+    CACHE.docEvents=r[12]||[];CACHE.forms=r[13]||[];CACHE.formTpls=r[14]||[];CACHE.upsells=r[15]||[];
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
 }
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
-  renderEq();renderCms();renderSet();initStats();renderTpls();renderForms();
+  renderEq();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
 }
 
 /* ===== Dashboard ===== */
@@ -1582,6 +1584,50 @@ function saveTpl(id){
     .then(function(){closeModal();toast('Gespeichert ✓');reloadTpls()}).catch(function(e){toast(e.message,1)});
 }
 function reloadTpls(){api('email_templates?select=*&order=sort').then(function(r){CACHE.tpls=r||[];renderTpls()})}
+
+/* ===== Upsell-Extras ===== */
+function renderUpsells(){
+  document.getElementById('upList').innerHTML=(CACHE.upsells||[]).map(function(u){
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openUpModal(\''+u.id+'\')">'+esc(u.title)+'</a> <span class="mut">'+euro(u.price_net)+(u.occasions?' · '+esc(u.occasions):'')+'</span> '+
+    (u.active?'<span class="b green">aktiv</span>':'<span class="b grey">aus</span>')+
+    (u.show_portal?' <span class="b blue">im Portal</span>':'')+'</div>';
+  }).join('')||'<span class="mut">Keine Extras.</span>';
+}
+function openUpModal(id){
+  var u=id?(CACHE.upsells||[]).find(function(x){return x.id===id}):{};u=u||{};
+  openModal(id?'Extra bearbeiten':'Neues Extra',
+    '<div class="grid2"><div><label>Titel *</label><input id="uTitle" value="'+esc(u.title||'')+'"></div>'+
+    '<div><label>Preis netto (€)</label><input type="number" step="0.01" id="uPrice" value="'+(u.price_net||0)+'"></div></div>'+
+    '<label>Beschreibung (sieht der Kunde)</label><textarea id="uDesc">'+esc(u.description||'')+'</textarea>'+
+    '<div class="grid2"><div><label>Passt zu (nur intern)</label><input id="uOcc" value="'+esc(u.occasions||'')+'" placeholder="Hochzeit, Firmenfeier …"></div>'+
+    '<div><label>Sortierung</label><input type="number" id="uSort" value="'+(u.sort||0)+'"></div></div>'+
+    '<label style="margin-top:12px"><input type="checkbox" id="uActive" style="width:auto;margin-right:6px" '+(u.active!==false?'checked':'')+'>Aktiv</label>'+
+    '<label><input type="checkbox" id="uPortal" style="width:auto;margin-right:6px" '+(u.show_portal!==false?'checked':'')+'>Im Kundenportal unter Angeboten anzeigen</label>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveUp(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delRow(\'upsells\',\''+id+'\',reloadUps)">Löschen</button>':'')+'</div>');
+}
+function saveUp(id){
+  if(!v('uTitle')){toast('Titel fehlt.',1);return}
+  var body={title:v('uTitle'),price_net:Number(v('uPrice'))||0,description:v('uDesc'),occasions:v('uOcc'),
+    sort:Number(v('uSort'))||0,active:document.getElementById('uActive').checked,show_portal:document.getElementById('uPortal').checked};
+  (id?api('upsells?id=eq.'+id,{method:'PATCH',body:body}):api('upsells',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Gespeichert ✓');reloadUps()}).catch(function(e){toast(e.message,1)});
+}
+function reloadUps(){api('upsells?select=*&order=sort').then(function(r){CACHE.upsells=r||[];renderUpsells()})}
+function openUpsellPicker(){
+  var list=(CACHE.upsells||[]).filter(function(u){return u.active});
+  if(!list.length){toast('Keine aktiven Extras — unter Vorlagen anlegen.',1);return}
+  openModal('Extra als Position einfügen',list.map(function(u){
+    return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:10px;align-items:center">'+
+    '<div><b>'+esc(u.title)+'</b> <span class="mut">'+euro(u.price_net)+'</span><div class="mut sml">'+esc(u.description||'')+'</div></div>'+
+    '<button class="btn sm" onclick="insertUpsell(\''+u.id+'\')">Einfügen</button></div>';
+  }).join(''));
+}
+function insertUpsell(id){
+  var u=(CACHE.upsells||[]).find(function(x){return x.id===id});if(!u)return;
+  curItems.push({pos:curItems.length+1,description:u.title,note:u.description||'',qty:1,unit:'pausch.',unit_price:Number(u.price_net)||0});
+  closeModal();renderItems();toast('„'+u.title+'“ eingefügt ✓');
+}
 
 /* Antwort aus Anfrage verfassen */
 function fillTpl(text,i){

@@ -35,6 +35,7 @@ const JSON_COLS = [
 ];
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'],
+  'upsells' => ['active','show_portal'],
   'equipment' => ['public','rentable'],
   'booking_equipment' => ['out_done','back_done'],
   'communications' => ['followup_done'],
@@ -42,7 +43,7 @@ const BOOL_COLS = [
 ];
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
-  'doc_events','form_templates','forms'];
+  'doc_events','form_templates','forms','upsells'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -77,7 +78,7 @@ function db(): PDO {
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
   ]);
   $pdo->exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;');
-  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=2'); }
+  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=3'); }
   else upgrade($pdo);
   return $pdo;
 }
@@ -99,7 +100,11 @@ function upgrade(PDO $p): void {
       inquiry_id text, customer_id text, created_at text, submitted_at text)",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
   if (!(int)$p->query("select count(*) from form_templates")->fetchColumn()) seedFormTemplates($p);
-  $p->exec('PRAGMA user_version=2');
+  try { $p->exec("create table if not exists upsells (id text primary key, sort integer default 0,
+    title text not null, description text, price_net real default 0, occasions text,
+    active integer default 1, show_portal integer default 1, created_at text)"); } catch (PDOException $e) {}
+  if (!(int)$p->query("select count(*) from upsells")->fetchColumn()) seedUpsells($p);
+  $p->exec('PRAGMA user_version=3');
 }
 
 function migrate(PDO $p): void {
@@ -151,6 +156,9 @@ create table documents (id text primary key, share_token text, doc_type text not
   deposit_deducted real default 0, sent_at text, paid_at text, created_at text, updated_at text);
 create table email_templates (id text primary key, sort integer default 0, name text not null,
   subject text, body text, created_at text);
+create table upsells (id text primary key, sort integer default 0, title text not null,
+  description text, price_net real default 0, occasions text,
+  active integer default 1, show_portal integer default 1, created_at text);
 create table doc_events (id text primary key,
   document_id text not null references documents(id) on delete cascade,
   kind text not null, message text, phone text, created_at text, seen integer default 0);
@@ -206,7 +214,7 @@ function seed(PDO $p): void {
     ['legal', json_encode([
       'impressum' => "Angaben gemäß § 5 DDG\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\n\nTelefon: 01523 6439373\nE-Mail: (bitte im Backoffice ergänzen)\n\nUmsatzsteuer: (Steuernummer / USt-IdNr. bitte im Backoffice ergänzen)\n\nVerantwortlich für den Inhalt: Markus Jankowski (Anschrift wie oben)",
       'datenschutz' => "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer, Telefon 01523 6439373.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n4. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n5. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: bitte nach juristischer Prüfung ergänzen.",
-      'agb' => "Allgemeine Geschäftsbedingungen (AGB)\n\n1. Geltungsbereich\nDiese AGB gelten für alle Verträge über DJ-Leistungen und Technikvermietung zwischen Markus Jankowski (DJ Lauschgift), Büttmecker Weg 35c, 58675 Hemer, und seinen Auftraggebern.\n\n2. Angebot und Vertragsschluss\nAngebote sind freibleibend. Der Vertrag kommt mit schriftlicher Bestätigung (auch per E-Mail) zustande. Erst mit der Bestätigung ist der Termin verbindlich reserviert.\n\n3. Preise\nDie Vergütung richtet sich nach Auslastung, Arbeitsstunden und technischem Aufwand der jeweiligen Veranstaltung; eine Unterscheidung nach Anlass (z. B. Hochzeit, Geburtstag, Firmenfeier) findet nicht statt. Alle Posten werden im Angebot ausgewiesen.\n\n4. Ausfall und Ersatz (Plan B)\nBei kurzfristiger Verhinderung (z. B. Krankheit) bemüht sich der Auftragnehmer nach besten Kräften um gleichwertigen Ersatz aus seinem Kollegen-Netzwerk. Gelingt dies nicht, werden bereits geleistete Zahlungen vollständig erstattet; weitergehende Ansprüche bestehen nur bei Vorsatz oder grober Fahrlässigkeit.\n\n5. DJ-Vermittlung über Partner-Agentur\nIst der Auftragnehmer am gewünschten Termin verhindert oder kommt eine Zusammenarbeit aus anderen Gründen nicht zustande, kann er dem Interessenten auf Wunsch bis zu fünf passende DJs vorschlagen. Diese Vermittlung erfolgt über die Partner-Agentur DJ Bande (Münster). Der Auftragnehmer erhält für eine erfolgreich zustande gekommene Vermittlung eine Provision von der Agentur bzw. dem vermittelten DJ. Für den Interessenten entstehen dadurch keine zusätzlichen Kosten; ein Vertrag über die DJ-Leistung kommt in diesem Fall ausschließlich zwischen dem Interessenten und dem vermittelten DJ bzw. der Agentur zustande. Die auf dieser Website genannten Preise und Preisbeispiele gelten ausschließlich für Leistungen des Auftragnehmers selbst; vermittelte DJs kalkulieren ihre Vergütung eigenständig, deren Konditionen können abweichen.\n\n6. Technikvermietung\nMietpreise gelten pro Miettag (24 Stunden); jeder Folgetag wird mit 50 % des Grundpreises berechnet. Der Mieter haftet für Verlust und Beschädigung der Mietsachen ab Übergabe bis zur Rückgabe.\n\n7. Zahlungsbedingungen\nRechnungen sind, sofern nicht anders vereinbart, innerhalb von 14 Tagen ohne Abzug zahlbar. Bei Buchungen kann eine Abschlagszahlung vereinbart werden.\n\n8. Schlussbestimmungen\nEs gilt deutsches Recht. Sollten einzelne Bestimmungen unwirksam sein, bleibt der Vertrag im Übrigen wirksam.\n\nStand: bitte nach juristischer Prüfung ergänzen.",
+      'agb' => "Allgemeine Geschäftsbedingungen (AGB)\n\n1. Geltungsbereich\nDiese AGB gelten für alle Verträge über DJ-Leistungen und Technikvermietung zwischen Markus Jankowski (DJ Lauschgift), Büttmecker Weg 35c, 58675 Hemer, und seinen Auftraggebern.\n\n2. Angebot und Vertragsschluss\nAngebote sind freibleibend. Der Vertrag kommt mit schriftlicher Bestätigung (auch per E-Mail) zustande. Erst mit der Bestätigung ist der Termin verbindlich reserviert.\n\n3. Preise\nDie Vergütung richtet sich nach Auslastung, Arbeitsstunden und technischem Aufwand der jeweiligen Veranstaltung; eine Unterscheidung nach Anlass (z. B. Hochzeit, Geburtstag, Firmenfeier) findet nicht statt. Alle Posten werden im Angebot ausgewiesen.\n\n4. Ausfall und Ersatz (Plan B)\nBei kurzfristiger Verhinderung (z. B. Krankheit) bemüht sich der Auftragnehmer nach besten Kräften um gleichwertigen Ersatz aus seinem Kollegen-Netzwerk. Gelingt dies nicht, werden bereits geleistete Zahlungen vollständig erstattet; weitergehende Ansprüche bestehen nur bei Vorsatz oder grober Fahrlässigkeit.\n\n5. DJ-Vermittlung über Partner-Agentur\nIst der Auftragnehmer am gewünschten Termin verhindert oder kommt eine Zusammenarbeit aus anderen Gründen nicht zustande, kann er dem Interessenten auf Wunsch bis zu fünf passende DJs vorschlagen. Diese Vermittlung erfolgt über die Partner-Agentur DJ Bande (Münster). Der Auftragnehmer erhält für eine erfolgreich zustande gekommene Vermittlung eine Provision von der Agentur bzw. dem vermittelten DJ. Für den Interessenten entstehen dadurch keine zusätzlichen Kosten; ein Vertrag über die DJ-Leistung kommt in diesem Fall ausschließlich zwischen dem Interessenten und dem vermittelten DJ bzw. der Agentur zustande. Die auf dieser Website genannten Preise und Preisbeispiele gelten ausschließlich für Leistungen des Auftragnehmers selbst; vermittelte DJs kalkulieren ihre Vergütung eigenständig, deren Konditionen können abweichen.\n\n6. Widerrufsrecht\nBei der Buchung von DJ- und Veranstaltungstechnik-Leistungen für einen bestimmten Termin besteht kein Widerrufsrecht. Gemäß § 312g Abs. 2 Nr. 9 BGB ist das Widerrufsrecht ausgeschlossen bei Verträgen zur Erbringung von Dienstleistungen im Zusammenhang mit Freizeitbetätigungen, wenn der Vertrag für die Erbringung einen spezifischen Termin oder Zeitraum vorsieht. Jede Buchung ist daher rechtsverbindlich und verpflichtet zur Abnahme und Bezahlung der Leistung.\n\nSofern eine Buchung im Einzelfall nicht unter § 312g Abs. 2 Nr. 9 BGB fallen sollte, gilt für Verbraucher: Sie haben das Recht, binnen vierzehn Tagen ab Vertragsschluss diesen Vertrag ohne Angabe von Gründen zu widerrufen. Der Widerruf ist zu richten an: Markus Jankowski, Büttmecker Weg 35c, 58675 Hemer (oder per E-Mail an die im Impressum genannte Adresse).\n\n7. Technikvermietung\nMietpreise gelten pro Miettag (24 Stunden); jeder Folgetag wird mit 50 % des Grundpreises berechnet. Der Mieter haftet für Verlust und Beschädigung der Mietsachen ab Übergabe bis zur Rückgabe.\n\n8. Zahlungsbedingungen\nRechnungen sind, sofern nicht anders vereinbart, innerhalb von 14 Tagen ohne Abzug zahlbar. Bei Buchungen kann eine Abschlagszahlung vereinbart werden.\n\n9. Schlussbestimmungen\nEs gilt deutsches Recht. Sollten einzelne Bestimmungen unwirksam sein, bleibt der Vertrag im Übrigen wirksam.\n\nStand: bitte nach juristischer Prüfung ergänzen.",
     ], JSON_UNESCAPED_UNICODE)],
   ] as [$k, $v]) $p->prepare('insert into site_content (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
 
@@ -309,6 +317,7 @@ Markus Jankowski – DJ Lauschgift"],
     $ins('email_templates', ['sort'=>$s,'name'=>$n,'subject'=>$sub,'body'=>$b]);
 
   seedFormTemplates($p);
+  seedUpsells($p);
 
   /* Beispiel-Location als Vorlage — erst nach Bearbeitung auf 'öffentlich' stellen */
   $ins('locations', ['sort'=>1,'name'=>'Beispiel-Location (bitte ersetzen)','city'=>'Musterstadt','region'=>'NRW',
@@ -349,6 +358,18 @@ function seedFormTemplates(PDO $p): void {
     $p->prepare('insert into form_templates (id,sort,name,intro,fields) values (?,?,?,?,?)')
       ->execute([uuid(), $s, $n, $i, json_encode($f, JSON_UNESCAPED_UNICODE)]);
   }
+}
+
+function seedUpsells(PDO $p): void {
+  $ups = [
+    [1,'Spiegelkugel-Paket','Die echte Spiegelkugel über der Tanzfläche, angestrahlt von Spots – Gänsehaut-Garantie beim ersten Tanz und auf jedem Partyfoto.',249,'Hochzeit, runder Geburtstag'],
+    [2,'Tonanlagen-Upgrade XL','Mehr Druck und satter Klang: die größere PA-Stufe für über 100 Gäste, große Säle oder Open-Air.',149,'Firmenfeier, große Hochzeit'],
+    [3,'Ambiente-Licht XL','Der ganze Raum in eurer Wunschfarbe: zusätzliche Uplights setzen Wände und Details in Szene – dezent, nicht Disco.',129,'Hochzeit, Firmenfeier'],
+    [4,'Auf Wolken tanzen','Bodennebel-Effekt für den ersten Tanz – ihr schwebt auf einer Wolke, eure Gäste zücken die Handys.',99,'Hochzeit'],
+  ];
+  foreach ($ups as [$s,$t,$d,$pr,$o])
+    $p->prepare('insert into upsells (id,sort,title,description,price_net,occasions,created_at) values (?,?,?,?,?,?,?)')
+      ->execute([uuid(),$s,$t,$d,$pr,$o,now()]);
 }
 
 /* ---------- Auth ---------- */
@@ -556,12 +577,17 @@ function handlePortal(string $path, string $method, $body): never {
     $it = $p->prepare('select pos, description, note, qty, unit, unit_price from document_items where document_id = ? order by pos');
     $it->execute([$d['id']]);
     $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+    $ups = [];
+    if ($d['doc_type'] === 'angebot' && !in_array($d['status'], ['angenommen','abgelehnt','storniert']))
+      $ups = $p->query('select id, title, description, price_net from upsells
+        where active=1 and show_portal=1 order by sort')->fetchAll();
     out([
       'doc' => array_intersect_key($d, array_flip(['doc_type','number','status','doc_date','valid_until','due_date',
         'tax_rate','is_small_business','intro_text','outro_text','total_net','total_tax','total_gross','deposit_deducted'])),
       'customer' => trim(($d['company'] ? $d['company'] : ($d['first_name'].' '.$d['last_name']))),
       'items' => $it->fetchAll(),
-      'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email'])),
+      'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city','iban','bic','bank','tax_id'])),
+      'upsells' => $ups,
     ]);
   }
   if (preg_match('#^portal/offer/([a-f0-9]+)/action$#', $path, $m) && $method === 'POST') {
