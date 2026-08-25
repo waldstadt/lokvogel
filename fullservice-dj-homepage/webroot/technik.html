@@ -87,6 +87,8 @@ nav.scrolled{border-bottom-color:var(--line)}
 .trio .sol{font-size:14px;line-height:1.65}
 .statement{margin-top:48px;border-left:3px solid var(--acc);padding:8px 0 8px 24px;font-size:clamp(16px,2vw,19px);line-height:1.65;max-width:780px}
 .statement b{color:var(--acc)}
+.chip{display:inline-block;font-size:12.5px;color:var(--txt);border:1px solid var(--line);border-radius:20px;padding:7px 15px;cursor:pointer;transition:border-color .2s,color .2s}
+.chip:hover{border-color:var(--acc);color:var(--acc)}
 .duo h3{font-size:20px;font-weight:700;margin-bottom:10px}
 .duo p{font-size:14px;color:var(--mut);margin-bottom:14px}
 .duo ul{list-style:none}
@@ -162,6 +164,12 @@ footer a:hover{color:var(--acc)}
       <a href="#anfrage" class="btn" id="heroCta">Unverbindlich anfragen</a>
       <a href="#mieten" class="btn ghost">Technik ansehen</a>
     </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:26px;align-items:center">
+      <span style="font-size:12px;color:var(--mut)">Was plant ihr?</span>
+      <a class="chip" onclick="pickAnlass('fw-reden','Firmen-/Vereinsfeier mit Reden')">🎤 Feier mit Reden</a>
+      <a class="chip" onclick="pickAnlass('fw-live','Livemusik / Singer-Songwriter')">🎸 Livemusik</a>
+      <a class="chip" onclick="pickAnlass('fw-kneipe','Kneipen-/Gastro-Event')">🍺 Kneipen-Event</a>
+    </div>
     <div class="badges">
       <div class="badge"><b>24 h</b><span>= 1 Miettag</span></div>
       <div class="badge"><b>50 %</b><span>jeder Folgetag</span></div>
@@ -178,17 +186,17 @@ footer a:hover{color:var(--acc)}
       <p class="lead">Drei Situationen, für die man mich holt – und was ich daraus mache.</p>
     </div>
     <div class="trio">
-      <div class="card reveal">
+      <div class="card reveal" id="fw-reden">
         <h3>🎤 Reden &amp; Firmenfeiern</h3>
         <p class="prob">„Der Chef hält die Rede des Jahres – und ab Reihe drei versteht niemand mehr ein Wort. Das Mikro pfeift, einer fummelt hektisch am Mischpult."</p>
         <p class="sol">Sprachverständlichkeit ist meine Kernkompetenz: die passenden Funkmikrofone, eine sauber eingestellte Anlage, dezentes Licht – und ich bleibe daneben stehen, bis der letzte Applaus vorbei ist.</p>
       </div>
-      <div class="card reveal">
+      <div class="card reveal" id="fw-live">
         <h3>🎸 Singer-Songwriter &amp; kleine Bands</h3>
         <p class="prob">„Handgemachte Musik über eine Party-Box klingt schnell nach Dosenkonzert. Und die Hausanlage der Location war nie für Livemusik gedacht."</p>
         <p class="sol">Kompakte Anlagen mit erwachsenem Klang (u. a. Seeburg Acoustic Line) und Monitoring, das Rückkopplung gar nicht erst entstehen lässt. Euer Sound – nur größer.</p>
       </div>
-      <div class="card reveal">
+      <div class="card reveal" id="fw-kneipe">
         <h3>🍺 Kneipen &amp; Gastro-Events</h3>
         <p class="prob">„Volle Kneipe, niedrige Decke, Gäste direkt vor der Box – einmal falsch aufgebaut, und der Abend ist anstrengend statt gemütlich."</p>
         <p class="sol">Ich kenne genau diese Räume: wenig Stellfläche, kurze Aufbauzeiten, Nachbarn. Technik, die in die Ecke passt und trotzdem den Raum füllt – geliefert, aufgebaut, nachts wieder weg.</p>
@@ -468,6 +476,13 @@ function openLegal(key){
 }
 function closeLegal(){document.getElementById('legalBg').style.display='none';document.body.style.overflow=''}
 
+function pickAnlass(cardId,label){
+  var f=document.getElementById('inqForm');
+  if(f&&f.message&&!f.message.value)f.message.value='Anlass: '+label+' — ';
+  var c=document.getElementById(cardId);
+  if(c){c.scrollIntoView({behavior:'smooth',block:'center'});
+    c.style.borderColor='var(--acc)';setTimeout(function(){c.style.borderColor=''},2500)}
+}
 document.getElementById('inqForm').addEventListener('submit',function(ev){
   ev.preventDefault();
   var f=ev.target,msg=document.getElementById('formMsg'),btn=document.getElementById('sendBtn');

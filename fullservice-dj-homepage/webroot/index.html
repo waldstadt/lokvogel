@@ -502,6 +502,8 @@ function applyContent(rows){
     if(c.guarantee.text)document.getElementById('gText').textContent=c.guarantee.text;
   }
   if(c.legal)LEGAL=c.legal;
+  var lq=new URLSearchParams(location.search).get('legal');
+  if(lq&&LEGAL_TITLES[lq])openLegal(lq);
   if(c.reviews){
     if(c.reviews.tagline)document.getElementById('revTagline').textContent=c.reviews.tagline;
     var links='';
