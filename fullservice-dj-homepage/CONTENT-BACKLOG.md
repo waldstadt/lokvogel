@@ -106,3 +106,20 @@ postet sie nur noch auf Instagram). Timing-Logik:
   widerspricht aktuell „alles auf eigenem Server / DSGVO-sauber".
   Bis dahin: km-Feld im Rider (Google-Maps-Entfernung einmal ablesen),
   Satz und Freikilometer in den Einstellungen.
+
+## Positionierung Lauschgift Veranstaltungstechnik (fix, 2026-08-25)
+
+- **Nische: hochwertige Technik für kleine Veranstaltungen, 30–200 Personen.**
+  Nicht mit Großanbietern konkurrieren (bedienen große Events), nicht mit
+  Billig-Anbietern über den Preis — sondern über Verlässlichkeit und
+  Sprachverständlichkeit, zu Preisen, die für Markus angenehm sind.
+- Ziel-Anlässe wörtlich benennen: Firmen-/Vereinsfeiern mit Reden
+  (Sprachbeschallung), Singer-Songwriter & kleine Bands, Kneipen-/Gastro-Events.
+- Passt zum Auslastungsziel: solche Jobs sind Wochentags-/Tagesgeschäft.
+- DJ und Technik **separat bewerben**: eigene Kampagnen, eigene Zielseiten;
+  Teaser nur DJ→Technik, umgekehrt DJ klein halten.
+- Später: eigene Domain für die Technik (z. B.
+  lauschgift-veranstaltungstechnik.de → zeigt auf technik.html),
+  gleiche Installation, ein Backoffice.
+- To-do Seite: technik.html oben zielgruppen-orientiert einleiten
+  („Für wen") statt direkt mit dem Mietkatalog zu starten.
