@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Kundenbereich – DJ Lauschgift</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23ff6f5b'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f1012;--card:#1a1c21;--card2:#212429;--line:#282b32;--acc:#ff6f5b;--acc2:#ff8d7c;
+--txt:#f2f0ec;--mut:#a3a29b;--mut2:#6f6e68;--grn:#5aa05a}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;letter-spacing:-.01em}
+a{color:var(--acc);text-decoration:none}
+.wrap{max-width:760px;margin:0 auto;padding:32px 20px 80px}
+.logo{display:flex;align-items:center;gap:9px;margin-bottom:36px}
+.logo svg{width:24px;height:24px}
+.logo b{font-family:'Space Grotesk',sans-serif;font-size:19px}
+.logo b i{font-style:normal;color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px;margin-bottom:18px}
+.kicker{font-family:'Space Grotesk',sans-serif;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:8px}
+h1{font-size:clamp(24px,5vw,32px);margin-bottom:6px}
+.sub{color:var(--mut);font-size:14px}
+label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:14px 0 6px;font-weight:600}
+input,select,textarea{width:100%;padding:12px 14px;background:var(--bg);border:1px solid var(--line);color:var(--txt);font:inherit;font-size:15px;outline:0;border-radius:9px}
+input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+textarea{min-height:100px;resize:vertical}
+.btn{display:inline-block;background:var(--acc);color:#16110f;padding:13px 26px;font-size:13px;font-weight:600;letter-spacing:.03em;border:none;border-radius:9px;cursor:pointer;font-family:'Space Grotesk',sans-serif;transition:background .2s}
+.btn:hover{background:var(--acc2)}
+.btn.g{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.btn.g:hover{border-color:var(--acc);color:var(--acc)}
+.btn.green{background:#4f9a4f;color:#0c150c}
+.btn:disabled{opacity:.5;cursor:default}
+.msg{padding:14px 16px;font-size:14px;border:1px solid;border-radius:9px;margin:14px 0;display:none}
+.msg.ok{display:block;border-color:#3d6b3d;background:rgba(60,120,60,.12);color:#9fd49f}
+.msg.err{display:block;border-color:#7a3535;background:rgba(150,60,60,.12);color:#e0a0a0}
+
+/* Angebots-Tabelle */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut2);text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+th.num{text-align:right}
+.pos-desc{position:relative;cursor:default}
+.pos-desc .info{display:inline-block;margin-left:6px;width:17px;height:17px;line-height:17px;text-align:center;border-radius:50%;background:rgba(255,111,91,.15);color:var(--acc);font-size:11px;font-weight:700;cursor:help}
+.tip{display:none;position:absolute;left:0;top:100%;z-index:20;background:var(--card2);border:1px solid var(--acc);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--txt);max-width:380px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-top:4px}
+.pos-desc:hover .tip,.pos-desc.open .tip{display:block}
+.totals td{border-bottom:none;padding:5px 8px}
+.totals .grand{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--acc)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.status-b{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 12px;border-radius:12px;border:1px solid var(--grn);color:var(--grn)}
+.hint{font-size:12px;color:var(--mut2);margin-top:14px}
+footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
+.hidden{display:none}
+.fade{animation:f .5s ease}@keyframes f{from{opacity:0;transform:translateY(10px)}to{opacity:1}}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--mut);margin:14px 0}
+.chk input{width:auto;margin-top:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">
+    <svg viewBox="0 0 32 32"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>
+    <b>lauschgift<i>.</i></b>&nbsp;<span class="sub">Kundenbereich</span>
+  </div>
+  <div id="app"><div class="card"><div class="sub">Wird geladen …</div></div></div>
+  <footer id="foot"></footer>
+</div>
+
+<script>
+var API='api.php';
+var qs=new URLSearchParams(location.search);
+var OFFER=qs.get('a'),FORM=qs.get('f');
+var PLZ=sessionStorage.getItem('portal_plz')||'';
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
+function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
+function dt(d){if(!d)return '–';return new Date(d).toLocaleDateString('de-DE')}
+function app(html){document.getElementById('app').innerHTML='<div class="fade">'+html+'</div>'}
+function showMsg(id,cls,txt){var m=document.getElementById(id);m.className='msg '+cls;m.textContent=txt}
+
+/* ===================== ANGEBOT ===================== */
+var DOC=null;
+function loadOffer(){
+  fetch(API+'/portal/offer/'+OFFER+'?plz='+encodeURIComponent(PLZ))
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s===401){renderPlzGate();return}
+      if(res.s!==200){app('<div class="card"><h2>Link nicht gefunden</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte prüft den Link oder meldet euch direkt bei mir.')+'</p></div>');return}
+      DOC=res.j;renderOffer();
+    }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
+}
+function renderPlzGate(){
+  app('<div class="card"><div class="kicker">Euer Angebot</div><h1>Kurz einloggen</h1>'+
+    '<p class="sub">Zum Schutz eurer Daten: Gebt bitte die Postleitzahl eurer Rechnungsadresse ein.</p>'+
+    '<div class="msg err" id="gateMsg" style="display:'+(PLZ?'block':'none')+'">Die Postleitzahl passt leider nicht – bitte erneut versuchen.</div>'+
+    '<label>Postleitzahl</label><input id="plzIn" inputmode="numeric" maxlength="10" placeholder="z. B. 58675">'+
+    '<div style="margin-top:16px"><button class="btn" onclick="submitPlz()">Angebot öffnen</button></div></div>');
+  var inp=document.getElementById('plzIn');
+  inp.focus();
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter')submitPlz()});
+}
+function submitPlz(){
+  PLZ=document.getElementById('plzIn').value.trim();
+  sessionStorage.setItem('portal_plz',PLZ);
+  loadOffer();
+}
+var TYPE_NAME={angebot:'Angebot',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung'};
+function renderOffer(){
+  var d=DOC.doc,items=DOC.items;
+  document.getElementById('foot').innerHTML=esc(DOC.company.name||'DJ Lauschgift')+' · '+esc(DOC.company.owner||'')+
+    (DOC.company.phone?' · '+esc(DOC.company.phone):'');
+  var rows=items.map(function(it,i){
+    var info=it.note?'<span class="info">i</span><span class="tip">'+esc(it.note)+'</span>':'';
+    return '<tr><td class="num">'+(i+1)+'</td>'+
+      '<td class="pos-desc" onclick="this.classList.toggle(\'open\')">'+esc(it.description)+info+'</td>'+
+      '<td class="num">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
+      '<td class="num">'+euro(it.qty*it.unit_price)+'</td></tr>';
+  }).join('');
+  var totals='<tr class="totals"><td colspan="3" class="num">Netto</td><td class="num">'+euro(d.total_net)+'</td></tr>';
+  if(!d.is_small_business)totals+='<tr class="totals"><td colspan="3" class="num">USt. '+Number(d.tax_rate)+' %</td><td class="num">'+euro(d.total_tax)+'</td></tr>';
+  totals+='<tr class="totals"><td colspan="3" class="num"><b>Gesamt</b></td><td class="num grand">'+euro(d.total_gross)+'</td></tr>';
+  var decided=['angenommen','abgelehnt','bezahlt','storniert'].indexOf(d.status)>=0;
+  var statusLine=d.status==='angenommen'?'<span class="status-b">✓ Angenommen — danke euch!</span>':
+    (d.status==='abgelehnt'?'<span class="status-b" style="border-color:var(--mut2);color:var(--mut)">Abgelehnt</span>':'');
+  app(
+    '<div class="card"><div class="kicker">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+
+    '<h1>Hallo '+esc(DOC.customer)+'!</h1>'+
+    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until?' · gültig bis '+dt(d.valid_until):'')+'</p>'+
+    (statusLine?'<div style="margin-top:12px">'+statusLine+'</div>':'')+
+    (d.intro_text?'<p style="margin-top:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
+    '</div>'+
+    '<div class="card"><table><thead><tr><th class="num">#</th><th>Leistung</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>'+
+    '<p class="hint">💡 Tippt auf eine Position mit dem <b style="color:var(--acc)">i</b> – dort erkläre ich, was genau dahintersteckt.</p></div>'+
+    (d.outro_text?'<div class="card"><p style="white-space:pre-wrap" class="sub">'+esc(d.outro_text)+'</p></div>':'')+
+    '<div class="card" id="actionCard">'+
+    (decided?
+      '<p class="sub">'+(d.status==='angenommen'?'Ich melde mich zeitnah bei euch mit den nächsten Schritten. Wenn euch noch etwas einfällt, schreibt mir hier:':'Ihr habt Fragen oder wollt doch nochmal sprechen? Schreibt mir gerne:')+'</p>'+
+      '<div class="msg" id="aMsg"></div>'+
+      '<label>Nachricht</label><textarea id="cmt"></textarea>'+
+      '<div class="actions" style="margin-top:12px"><button class="btn g" onclick="act(\'comment\')">💬 Nachricht senden</button></div>'
+      :
+      '<h3 style="margin-bottom:6px">Wie möchtet ihr weitermachen?</h3>'+
+      '<p class="sub">Alles unverbindlich bis zur Annahme – und Fragen kosten nichts.</p>'+
+      '<div class="msg" id="aMsg"></div>'+
+      '<div class="actions" style="margin-top:16px">'+
+      '<button class="btn green" onclick="confirmAccept()">✓ Angebot annehmen</button>'+
+      '<button class="btn g" onclick="toggle(\'cmtBox\')">💬 Frage / Anmerkung</button>'+
+      '<button class="btn g" onclick="toggle(\'cbBox\')">📞 Rückruf wünschen</button>'+
+      '<button class="btn g" onclick="toggle(\'declBox\')">Eher nicht …</button></div>'+
+      '<div id="cmtBox" class="hidden"><label>Eure Frage oder Anmerkung</label><textarea id="cmt"></textarea>'+
+      '<div style="margin-top:10px"><button class="btn" onclick="act(\'comment\')">Senden</button></div></div>'+
+      '<div id="cbBox" class="hidden"><label>Telefonnummer & wann ihr gut erreichbar seid</label><input id="cbPhone" placeholder="z. B. 0171 1234567, abends ab 18 Uhr">'+
+      '<div style="margin-top:10px"><button class="btn" onclick="act(\'callback\')">Rückruf anfordern</button></div></div>'+
+      '<div id="declBox" class="hidden">'+
+      '<label>Magst du kurz sagen, woran es liegt? (optional)</label><textarea id="declMsg" placeholder="z. B. Budget, anderer Stil, Termin geändert …" style="min-height:70px"></textarea>'+
+      '<div class="chk"><input type="checkbox" id="bandeOpt" checked><span><b style="color:var(--txt)">Trotzdem einen richtig guten DJ finden – kostenlos.</b> Ich wähle über meine Partner-Agentur DJ Bande bis zu fünf handverlesene Kollegen aus, die zu eurer Feier und eurem Budget passen. Mit dem Haken erlaubt ihr mir, eure Eckdaten dafür weiterzugeben.</span></div>'+
+      '<div style="margin-top:10px"><button class="btn" onclick="decline()">Absagen'+' &amp; ggf. Vorschläge erhalten</button></div></div>'
+    )+'</div>');
+}
+function toggle(id){['cmtBox','cbBox','declBox'].forEach(function(x){
+  document.getElementById(x).classList.toggle('hidden',x!==id||!document.getElementById(x).classList.contains('hidden'))})}
+function confirmAccept(){
+  if(!confirm('Angebot verbindlich annehmen? Damit ist euer Termin fest reserviert – ihr bekommt anschließend eine Bestätigung.'))return;
+  act('accept');
+}
+function decline(){
+  var opt=document.getElementById('bandeOpt').checked;
+  act('decline',document.getElementById('declMsg').value,null,function(){
+    if(opt)sendAction('bande','Kunde wünscht DJ-Bande-Vorschläge (Einwilligung zur Datenweitergabe erteilt).');
+  });
+}
+function act(kind,msg,phone,after){
+  msg=msg!==undefined&&msg!==null?msg:(document.getElementById('cmt')?document.getElementById('cmt').value:'');
+  phone=phone||(document.getElementById('cbPhone')?document.getElementById('cbPhone').value:'');
+  if(kind==='comment'&&!msg.trim()){showMsg('aMsg','err','Bitte erst eine Nachricht eintragen.');return}
+  if(kind==='callback'&&!phone.trim()){showMsg('aMsg','err','Bitte Telefonnummer angeben.');return}
+  sendAction(kind,msg,phone,function(){
+    if(kind==='accept'||kind==='decline'){loadOffer()}
+    else showMsg('aMsg','ok',kind==='callback'?'Rückruf-Wunsch ist angekommen – ich melde mich!':'Nachricht ist angekommen – ich melde mich zeitnah!');
+    if(after)after();
+  });
+}
+function sendAction(kind,msg,phone,cb){
+  fetch(API+'/portal/offer/'+OFFER+'/action',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({plz:PLZ,action:kind,message:msg||'',phone:phone||''})
+  }).then(function(r){
+    if(!r.ok)throw new Error();
+    if(cb)cb();
+  }).catch(function(){showMsg('aMsg','err','Senden fehlgeschlagen – bitte erneut versuchen oder ruft mich direkt an.')});
+}
+
+/* ===================== FRAGEBOGEN ===================== */
+var FDEF=null;
+function loadForm(){
+  fetch(API+'/portal/form/'+FORM).then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s!==200){app('<div class="card"><h2>Link nicht gefunden</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'')+'</p></div>');return}
+      FDEF=res.j;renderForm();
+    });
+}
+function renderForm(){
+  if(FDEF.done){app('<div class="card"><h1>Danke euch! 🙌</h1><p class="sub" style="margin-top:8px">Dieser Fragebogen wurde bereits beantwortet – ich melde mich zeitnah bei euch.</p></div>');return}
+  var fields=(FDEF.fields||[]).map(function(f,i){
+    var t=f.type||'text';
+    if(t==='textarea')return '<label>'+esc(f.label)+'</label><textarea data-i="'+i+'"></textarea>';
+    if(t==='select')return '<label>'+esc(f.label)+'</label><select data-i="'+i+'"><option value="">– bitte wählen –</option>'+
+      (f.options||[]).map(function(o){return '<option>'+esc(o)+'</option>'}).join('')+'</select>';
+    if(t==='checkbox')return '<div class="chk"><input type="checkbox" data-i="'+i+'"><span>'+esc(f.label)+'</span></div>';
+    return '<label>'+esc(f.label)+'</label><input type="text" data-i="'+i+'">';
+  }).join('');
+  app('<div class="card"><div class="kicker">Ein paar Fragen</div><h1>'+esc(FDEF.title)+'</h1>'+
+    (FDEF.intro?'<p class="sub" style="margin-top:8px">'+esc(FDEF.intro)+'</p>':'')+
+    '<div class="msg" id="fMsg"></div><div style="margin-top:6px">'+fields+'</div>'+
+    '<div style="margin-top:22px"><button class="btn" id="fSend" onclick="submitForm()">Antworten absenden</button></div></div>');
+}
+function submitForm(){
+  var answers=[];
+  (FDEF.fields||[]).forEach(function(f,i){
+    var el=document.querySelector('[data-i="'+i+'"]');
+    answers[i]=el?(el.type==='checkbox'?(el.checked?'Ja':'Nein'):el.value.trim()):'';
+  });
+  document.getElementById('fSend').disabled=true;
+  fetch(API+'/portal/form/'+FORM,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers:answers})})
+    .then(function(r){if(!r.ok)throw new Error();
+      app('<div class="card"><h1>Danke euch! 🙌</h1><p class="sub" style="margin-top:8px">Eure Antworten sind angekommen. Ich melde mich in der Regel innerhalb von 24 Stunden mit den nächsten Schritten.</p></div>');
+    }).catch(function(){document.getElementById('fSend').disabled=false;showMsg('fMsg','err','Senden fehlgeschlagen – bitte erneut versuchen.')});
+}
+
+if(OFFER)loadOffer();
+else if(FORM)loadForm();
+else app('<div class="card"><h2>Kein gültiger Link</h2><p class="sub" style="margin-top:8px">Dieser Bereich ist nur über persönliche Links erreichbar, die ihr von mir bekommt.</p></div>');
+</script>
+</body>
+</html>

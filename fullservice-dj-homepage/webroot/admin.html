@@ -153,6 +153,7 @@ th.num{text-align:right}
       <a data-pg="cust">👥 Kunden</a>
       <a data-pg="book">📅 Buchungen</a>
       <a data-pg="tpl">✉️ Vorlagen</a>
+      <a data-pg="forms">📋 Fragebögen</a>
       <div class="grp">Finanzen</div>
       <a data-pg="quotes">📝 Angebote</a>
       <a data-pg="inv">🧾 Rechnungen</a>
@@ -178,6 +179,8 @@ th.num{text-align:right}
       <div class="card"><h3>Wiedervorlagen / Nachfassen</h3><div id="dashFollow" class="sml mut">–</div></div>
       <div class="card"><h3>Neue Anfragen</h3><div id="dashInq" class="sml mut">–</div></div>
       <div class="card"><h3>Offene Rechnungen</h3><div id="dashOpenInv" class="sml mut">–</div></div>
+      <div class="card"><h3>Portal-Aktivität <span class="mut sml" style="font-weight:400">(Kundenreaktionen auf Angebote)</span></h3><div id="dashPortal" class="sml mut">–</div></div>
+      <div class="card"><h3>Beantwortete Fragebögen</h3><div id="dashForms" class="sml mut">–</div></div>
     </div>
   </div>
 
@@ -246,6 +249,14 @@ th.num{text-align:right}
     <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Betreff</th><th class="num">Sortierung</th></tr></thead><tbody id="tplRows"></tbody></table></div>
   </div>
 
+  <!-- FRAGEBÖGEN -->
+  <div class="pg" id="pg-forms">
+    <div class="phead"><div><div class="pt">Fragebögen</div><div class="ps">Online-Bögen statt E-Mail-Pingpong — Kunde bekommt einen Link, Antworten landen hier und in der Kunden-Timeline</div></div>
+      <button class="btn" onclick="openNewFormModal()">+ Fragebogen erstellen</button></div>
+    <div class="tbl-wrap card"><table><thead><tr><th>Erstellt</th><th>Titel</th><th>Für</th><th>Status</th><th></th></tr></thead><tbody id="formRows"></tbody></table></div>
+    <div class="card"><h3>Bogen-Vorlagen <button class="btn sm" style="float:right" onclick="openFtModal()">+ Vorlage</button></h3><div id="ftList" class="sml"></div></div>
+  </div>
+
   <!-- ANGEBOTE -->
   <div class="pg" id="pg-quotes">
     <div class="phead"><div><div class="pt">Angebote</div><div class="ps" id="qStats"></div></div>
@@ -267,6 +278,7 @@ th.num{text-align:right}
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="docTitle">Dokument</div><div class="ps" id="docSub"></div></div>
       <div>
         <button class="btn g sm" onclick="printDoc()">🖨 Drucken / PDF</button>
+        <button class="btn g sm" onclick="shareDoc()">🔗 Kundenlink</button>
         <span id="docStatusBtns"></span>
         <button class="btn sm" onclick="saveDoc()">💾 Speichern</button>
       </div></div>
@@ -514,19 +526,23 @@ function loadAll(){
     api('packages?select=*&order=sort'),
     api('faq?select=*&order=sort'),
     api('communications?select=*&order=occurred_at.desc'),
-    api('email_templates?select=*&order=sort')
+    api('email_templates?select=*&order=sort'),
+    api('doc_events?select=*&order=created_at.desc'),
+    api('forms?select=*&order=created_at.desc'),
+    api('form_templates?select=*&order=sort')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
     CACHE.documents=r[4]||[];CACHE.equipment=r[5]||[];CACHE.be=r[6]||[];
     CACHE.content={};(r[7]||[]).forEach(function(x){CACHE.content[x.key]=x.value});
     CACHE.packages=r[8]||[];CACHE.faq=r[9]||[];CACHE.comms=r[10]||[];CACHE.tpls=r[11]||[];
+    CACHE.docEvents=r[12]||[];CACHE.forms=r[13]||[];CACHE.formTpls=r[14]||[];
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
 }
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
-  renderEq();renderCms();renderSet();initStats();renderTpls();
+  renderEq();renderCms();renderSet();initStats();renderTpls();renderForms();
 }
 
 /* ===== Dashboard ===== */
@@ -560,6 +576,24 @@ function renderDash(){
   document.getElementById('dashOpenInv').innerHTML=openInv.slice(0,6).map(function(d){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> <span class="mut">'+esc(custName(d.customers))+' · '+euro(d.total_gross)+(d.due_date?' · fällig '+dt(d.due_date):'')+'</span></div>';
   }).join('')||'Alles bezahlt. 🎉';
+  var EV_LBL={accept:'✅ Angenommen',decline:'❌ Abgelehnt',comment:'💬 Kommentar',callback:'📞 Rückruf-Wunsch',bande:'🤝 DJ-Bande-Opt-in'};
+  var unseen=(CACHE.docEvents||[]).filter(function(e){return !e.seen});
+  document.getElementById('dashPortal').innerHTML=unseen.slice(0,8).map(function(e){
+    var d=CACHE.documents.find(function(x){return x.id===e.document_id});
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openEventDoc(\''+e.id+'\',\''+e.document_id+'\')">'+(EV_LBL[e.kind]||e.kind)+'</a> <span class="mut">'+(d?esc(d.number)+' · '+esc(custName(d.customers)):'')+' · '+dtt(e.created_at)+'</span>'+
+      (e.message?'<div class="mut sml" style="white-space:pre-wrap">„'+esc(e.message.slice(0,140))+'“</div>':'')+
+      (e.phone?'<div class="mut sml">☎ '+esc(e.phone)+'</div>':'')+'</div>';
+  }).join('')||'Keine neuen Reaktionen.';
+  var answered=(CACHE.forms||[]).filter(function(f){return f.status==='beantwortet'});
+  document.getElementById('dashForms').innerHTML=answered.slice(0,5).map(function(f){
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="viewFormAnswers(\''+f.id+'\')">'+esc(f.title)+'</a> <span class="mut">'+dtt(f.submitted_at)+'</span></div>';
+  }).join('')||'Noch keine Antworten.';
+}
+function openEventDoc(evId,docId){
+  api('doc_events?id=eq.'+evId,{method:'PATCH',body:{seen:1}}).then(function(){
+    var e=(CACHE.docEvents||[]).find(function(x){return x.id===evId});if(e)e.seen=1;
+    renderDash();openDocEditor(docId);
+  });
 }
 function tile(v,l){return '<div class="tile"><div class="tv">'+v+'</div><div class="tl">'+l+'</div></div>'}
 function markFollowDone(id){api('communications?id=eq.'+id,{method:'PATCH',body:{followup_done:true}}).then(function(){loadAll();toast('Erledigt ✓')})}
@@ -971,17 +1005,18 @@ function refreshDocs(){api('documents?select=*,customers(*)&order=created_at.des
 function renderItems(){
   document.getElementById('docItems').innerHTML=curItems.map(function(it,i){
     var sum=(Number(it.qty)||0)*(Number(it.unit_price)||0);
-    return '<div class="it-row"><input value="'+(i+1)+'" disabled style="text-align:center">'+
+    return '<div style="margin-bottom:10px"><div class="it-row" style="margin-bottom:3px"><input value="'+(i+1)+'" disabled style="text-align:center">'+
     '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
     '<input type="number" step="0.5" value="'+it.qty+'" oninput="itSet('+i+',\'qty\',this.value)">'+
     '<input value="'+esc(it.unit||'Stk.')+'" oninput="itSet('+i+',\'unit\',this.value)">'+
     '<input type="number" step="0.01" value="'+it.unit_price+'" oninput="itSet('+i+',\'unit_price\',this.value)">'+
     '<input value="'+euro(sum)+'" disabled class="num">'+
-    '<a onclick="itDel('+i+')" style="color:var(--red)">✕</a></div>';
+    '<a onclick="itDel('+i+')" style="color:var(--red)">✕</a></div>'+
+    '<div style="padding-left:42px;padding-right:34px"><input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="ℹ Erklärung für das Kundenportal (erscheint beim Drüberfahren) — optional" style="font-size:10px;padding:5px 8px;color:var(--gll)"></div></div>';
   }).join('');
   renderTotals();
 }
-function itSet(i,k,val){curItems[i][k]=(k==='qty'||k==='unit_price')?Number(val)||0:val;renderTotals()}
+function itSet(i,k,val){curItems[i][k]=(k==='qty'||k==='unit_price')?Number(val)||0:val;if(k!=='note')renderTotals()}
 function itDel(i){curItems.splice(i,1);renderItems()}
 function addItemRow(){curItems.push({pos:curItems.length+1,description:'',qty:1,unit:'Stk.',unit_price:0});renderItems()}
 function docCalc(){
@@ -1020,7 +1055,7 @@ function saveDoc(){
     var d=rows[0];curDoc.id=d.id;curDoc.number=d.number;curDoc.status=d.status;curDoc.doc_type=d.doc_type;
     return api('document_items?document_id=eq.'+d.id,{method:'DELETE'}).then(function(){
       var items=curItems.filter(function(it){return it.description}).map(function(it,i){
-        return {document_id:d.id,pos:i+1,description:it.description,qty:it.qty,unit:it.unit,unit_price:it.unit_price}});
+        return {document_id:d.id,pos:i+1,description:it.description,note:it.note||null,qty:it.qty,unit:it.unit,unit_price:it.unit_price}});
       return items.length?api('document_items',{method:'POST',body:items}):null;
     });
   }).then(function(){
@@ -1420,6 +1455,109 @@ function saveNumbering(){
   ]).then(function(){S.numbering=n;S.defaults=d;toast('Gespeichert ✓')}).catch(function(e){toast(e.message,1)});
 }
 
+/* ===== Kundenportal: Angebots-Link & Fragebögen ===== */
+function hexToken(){var b=new Uint8Array(16);crypto.getRandomValues(b);return Array.from(b).map(function(x){return x.toString(16).padStart(2,'0')}).join('')}
+function portalUrl(param,token){return location.origin+location.pathname.replace(/[^\/]*$/,'portal.html')+'?'+param+'='+token}
+function shareDoc(){
+  if(!curDoc.id){toast('Bitte erst speichern.',1);return}
+  var cust=CACHE.customers.find(function(c){return c.id===curDoc.customer_id});
+  if(!cust){toast('Kunde nicht gefunden.',1);return}
+  var ensureZip=cust.zip?Promise.resolve():(function(){
+    var z=prompt('Der Kunde hat noch keine PLZ hinterlegt — sie dient als Login fürs Portal.\nPLZ des Kunden:');
+    if(!z)return Promise.reject(new Error('Ohne PLZ kein Kundenlink.'));
+    return api('customers?id=eq.'+cust.id,{method:'PATCH',body:{zip:z.trim()}}).then(function(){cust.zip=z.trim()});
+  })();
+  ensureZip.then(function(){
+    if(curDoc.share_token)return curDoc.share_token;
+    var t=hexToken();
+    return api('documents?id=eq.'+curDoc.id,{method:'PATCH',body:{share_token:t}}).then(function(){curDoc.share_token=t;
+      var d=CACHE.documents.find(function(x){return x.id===curDoc.id});if(d)d.share_token=t;return t});
+  }).then(function(t){
+    var url=portalUrl('a',t);
+    navigator.clipboard.writeText(url).then(function(){toast('Kundenlink kopiert ✓ — Login: PLZ '+cust.zip)})
+      .catch(function(){prompt('Kundenlink (kopieren mit Strg+C):',url)});
+  }).catch(function(e){toast(e.message,1)});
+}
+
+function renderForms(){
+  var STB={offen:'gold',beantwortet:'green'};
+  document.getElementById('formRows').innerHTML=(CACHE.forms||[]).map(function(f){
+    var who=f.customer_id?custName(CACHE.customers.find(function(c){return c.id===f.customer_id})):
+      (f.inquiry_id?('Anfrage: '+esc((CACHE.inquiries.find(function(i){return i.id===f.inquiry_id})||{}).name||'?')):'–');
+    return '<tr><td>'+dtt(f.created_at)+'</td><td><b>'+esc(f.title)+'</b></td><td class="sml">'+who+'</td>'+
+    '<td><span class="b '+(STB[f.status]||'grey')+'">'+f.status+'</span></td>'+
+    '<td style="white-space:nowrap">'+
+    (f.status==='beantwortet'?'<button class="btn sm" onclick="viewFormAnswers(\''+f.id+'\')">Antworten</button> ':
+      '<button class="btn g sm" onclick="copyFormLink(\''+f.token+'\')">🔗 Link</button> ')+
+    '<a onclick="delRow(\'forms\',\''+f.id+'\',reloadForms)" style="color:var(--red)">✕</a></td></tr>';
+  }).join('')||'<tr><td colspan="5" class="mut">Noch keine Fragebögen verschickt.</td></tr>';
+  document.getElementById('ftList').innerHTML=(CACHE.formTpls||[]).map(function(t){
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openFtModal(\''+t.id+'\')">'+esc(t.name)+'</a> <span class="mut">'+(t.fields||[]).length+' Fragen</span></div>';
+  }).join('')||'<span class="mut">Keine Vorlagen.</span>';
+}
+function copyFormLink(token){
+  var url=portalUrl('f',token);
+  navigator.clipboard.writeText(url).then(function(){toast('Fragebogen-Link kopiert ✓')})
+    .catch(function(){prompt('Link:',url)});
+}
+function openNewFormModal(){
+  openModal('Fragebogen erstellen',
+    '<label>Vorlage</label><select id="nfTpl">'+(CACHE.formTpls||[]).map(function(t){return '<option value="'+t.id+'">'+esc(t.name)+'</option>'}).join('')+'</select>'+
+    '<label>Kunde (optional — Antworten landen dann in der Timeline)</label><select id="nfCust"><option value="">–</option>'+
+    CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custName(c))+'</option>'}).join('')+'</select>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="createForm()">Erstellen &amp; Link kopieren</button></div>');
+}
+function createForm(tplId,inqId,custId,cb){
+  tplId=tplId||v('nfTpl');
+  var t=(CACHE.formTpls||[]).find(function(x){return x.id===tplId})||(CACHE.formTpls||[])[0];
+  if(!t){toast('Keine Bogen-Vorlage vorhanden.',1);return Promise.reject()}
+  var token=hexToken();
+  return api('forms',{method:'POST',prefer:'return=representation',body:{
+    token:token,title:t.name,intro:t.intro,fields:t.fields,
+    customer_id:custId!==undefined?custId:(v('nfCust')||null),inquiry_id:inqId||null
+  }}).then(function(rows){
+    CACHE.forms.unshift(rows[0]);renderForms();
+    if(cb)cb(rows[0]);
+    else{closeModal();copyFormLink(token)}
+    return rows[0];
+  }).catch(function(e){toast(e.message,1)});
+}
+function viewFormAnswers(id){
+  var f=(CACHE.forms||[]).find(function(x){return x.id===id});if(!f)return;
+  var html=(f.fields||[]).map(function(fl,i){
+    return '<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div class="mut sml">'+esc(fl.label)+'</div><div style="white-space:pre-wrap">'+esc((f.answers||[])[i]||'–')+'</div></div>';
+  }).join('');
+  openModal('Antworten: '+esc(f.title),'<div class="sml">'+html+'</div>');
+}
+function openFtModal(id){
+  var t=id?(CACHE.formTpls||[]).find(function(x){return x.id===id}):{};t=t||{};
+  var lines=(t.fields||[]).map(function(f){return f.label+' | '+(f.type||'text')+(f.options?' | '+f.options.join(', '):'')}).join('\n');
+  openModal(id?'Bogen-Vorlage bearbeiten':'Neue Bogen-Vorlage',
+    '<label>Name *</label><input id="ftName" value="'+esc(t.name||'')+'">'+
+    '<label>Einleitung</label><textarea id="ftIntro" style="min-height:56px">'+esc(t.intro||'')+'</textarea>'+
+    '<label>Fragen — eine pro Zeile: Frage | Typ | Optionen (Typ: text, textarea, select, checkbox)</label>'+
+    '<textarea id="ftFields" style="min-height:180px;font-size:11px">'+esc(lines)+'</textarea>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveFt(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delRow(\'form_templates\',\''+id+'\',reloadForms)">Löschen</button>':'')+'</div>');
+}
+function saveFt(id){
+  if(!v('ftName')){toast('Name fehlt.',1);return}
+  var fields=document.getElementById('ftFields').value.split('\n').map(function(l){
+    var p=l.split('|').map(function(s){return s.trim()});
+    if(!p[0])return null;
+    var f={label:p[0],type:p[1]||'text'};
+    if(p[2])f.options=p[2].split(',').map(function(s){return s.trim()}).filter(Boolean);
+    return f;
+  }).filter(Boolean);
+  var body={name:v('ftName'),intro:document.getElementById('ftIntro').value,fields:fields};
+  (id?api('form_templates?id=eq.'+id,{method:'PATCH',body:body}):api('form_templates',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Gespeichert ✓');reloadForms()}).catch(function(e){toast(e.message,1)});
+}
+function reloadForms(){
+  Promise.all([api('forms?select=*&order=created_at.desc'),api('form_templates?select=*&order=sort')])
+    .then(function(r){CACHE.forms=r[0]||[];CACHE.formTpls=r[1]||[];renderForms();renderDash()});
+}
+
 /* ===== E-Mail-Vorlagen ===== */
 function renderTpls(){
   document.getElementById('tplRows').innerHTML=(CACHE.tpls||[]).map(function(t){
@@ -1461,9 +1599,21 @@ function composeReply(inqId){
   var t=(CACHE.tpls||[]).find(function(x){return x.id===tplId});if(!t){toast('Bitte Vorlage wählen.',1);return}
   if(i.status==='neu')api('inquiries?id=eq.'+inqId,{method:'PATCH',body:{status:'in_bearbeitung'}})
     .then(function(){i.status='in_bearbeitung';renderInq();renderDash()});
+  if((t.body||'').indexOf('{fragebogen}')>=0){
+    var ft=(CACHE.formTpls||[]).find(function(x){return x.name.indexOf('DJ-Bande')>=0})||(CACHE.formTpls||[])[0];
+    createForm(ft&&ft.id,inqId,i.customer_id||null,function(f){
+      openCompose(i,t,portalUrl('f',f.token));
+    });
+    return;
+  }
+  openCompose(i,t,null);
+}
+function openCompose(i,t,formLink){
+  var body=fillTpl(t.body,i);
+  if(formLink)body=body.replace(/\{fragebogen\}/g,formLink);
   openModal('Antwort an '+esc(i.name)+(i.email?' <span class="mut sml">('+esc(i.email)+')</span>':''),
     '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
-    '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(fillTpl(t.body,i))+'</textarea>'+
+    '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
     '<button class="btn" onclick="copyReply()">📋 Text kopieren</button>'+
     (i.email?'<button class="btn g" onclick="mailReply(\''+esc(i.email)+'\')">✉️ Im Mail-Programm öffnen</button>':'')+

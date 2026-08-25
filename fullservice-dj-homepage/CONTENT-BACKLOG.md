@@ -18,6 +18,14 @@ auf die Seite).
   - Veranstaltungen tagsüber (z. B. 12–18 Uhr)
 - Preise gelten nur für Markus selbst; über die DJ Bande vermittelte
   Kollegen kalkulieren eigenständig (Provision an Markus, steht in AGB §5).
+- **DJ-Bande-Provision: meist 50–100 € pro erfolgreicher Vermittlung.**
+  Strategisches Ziel: Vermittlung als passives Einkommen ausbauen —
+  Markus will nicht mehr jedes Wochenende selbst spielen, sondern sich
+  die besten Jobs aussuchen ("Cherry Picking") und den Rest hochwertig
+  vermitteln. Deshalb: Jede Absage/Ablehnung aktiv in eine
+  DJ-Bande-Vermittlung überführen (Portal-Ablehnen-Flow + Vorlage
+  'Termin belegt' tun das bereits). Wichtig in der Kommunikation: Die
+  Vorauswahl ist handverlesen und persönlich — keine anonyme Liste.
 
 ## Für die Antwort-E-Mail (Vorlage im Backoffice bauen)
 
@@ -27,9 +35,11 @@ auf die Seite).
   Reservierungsdauer des Termins).
 - Details zur DJ-Bande-Vermittlung, wenn Termin belegt ist (bis zu 5
   Vorschläge, wie es dann weitergeht).
-- TODO: E-Mail-Vorlagen-Funktion im Backoffice (Textbausteine je
-  Anfrage-Typ: Hochzeit / Geburtstag / Firmenfeier / Technik / Termin
-  belegt) — noch nicht gebaut.
+- ✅ E-Mail-Vorlagen im Backoffice gebaut (5 Vorlagen mit Platzhaltern).
+- ✅ Online-Fragebögen gebaut ('DJ-Bande Vorauswahl' +
+  'Hochzeits-Planungsbogen', frei erweiterbar).
+- ✅ Kundenportal für Angebote gebaut (PLZ-Login, Hover-Erklärungen,
+  Annehmen/Ablehnen/Kommentar/Rückruf, DJ-Bande-Opt-in bei Absage).
 
 ## Ideen für später (bewusst zurückgestellt, Seite schlank halten)
 

@@ -31,6 +31,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 const JSON_COLS = [
   'settings' => ['value'], 'site_content' => ['value'],
   'packages' => ['features'], 'customers' => ['tags'],
+  'form_templates' => ['fields'], 'forms' => ['fields','answers'],
 ];
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'],
@@ -40,7 +41,8 @@ const BOOL_COLS = [
   'documents' => ['is_small_business'],
 ];
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
-  'customers','communications','bookings','booking_equipment','documents','document_items','email_templates'];
+  'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
+  'doc_events','form_templates','forms'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -75,8 +77,29 @@ function db(): PDO {
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
   ]);
   $pdo->exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;');
-  if ($init) migrate($pdo);
+  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=2'); }
+  else upgrade($pdo);
   return $pdo;
+}
+
+/* Schema-Upgrades für bereits vorhandene Datenbanken (idempotent) */
+function upgrade(PDO $p): void {
+  $v = (int)$p->query('PRAGMA user_version')->fetchColumn();
+  if ($v >= 2) return;
+  foreach ([
+    "alter table documents add column share_token text",
+    "alter table document_items add column note text",
+    "create table if not exists doc_events (id text primary key,
+      document_id text not null references documents(id) on delete cascade,
+      kind text not null, message text, phone text, created_at text, seen integer default 0)",
+    "create table if not exists form_templates (id text primary key, sort integer default 0,
+      name text not null, intro text, fields text default '[]')",
+    "create table if not exists forms (id text primary key, token text unique not null, title text not null,
+      intro text, fields text default '[]', answers text, status text default 'offen',
+      inquiry_id text, customer_id text, created_at text, submitted_at text)",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
+  if (!(int)$p->query("select count(*) from form_templates")->fetchColumn()) seedFormTemplates($p);
+  $p->exec('PRAGMA user_version=2');
 }
 
 function migrate(PDO $p): void {
@@ -119,7 +142,7 @@ create table booking_equipment (id text primary key,
   equipment_id text not null references equipment(id) on delete restrict,
   qty integer default 1, price_override real, out_done integer default 0,
   back_done integer default 0, notes text);
-create table documents (id text primary key, doc_type text not null, number text unique not null,
+create table documents (id text primary key, share_token text, doc_type text not null, number text unique not null,
   customer_id text not null references customers(id) on delete restrict,
   booking_id text references bookings(id) on delete set null,
   parent_id text, status text default 'entwurf', doc_date text, valid_until text, due_date text,
@@ -128,9 +151,18 @@ create table documents (id text primary key, doc_type text not null, number text
   deposit_deducted real default 0, sent_at text, paid_at text, created_at text, updated_at text);
 create table email_templates (id text primary key, sort integer default 0, name text not null,
   subject text, body text, created_at text);
+create table doc_events (id text primary key,
+  document_id text not null references documents(id) on delete cascade,
+  kind text not null, message text, phone text, created_at text, seen integer default 0);
+create table form_templates (id text primary key, sort integer default 0, name text not null,
+  intro text, fields text default '[]');
+create table forms (id text primary key, token text unique not null, title text not null,
+  intro text, fields text default '[]', answers text,
+  status text default 'offen', inquiry_id text, customer_id text,
+  created_at text, submitted_at text);
 create table document_items (id text primary key,
   document_id text not null references documents(id) on delete cascade,
-  pos integer default 1, description text not null, qty real default 1, unit text, unit_price real default 0);
+  pos integer default 1, description text not null, note text, qty real default 1, unit text, unit_price real default 0);
 SQL);
   seed($p);
 }
@@ -263,9 +295,12 @@ Markus Jankowski – Lauschgift Veranstaltungstechnik"],
 
 vielen Dank für eure Anfrage – und erstmal die weniger gute Nachricht: An eurem Termin am {datum} bin ich leider bereits gebucht.
 
-Aber ich lasse euch nicht hängen. Über meine Partner-Agentur DJ Bande aus Münster kann ich euch bis zu fünf Kollegen vorschlagen, die zu eurer Feier passen – DJs, die ich kenne und hinter denen ich stehe. Zur Transparenz: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision; für euch entstehen dadurch keine zusätzlichen Kosten, und die Preise vereinbart ihr direkt mit dem jeweiligen DJ.
+Aber ich lasse euch nicht hängen – und ich schicke euch auch nicht einfach irgendeine Liste. Über meine Partner-Agentur DJ Bande aus Münster wähle ich persönlich bis zu fünf Kollegen aus, die wirklich zu eurer Feier passen: zu eurer Musikrichtung, eurer Location und der Art, wie ihr feiern wollt. Dafür kenne ich die Kollegen und ihre Stärken.
 
-Wenn ihr das möchtet, gebt mir einfach kurz Bescheid – dann leite ich eure Eckdaten (Termin, Ort, Anlass) mit eurem Einverständnis weiter und ihr bekommt zeitnah Vorschläge.
+Damit meine Vorauswahl sitzt, habe ich einen kurzen Online-Fragebogen für euch (keine 5 Minuten):
+{fragebogen}
+
+Zur Transparenz: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision; für euch entstehen dadurch keine zusätzlichen Kosten, und die Preise vereinbart ihr direkt mit dem jeweiligen DJ. Eure Angaben leite ich erst nach eurem Einverständnis weiter (das fragt der Bogen mit ab).
 
 Viele Grüße
 Markus Jankowski – DJ Lauschgift"],
@@ -273,10 +308,47 @@ Markus Jankowski – DJ Lauschgift"],
   foreach ($tpls as [$s,$n,$sub,$b])
     $ins('email_templates', ['sort'=>$s,'name'=>$n,'subject'=>$sub,'body'=>$b]);
 
+  seedFormTemplates($p);
+
   /* Beispiel-Location als Vorlage — erst nach Bearbeitung auf 'öffentlich' stellen */
   $ins('locations', ['sort'=>1,'name'=>'Beispiel-Location (bitte ersetzen)','city'=>'Musterstadt','region'=>'NRW',
     'description'=>'Kurz beschreiben, warum du dort so gerne auflegst und was das Team besonders gut macht.',
     'website'=>'','public'=>0]);
+}
+
+function seedFormTemplates(PDO $p): void {
+  $tpls = [
+    [1, 'DJ-Bande Vorauswahl',
+     "Damit ich euch nicht irgendwelche, sondern wirklich passende DJs vorschlagen kann, beantwortet mir bitte kurz diese Fragen – dauert keine 5 Minuten.",
+     [
+       ['label'=>'Anlass eurer Feier','type'=>'select','options'=>['Hochzeit','Geburtstag','Firmenfeier','Sonstiges']],
+       ['label'=>'Datum der Feier','type'=>'text'],
+       ['label'=>'Location & Ort (Name reicht)','type'=>'text'],
+       ['label'=>'Ungefähre Gästezahl','type'=>'text'],
+       ['label'=>'Welche Musikrichtungen sollen auf jeden Fall laufen?','type'=>'textarea'],
+       ['label'=>'Was darf auf KEINEN Fall laufen?','type'=>'textarea'],
+       ['label'=>'Wie soll euer DJ auftreten?','type'=>'select','options'=>['Zurückhaltend im Hintergrund','Moderiert & animiert aktiv','Mischung aus beidem','Egal, Hauptsache gute Musik']],
+       ['label'=>'Euer ungefähres Budget für den DJ','type'=>'select','options'=>['bis 800 €','800–1.200 €','1.200–1.800 €','über 1.800 €','noch offen']],
+       ['label'=>'Braucht ihr zusätzlich Ton für Reden oder eine freie Trauung?','type'=>'select','options'=>['Ja','Nein','Weiß noch nicht']],
+       ['label'=>'Sonst noch etwas, das der DJ wissen sollte?','type'=>'textarea'],
+       ['label'=>'Ich bin einverstanden, dass meine Angaben zur DJ-Vermittlung an die Partner-Agentur DJ Bande (Münster) weitergegeben werden.','type'=>'checkbox'],
+     ]],
+    [2, 'Hochzeits-Planungsbogen',
+     "Je besser ich eure Feier kenne, desto besser wird der Abend. Nehmt euch ein paar Minuten – es lohnt sich.",
+     [
+       ['label'=>'Wie läuft euer Tag grob ab? (Trauung, Empfang, Essen, Party …)','type'=>'textarea'],
+       ['label'=>'Gibt es eine freie Trauung, die Ton braucht?','type'=>'select','options'=>['Ja','Nein']],
+       ['label'=>'Euer Lied für den ersten Tanz','type'=>'text'],
+       ['label'=>'Musikwünsche – was soll unbedingt laufen?','type'=>'textarea'],
+       ['label'=>'No-Gos – was darf auf keinen Fall laufen?','type'=>'textarea'],
+       ['label'=>'Gibt es Programmpunkte, die ich musikalisch begleiten soll? (Einzug, Tortenanschnitt …)','type'=>'textarea'],
+       ['label'=>'Ansprechpartner am Abend (Name & Handynummer)','type'=>'text'],
+     ]],
+  ];
+  foreach ($tpls as [$s,$n,$i,$f]) {
+    $p->prepare('insert into form_templates (id,sort,name,intro,fields) values (?,?,?,?,?)')
+      ->execute([uuid(), $s, $n, $i, json_encode($f, JSON_UNESCAPED_UNICODE)]);
+  }
 }
 
 /* ---------- Auth ---------- */
@@ -461,6 +533,79 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
   fail('Methode nicht unterstützt.', 405);
 }
 
+/* ---------- Kundenportal (öffentlich, Token-geschützt) ---------- */
+function portalDoc(string $token, string $plz): array {
+  $p = db();
+  if (!preg_match('/^[a-f0-9]{24,64}$/', $token)) fail('Ungültiger Link.', 404);
+  $st = $p->prepare('select d.*, c.first_name, c.last_name, c.company, c.zip
+    from documents d join customers c on c.id = d.customer_id where d.share_token = ?');
+  $st->execute([$token]);
+  $d = $st->fetch();
+  if (!$d) fail('Dieses Angebot wurde nicht gefunden oder der Link ist abgelaufen.', 404);
+  if (trim($plz) === '' || trim($plz) !== trim((string)$d['zip'])) {
+    usleep(500000);
+    out(['need' => 'plz'], 401);
+  }
+  return $d;
+}
+
+function handlePortal(string $path, string $method, $body): never {
+  $p = db();
+  if (preg_match('#^portal/offer/([a-f0-9]+)$#', $path, $m) && $method === 'GET') {
+    $d = portalDoc($m[1], (string)($_GET['plz'] ?? ''));
+    $it = $p->prepare('select pos, description, note, qty, unit, unit_price from document_items where document_id = ? order by pos');
+    $it->execute([$d['id']]);
+    $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+    out([
+      'doc' => array_intersect_key($d, array_flip(['doc_type','number','status','doc_date','valid_until','due_date',
+        'tax_rate','is_small_business','intro_text','outro_text','total_net','total_tax','total_gross','deposit_deducted'])),
+      'customer' => trim(($d['company'] ? $d['company'] : ($d['first_name'].' '.$d['last_name']))),
+      'items' => $it->fetchAll(),
+      'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email'])),
+    ]);
+  }
+  if (preg_match('#^portal/offer/([a-f0-9]+)/action$#', $path, $m) && $method === 'POST') {
+    $d = portalDoc($m[1], (string)($body['plz'] ?? ''));
+    $kind = (string)($body['action'] ?? '');
+    if (!in_array($kind, ['accept','decline','comment','callback','bande'])) fail('Unbekannte Aktion.');
+    $msg = mb_substr(trim((string)($body['message'] ?? '')), 0, 4000);
+    $phone = mb_substr(trim((string)($body['phone'] ?? '')), 0, 60);
+    if ($kind === 'accept' && $d['status'] !== 'storniert')
+      $p->prepare("update documents set status='angenommen', updated_at=? where id=?")->execute([now(), $d['id']]);
+    if ($kind === 'decline' && $d['status'] !== 'storniert')
+      $p->prepare("update documents set status='abgelehnt', updated_at=? where id=?")->execute([now(), $d['id']]);
+    $p->prepare('insert into doc_events (id,document_id,kind,message,phone,created_at) values (?,?,?,?,?,?)')
+      ->execute([uuid(), $d['id'], $kind, $msg, $phone, now()]);
+    out(['ok' => true], 201);
+  }
+  if (preg_match('#^portal/form/([a-f0-9]+)$#', $path, $m)) {
+    if (!preg_match('/^[a-f0-9]{24,64}$/', $m[1])) fail('Ungültiger Link.', 404);
+    $st = $p->prepare('select * from forms where token=?'); $st->execute([$m[1]]);
+    $f = $st->fetch();
+    if (!$f) fail('Dieser Fragebogen wurde nicht gefunden.', 404);
+    if ($method === 'GET')
+      out(['title'=>$f['title'],'intro'=>$f['intro'],'fields'=>json_decode($f['fields'],true),'done'=>$f['status']==='beantwortet']);
+    if ($method === 'POST') {
+      if ($f['status'] === 'beantwortet') fail('Dieser Fragebogen wurde bereits beantwortet.', 409);
+      $answers = $body['answers'] ?? null;
+      if (!is_array($answers)) fail('Antworten fehlen.');
+      $answers = array_map(fn($a) => mb_substr(trim((string)$a), 0, 4000), $answers);
+      $p->prepare("update forms set answers=?, status='beantwortet', submitted_at=? where id=?")
+        ->execute([json_encode($answers, JSON_UNESCAPED_UNICODE), now(), $f['id']]);
+      if ($f['customer_id']) {
+        $fields = json_decode($f['fields'], true) ?: [];
+        $sum = '';
+        foreach ($fields as $i => $fl) $sum .= ($fl['label'] ?? ('Frage '.($i+1))).":\n".($answers[$i] ?? '–')."\n\n";
+        $p->prepare('insert into communications (id,customer_id,channel,direction,subject,content,occurred_at,created_at)
+          values (?,?,?,?,?,?,?,?)')
+          ->execute([uuid(), $f['customer_id'], 'note', 'in', 'Fragebogen beantwortet: '.$f['title'], trim($sum), now(), now()]);
+      }
+      out(['ok' => true], 201);
+    }
+  }
+  fail('Unbekannter Portal-Endpunkt.', 404);
+}
+
 /* ---------- Upload ---------- */
 function handleUpload(string $name): never {
   if (!currentUser()) fail('Nicht angemeldet.', 401);
@@ -488,6 +633,7 @@ if (in_array($method, ['POST','PATCH']) &&
 
 try {
   if ($path === 'auth/login' && $method === 'POST') handleLogin($body ?? []);
+  if (str_starts_with($path, 'portal/')) handlePortal($path, $method, $body ?? []);
   if (preg_match('#^rest/(\w+)$#', $path, $m)) {
     $q = $_GET; unset($q['_p']);
     handleRest($m[1], $method, $q, $body, $prefer);
