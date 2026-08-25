@@ -32,7 +32,7 @@ const JSON_COLS = [
   'settings' => ['value'], 'site_content' => ['value'],
   'packages' => ['features'], 'customers' => ['tags'],
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
-  'products' => ['bundle'],
+  'products' => ['bundle'], 'bookings' => ['rider'],
 ];
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'],
@@ -80,7 +80,7 @@ function db(): PDO {
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
   ]);
   $pdo->exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;');
-  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=6'); }
+  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=7'); }
   else upgrade($pdo);
   return $pdo;
 }
@@ -140,7 +140,10 @@ function upgrade(PDO $p): void {
     try { $p->prepare("insert into settings (key,value,updated_at) values ('rental_contract',?,?)")
       ->execute([json_encode(['text' => rentalContractDefault()], JSON_UNESCAPED_UNICODE), now()]); } catch (PDOException $e) {}
   }
-  $p->exec('PRAGMA user_version=6');
+  if ($v < 7) {
+    try { $p->exec("alter table bookings add column rider text"); } catch (PDOException $e) {}
+  }
+  $p->exec('PRAGMA user_version=7');
 }
 
 function rentalContractDefault(): string {
@@ -180,7 +183,7 @@ create table bookings (id text primary key,
   customer_id text not null references customers(id) on delete cascade,
   status text default 'anfrage', kind text default 'dj', event_type text, title text,
   event_date text not null, end_date text, start_time text, end_time text,
-  venue_name text, venue_address text, guests integer, fee_net real, notes text,
+  venue_name text, venue_address text, guests integer, fee_net real, notes text, rider text,
   review_requested integer default 0, created_at text, updated_at text);
 create table booking_equipment (id text primary key,
   booking_id text not null references bookings(id) on delete cascade,

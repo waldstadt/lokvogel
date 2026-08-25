@@ -101,3 +101,8 @@ postet sie nur noch auf Instagram). Timing-Logik:
 - Referenzen/Testimonials-Sektion.
 - Budget-/Termin-Vorqualifizierung im Anfrageformular (mit 1.200-€-Logik
   und Saison-Hinweis) — nur wenn es die Hürde zur Anfrage nicht erhöht.
+- **Automatische km-Berechnung aus der Location-Adresse** (Routing):
+  bräuchte einen externen Dienst (Google Maps / OpenStreetMap-Routing) —
+  widerspricht aktuell „alles auf eigenem Server / DSGVO-sauber".
+  Bis dahin: km-Feld im Rider (Google-Maps-Entfernung einmal ablesen),
+  Satz und Freikilometer in den Einstellungen.

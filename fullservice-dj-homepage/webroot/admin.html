@@ -244,6 +244,8 @@ th.num{text-align:right}
       <div class="card"><h3>Technik für diesen Auftrag <button class="btn sm" style="float:right" onclick="openBeModal()">+ Technik</button></h3>
         <div id="bdEquip" class="sml mut">Keine Technik zugeordnet.</div></div>
     </div>
+    <div class="card"><h3>Rider / Einsatzblatt <span style="float:right"><button class="btn g sm" onclick="printRider()">🖨 Drucken</button> <button class="btn sm" onclick="openRiderModal()">Bearbeiten</button></span></h3>
+      <div id="bdRider" class="sml mut">–</div></div>
     <div class="card"><h3>Dokumente zu diesem Auftrag</h3><div id="bdDocs" class="sml mut">–</div></div>
   </div>
 
@@ -470,6 +472,10 @@ th.num{text-align:right}
           <div class="grid2">
             <div><label>USt.-Satz Standard (%)</label><input type="number" step="0.1" id="sTaxRate"></div>
             <div><label>Partner-Rabatt Technik-Miete (%)</label><input type="number" id="sPartnerPct"></div>
+          </div>
+          <div class="grid2">
+            <div><label>Reisekosten (€ / km, einfache Strecke ×2)</label><input type="number" step="0.01" id="sKmRate"></div>
+            <div><label>Freikilometer (einfach, ohne Berechnung)</label><input type="number" id="sKmFree"></div>
           </div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveNumbering()">Speichern</button></div>
         </div>
@@ -838,7 +844,7 @@ function openBookDetail(id){
     row('Anlass',b.event_type)+row('Zeit',[b.start_time,b.end_time].filter(Boolean).join(' – '))+
     row('Location',b.venue_name)+row('Adresse',b.venue_address)+row('Gäste',b.guests)+
     row('Gage netto',b.fee_net?euro(b.fee_net):'')+row('Notizen',b.notes);
-  renderBe();
+  renderBe();renderRider();
   var docs=CACHE.documents.filter(function(d){return d.booking_id===id});
   document.getElementById('bdDocs').innerHTML=docs.map(function(d){
     return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+euro(d.total_gross)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
@@ -940,6 +946,96 @@ function saveBook(id){
 }
 function delBook(id){if(!confirm('Buchung löschen?'))return;
   api('bookings?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();showPage('book');loadAll()}).catch(function(e){toast(e.message,1)})}
+
+/* ===== Rider / Einsatzblatt ===== */
+function riderOf(b){return (b&&b.rider&&typeof b.rider==='object')?b.rider:{}}
+function travelRate(){var d=S.defaults||{};return d.travel_rate_km!=null?Number(d.travel_rate_km):0.70}
+function travelFree(){var d=S.defaults||{};return d.travel_free_km!=null?Number(d.travel_free_km):30}
+function travelCost(km){
+  var chg=Math.max(0,(Number(km)||0)-travelFree());
+  return Math.round(chg*2*travelRate()*100)/100;
+}
+function renderRider(){
+  var r=riderOf(curBook),el=document.getElementById('bdRider');
+  var filled=Object.keys(r).some(function(k){return r[k]!=null&&r[k]!==''});
+  if(!filled){el.innerHTML='Noch kein Rider — mit „Bearbeiten“ alles Wichtige zum Einsatz von Anfang an erfassen: Personenzahl, Location-Adresse, Ansprechpartner, Strom, Parken, Anfahrt …';return}
+  var tc=r.distance_km?travelCost(r.distance_km):0;
+  el.innerHTML='<div class="grid2" style="gap:0 24px">'+
+    row('Personen',r.guests)+row('Aufbau ab',r.setup_from)+
+    row('Location',r.venue_name)+row('Adresse',r.venue_address)+
+    row('Ansprechpartner vor Ort',[r.contact_name,r.contact_phone].filter(Boolean).join(' · '))+
+    row('Strom',r.power)+row('Parken / Anlieferung',r.parking)+row('Aufbauort / Bühne',r.stage)+
+    row('Musikwünsche',r.music)+row('No-Gos',r.nogos)+
+    row('Entfernung (einfach)',r.distance_km?r.distance_km+' km':'')+
+    row('Reisekosten',tc?euro(tc)+' netto (wird als Position „Anfahrt“ übernommen)':'')+
+    '</div>'+(r.notes?'<div style="margin-top:6px">'+row('Sonstiges / Ablauf',r.notes)+'</div>':'');
+}
+function openRiderModal(){
+  var b=curBook,r=riderOf(b);
+  openModal('Rider / Einsatzblatt — '+dt(b.event_date),
+    '<div class="grid3"><div><label>Personen / Gäste</label><input type="number" id="rGuests" value="'+(r.guests!=null?r.guests:(b.guests||''))+'"></div>'+
+    '<div><label>Aufbau ab</label><input type="time" id="rSetup" value="'+(r.setup_from||'')+'"></div>'+
+    '<div><label>Entfernung einfach (km)</label><input type="number" id="rKm" value="'+(r.distance_km||'')+'" oninput="riderKmHint()"></div></div>'+
+    '<div class="sml mut" id="rKmHint" style="margin:2px 0 8px"></div>'+
+    '<div class="grid2"><div><label>Location</label><input id="rVenue" value="'+esc(r.venue_name||b.venue_name||'')+'"></div>'+
+    '<div><label>Adresse (Straße, PLZ Ort)</label><input id="rAddr" value="'+esc(r.venue_address||b.venue_address||'')+'"></div></div>'+
+    '<div class="grid2"><div><label>Ansprechpartner vor Ort</label><input id="rContact" value="'+esc(r.contact_name||'')+'"></div>'+
+    '<div><label>Telefon vor Ort</label><input id="rPhone" value="'+esc(r.contact_phone||'')+'"></div></div>'+
+    '<div class="grid2"><div><label>Strom</label><input id="rPower" value="'+esc(r.power||'')+'" placeholder="z. B. 2× 230 V Schuko in Bühnennähe"></div>'+
+    '<div><label>Parken / Anlieferung</label><input id="rParking" value="'+esc(r.parking||'')+'" placeholder="z. B. Hof hinterm Haus, Aufzug vorhanden"></div></div>'+
+    '<label>Aufbauort / Bühne / Platz</label><input id="rStage" value="'+esc(r.stage||'')+'" placeholder="z. B. Ecke neben der Tanzfläche, ca. 3 × 2 m">'+
+    '<div class="grid2"><div><label>Musikwünsche</label><input id="rMusic" value="'+esc(r.music||'')+'"></div>'+
+    '<div><label>No-Gos</label><input id="rNogos" value="'+esc(r.nogos||'')+'"></div></div>'+
+    '<label>Sonstiges / Ablauf</label><textarea id="rNotes">'+esc(r.notes||'')+'</textarea>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveRider()">Speichern</button></div>');
+  riderKmHint();
+}
+function riderKmHint(){
+  var km=Number(v('rKm'))||0,rate=travelRate(),free=travelFree();
+  document.getElementById('rKmHint').innerHTML=km?
+    ('Reisekosten: <b style="color:var(--wh)">'+euro(travelCost(km))+'</b> netto — '+Math.max(0,km-free)+' km berechnet × 2 (hin &amp; zurück) × '+euro(rate)+'/km'+(free?' ('+free+' Freikilometer)':'')+'. Fließt automatisch als Position „Anfahrt“ in Angebot/Rechnung. Satz in den Einstellungen.'):'';
+}
+function saveRider(){
+  var r={guests:v('rGuests')?Number(v('rGuests')):null,setup_from:v('rSetup')||null,
+    distance_km:v('rKm')?Number(v('rKm')):null,
+    venue_name:v('rVenue'),venue_address:v('rAddr'),contact_name:v('rContact'),contact_phone:v('rPhone'),
+    power:v('rPower'),parking:v('rParking'),stage:v('rStage'),music:v('rMusic'),nogos:v('rNogos'),notes:v('rNotes')};
+  var sync={rider:r,venue_name:r.venue_name||curBook.venue_name,venue_address:r.venue_address||curBook.venue_address,
+    guests:r.guests!=null?r.guests:curBook.guests};
+  api('bookings?id=eq.'+curBook.id,{method:'PATCH',body:sync}).then(function(){
+    Object.assign(curBook,sync);closeModal();toast('Rider gespeichert ✓');openBookDetail(curBook.id);
+  }).catch(function(e){toast(e.message,1)});
+}
+function printRider(){
+  var b=curBook,r=riderOf(b),comp=S.company||{},cust=b.customers||CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
+  var tech=CACHE.be.filter(function(x){return x.booking_id===b.id}).map(function(x){
+    var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};
+    return x.qty+'× '+(eq.name||'?');
+  }).join(', ');
+  var pr=function(l,val){return val?'<tr><td style="padding:6px 10px 6px 0;color:#777;white-space:nowrap;vertical-align:top">'+l+'</td><td style="padding:6px 0">'+esc(String(val))+'</td></tr>':''};
+  document.getElementById('printArea').innerHTML=
+  '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
+  '<div style="font-size:18px;font-weight:700">Einsatzblatt / Rider</div>'+
+  '<div style="color:#777;margin-bottom:16px">'+esc(b.title||b.event_type||'Auftrag')+' · '+dt(b.event_date)+(b.start_time?' · '+b.start_time.slice(0,5)+(b.end_time?'–'+b.end_time.slice(0,5):'')+' Uhr':'')+'</div>'+
+  '<table style="width:100%;border-collapse:collapse">'+
+  pr('Kunde',custName(cust)+(cust.phone?' · '+cust.phone:''))+
+  pr('Personen / Gäste',r.guests)+
+  pr('Aufbau ab',r.setup_from)+
+  pr('Location',r.venue_name)+
+  pr('Adresse',r.venue_address)+
+  pr('Ansprechpartner vor Ort',[r.contact_name,r.contact_phone].filter(Boolean).join(' · '))+
+  pr('Strom',r.power)+
+  pr('Parken / Anlieferung',r.parking)+
+  pr('Aufbauort / Bühne',r.stage)+
+  pr('Musikwünsche',r.music)+
+  pr('No-Gos',r.nogos)+
+  pr('Entfernung (einfach)',r.distance_km?r.distance_km+' km':'')+
+  pr('Technik',tech)+
+  pr('Sonstiges / Ablauf',r.notes)+
+  '</table>'+
+  '<div style="margin-top:24px;color:#777;border-top:1px solid #ddd;padding-top:10px">'+esc(comp.name||'')+(comp.phone?' · '+esc(comp.phone):'')+'</div></div>';
+  window.print();
+}
 
 /* ===== Dokumente (Angebote & Rechnungen) ===== */
 function docTypeName(t){return {angebot:'Angebot',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'}[t]||t}
@@ -1065,7 +1161,8 @@ function refreshDocs(){api('documents?select=*,customers(*)&order=created_at.des
 function renderItems(){
   document.getElementById('docItems').innerHTML=curItems.map(function(it,i){
     var sum=lineTotal(it);
-    return '<div style="margin-bottom:10px"><div class="it-row" style="margin-bottom:3px"><input value="'+(i+1)+'" disabled style="text-align:center">'+
+    return '<div style="margin-bottom:10px" ondragover="itDragOver(event)" ondrop="itDrop('+i+',event)"><div class="it-row" style="margin-bottom:3px">'+
+    '<div draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren" style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:grab;color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none"><span style="opacity:.55">⠿</span>'+(i+1)+'</div>'+
     '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
     '<input type="number" step="0.5" value="'+it.qty+'" oninput="itSet('+i+',\'qty\',this.value)">'+
     '<input value="'+esc(it.unit||'Stk.')+'" oninput="itSet('+i+',\'unit\',this.value)">'+
@@ -1089,6 +1186,11 @@ function lineTotal(it){
   return it.discount_type==='eur'?Math.max(0,g-d):g*(1-Math.min(100,d)/100);
 }
 function itDel(i){curItems.splice(i,1);renderItems()}
+var itDragIdx=null;
+function itDragStart(i,ev){itDragIdx=i;ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',String(i))}catch(e){}}
+function itDragOver(ev){if(itDragIdx!==null)ev.preventDefault()}
+function itDrop(i,ev){ev.preventDefault();if(itDragIdx===null||itDragIdx===i){itDragIdx=null;return}
+  var m=curItems.splice(itDragIdx,1)[0];curItems.splice(i,0,m);itDragIdx=null;renderItems()}
 function addItemRow(){curItems.push({pos:curItems.length+1,description:'',qty:1,unit:'Stk.',unit_price:0});renderItems()}
 function docCalc(){
   var sub=curItems.reduce(function(s,it){return s+lineTotal(it)},0);
@@ -1176,6 +1278,10 @@ function createDocFromBooking(type){
       var price=x.price_override!=null?Number(x.price_override):rentPrice(eq,b)*x.qty;
       curItems.push({pos:curItems.length+1,description:'Technik-Miete: '+(eq.name||'?')+' ('+rentDays(b)+' Miettag'+(rentDays(b)>1?'e':'')+')',qty:x.qty,unit:'Stk.',unit_price:x.qty?price/x.qty:price});
     });
+    var rd=riderOf(b),tc=rd.distance_km?travelCost(rd.distance_km):0;
+    if(tc>0)curItems.push({pos:curItems.length+1,description:'Anfahrt ('+rd.distance_km+' km einfache Strecke)',
+      note:'Hin- und Rückweg, '+travelFree()+' Freikilometer bereits abgezogen.',
+      qty:1,unit:'pausch.',unit_price:tc});
     if(!curItems.length)curItems=[{pos:1,description:label,qty:1,unit:'pausch.',unit_price:0}];
     renderItems();
     if(type==='abschlag'){
@@ -1784,6 +1890,8 @@ function renderSet(){
   document.getElementById('sSmall').checked=!!c.small_business;
   document.getElementById('sTaxRate').value=d.tax_rate!=null?d.tax_rate:19;
   document.getElementById('sPartnerPct').value=d.partner_discount_pct!=null?d.partner_discount_pct:20;
+  document.getElementById('sKmRate').value=d.travel_rate_km!=null?d.travel_rate_km:0.70;
+  document.getElementById('sKmFree').value=d.travel_free_km!=null?d.travel_free_km:30;
   document.getElementById('sBank').value=c.bank||'';
   document.getElementById('sIban').value=c.iban||'';
   document.getElementById('sBic').value=c.bic||'';
@@ -1811,6 +1919,7 @@ function saveNumbering(){
   var n={angebot:{prefix:v('sQPre'),next:Number(v('sQNext'))||1},rechnung:{prefix:v('sIPre'),next:Number(v('sINext'))||1},year_in_number:true};
   var d=S.defaults||{};d.payment_days=Number(v('sPayDays'))||14;d.quote_valid_days=Number(v('sValidDays'))||30;
   d.tax_rate=Number(v('sTaxRate'))||19;d.partner_discount_pct=Number(v('sPartnerPct'))||20;
+  d.travel_rate_km=Number(v('sKmRate'))||0;d.travel_free_km=Number(v('sKmFree'))||0;
   Promise.all([
     api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'numbering',value:n}}),
     api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'defaults',value:d}})
