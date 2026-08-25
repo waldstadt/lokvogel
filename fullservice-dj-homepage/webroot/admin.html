@@ -609,15 +609,18 @@ function renderAll(){
 /* ===== Workshop-Termine & Anmeldungen ===== */
 function wsBooked(wid){return (CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===wid&&s.status==='angemeldet'})
   .reduce(function(a,s){return a+(Number(s.seats)||1)},0)}
+function wsWaitlist(wid){return (CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===wid&&s.status==='warteliste'})
+  .reduce(function(a,s){return a+(Number(s.seats)||1)},0)}
 function renderWsAdmin(){
   var list=CACHE.wsEvents||[];
   document.getElementById('wsAdminList').innerHTML=list.length?('<table><thead><tr><th>Datum</th><th>Titel</th><th class="num">Preis p. P.</th><th class="num">Belegt</th><th>Sichtbar</th><th></th></tr></thead><tbody>'+
     list.map(function(w){
-      var b=wsBooked(w.id);
+      var b=wsBooked(w.id),wl=wsWaitlist(w.id);
       return '<tr><td>'+dt(w.event_date)+(w.start_time?' '+w.start_time.slice(0,5):'')+'</td>'+
       '<td><a onclick="openWsDetail(\''+w.id+'\')">'+esc(w.title)+'</a></td>'+
       '<td class="num">'+(w.price_net!=null?euro(w.price_net):'–')+'</td>'+
-      '<td class="num">'+b+' / '+(w.capacity||0)+(b>=(w.capacity||0)?' <span class="b red">voll</span>':'')+'</td>'+
+      '<td class="num">'+b+' / '+(w.capacity||0)+(b>=(w.capacity||0)?' <span class="b red">voll</span>':'')+
+      (wl?' <span class="b blue">+'+wl+' WL</span>':'')+'</td>'+
       '<td>'+(w.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</td>'+
       '<td><a onclick="openWsModal(\''+w.id+'\')">Bearbeiten</a></td></tr>';
     }).join('')+'</tbody></table>'):'<span class="mut">Noch keine Termine — lege den ersten an, dann erscheint er buchbar auf der Technik-Seite.</span>';
@@ -648,20 +651,39 @@ function saveWs(id){
 }
 function openWsDetail(id){
   var w=(CACHE.wsEvents||[]).find(function(x){return x.id===id});if(!w)return;
-  var sg=(CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===id});
+  var order={angemeldet:0,warteliste:1,storniert:2};
+  var sg=(CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===id})
+    .sort(function(a,b){return (order[a.status]||0)-(order[b.status]||0)});
   var rows=sg.map(function(s){
-    return '<tr'+(s.status!=='angemeldet'?' style="opacity:.45"':'')+'><td>'+esc(s.name)+'</td>'+
+    var badge=s.status==='warteliste'?'<span class="b blue">Warteliste</span>':(s.status==='storniert'?'<span class="b grey">storniert</span>':'<span class="b green">angemeldet</span>');
+    var qa=[['Musikalisch',s.q_music],['Herausforderung',s.q_challenge],['Ziel',s.q_goal]]
+      .filter(function(x){return x[1]}).map(function(x){return '<div><span class="mut">'+x[0]+':</span> '+esc(x[1])+'</div>'}).join('');
+    return '<tr'+(s.status==='storniert'?' style="opacity:.45"':'')+'><td>'+esc(s.name)+'<br>'+badge+'</td>'+
     '<td>'+esc(s.email||'')+(s.phone?'<br><span class="mut">'+esc(s.phone)+'</span>':'')+'</td>'+
-    '<td class="num">'+(s.seats||1)+'</td><td>'+esc(s.message||'')+'</td>'+
+    '<td class="num">'+(s.seats||1)+'</td>'+
+    '<td style="font-size:11px;line-height:1.6">'+qa+(s.message?'<div><span class="mut">Nachricht:</span> '+esc(s.message)+'</div>':'')+'</td>'+
     '<td>'+(s.status==='angemeldet'
       ?'<a onclick="wsCancel(\''+s.id+'\',\''+id+'\')" style="color:var(--red)">stornieren</a>'
-      :'<span class="mut">storniert</span>')+'</td></tr>';
+      :(s.status==='warteliste'
+        ?'<a onclick="wsPromote(\''+s.id+'\',\''+id+'\')">nachrücken ↑</a>'
+        :''))+'</td></tr>';
   }).join('');
   openModal('Teilnehmer — '+esc(w.title)+' am '+dt(w.event_date),
     '<div class="sml mut" style="margin-bottom:10px">Belegt: <b style="color:var(--wh)">'+wsBooked(id)+' / '+(w.capacity||0)+'</b>'+
+    (wsWaitlist(id)?' · Warteliste: <b style="color:var(--wh)">'+wsWaitlist(id)+'</b>':'')+
     (w.price_net!=null?' · Preis p. P.: '+euro(w.price_net):'')+' — Bezahlung vor Ort oder per Rechnung.</div>'+
-    (sg.length?('<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Kontakt</th><th class="num">Plätze</th><th>Nachricht</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>')
+    (sg.length?('<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Kontakt</th><th class="num">Plätze</th><th>Antworten</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>')
       :'<span class="mut">Noch keine Anmeldungen.</span>'));
+}
+function wsPromote(sid,wid){
+  var w=(CACHE.wsEvents||[]).find(function(x){return x.id===wid});
+  var s=(CACHE.wsSignups||[]).find(function(x){return x.id===sid});
+  var free=(w.capacity||0)-wsBooked(wid);
+  if((s.seats||1)>free&&!confirm('Achtung: Der Termin hat nur noch '+free+' freie Plätze — nachrücken lassen und überbuchen?'))return;
+  api('workshop_signups?id=eq.'+sid,{method:'PATCH',body:{status:'angemeldet'}})
+    .then(function(){toast('Nachgerückt ✓ — kurze Bestätigungs-Mail an den Teilnehmer nicht vergessen.');
+      return api('workshop_signups?select=*&order=created_at.desc')})
+    .then(function(r){CACHE.wsSignups=r||[];renderWsAdmin();openWsDetail(wid)}).catch(function(e){toast(e.message,1)});
 }
 function wsCancel(sid,wid){
   if(!confirm('Anmeldung stornieren? Der Platz wird wieder frei.'))return;

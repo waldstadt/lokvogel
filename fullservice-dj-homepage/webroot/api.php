@@ -154,7 +154,12 @@ function upgrade(PDO $p): void {
   if ($v < 10) {
     foreach (workshopsDdl() as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   }
-  $p->exec('PRAGMA user_version=10');
+  if ($v < 11) foreach ([
+    "alter table workshop_signups add column q_music text",
+    "alter table workshop_signups add column q_challenge text",
+    "alter table workshop_signups add column q_goal text",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+  $p->exec('PRAGMA user_version=11');
 }
 
 function workshopsDdl(): array {
@@ -165,6 +170,7 @@ function workshopsDdl(): array {
     "create table if not exists workshop_signups (id text primary key,
       workshop_id text not null references workshop_events(id) on delete cascade,
       name text not null, email text, phone text, seats integer default 1, message text,
+      q_music text, q_challenge text, q_goal text,
       status text default 'angemeldet', created_at text)",
   ];
 }
@@ -885,16 +891,23 @@ function handlePortal(string $path, string $method, $body): never {
     if ($name === '' || $email === '') fail('Name und E-Mail erforderlich.');
     $seats = max(1, min(5, (int)($body['seats'] ?? 1)));
     $free = max(0, (int)$w['capacity'] - (int)$w['booked']);
-    if ($seats > $free) fail($free ? ($free === 1 ? 'Für diesen Termin ist nur noch 1 Platz frei.' : "Für diesen Termin sind nur noch $free Plätze frei.") : 'Dieser Termin ist leider ausgebucht.', 409);
-    $dup = $p->prepare("select count(*) from workshop_signups where workshop_id = ? and email = ? and status = 'angemeldet'");
+    $wantWaitlist = !empty($body['waitlist']);
+    if ($seats > $free && !$wantWaitlist)
+      fail($free ? ($free === 1 ? 'Für diesen Termin ist nur noch 1 Platz frei.' : "Für diesen Termin sind nur noch $free Plätze frei.") : 'Dieser Termin ist leider ausgebucht.', 409);
+    $status = ($seats > $free) ? 'warteliste' : 'angemeldet';
+    $dup = $p->prepare("select count(*) from workshop_signups where workshop_id = ? and email = ? and status in ('angemeldet','warteliste')");
     $dup->execute([$w['id'], $email]);
-    if ((int)$dup->fetchColumn()) fail('Mit dieser E-Mail-Adresse bist du für diesen Termin schon angemeldet.', 409);
-    $p->prepare('insert into workshop_signups (id, workshop_id, name, email, phone, seats, message, status, created_at)
-        values (?,?,?,?,?,?,?,?,?)')
+    if ((int)$dup->fetchColumn()) fail('Mit dieser E-Mail-Adresse bist du für diesen Termin schon angemeldet bzw. auf der Warteliste.', 409);
+    $p->prepare('insert into workshop_signups (id, workshop_id, name, email, phone, seats, message,
+        q_music, q_challenge, q_goal, status, created_at) values (?,?,?,?,?,?,?,?,?,?,?,?)')
       ->execute([uuid(), $w['id'], $name, $email,
         mb_substr(trim((string)($body['phone'] ?? '')), 0, 60), $seats,
-        mb_substr(trim((string)($body['message'] ?? '')), 0, 2000), 'angemeldet', now()]);
-    out(['ok' => true, 'free' => $free - $seats], 201);
+        mb_substr(trim((string)($body['message'] ?? '')), 0, 2000),
+        mb_substr(trim((string)($body['q_music'] ?? '')), 0, 1000),
+        mb_substr(trim((string)($body['q_challenge'] ?? '')), 0, 1000),
+        mb_substr(trim((string)($body['q_goal'] ?? '')), 0, 1000),
+        $status, now()]);
+    out(['ok' => true, 'status' => $status, 'free' => max(0, $free - ($status === 'angemeldet' ? $seats : 0))], 201);
   }
   /* Partner-Registrierung (DJs, Bands, Musiker, Techniker) */
   if ($path === 'portal/partner' && $method === 'POST') {

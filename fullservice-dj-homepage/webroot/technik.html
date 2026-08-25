@@ -327,7 +327,13 @@ footer a:hover{color:var(--acc)}
           <div><label>Telefon</label><input id="wsPhone"></div>
           <div><label>Plätze</label><select id="wsSeats"><option>1</option><option>2</option><option>3</option></select></div>
         </div>
-        <label>Nachricht (optional)</label><input id="wsNote" placeholder="z. B. Ich lege mit XDJ auf / spiele in einer Band …">
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
+          <div class="sml" style="color:var(--mut);margin-bottom:4px">Drei kurze Fragen, damit ich den Workshop auf euch zuschneiden kann:</div>
+          <label>Was machst du musikalisch? *</label><input id="wsQ1" placeholder="z. B. Ich lege Techno mit XDJ auf / spiele Gitarre in einer Coverband …">
+          <label>Wo liegt deine größte Herausforderung? *</label><input id="wsQ2" placeholder="z. B. Es pfeift, sobald ich das Mikro aufdrehe / mein Bass matscht …">
+          <label>Was willst du aus dem Workshop mitnehmen? *</label><input id="wsQ3" placeholder="z. B. Meine Anlage endlich selbst sauber einstellen können …">
+        </div>
+        <label>Nachricht (optional)</label><input id="wsNote" placeholder="Sonst noch etwas?">
         <div style="margin-top:16px;display:flex;gap:10px">
           <button class="btn" id="wsSend" onclick="sendWs()">Platz verbindlich reservieren</button>
           <button class="btn ghost" onclick="document.getElementById('wsForm').style.display='none'">Abbrechen</button>
@@ -550,35 +556,58 @@ function loadWorkshops(){
         '<div style="font-size:13px;color:var(--mut);margin-bottom:12px">'+(w.location?esc(w.location)+' · ':'')+
         (w.price_net!=null?euro2(w.price_net)+' p. P. · ':'')+
         (full?'<b style="color:var(--mut2)">ausgebucht</b>':'<b style="color:var(--acc)">'+w.free+' Plätze frei</b>')+'</div>'+
-        (full?'':'<button class="btn small" onclick="openWsForm('+i+')">Platz reservieren</button>')+
+        (full?'<button class="btn ghost small" onclick="openWsForm('+i+',true)">Auf die Warteliste</button>'
+             :'<button class="btn small" onclick="openWsForm('+i+')">Platz reservieren</button>')+
         '</div>';
-    }).join('');
+    }).join('')+
+    '<div style="background:transparent;border:1px dashed var(--line);border-radius:14px;padding:22px 20px;display:flex;flex-direction:column;justify-content:center">'+
+    '<h4 style="font-size:16px;margin-bottom:6px">🗓 Kein Termin passt?</h4>'+
+    '<p style="font-size:13px;color:var(--mut);margin-bottom:12px">Ab 3 Personen mache ich auch einen Sondertermin nur für eure Gruppe — Band, DJ-Crew oder Verein, Inhalte nach euren Themen.</p>'+
+    '<div><button class="btn ghost small" onclick="pickSondertermin()">Sondertermin anfragen</button></div></div>';
     document.getElementById('wsTermine').style.display='';
     document.getElementById('wsFallback').innerHTML='<a class="btn ghost" href="#anfrage" onclick="pickWorkshop()">Kein Termin passt? Anfragen</a>';
   }).catch(function(){});
 }
-function openWsForm(i){
-  wsSel=WS[i];
-  document.getElementById('wsFormTitle').textContent=wsSel.title+' — '+wsDate(wsSel);
+var wsWl=false;
+function openWsForm(i,wl){
+  wsSel=WS[i];wsWl=!!wl;
+  document.getElementById('wsFormTitle').textContent=wsSel.title+' — '+wsDate(wsSel)+(wsWl?' · Warteliste':'');
+  document.getElementById('wsSend').textContent=wsWl?'Auf die Warteliste setzen':'Platz verbindlich reservieren';
   var m=document.getElementById('wsMsg');m.style.display='none';
   var f=document.getElementById('wsForm');f.style.display='';
   f.scrollIntoView({behavior:'smooth',block:'center'});
 }
+function pickSondertermin(){
+  var f=document.getElementById('inqForm');
+  if(f&&f.event_type)f.event_type.value='Workshop besuchen';
+  if(f&&f.message&&!f.message.value)f.message.value='Sondertermin-Anfrage für unsere Gruppe ('+'Anzahl Personen?'+'). Was wir machen und welche Themen uns interessieren: ';
+  location.hash='#anfrage';
+}
 function sendWs(){
   var m=document.getElementById('wsMsg'),btn=document.getElementById('wsSend');
+  function err(t){m.style.display='block';m.className='msg err';m.innerHTML=t}
   var name=document.getElementById('wsName').value.trim(),mail=document.getElementById('wsMail').value.trim();
-  if(!name||!mail){m.style.display='block';m.className='msg err';m.textContent='Bitte Name und E-Mail angeben.';return}
+  if(!name||!mail){err('Bitte Name und E-Mail angeben.');return}
+  var q1=document.getElementById('wsQ1').value.trim(),q2=document.getElementById('wsQ2').value.trim(),q3=document.getElementById('wsQ3').value.trim();
+  if(!q1||!q2||!q3){err('Bitte beantworte kurz die drei Fragen — so kann ich den Workshop auf euch zuschneiden.');return}
   btn.disabled=true;
   fetch(API+'/portal/workshops/'+wsSel.id+'/signup',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({name:name,email:mail,phone:document.getElementById('wsPhone').value.trim(),
-      seats:Number(document.getElementById('wsSeats').value)||1,message:document.getElementById('wsNote').value.trim()})})
+      seats:Number(document.getElementById('wsSeats').value)||1,message:document.getElementById('wsNote').value.trim(),
+      q_music:q1,q_challenge:q2,q_goal:q3,waitlist:wsWl})})
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
+      if(res.s===409&&/Plätze|Platz frei|ausgebucht/.test(res.j.error||'')){
+        err(esc(res.j.error)+'<br><a onclick="wsWl=true;sendWs()" style="cursor:pointer;font-weight:600">→ Stattdessen auf die Warteliste setzen</a>');
+        return;
+      }
       if(res.s>=400)throw new Error(res.j.error||'Anmeldung fehlgeschlagen.');
       m.style.display='block';m.className='msg ok';
-      m.textContent='Platz reserviert ✓ Du bekommst eine Bestätigung per E-Mail. Bezahlung vor Ort oder per Rechnung.';
+      m.textContent=res.j.status==='warteliste'
+        ?'Du stehst auf der Warteliste ✓ Wird ein Platz frei, melde ich mich sofort bei dir.'
+        :'Platz reserviert ✓ Du bekommst eine Bestätigung per E-Mail. Bezahlung vor Ort oder per Rechnung.';
       loadWorkshops();
-    }).catch(function(e){m.style.display='block';m.className='msg err';m.textContent=e.message})
+    }).catch(function(e){err(esc(e.message))})
     .finally(function(){btn.disabled=false});
 }
 loadWorkshops();
