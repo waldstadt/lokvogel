@@ -142,3 +142,16 @@ postet sie nur noch auf Instagram). Timing-Logik:
   Elektroarbeiten am Hausnetz durch Partnerbetrieb".
 - Angebots-Idee: Wartungsvertrag als Produkt im Katalog (jährlich/halb-
   jährlich, Pauschale) — planbar, kündigt Kundenbindung an.
+
+## Erledigt im Nacht-Paket (2026-08-25)
+
+- ✅ GoBD: Rechnungen ab „versendet" festgeschrieben (serverseitig),
+  Änderungsprotokoll, Korrekturrechnungs-Flow, Storno statt Löschen.
+- ✅ Backup: Cron-URL für tägliche Snapshots (Einstellungen →
+  Datensicherung), Rotation 14 Stück, Download im Backoffice.
+- ✅ Mahnwesen light: Überfällig-Erkennung + Zahlungserinnerungs-Mail
+  per Klick (Vorlage anpassbar unter Vorlagen).
+- ✅ Neue E-Mail-Vorlagen: Zahlungserinnerung, Angebots-Begleitmail,
+  Workshop-Bestätigung.
+- ✅ Halloween-Minipage (halloween.html) — Kampagnenziel für Canva-
+  Anzeigen ab September; 31.10.2026 ist ein Samstag.

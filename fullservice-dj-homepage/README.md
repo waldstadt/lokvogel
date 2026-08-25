@@ -37,8 +37,20 @@ Beim ersten Aufruf legt `api.php` selbstständig an:
 3. Fertig. Homepage läuft unter `index.html`, alle Inhalte pflegst du im
    Backoffice unter „Inhalte“.
 
-**Backup:** einfach `data/dj.sqlite` und den `uploads/`-Ordner per FTP
-herunterladen — das ist der komplette Datenbestand.
+**Backup:** Zwei Wege:
+1. **Automatisch (empfohlen):** Im Backoffice unter Einstellungen →
+   Datensicherung steht eine Cron-URL. Bei All-Inkl (KAS → Tools →
+   Cronjobs) einen täglichen Cronjob auf diese URL anlegen — dann landet
+   jede Nacht ein komprimierter Datenbank-Snapshot in `data/backups/`
+   (die letzten 14 werden behalten, ältere automatisch gelöscht).
+   Regelmäßig ein Backup per Klick herunterladen (externe Kopie!).
+2. **Manuell:** `data/dj.sqlite` und den `uploads/`-Ordner per FTP
+   herunterladen — das ist der komplette Datenbestand.
+
+**GoBD:** Rechnungen sind ab dem Status „versendet" festgeschrieben —
+Inhalte lassen sich dann weder ändern noch löschen (serverseitig
+erzwungen). Änderungen laufen über Korrekturrechnung oder Storno; jede
+Anlage und jeder Statuswechsel steht im Änderungsprotokoll der Rechnung.
 
 ## Zugriffsmodell / Datenschutz
 

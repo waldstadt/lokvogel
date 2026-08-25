@@ -26,6 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
+const SCHEMA_VERSION = 14;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -47,7 +48,7 @@ const BOOL_COLS = [
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
-  'workshop_events','workshop_signups'];
+  'workshop_events','workshop_signups','doc_audit'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -82,7 +83,7 @@ function db(): PDO {
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
   ]);
   $pdo->exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;');
-  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=7'); }
+  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=' . SCHEMA_VERSION); }
   else upgrade($pdo);
   return $pdo;
 }
@@ -90,7 +91,7 @@ function db(): PDO {
 /* Schema-Upgrades für bereits vorhandene Datenbanken (idempotent) */
 function upgrade(PDO $p): void {
   $v = (int)$p->query('PRAGMA user_version')->fetchColumn();
-  if ($v >= 6) return;
+  if ($v >= SCHEMA_VERSION) return;
   if ($v < 2) foreach ([
     "alter table documents add column share_token text",
     "alter table document_items add column note text",
@@ -168,7 +169,58 @@ function upgrade(PDO $p): void {
     "alter table workshop_signups add column city text",
     "alter table workshop_signups add column invoice_id text",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
-  $p->exec('PRAGMA user_version=13');
+  if ($v < 14) {
+    try { $p->exec(docAuditDdl()); } catch (PDOException $e) {}
+    seedExtraTemplates($p);
+  }
+  $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
+}
+
+function docAuditDdl(): string {
+  return "create table if not exists doc_audit (id text primary key, document_id text,
+    user_email text, action text, detail text, created_at text)";
+}
+
+/* Änderungsprotokoll für Dokumente (GoBD) */
+function docAudit(PDO $p, ?string $docId, string $action, string $detail = ''): void {
+  $u = currentUser();
+  try {
+    $p->prepare('insert into doc_audit (id, document_id, user_email, action, detail, created_at) values (?,?,?,?,?,?)')
+      ->execute([uuid(), $docId, $u['email'] ?? 'system/portal', $action, mb_substr($detail, 0, 2000), now()]);
+  } catch (PDOException $e) {}
+}
+
+/* Festgeschrieben = Rechnungsartige Dokumente, die den Entwurfsstatus verlassen haben */
+function docLockedRow(array $d): bool {
+  return !in_array($d['doc_type'] ?? '', ['angebot', 'lieferschein'])
+    && ($d['status'] ?? 'entwurf') !== 'entwurf';
+}
+/* Positionen dürfen nur geändert werden, solange das zugehörige Dokument nicht festgeschrieben ist */
+function assertItemsUnlocked(PDO $p, string $wsql, array $args): void {
+  $st = $p->prepare("select distinct d.number, d.doc_type, d.status from documents d
+    where d.id in (select document_id from document_items" . ($wsql ?: '') . ")");
+  $st->execute($args);
+  foreach ($st->fetchAll() as $d) if (docLockedRow($d))
+    fail('Rechnung ' . $d['number'] . ' ist festgeschrieben (GoBD): Positionen können nicht mehr geändert werden.', 409);
+}
+
+/* Nachträgliche E-Mail-Vorlagen, nur wenn noch nicht vorhanden */
+function seedExtraTemplates(PDO $p): void {
+  $extra = [
+    [90, 'Zahlungserinnerung (freundlich)', 'Kleine Erinnerung: Rechnung {nr}',
+      "Hallo {vorname},\n\nich hoffe, es ist alles gut angekommen! Mir ist aufgefallen, dass die Rechnung {nr} über {betrag} (fällig am {faellig}) noch offen ist.\n\nBestimmt ist sie nur untergegangen — hier ist der Link zum Ansehen und als PDF:\n{link}\n\nFalls die Zahlung schon unterwegs ist: einfach ignorieren, dann hat sich das überschnitten.\n\nViele Grüße\nMarkus"],
+    [91, 'Angebots-Begleitmail', 'Euer Angebot ist fertig 🎉',
+      "Hallo {vorname},\n\ndanke für das gute Gespräch! Euer Angebot ist fertig und wartet hier auf euch:\n{link}\n\nIhr könnt es direkt online ansehen, Fragen zu einzelnen Positionen stellen oder mit einem Klick annehmen. Login ist eure Postleitzahl.\n\nWenn euch etwas nicht passt: sagt es mir einfach — wir biegen das hin.\n\nViele Grüße\nMarkus"],
+    [92, 'Workshop-Bestätigung (Zahlung eingegangen)', 'Dein Platz ist fix! 🎚',
+      "Hallo {vorname},\n\ndeine Zahlung ist da — damit ist dein Workshop-Platz verbindlich reserviert!\n\nWann: {datum}\nWo: Lager Hemer, Büttmecker Weg 35c\n\nBring gern dein eigenes Equipment-Problem mit — wir schauen uns echte Fälle an. Getränke gehen auf mich.\n\nBis bald!\nMarkus"],
+  ];
+  foreach ($extra as [$s, $n, $sub, $b]) {
+    $c = $p->prepare('select count(*) from email_templates where name = ?');
+    $c->execute([$n]);
+    if (!(int)$c->fetchColumn())
+      $p->prepare('insert into email_templates (id, sort, name, subject, body) values (?,?,?,?,?)')
+        ->execute([uuid(), $s, $n, $sub, $b]);
+  }
 }
 
 function workshopsDdl(): array {
@@ -282,7 +334,9 @@ SQL);
   $p->exec(rentalContractsDdl());
   $p->exec(friendsDdl());
   foreach (workshopsDdl() as $sql) $p->exec($sql);
+  $p->exec(docAuditDdl());
   seed($p);
+  seedExtraTemplates($p);
 }
 
 function seed(PDO $p): void {
@@ -657,6 +711,16 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       $items = is_array($body) && array_is_list($body) ? $body : [$body];
       $merge = in_array('resolution=merge-duplicates', $prefer);
       $pk = PK[$t] ?? 'id';
+      if ($t === 'document_items') {
+        $docIds = array_values(array_unique(array_filter(array_map(fn($r) => is_array($r) ? ($r['document_id'] ?? null) : null, $items))));
+        if ($docIds) {
+          $in = implode(',', array_fill(0, count($docIds), '?'));
+          $chk = $p->prepare("select number, doc_type, status from documents where id in ($in)");
+          $chk->execute($docIds);
+          foreach ($chk->fetchAll() as $d) if (docLockedRow($d))
+            fail('Rechnung ' . $d['number'] . ' ist festgeschrieben (GoBD): Positionen können nicht mehr geändert werden.', 409);
+        }
+      }
       $result = [];
       foreach ($items as $row) {
         if (!is_array($row)) fail('Ungültiger Body.');
@@ -674,6 +738,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         }
         try { $p->prepare($sql)->execute(array_values($row)); }
         catch (PDOException $e) { fail('Konflikt: ' . $e->getMessage(), 409); }
+        if ($t === 'documents') docAudit($p, $row['id'] ?? null, 'erstellt', ($row['number'] ?? '') . ' (' . ($row['doc_type'] ?? '') . ')');
         $result[] = decodeRow($t, array_map(fn($v) => $v, $row));
       }
       if (in_array('return=representation', $prefer)) {
@@ -688,12 +753,33 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
     case 'PATCH':
       if (!$where) fail('PATCH ohne Filter verweigert.', 400);
       $row = array_intersect_key(is_array($body) ? $body : [], array_flip(tableCols($t)));
-      if (in_array('updated_at', tableCols($t))) $row['updated_at'] = now();
       if (!$row) fail('Nichts zu ändern.');
+      /* GoBD: festgeschriebene Rechnungen — nur Status-/Versandfelder änderbar, Inhalte nie */
+      if ($t === 'documents') {
+        $chk = $p->prepare("select * from documents$wsql"); $chk->execute($args);
+        $before = $chk->fetchAll();
+        $allowed = ['status','paid_at','sent_at','share_token'];
+        foreach ($before as $b) {
+          if (docLockedRow($b) && array_diff(array_keys($row), $allowed))
+            fail('Rechnung ' . $b['number'] . ' ist festgeschrieben (GoBD): Inhalte können nach dem Versand nicht mehr geändert werden. Erstelle eine Korrekturrechnung oder storniere sie.', 409);
+        }
+      }
+      if ($t === 'document_items') assertItemsUnlocked($p, $wsql, $args);
+      if (in_array('updated_at', tableCols($t))) $row['updated_at'] = now();
       foreach ($row as $c => $v) $row[$c] = encodeVal($t, $c, $v);
       $set = implode(',', array_map(fn($c) => "\"$c\"=?", array_keys($row)));
       $st = $p->prepare("update \"$t\" set $set$wsql");
       $st->execute(array_merge(array_values($row), $args));
+      if ($t === 'documents' && !empty($before)) {
+        foreach ($before as $b) {
+          $changes = [];
+          foreach ($row as $c => $vNew) {
+            $old = $b[$c] ?? null;
+            if ((string)$old !== (string)$vNew && $c !== 'updated_at') $changes[] = "$c: " . ($old ?? '–') . ' → ' . ($vNew ?? '–');
+          }
+          if ($changes) docAudit($p, $b['id'], 'geändert', $b['number'] . ' · ' . implode(', ', $changes));
+        }
+      }
       if (in_array('return=representation', $prefer)) {
         $st = $p->prepare("select * from \"$t\"$wsql"); $st->execute($args);
         out(array_map(fn($r) => decodeRow($t, $r), $st->fetchAll()));
@@ -702,6 +788,15 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
 
     case 'DELETE':
       if (!$where) fail('DELETE ohne Filter verweigert.', 400);
+      if ($t === 'documents') {
+        $chk = $p->prepare("select * from documents$wsql"); $chk->execute($args);
+        foreach ($chk->fetchAll() as $b) {
+          if (docLockedRow($b))
+            fail('Rechnung ' . $b['number'] . ' ist festgeschrieben (GoBD) und kann nicht gelöscht werden — bitte stornieren.', 409);
+          docAudit($p, $b['id'], 'gelöscht', $b['number'] . ' (' . $b['doc_type'] . ', Entwurf)');
+        }
+      }
+      if ($t === 'document_items') assertItemsUnlocked($p, $wsql, $args);
       try { $st = $p->prepare("delete from \"$t\"$wsql"); $st->execute($args); }
       catch (PDOException $e) { fail('Löschen nicht möglich (verknüpfte Daten): ' . $e->getMessage(), 409); }
       out(null, 204);
@@ -859,6 +954,7 @@ function workshopInvoice(PDO $p, string $signupId): array {
         values (?,?,?,?,?,?,?)')
       ->execute([uuid(), $docId, 1, 'Workshop: ' . $dTitle . ' — Teilnahme', $seats, $seats > 1 ? 'Plätze' : 'Platz', $price]);
     $p->prepare('update workshop_signups set invoice_id = ? where id = ?')->execute([$docId, $signupId]);
+    docAudit($p, $docId, 'erstellt', $number . ' (rechnung, automatisch aus Workshop-Buchung)');
     $p->commit();
   } catch (Throwable $e) {
     $p->rollBack();
@@ -883,6 +979,36 @@ function workshopInvoice(PDO $p, string $signupId): array {
       'Workshop-Rechnung ' . $number . ($mailed ? ' automatisch versendet' : ' erstellt (Mailversand fehlgeschlagen — bitte manuell senden)'),
       'Workshop: ' . $dTitle . ' · ' . $seats . ' Platz/Plätze · ' . number_format($net + $tax, 2, ',', '.') . " €\nPortal-Link: $portal", now(), now()]);
   return ['ok' => true, 'number' => $number, 'mailed' => $mailed, 'portal' => $portal];
+}
+
+/* ---------- Backup ---------- */
+function backupKey(): string {
+  $p = db();
+  $row = $p->query("select value from settings where key='backup'")->fetchColumn();
+  $cfg = $row ? (json_decode($row, true) ?: []) : [];
+  if (empty($cfg['key'])) {
+    $cfg['key'] = bin2hex(random_bytes(16));
+    $p->prepare("insert into settings (key, value, updated_at) values ('backup', ?, ?)
+        on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
+      ->execute([json_encode($cfg), now()]);
+  }
+  return $cfg['key'];
+}
+function runBackup(): array {
+  $p = db();
+  $dir = DATA_DIR . '/backups';
+  if (!is_dir($dir)) mkdir($dir, 0755, true);
+  try { $p->exec('PRAGMA wal_checkpoint(TRUNCATE)'); } catch (PDOException $e) {}
+  $name = 'dj-' . gmdate('Ymd-Hi') . '.sqlite.gz';
+  $raw = file_get_contents(DB_FILE);
+  if ($raw === false) return ['ok' => false, 'error' => 'Datenbank nicht lesbar.'];
+  file_put_contents("$dir/$name", gzencode($raw, 6));
+  /* Rotation: die letzten 14 Snapshots behalten */
+  $files = glob("$dir/dj-*.sqlite.gz") ?: [];
+  sort($files);
+  $deleted = 0;
+  while (count($files) > 14) { @unlink(array_shift($files)); $deleted++; }
+  return ['ok' => true, 'file' => $name, 'size' => filesize("$dir/$name"), 'kept' => count($files), 'pruned' => $deleted];
 }
 
 function handlePortal(string $path, string $method, $body): never {
@@ -1124,6 +1250,34 @@ try {
   if (preg_match('#^workshop/([a-f0-9-]{30,40})/invoice$#', $path, $m) && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
     out(workshopInvoice(db(), $m[1]), 201);
+  }
+  /* Backups: Snapshot der SQLite-Datenbank nach data/backups (durch .htaccess geschützt).
+     cron/backup?key=… ist für den All-Inkl-Cronjob (Schlüssel aus den Einstellungen),
+     backup/run|list|get nur angemeldet. */
+  if ($path === 'cron/backup' && $method === 'GET') {
+    $key = (string)($_GET['key'] ?? '');
+    if ($key === '' || !hash_equals(backupKey(), $key)) { usleep(500000); fail('Ungültiger Schlüssel.', 401); }
+    out(runBackup());
+  }
+  if ($path === 'backup/run' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    out(runBackup());
+  }
+  if ($path === 'backup/list' && $method === 'GET') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $files = [];
+    foreach (glob(DATA_DIR . '/backups/dj-*.sqlite.gz') ?: [] as $f)
+      $files[] = ['name' => basename($f), 'size' => filesize($f), 'time' => gmdate('c', filemtime($f))];
+    usort($files, fn($a, $b) => strcmp($b['name'], $a['name']));
+    out(['key' => backupKey(), 'files' => $files]);
+  }
+  if (preg_match('#^backup/get/(dj-[0-9-]+\.sqlite\.gz)$#', $path, $m) && $method === 'GET') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $f = DATA_DIR . '/backups/' . $m[1];
+    if (!is_file($f)) fail('Backup nicht gefunden.', 404);
+    header('Content-Type: application/gzip');
+    header('Content-Disposition: attachment; filename="' . $m[1] . '"');
+    readfile($f); exit;
   }
   /* Ausweisfotos: liegen geschützt in data/ids, Abruf/Löschung nur angemeldet */
   if (preg_match('#^idfile/([a-f0-9-]{30,50}-(?:front|back)\.(?:jpg|png|webp))$#', $path, $m)) {

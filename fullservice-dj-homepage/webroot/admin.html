@@ -286,6 +286,7 @@ th.num{text-align:right}
     <div class="phead"><div><div class="pt">Rechnungen</div><div class="ps">inkl. Abschlags- und Schlussrechnungen</div></div>
       <div><button class="btn g" onclick="openDocEditor(null,'abschlag')">+ Abschlag</button>
       <button class="btn" onclick="openDocEditor(null,'rechnung')">+ Neue Rechnung</button></div></div>
+    <div id="invOverdue" class="sml" style="color:var(--red);margin-bottom:10px"></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Typ</th><th>Datum</th><th>Kunde</th><th class="num">Brutto</th><th>Fällig</th><th>Status</th></tr></thead><tbody id="invRows"></tbody></table></div>
   </div>
 
@@ -297,8 +298,9 @@ th.num{text-align:right}
         <button class="btn g sm" onclick="printDoc()">🖨 Drucken / PDF</button>
         <button class="btn g sm" onclick="shareDoc()">🔗 Kundenlink</button>
         <span id="docStatusBtns"></span>
-        <button class="btn sm" onclick="saveDoc()">💾 Speichern</button>
+        <button class="btn sm" id="docSaveBtn" onclick="saveDoc()">💾 Speichern</button>
       </div></div>
+    <div id="docLockNote" style="display:none;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--gll)">🔒 <b>Festgeschrieben (GoBD):</b> Diese Rechnung wurde versendet — Inhalte lassen sich nicht mehr ändern. Für Änderungen eine <a onclick="korrekturDoc()">Korrekturrechnung erstellen</a> oder die Rechnung stornieren. <a onclick="openAuditModal()" style="float:right">📜 Änderungsprotokoll</a></div>
     <div class="card">
       <div class="grid4">
         <div><label>Kunde *</label><select id="docCust"></select></div>
@@ -322,7 +324,7 @@ th.num{text-align:right}
       </div>
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
     </div>
-    <div class="card"><h3>Positionen <span style="float:right"><button class="btn g sm" onclick="openProductPicker()">📦 + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()">✨ + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button></span></h3>
+    <div class="card"><h3>Positionen <span style="float:right" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()">📦 + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()">✨ + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button></span></h3>
       <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel netto</div><div>Gesamt</div><div></div></div>
       <div id="docItems"></div>
       <div class="totals" id="docTotals"></div>
@@ -489,6 +491,12 @@ th.num{text-align:right}
           <textarea id="sRental" style="min-height:160px;font-size:11px"></textarea>
           <div class="mut sml" style="margin-top:6px">Erscheint auf jedem gedruckten Mietvertrag (Buchungs-Detail → „📄 Mietvertrag“). Vor Livegang anwaltlich prüfen lassen.</div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveRental()">Speichern</button></div>
+        </div>
+        <div class="card"><h3>Datensicherung <button class="btn sm" style="float:right" onclick="runBackupNow()">💾 Backup jetzt</button></h3>
+          <div class="sml mut" style="margin-bottom:8px">Snapshots der Datenbank landen geschützt in <code>data/backups/</code> (die letzten 14 werden behalten). Für automatische tägliche Sicherung: bei All-Inkl (KAS → Tools → Cronjobs) einen täglichen Cronjob auf diese URL anlegen:</div>
+          <input id="bkUrl" readonly onclick="this.select()" style="font-size:11px">
+          <div class="sml mut" style="margin:8px 0 4px">Wichtig: Backups liegen auf demselben Server — lade dir regelmäßig eins per Klick herunter (externe Kopie).</div>
+          <div id="bkList" class="sml mut">–</div>
         </div>
       </div>
     </div>
@@ -1180,8 +1188,13 @@ function renderInv(){
   document.getElementById('invRows').innerHTML=list.map(function(d){
     return '<tr class="click" onclick="openDocEditor(\''+d.id+'\')"><td><b>'+esc(d.number)+'</b></td><td>'+docTypeName(d.doc_type)+'</td><td>'+dt(d.doc_date)+'</td>'+
     '<td>'+esc(custName(d.customers))+'</td><td class="num">'+euro(Number(d.total_gross)-Number(d.deposit_deducted||0))+'</td><td>'+dt(d.due_date)+'</td>'+
-    '<td><span class="b '+docBadge(d.status)+'">'+d.status+'</span></td></tr>';
+    '<td>'+(isOverdue(d)?'<span class="b red">überfällig</span>':'<span class="b '+docBadge(d.status)+'">'+d.status+'</span>')+'</td></tr>';
   }).join('')||'<tr><td colspan="7" class="mut">Noch keine Rechnungen.</td></tr>';
+  var od=list.filter(isOverdue);
+  var el=document.getElementById('invOverdue');
+  if(el)el.innerHTML=od.length?('⚠ <b>'+od.length+'</b> überfällige Rechnung'+(od.length>1?'en':'')+' — insgesamt '+
+    euro(od.reduce(function(s,d){return s+Number(d.total_gross)-Number(d.deposit_deducted||0)},0))+
+    '. Öffne die Rechnung und nutze „✉ Zahlungserinnerung".'):'';
 }
 
 var curDoc=null,curItems=[];
@@ -1253,7 +1266,42 @@ function fillDocForm(){
   document.getElementById('docIntro').value=d.intro_text||'';
   document.getElementById('docOutro').value=d.outro_text||'';
   updateDocTypeUI(d.doc_type);
-  renderItems();renderStatusBtns();
+  renderItems();renderStatusBtns();applyDocLock();
+}
+function docLockedJs(d){return !!(d&&d.id&&['angebot','lieferschein'].indexOf(d.doc_type)<0&&d.status!=='entwurf')}
+function applyDocLock(){
+  var locked=docLockedJs(curDoc);
+  ['docType','docCust','docBook','docDate','docDate2','docTax','docMode','docDiscVal','docDiscType','docDep','docIntro','docOutro']
+    .forEach(function(i){var el=document.getElementById(i);if(el)el.disabled=locked});
+  document.querySelectorAll('#docItems input, #docItems select').forEach(function(el){el.disabled=locked});
+  document.getElementById('docSaveBtn').style.display=locked?'none':'';
+  document.getElementById('docAddBtns').style.display=locked?'none':'';
+  document.getElementById('docLockNote').style.display=locked?'':'none';
+}
+function korrekturDoc(){
+  var src=curDoc,items=curItems.map(function(it){return Object.assign({},it)});
+  openDocEditor(null,src.doc_type);
+  curDoc.customer_id=src.customer_id;curDoc.booking_id=src.booking_id;
+  curDoc.parent_id=src.id;
+  curDoc.tax_rate=src.tax_rate;curDoc.price_mode=src.price_mode;
+  curDoc.discount_value=src.discount_value;curDoc.discount_type=src.discount_type;
+  curDoc.intro_text='Korrektur zur Rechnung '+src.number+'. '+(src.intro_text||'');
+  curDoc.outro_text=src.outro_text;
+  curItems=items;
+  fillDocForm();
+  toast('Korrektur-Entwurf angelegt — Original '+src.number+' ggf. noch stornieren.');
+}
+function openAuditModal(){
+  if(!curDoc.id)return;
+  api('doc_audit?document_id=eq.'+curDoc.id+'&order=created_at.desc').then(function(rows){
+    openModal('Änderungsprotokoll — '+esc(curDoc.number),
+      (rows&&rows.length?rows.map(function(a){
+        return '<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)" class="sml">'+
+        '<span class="mut">'+new Date(a.created_at).toLocaleString('de-DE')+' · '+esc(a.user_email||'')+'</span><br>'+
+        '<b>'+esc(a.action)+'</b> — '+esc(a.detail||'')+'</div>';
+      }).join(''):'<span class="mut sml">Keine Einträge.</span>')+
+      '<div class="mut sml" style="margin-top:10px">Automatisch geführt (GoBD): Anlage, Statuswechsel und Änderungsversuche.</div>');
+  }).catch(function(e){toast(e.message,1)});
 }
 function renderStatusBtns(){
   var d=curDoc,btns='';
@@ -1267,8 +1315,37 @@ function renderStatusBtns(){
     btns+='<button class="btn g sm" onclick="docToInvoice(\'abschlag\')">→ Abschlag</button> <button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button> ';
   if(d.doc_type==='abschlag'&&d.status==='bezahlt')
     btns+='<button class="btn g sm" onclick="docToInvoice(\'schluss\')">→ Schlussrechnung</button> ';
+  if(d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
+    btns+='<button class="btn g sm" onclick="composeReminderMail()">✉ Zahlungserinnerung</button> ';
   if(d.status!=='storniert')btns+='<button class="btn g sm" onclick="setDocStatus(\'storniert\')">Storno</button> ';
   document.getElementById('docStatusBtns').innerHTML=btns;
+}
+function isOverdue(d){
+  return d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'&&d.status==='versendet'
+    &&d.due_date&&d.due_date<new Date().toISOString().slice(0,10);
+}
+function composeReminderMail(){
+  var d=curDoc,cust=CACHE.customers.find(function(c){return c.id===d.customer_id})||{};
+  var tpl=(CACHE.tpls||[]).find(function(t){return /zahlungserinnerung/i.test(t.name)})||{subject:'Kleine Erinnerung: Rechnung {nr}',body:''};
+  var link=d.share_token?portalUrl('a',d.share_token):'(erst „Kundenlink“ erzeugen)';
+  var map={'{vorname}':cust.first_name||'','{name}':custName(cust),'{nr}':d.number,
+    '{betrag}':euro(d.total_gross),'{faellig}':dt(d.due_date),'{link}':link,'{datum}':dt(d.due_date)};
+  var fill=function(s){return (s||'').replace(/\{vorname\}|\{name\}|\{nr\}|\{betrag\}|\{faellig\}|\{link\}|\{datum\}/g,function(m){return map[m]!==undefined?map[m]:m})};
+  var subj=fill(tpl.subject),body=fill(tpl.body);
+  openModal('Zahlungserinnerung — '+esc(d.number),
+    '<label>An</label><input id="remTo" value="'+esc(cust.email||'')+'">'+
+    '<label>Betreff</label><input id="remSubject" value="'+esc(subj)+'">'+
+    '<label>Text</label><textarea id="remBody" style="min-height:220px">'+esc(body)+'</textarea>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="sendReminder()">📧 Im Mailprogramm öffnen</button></div>'+
+    '<div class="mut sml" style="margin-top:8px">Öffnet deine Mail-App mit fertigem Text — kurz prüfen, absenden, fertig. Der Vorgang wird in der Kunden-Timeline vermerkt.</div>');
+}
+function sendReminder(){
+  var d=curDoc,to=v('remTo');
+  api('communications',{method:'POST',body:{customer_id:d.customer_id,channel:'email',direction:'out',
+    subject:'Zahlungserinnerung '+d.number,content:document.getElementById('remBody').value,occurred_at:new Date().toISOString()}})
+    .then(function(){closeModal();
+      location.href='mailto:'+to+'?subject='+encodeURIComponent(v('remSubject'))+'&body='+encodeURIComponent(document.getElementById('remBody').value);
+    }).catch(function(e){toast(e.message,1)});
 }
 function setDocStatus(st){
   var patch={status:st};
@@ -1277,22 +1354,23 @@ function setDocStatus(st){
   api('documents?id=eq.'+curDoc.id,{method:'PATCH',body:patch}).then(function(){
     curDoc.status=st;toast('Status: '+st+' ✓');
     document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(st)+'">'+st+'</span>';
-    renderStatusBtns();refreshDocs();
+    renderStatusBtns();renderItems();applyDocLock();refreshDocs();
   }).catch(function(e){toast(e.message,1)});
 }
 function refreshDocs(){api('documents?select=*,customers(*)&order=created_at.desc').then(function(r){CACHE.documents=r||[];renderQuotes();renderInv();renderDash()})}
 
 function renderItems(){
+  var locked=docLockedJs(curDoc);
   document.getElementById('docItems').innerHTML=curItems.map(function(it,i){
     var sum=lineTotal(it);
-    return '<div style="margin-bottom:10px" ondragover="itDragOver(event)" ondrop="itDrop('+i+',event)"><div class="it-row" style="margin-bottom:3px">'+
-    '<div draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren" style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:grab;color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none"><span style="opacity:.55">⠿</span>'+(i+1)+'</div>'+
+    return '<div style="margin-bottom:10px"'+(locked?'':' ondragover="itDragOver(event)" ondrop="itDrop('+i+',event)"')+'><div class="it-row" style="margin-bottom:3px">'+
+    '<div'+(locked?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':'grab')+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked?'':'<span style="opacity:.55">⠿</span>')+(i+1)+'</div>'+
     '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
     '<input type="number" step="0.5" value="'+it.qty+'" oninput="itSet('+i+',\'qty\',this.value)">'+
     '<input value="'+esc(it.unit||'Stk.')+'" oninput="itSet('+i+',\'unit\',this.value)">'+
     '<input type="number" step="0.01" value="'+it.unit_price+'" oninput="itSet('+i+',\'unit_price\',this.value)">'+
     '<input value="'+euro(sum)+'" disabled class="num">'+
-    '<a onclick="itDel('+i+')" style="color:var(--red)">✕</a></div>'+
+    (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)">✕</a>')+'</div>'+
     '<div style="padding-left:42px;padding-right:34px;display:flex;gap:6px">'+
     '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="ℹ Erklärung für das Kundenportal (erscheint beim Drüberfahren) — optional" style="font-size:10px;padding:5px 8px;color:var(--gll)">'+
     '<input type="number" step="0.01" value="'+(it.discount_value||0)+'" oninput="itSet('+i+',\'discount_value\',this.value)" title="Rabatt auf diese Position" style="width:74px;font-size:10px;padding:5px 8px" placeholder="Rabatt">'+
@@ -1348,7 +1426,7 @@ function saveDoc(){
   var body={doc_type:type,customer_id:custId,booking_id:v('docBook')||null,doc_date:v('docDate'),
     tax_rate:c.rate,is_small_business:c.rate===0&&!!(S.company&&S.company.small_business),
     intro_text:v('docIntro'),outro_text:v('docOutro'),
-    price_mode:v('docMode'),discount_value:c.discVal,discount_type:c.discType,
+    price_mode:v('docMode'),discount_value:c.discVal,discount_type:c.discType,parent_id:curDoc.parent_id||null,
     total_net:c.net,total_tax:c.tax,total_gross:c.gross,deposit_deducted:type==='schluss'?c.dep:0};
   body[type==='angebot'?'valid_until':'due_date']=v('docDate2')||null;
   var p;
@@ -2082,6 +2160,30 @@ function saveFriend(id){
     .then(function(){closeModal();toast('Gespeichert ✓');reloadFriends()}).catch(function(e){toast(e.message,1)});
 }
 function reloadFriends(){api('friends?select=*&order=sort').then(function(r){CACHE.friends=r||[];renderFriendAdmin()})}
+
+/* ===== Datensicherung ===== */
+function fmtBytes(b){return b>1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB'}
+function loadBackups(){
+  fetch('api.php/backup/list',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(j){
+    if(!j||!j.key)return;
+    document.getElementById('bkUrl').value=location.origin+location.pathname.replace(/[^\/]*$/,'')+'api.php/cron/backup?key='+j.key;
+    document.getElementById('bkList').innerHTML=(j.files&&j.files.length)?j.files.map(function(f){
+      return '<div style="padding:4px 0">📦 <a onclick="dlBackup(\''+f.name+'\')">'+f.name+'</a> <span class="mut">('+fmtBytes(f.size)+')</span></div>';
+    }).join(''):'Noch keine Backups — „Backup jetzt" klicken oder Cronjob einrichten.';
+  }).catch(function(){});
+}
+function runBackupNow(){
+  fetch('api.php/backup/run',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){return r.json()})
+    .then(function(j){if(j.ok){toast('Backup erstellt ✓ ('+j.file+')');loadBackups()}else toast(j.error||'Backup fehlgeschlagen',1)})
+    .catch(function(e){toast(e.message,1)});
+}
+function dlBackup(name){
+  fetch('api.php/backup/get/'+name,{headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){if(!r.ok)throw new Error('Download fehlgeschlagen');return r.blob()})
+    .then(function(bl){var a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=name;a.click()})
+    .catch(function(e){toast(e.message,1)});
+}
 function renderCmsReload(){
   Promise.all([api('packages?select=*&order=sort'),api('faq?select=*&order=sort')]).then(function(r){
     CACHE.packages=r[0]||[];CACHE.faq=r[1]||[];renderPackAdmin();renderFaqAdmin()});
@@ -2089,6 +2191,7 @@ function renderCmsReload(){
 
 /* ===== Einstellungen ===== */
 function renderSet(){
+  loadBackups();
   var c=S.company||{},n=S.numbering||{},d=S.defaults||{};
   document.getElementById('sName').value=c.name||'';
   document.getElementById('sOwner').value=c.owner||'';
