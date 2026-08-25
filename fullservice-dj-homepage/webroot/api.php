@@ -35,7 +35,8 @@ const JSON_COLS = [
 ];
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'],
-  'upsells' => ['active','show_portal'],
+  'upsells' => ['active','show_portal'], 'reviews' => ['public'],
+  'bookings' => ['review_requested'],
   'equipment' => ['public','rentable'],
   'booking_equipment' => ['out_done','back_done'],
   'communications' => ['followup_done'],
@@ -43,11 +44,11 @@ const BOOL_COLS = [
 ];
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
-  'doc_events','form_templates','forms','upsells'];
+  'doc_events','form_templates','forms','upsells','reviews'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
-const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations'];
+const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews'];
 const INQUIRY_FIELDS = ['name','email','phone','event_type','event_date','location','guests','message'];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -78,7 +79,7 @@ function db(): PDO {
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
   ]);
   $pdo->exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;');
-  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=3'); }
+  if ($init) { migrate($pdo); $pdo->exec('PRAGMA user_version=4'); }
   else upgrade($pdo);
   return $pdo;
 }
@@ -86,8 +87,8 @@ function db(): PDO {
 /* Schema-Upgrades für bereits vorhandene Datenbanken (idempotent) */
 function upgrade(PDO $p): void {
   $v = (int)$p->query('PRAGMA user_version')->fetchColumn();
-  if ($v >= 2) return;
-  foreach ([
+  if ($v >= 4) return;
+  if ($v < 2) foreach ([
     "alter table documents add column share_token text",
     "alter table document_items add column note text",
     "create table if not exists doc_events (id text primary key,
@@ -99,12 +100,22 @@ function upgrade(PDO $p): void {
       intro text, fields text default '[]', answers text, status text default 'offen',
       inquiry_id text, customer_id text, created_at text, submitted_at text)",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
-  if (!(int)$p->query("select count(*) from form_templates")->fetchColumn()) seedFormTemplates($p);
-  try { $p->exec("create table if not exists upsells (id text primary key, sort integer default 0,
-    title text not null, description text, price_net real default 0, occasions text,
-    active integer default 1, show_portal integer default 1, created_at text)"); } catch (PDOException $e) {}
-  if (!(int)$p->query("select count(*) from upsells")->fetchColumn()) seedUpsells($p);
-  $p->exec('PRAGMA user_version=3');
+  if ($v < 2 && !(int)$p->query("select count(*) from form_templates")->fetchColumn()) seedFormTemplates($p);
+  if ($v < 3) {
+    try { $p->exec("create table if not exists upsells (id text primary key, sort integer default 0,
+      title text not null, description text, price_net real default 0, occasions text,
+      active integer default 1, show_portal integer default 1, created_at text)"); } catch (PDOException $e) {}
+    if (!(int)$p->query("select count(*) from upsells")->fetchColumn()) seedUpsells($p);
+  }
+  if ($v < 4) foreach ([
+    "create table if not exists reviews (id text primary key, sort integer default 0, author text not null,
+      event_type text, text text not null, rating integer default 5,
+      source text default 'google', review_date text, public integer default 1, created_at text)",
+    "alter table bookings add column review_requested integer default 0",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+  if ($v < 4) try { $p->prepare("insert into site_content (key,value,updated_at) values ('reviews',?,?)")
+    ->execute(['{"google_url":"","djbande_url":"","tagline":""}', now()]); } catch (PDOException $e) {}
+  $p->exec('PRAGMA user_version=4');
 }
 
 function migrate(PDO $p): void {
@@ -141,7 +152,7 @@ create table bookings (id text primary key,
   status text default 'anfrage', kind text default 'dj', event_type text, title text,
   event_date text not null, end_date text, start_time text, end_time text,
   venue_name text, venue_address text, guests integer, fee_net real, notes text,
-  created_at text, updated_at text);
+  review_requested integer default 0, created_at text, updated_at text);
 create table booking_equipment (id text primary key,
   booking_id text not null references bookings(id) on delete cascade,
   equipment_id text not null references equipment(id) on delete restrict,
@@ -156,6 +167,9 @@ create table documents (id text primary key, share_token text, doc_type text not
   deposit_deducted real default 0, sent_at text, paid_at text, created_at text, updated_at text);
 create table email_templates (id text primary key, sort integer default 0, name text not null,
   subject text, body text, created_at text);
+create table reviews (id text primary key, sort integer default 0, author text not null,
+  event_type text, text text not null, rating integer default 5,
+  source text default 'google', review_date text, public integer default 1, created_at text);
 create table upsells (id text primary key, sort integer default 0, title text not null,
   description text, price_net real default 0, occasions text,
   active integer default 1, show_portal integer default 1, created_at text);
@@ -210,6 +224,7 @@ function seed(PDO $p): void {
     ['tech_teaser', '{"title":"Lauschgift Veranstaltungstechnik","text":"Ihr braucht keinen DJ, sondern Technik? Ton- und Lichttechnik zum Mieten direkt aus meinem Lager in Hemer – oder mich als Techniker inklusive Equipment. Das ist ein eigenes Gewerk mit eigener Seite."}'],
     ['contact', '{"title":"Kontakt","phone":"01523 6439373","email":"","address":"Büttmecker Weg 35c, 58675 Hemer","instagram":"","whatsapp":""}'],
     ['theme', '{"preset":"koralle","primary":"#ff6f5b","bg":"#0f1012","font":"Space Grotesk"}'],
+    ['reviews', '{"google_url":"","djbande_url":"","tagline":""}'],
     ['seo', '{"title":"DJ Lauschgift – Hochzeits-DJ & Event-DJ | Deutschlandweit","description":"DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer."}'],
     ['legal', json_encode([
       'impressum' => "Angaben gemäß § 5 DDG\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\n\nTelefon: 01523 6439373\nE-Mail: (bitte im Backoffice ergänzen)\n\nUmsatzsteuer: (Steuernummer / USt-IdNr. bitte im Backoffice ergänzen)\n\nVerantwortlich für den Inhalt: Markus Jankowski (Anschrift wie oben)",
@@ -257,7 +272,9 @@ Danach bekommt ihr von mir ein Angebot mit klaren Posten für Dauer und Technik.
 Wann erreiche ich euch am besten? Oder ruft mich einfach direkt an.
 
 Viele Grüße
-Markus Jankowski – DJ Lauschgift"],
+Markus Jankowski – DJ Lauschgift
+
+PS: Was andere Paare über ihre Feier mit mir sagen, lest ihr hier: {bewertungen}"],
     [2, 'Geburtstag / private Feier – Erstantwort', 'Eure Feier am {datum} – Rückmeldung von DJ Lauschgift',
 "Hallo {vorname},
 
@@ -270,7 +287,9 @@ Am einfachsten telefonieren wir einmal kurz (15 Minuten reichen), dann klären w
 Wann passt es euch am besten?
 
 Viele Grüße
-Markus Jankowski – DJ Lauschgift"],
+Markus Jankowski – DJ Lauschgift
+
+PS: Was andere über ihre Feier mit mir sagen, lest ihr hier: {bewertungen}"],
     [3, 'Firmenfeier – Erstantwort', 'Ihre Veranstaltung am {datum} – Rückmeldung von DJ Lauschgift',
 "Guten Tag {name},
 
@@ -283,7 +302,9 @@ Für Veranstaltungen unter der Woche oder tagsüber kalkuliere ich übrigens sp�
 Wann darf ich Sie am besten anrufen?
 
 Mit freundlichen Grüßen
-Markus Jankowski – DJ Lauschgift"],
+Markus Jankowski – DJ Lauschgift
+
+PS: Stimmen bisheriger Kunden finden Sie hier: {bewertungen}"],
     [4, 'Technik-Anfrage – Erstantwort', 'Eure Technik-Anfrage – Lauschgift Veranstaltungstechnik',
 "Hallo {vorname},
 
@@ -298,6 +319,20 @@ Damit ich euch Verfügbarkeit und Preis nennen kann, brauche ich nur noch:
 
 Viele Grüße
 Markus Jankowski – Lauschgift Veranstaltungstechnik"],
+    [6, 'Nach der Feier – Danke & Bewertung',
+     'Danke für eure Feier am {datum}! 🎉',
+"Hallo {vorname},
+
+was für ein Abend! Vielen Dank, dass ich eure Feier begleiten durfte – ihr wart ein großartiges Publikum, und ich hoffe, ihr habt genauso viel Spaß gehabt wie ich.
+
+Eine kleine Bitte zum Schluss: Bewertungen sind für mich als selbstständigen DJ das Wichtigste überhaupt – sie entscheiden darüber, ob andere Paare und Gastgeber mich finden. Wenn ihr zwei Minuten Zeit habt, würde ich mich riesig über ein paar ehrliche Zeilen freuen:
+
+{bewertungen}
+
+Und falls euch später noch etwas einfällt (Fotos, Fragen, die nächste Feier 😉): Meldet euch jederzeit.
+
+Viele Grüße und alles Gute
+Markus Jankowski – DJ Lauschgift"],
     [5, 'Termin belegt – DJ-Vermittlung', 'Euer Termin am {datum} – ich habe trotzdem eine Lösung für euch',
 "Hallo {vorname},
 
@@ -588,6 +623,7 @@ function handlePortal(string $path, string $method, $body): never {
       'items' => $it->fetchAll(),
       'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city','iban','bic','bank','tax_id'])),
       'upsells' => $ups,
+      'reviews' => json_decode($p->query("select value from site_content where key='reviews'")->fetchColumn() ?: '{}', true),
     ]);
   }
   if (preg_match('#^portal/offer/([a-f0-9]+)/action$#', $path, $m) && $method === 'POST') {

@@ -94,6 +94,17 @@ nav.scrolled{border-bottom-color:var(--line)}
 .about-img .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut2);font-size:44px}
 @media(max-width:820px){.about-grid{grid-template-columns:1fr}.about-img{aspect-ratio:16/10}}
 
+/* Bewertungen */
+.rev-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:40px}
+.rev{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 24px;display:flex;flex-direction:column}
+.rev .stars{color:#f5b942;font-size:15px;letter-spacing:2px;margin-bottom:10px}
+.rev p{font-size:14px;color:var(--mut);flex:1;margin-bottom:14px}
+.rev .who{font-size:13px;font-weight:600}
+.rev .src{font-size:11px;color:var(--mut2)}
+.rev-links{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
+.rev-links a{display:inline-flex;align-items:center;gap:6px;font-size:13px;border:1px solid var(--line);border-radius:20px;padding:8px 16px;color:var(--mut);transition:border-color .2s,color .2s}
+.rev-links a:hover{border-color:var(--acc);color:var(--acc)}
+
 /* Preisbeispiele */
 .ex-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;margin-top:22px}
 .ex{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 24px}
@@ -234,6 +245,18 @@ footer a:hover{color:var(--acc)}
       <h2 id="aboutTitle">Musik ist mein Ding. Der Mittelpunkt gehört euch.</h2>
       <p class="lead" id="aboutText">Nach 23 Jahren hinter den Decks ist jede Feier immer noch anders – und genau das macht es aus. Ich bin kein DJ, der sich selbst inszeniert: Ich lese den Raum, spiele den richtigen Song zur richtigen Zeit und bleibe den ganzen Abend ansprechbar für euch und eure Gäste. Und weil ich ein echter Technik-Mensch bin, stehen Ton und Licht bei mir auf einem Niveau, das man sonst von deutlich größeren Produktionen kennt.</p>
     </div>
+  </div>
+</section>
+
+<section id="bewertungen" style="display:none;background:var(--bg2)">
+  <div class="wrap">
+    <div class="reveal vis">
+      <div class="kicker">Bewertungen</div>
+      <h2 id="revTitle">Das sagen die, die schon gefeiert haben</h2>
+      <p class="lead" id="revTagline"></p>
+    </div>
+    <div class="rev-grid" id="revGrid"></div>
+    <div class="rev-links" id="revLinks"></div>
   </div>
 </section>
 
@@ -479,6 +502,16 @@ function applyContent(rows){
     if(c.guarantee.text)document.getElementById('gText').textContent=c.guarantee.text;
   }
   if(c.legal)LEGAL=c.legal;
+  if(c.reviews){
+    if(c.reviews.tagline)document.getElementById('revTagline').textContent=c.reviews.tagline;
+    var links='';
+    var SRC_LBL={google_url:'★ Alle Google-Bewertungen lesen',djbande_url:'★ Bewertungen bei meiner Partner-Agentur'};
+    ['google_url','djbande_url'].forEach(function(k){
+      if(c.reviews[k])links+='<a href="'+esc(c.reviews[k])+'" target="_blank" rel="noopener">'+SRC_LBL[k]+' ↗</a>';
+    });
+    document.getElementById('revLinks').innerHTML=links;
+    if(links)document.getElementById('bewertungen').style.display='';
+  }
   if(c.seo){
     if(c.seo.title)document.title=c.seo.title;
     if(c.seo.description){var m=document.querySelector('meta[name=description]');if(m)m.content=c.seo.description}
@@ -495,6 +528,18 @@ function closeLegal(){document.getElementById('legalBg').style.display='none';do
 sfetch('site_content?select=key,value').then(applyContent).catch(function(){});
 sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderPacks(r)}).catch(function(){});
 sfetch('faq?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderFaq(r)}).catch(function(){});
+var SRC_NAME={google:'Google-Bewertung','dj-bande':'Bewertung über die Partner-Agentur',direkt:'Kundenstimme'};
+sfetch('reviews?select=*&public=eq.true&order=sort').then(function(r){
+  if(!r.length)return;
+  document.getElementById('revGrid').innerHTML=r.map(function(rv){
+    var stars='★★★★★'.slice(0,Math.max(1,Math.min(5,rv.rating||5)));
+    return '<div class="rev reveal vis"><div class="stars">'+stars+'</div>'+
+      '<p>„'+esc(rv.text)+'“</p>'+
+      '<div class="who">'+esc(rv.author)+(rv.event_type?' · '+esc(rv.event_type):'')+'</div>'+
+      '<div class="src">'+(SRC_NAME[rv.source]||esc(rv.source||''))+(rv.review_date?' · '+esc(rv.review_date):'')+'</div></div>';
+  }).join('');
+  document.getElementById('bewertungen').style.display='';
+}).catch(function(){});
 sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
   if(!r.length)return;
   document.getElementById('locGrid').innerHTML=r.map(function(l){

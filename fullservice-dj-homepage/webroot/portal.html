@@ -158,6 +158,15 @@ function renderOffer(){
         '<button class="btn g" onclick="askUpsell(\''+u.id+'\',this)">Interessiert mich</button></div>';
       }).join('')+'</div></div>':'')+
     (d.outro_text?'<div class="card"><p style="white-space:pre-wrap" class="sub">'+esc(d.outro_text)+'</p></div>':'')+
+    (function(){
+      var rv=DOC.reviews||{};if(!rv.google_url&&!rv.djbande_url)return '';
+      var l='';
+      if(rv.google_url)l+='<a href="'+esc(rv.google_url)+'" target="_blank" rel="noopener" style="margin-right:14px">★ Google-Bewertungen ↗</a>';
+      if(rv.djbande_url)l+='<a href="'+esc(rv.djbande_url)+'" target="_blank" rel="noopener">★ Agentur-Bewertungen ↗</a>';
+      return '<div class="card" style="padding:16px 24px;font-size:13px;color:var(--mut)">'+
+        (rv.tagline?'<b style="color:var(--txt)">'+esc(rv.tagline)+'</b> — ':'')+
+        'Ihr wollt wissen, wie andere ihre Feier mit mir erlebt haben? '+l+'</div>';
+    })()+
     '<div class="card" id="actionCard">'+
     (decided?
       '<p class="sub">'+(d.status==='angenommen'?'Ich melde mich zeitnah bei euch mit den nächsten Schritten. Wenn euch noch etwas einfällt, schreibt mir hier:':'Ihr habt Fragen oder wollt doch nochmal sprechen? Schreibt mir gerne:')+'</p>'+
