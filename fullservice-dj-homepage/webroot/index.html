@@ -505,10 +505,7 @@ function applyContent(rows){
   if(c.reviews){
     if(c.reviews.tagline)document.getElementById('revTagline').textContent=c.reviews.tagline;
     var links='';
-    var SRC_LBL={google_url:'★ Alle Google-Bewertungen lesen',djbande_url:'★ Bewertungen bei meiner Partner-Agentur'};
-    ['google_url','djbande_url'].forEach(function(k){
-      if(c.reviews[k])links+='<a href="'+esc(c.reviews[k])+'" target="_blank" rel="noopener">'+SRC_LBL[k]+' ↗</a>';
-    });
+    if(c.reviews.google_url)links='<a href="'+esc(c.reviews.google_url)+'" target="_blank" rel="noopener">★ Alle Google-Bewertungen lesen ↗</a>';
     document.getElementById('revLinks').innerHTML=links;
     if(links)document.getElementById('bewertungen').style.display='';
   }
@@ -528,7 +525,7 @@ function closeLegal(){document.getElementById('legalBg').style.display='none';do
 sfetch('site_content?select=key,value').then(applyContent).catch(function(){});
 sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderPacks(r)}).catch(function(){});
 sfetch('faq?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderFaq(r)}).catch(function(){});
-var SRC_NAME={google:'Google-Bewertung','dj-bande':'Bewertung über die Partner-Agentur',direkt:'Kundenstimme'};
+var SRC_NAME={google:'Google-Bewertung',direkt:'Kundenstimme'};
 sfetch('reviews?select=*&public=eq.true&order=sort').then(function(r){
   if(!r.length)return;
   document.getElementById('revGrid').innerHTML=r.map(function(rv){

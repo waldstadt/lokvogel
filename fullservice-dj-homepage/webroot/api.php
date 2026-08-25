@@ -114,7 +114,7 @@ function upgrade(PDO $p): void {
     "alter table bookings add column review_requested integer default 0",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   if ($v < 4) try { $p->prepare("insert into site_content (key,value,updated_at) values ('reviews',?,?)")
-    ->execute(['{"google_url":"","djbande_url":"","tagline":""}', now()]); } catch (PDOException $e) {}
+    ->execute(['{"google_url":"","tagline":""}', now()]); } catch (PDOException $e) {}
   $p->exec('PRAGMA user_version=4');
 }
 
@@ -224,7 +224,7 @@ function seed(PDO $p): void {
     ['tech_teaser', '{"title":"Lauschgift Veranstaltungstechnik","text":"Ihr braucht keinen DJ, sondern Technik? Ton- und Lichttechnik zum Mieten direkt aus meinem Lager in Hemer – oder mich als Techniker inklusive Equipment. Das ist ein eigenes Gewerk mit eigener Seite."}'],
     ['contact', '{"title":"Kontakt","phone":"01523 6439373","email":"","address":"Büttmecker Weg 35c, 58675 Hemer","instagram":"","whatsapp":""}'],
     ['theme', '{"preset":"koralle","primary":"#ff6f5b","bg":"#0f1012","font":"Space Grotesk"}'],
-    ['reviews', '{"google_url":"","djbande_url":"","tagline":""}'],
+    ['reviews', '{"google_url":"","tagline":""}'],
     ['seo', '{"title":"DJ Lauschgift – Hochzeits-DJ & Event-DJ | Deutschlandweit","description":"DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer."}'],
     ['legal', json_encode([
       'impressum' => "Angaben gemäß § 5 DDG\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\n\nTelefon: 01523 6439373\nE-Mail: (bitte im Backoffice ergänzen)\n\nUmsatzsteuer: (Steuernummer / USt-IdNr. bitte im Backoffice ergänzen)\n\nVerantwortlich für den Inhalt: Markus Jankowski (Anschrift wie oben)",

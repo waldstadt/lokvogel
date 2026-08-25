@@ -159,13 +159,11 @@ function renderOffer(){
       }).join('')+'</div></div>':'')+
     (d.outro_text?'<div class="card"><p style="white-space:pre-wrap" class="sub">'+esc(d.outro_text)+'</p></div>':'')+
     (function(){
-      var rv=DOC.reviews||{};if(!rv.google_url&&!rv.djbande_url)return '';
-      var l='';
-      if(rv.google_url)l+='<a href="'+esc(rv.google_url)+'" target="_blank" rel="noopener" style="margin-right:14px">★ Google-Bewertungen ↗</a>';
-      if(rv.djbande_url)l+='<a href="'+esc(rv.djbande_url)+'" target="_blank" rel="noopener">★ Agentur-Bewertungen ↗</a>';
+      var rv=DOC.reviews||{};if(!rv.google_url)return '';
       return '<div class="card" style="padding:16px 24px;font-size:13px;color:var(--mut)">'+
         (rv.tagline?'<b style="color:var(--txt)">'+esc(rv.tagline)+'</b> — ':'')+
-        'Ihr wollt wissen, wie andere ihre Feier mit mir erlebt haben? '+l+'</div>';
+        'Ihr wollt wissen, wie andere ihre Feier mit mir erlebt haben? '+
+        '<a href="'+esc(rv.google_url)+'" target="_blank" rel="noopener">★ Google-Bewertungen ↗</a></div>';
     })()+
     '<div class="card" id="actionCard">'+
     (decided?
