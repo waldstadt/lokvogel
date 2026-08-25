@@ -233,7 +233,8 @@ th.num{text-align:right}
       <div><button class="btn g sm" onclick="openBookModal(curBook)">Bearbeiten</button>
       <button class="btn g sm" onclick="createDocFromBooking('angebot')">→ Angebot</button>
       <button class="btn g sm" onclick="createDocFromBooking('abschlag')">→ Abschlagsrechnung</button>
-      <button class="btn sm" onclick="createDocFromBooking('rechnung')">→ Rechnung</button></div></div>
+      <button class="btn sm" onclick="createDocFromBooking('rechnung')">→ Rechnung</button>
+      <button class="btn r sm" onclick="openStornoModal()">⚠ Storno</button></div></div>
     <div class="grid2" style="gap:16px;align-items:start">
       <div class="card"><h3>Details</h3><div id="bdData" class="sml"></div></div>
       <div class="card"><h3>Technik für diesen Auftrag <button class="btn sm" style="float:right" onclick="openBeModal()">+ Technik</button></h3>
@@ -1089,6 +1090,64 @@ function createDocFromBooking(type){
     renderItems();
   },80);
 }
+/* ===== Storno-Rechnung (Staffel gemäß AGB §5) ===== */
+var STORNO_TIERS=[
+  {minDays:180,pct:20,label:'bis 6 Monate vor dem Termin'},
+  {minDays:90, pct:40,label:'bis 3 Monate vor dem Termin'},
+  {minDays:42, pct:60,label:'bis 6 Wochen vor dem Termin'},
+  {minDays:7,  pct:80,label:'weniger als 6 Wochen vor dem Termin'},
+  {minDays:-99999,pct:90,label:'weniger als 7 Tage vor dem Termin'}
+];
+function bookingBaseNet(b){
+  var base=Number(b.fee_net)||0;
+  CACHE.be.filter(function(x){return x.booking_id===b.id}).forEach(function(x){
+    var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};
+    base+=x.price_override!=null?Number(x.price_override):rentPrice(eq,b)*x.qty;
+  });
+  return Math.round(base*100)/100;
+}
+function openStornoModal(){
+  var b=curBook;if(!b)return;
+  var days=Math.floor((new Date(b.event_date)-new Date().setHours(0,0,0,0))/86400000);
+  var tier=STORNO_TIERS.find(function(t){return days>=t.minDays});
+  openModal('Storno-Rechnung erzeugen',
+    '<div class="sml mut" style="margin-bottom:10px">Termin: <b style="color:var(--wh)">'+dt(b.event_date)+'</b> — Absage <b style="color:var(--wh)">'+days+' Tage</b> vorher → Staffel „'+tier.label+'“ = <b style="color:var(--acc)">'+tier.pct+' %</b> (AGB § 5). Alles unten ist anpassbar; die Rechnung entsteht als <b style="color:var(--wh)">Entwurf</b>, den du prüfst und freigibst.</div>'+
+    '<div class="grid2"><div><label>Vereinbarte Vergütung netto (€)</label><input type="number" step="0.01" id="stBase" value="'+bookingBaseNet(b)+'"></div>'+
+    '<div><label>Storno-Satz (%)</label><input type="number" id="stPct" value="'+tier.pct+'"></div></div>'+
+    '<div class="grid2"><div><label>Ersparte Fahrtkosten (€, Abzug)</label><input type="number" step="0.01" id="stFahrt" value="0"></div>'+
+    '<div><label>Stornierte Hotelkosten (€, Abzug)</label><input type="number" step="0.01" id="stHotel" value="0"></div></div>'+
+    '<label style="margin-top:12px"><input type="checkbox" id="stMark" style="width:auto;margin-right:6px" checked>Buchung auf „storniert“ setzen</label>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="createStorno('+days+')">Entwurf erzeugen</button></div>');
+}
+function createStorno(days){
+  var b=curBook;
+  var base=Number(v('stBase'))||0,pct=Number(v('stPct'))||0;
+  var fahrt=Number(v('stFahrt'))||0,hotel=Number(v('stHotel'))||0;
+  var fee=Math.round(base*pct)/100*1;fee=Math.round(base*pct/100*100)/100;
+  var label=(b.title||b.event_type||'Veranstaltung')+' am '+dt(b.event_date);
+  if(document.getElementById('stMark').checked)
+    api('bookings?id=eq.'+b.id,{method:'PATCH',body:{status:'storniert'}}).then(function(){loadAll()});
+  closeModal();
+  openDocEditor(null,'rechnung');
+  setTimeout(function(){
+    document.getElementById('docCust').value=b.customer_id;refreshBookOpts();
+    document.getElementById('docBook').value=b.id;
+    document.getElementById('docIntro').value='die Absage eurer Veranstaltung ('+label+') haben wir erhalten – schade! '+
+      'Da der Termin damit '+days+' Tage vorher frei wurde und so kurzfristig in der Regel nicht neu belegt werden kann, '+
+      'berechnen wir gemäß unserer AGB (§ 5, Storno-Staffel) eine Ausfallvergütung von '+pct+' % der vereinbarten Vergütung. '+
+      'Ersparte Aufwendungen ziehen wir selbstverständlich ab – die Zusammensetzung seht ihr unten.';
+    curItems=[{pos:1,description:'Ausfallvergütung bei Stornierung ('+pct+' % von '+euro(base)+' netto)',
+      note:'Gemäß AGB § 5: Absage '+days+' Tage vor dem Termin. Der Termin war fest für euch reserviert und kann so kurzfristig in der Regel nicht neu vergeben werden.',
+      qty:1,unit:'pausch.',unit_price:fee}];
+    if(fahrt>0)curItems.push({pos:curItems.length+1,description:'abzüglich ersparte Fahrtkosten',
+      note:'Da die Anfahrt entfällt, ziehen wir die kalkulierten Fahrtkosten vollständig ab.',qty:1,unit:'pausch.',unit_price:-fahrt});
+    if(hotel>0)curItems.push({pos:curItems.length+1,description:'abzüglich stornierte Übernachtungskosten',
+      note:'Die Hotelbuchung konnte kostenfrei storniert werden – der Betrag wird euch gutgeschrieben.',qty:1,unit:'pausch.',unit_price:-hotel});
+    renderItems();
+    toast('Storno-Entwurf vorbereitet — prüfen, ggf. anpassen und speichern.');
+  },80);
+}
+
 function docToInvoice(type){
   var src=curDoc,items=curItems.slice();
   openDocEditor(null,type);
