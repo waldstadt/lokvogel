@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 16;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 17;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -177,9 +177,9 @@ function upgrade(PDO $p): void {
   if ($v < 15) seedServiceProducts($p);
   if ($v < 16) {
     try { $p->exec("alter table customers add column tech_check text"); } catch (PDOException $e) {}
-    seedServiceProducts($p);
     seedTechCheckForm($p);
   }
+  if ($v < 17) seedServiceProducts($p);
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -219,7 +219,9 @@ function seedServiceProducts(PDO $p): void {
     ['INST-CHECK', 21, 'Service', 'Bestandsaufnahme & Beratung vor Ort',
      'Raum, Nutzung und vorhandene Technik aufnehmen; Empfehlung mit Festpreis-Angebot für die Installation. Wird bei Beauftragung verrechnet.', 'pausch.', 89.0],
     ['TECH-CHECK', 22, 'Service', 'Technik-Check bestehende Anlage',
-     'Kompletter Check eurer vorhandenen Tontechnik vor Ort: Funktionsprüfung aller Komponenten, Klang-Bewertung, Einstellungs- und Ergänzungs-Potenzial. Schriftlicher Bericht mit klarer Empfehlung: neu einstellen, ergänzen oder ersetzen. Wird bei Folgeauftrag verrechnet.', 'pausch.', 149.0],
+     'Kompletter Check eurer vorhandenen Tontechnik vor Ort: Funktionsprüfung aller Komponenten, Klang-Bewertung, Einstellungs- und Ergänzungs-Potenzial. Schriftlicher Bericht mit klarer Empfehlung: neu einstellen, ergänzen oder ersetzen. Wird bei Folgeauftrag verrechnet. Gilt für eine Anlage/einen Raum.', 'pausch.', 149.0],
+    ['TECH-CHECK-PLUS', 23, 'Service', 'Technik-Check: weitere Anlage / weiterer Raum',
+     'Zusätzliche Anlage oder zusätzlicher Raum im selben Termin — inkl. Aufnahme im selben Bericht.', 'Stk.', 79.0],
   ];
   foreach ($rows as [$sku, $s, $cat, $n, $d, $u, $pr]) {
     $c = $p->prepare('select count(*) from products where sku = ?');
