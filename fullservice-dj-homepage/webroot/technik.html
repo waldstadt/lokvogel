@@ -87,6 +87,7 @@ nav.scrolled{border-bottom-color:var(--line)}
 .trio .sol{font-size:14px;line-height:1.65}
 .statement{margin-top:48px;border-left:3px solid var(--acc);padding:8px 0 8px 24px;font-size:clamp(16px,2vw,19px);line-height:1.65;max-width:780px}
 .statement b{color:var(--acc)}
+@media(max-width:700px){.tc-list{grid-template-columns:1fr!important}}
 .chip{display:inline-block;font-size:12.5px;color:var(--txt);border:1px solid var(--line);border-radius:20px;padding:7px 15px;cursor:pointer;transition:border-color .2s,color .2s}
 .chip:hover{border-color:var(--acc);color:var(--acc)}
 .duo h3{font-size:20px;font-weight:700;margin-bottom:10px}
@@ -281,6 +282,22 @@ footer a:hover{color:var(--acc)}
         <p class="sol">Eine Anlage, die beides kann: abends angenehmer Klang auf Gesprächslautstärke, am Live-Abend druckvoll — mit vorbereitetem Anschluss für Gesang und Gitarre.</p>
       </div>
     </div>
+    <div class="card reveal" style="background:var(--card);border:1px solid var(--acc);border-radius:14px;padding:26px 24px;margin-top:36px">
+      <h3 style="margin-bottom:8px">🔍 Der Technik-Check — wisst endlich, woran ihr seid</h3>
+      <p style="font-size:14px;color:var(--mut);margin-bottom:14px">Ihr habt schon eine Anlage, aber keiner weiß, was sie noch taugt? Ich prüfe sie komplett durch und ihr bekommt einen <b style="color:var(--txt)">schriftlichen Bericht</b>, der diese Fragen beantwortet:</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 28px;font-size:13.5px;color:var(--mut)" class="tc-list">
+        <div>✔ Funktioniert noch alles — und wie lange noch?</div>
+        <div>✔ Wie ist der Stand der Technik einzuordnen?</div>
+        <div>✔ Wie gut ist der Klang — ehrlich, auf einer Skala?</div>
+        <div>✔ Holt eine Neueinstellung deutlich mehr heraus?</div>
+        <div>✔ Lohnen sich einzelne neue Komponenten?</div>
+        <div>✔ Verbessern oder langfristig neu anschaffen?</div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <a class="btn small" href="#anfrage" onclick="pickTechCheck()">Technik-Check anfragen</a>
+        <span style="font-size:12px;color:var(--mut2)">Pauschalpreis — wird bei einem Folgeauftrag verrechnet. Keine Verkaufsshow: Wenn eure Anlage gut ist, steht das genau so im Bericht.</span>
+      </div>
+    </div>
     <div class="duo">
       <div class="card reveal">
         <h3>So läuft's</h3>
@@ -449,6 +466,7 @@ footer a:hover{color:var(--acc)}
               <option>Techniker inkl. Technik buchen</option>
               <option>Workshop besuchen</option>
               <option>Festinstallation / Wartung</option>
+              <option>Technik-Check bestehende Anlage</option>
               <option>Beratung / Sonstiges</option>
             </select>
           </div>
@@ -683,6 +701,11 @@ function sendWs(){
     .finally(function(){btn.disabled=false});
 }
 loadWorkshops();
+function pickTechCheck(){
+  var f=document.getElementById('inqForm');
+  if(f&&f.event_type)f.event_type.value='Technik-Check bestehende Anlage';
+  if(f&&f.message&&!f.message.value)f.message.value='Technik-Check gewünscht. Unsere Anlage / unser Problem: ';
+}
 function pickInstallation(){
   var f=document.getElementById('inqForm');
   if(f&&f.event_type)f.event_type.value='Festinstallation / Wartung';

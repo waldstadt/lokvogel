@@ -26,14 +26,15 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 15;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 16;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
   'settings' => ['value'], 'site_content' => ['value'],
-  'packages' => ['features'], 'customers' => ['tags'],
+  'packages' => ['features'],
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
   'products' => ['bundle'], 'bookings' => ['rider'], 'rental_contracts' => ['snapshot'],
+  'customers' => ['tags', 'tech_check'],
 ];
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'], 'friends' => ['public'],
@@ -174,7 +175,40 @@ function upgrade(PDO $p): void {
     seedExtraTemplates($p);
   }
   if ($v < 15) seedServiceProducts($p);
+  if ($v < 16) {
+    try { $p->exec("alter table customers add column tech_check text"); } catch (PDOException $e) {}
+    seedServiceProducts($p);
+    seedTechCheckForm($p);
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
+}
+
+/* Vorab-Fragebogen für den Technik-Check, nur wenn noch nicht vorhanden */
+function seedTechCheckForm(PDO $p): void {
+  $name = 'Technik-Check — Vorab-Fragen';
+  $c = $p->prepare('select count(*) from form_templates where name = ?');
+  $c->execute([$name]);
+  if ((int)$c->fetchColumn()) return;
+  $fields = [
+    ['label' => 'Wofür nutzt ihr die Tontechnik hauptsächlich?', 'type' => 'select',
+     'options' => ['Hintergrundmusik', 'Reden & Durchsagen', 'Livemusik', 'Partys/DJ', 'Gemischt']],
+    ['label' => 'Wie oft ist die Anlage im Einsatz?', 'type' => 'select',
+     'options' => ['Täglich', 'Mehrmals pro Woche', 'Wöchentlich', 'Nur zu Veranstaltungen']],
+    ['label' => 'Was muss die Anlage können? (eure Anforderungen)', 'type' => 'textarea'],
+    ['label' => 'Wo liegen aktuell die Probleme? (Brummen, Pfeifen, zu leise, unverständlich …)', 'type' => 'textarea'],
+    ['label' => 'Was wünscht ihr euch am Ende? (z. B. „Reden versteht man bis hinten", „einfacher bedienbar")', 'type' => 'textarea'],
+    ['label' => 'Was ist an Technik vorhanden? (Hersteller/Modelle, so gut ihr es wisst — Fotos gern per Mail)', 'type' => 'textarea'],
+    ['label' => 'Wie alt ist die Anlage ungefähr?', 'type' => 'select',
+     'options' => ['unter 5 Jahre', '5–10 Jahre', '10–20 Jahre', 'älter/unbekannt']],
+    ['label' => 'Wer bedient die Technik normalerweise?', 'type' => 'select',
+     'options' => ['Immer dieselbe Person', 'Wechselnde Ehrenamtliche/Mitarbeiter', 'Jeder, der gerade da ist']],
+    ['label' => 'Gibt es einen Budgetrahmen für Verbesserungen?', 'type' => 'select',
+     'options' => ['bis 500 €', '500–1.500 €', '1.500–5.000 €', 'über 5.000 €', 'noch offen']],
+  ];
+  $p->prepare('insert into form_templates (id, sort, name, intro, fields) values (?,?,?,?,?)')
+    ->execute([uuid(), 10, $name,
+      'Damit ich beim Termin direkt loslegen kann, beantwortet mir vorab kurz diese Fragen — dauert keine 5 Minuten. Beim Check vor Ort prüfe ich dann alles durch und ihr bekommt einen schriftlichen Bericht mit klarer Empfehlung.',
+      json_encode($fields, JSON_UNESCAPED_UNICODE)]);
 }
 
 /* Service-Produkte für Festinstallation & Wartung, nur wenn SKU noch fehlt */
@@ -184,6 +218,8 @@ function seedServiceProducts(PDO $p): void {
      'Jährlicher Funktions-Check, Reinigung, Firmware-Updates und Nachmessen einer fest installierten Anlage — inkl. Kurzbericht für Träger/Vorstand. Verschleiß wird früh erkannt statt am Veranstaltungstag.', 'Jahr', 249.0],
     ['INST-CHECK', 21, 'Service', 'Bestandsaufnahme & Beratung vor Ort',
      'Raum, Nutzung und vorhandene Technik aufnehmen; Empfehlung mit Festpreis-Angebot für die Installation. Wird bei Beauftragung verrechnet.', 'pausch.', 89.0],
+    ['TECH-CHECK', 22, 'Service', 'Technik-Check bestehende Anlage',
+     'Kompletter Check eurer vorhandenen Tontechnik vor Ort: Funktionsprüfung aller Komponenten, Klang-Bewertung, Einstellungs- und Ergänzungs-Potenzial. Schriftlicher Bericht mit klarer Empfehlung: neu einstellen, ergänzen oder ersetzen. Wird bei Folgeauftrag verrechnet.', 'pausch.', 149.0],
   ];
   foreach ($rows as [$sku, $s, $cat, $n, $d, $u, $pr]) {
     $c = $p->prepare('select count(*) from products where sku = ?');
@@ -297,7 +333,7 @@ create table inquiries (id text primary key, name text not null, email text, pho
   status text default 'neu', customer_id text, created_at text);
 create table customers (id text primary key, kind text default 'privat', status text default 'lead',
   first_name text, last_name text, company text, email text, phone text, whatsapp text,
-  street text, zip text, city text, source text, tags text default '[]', notes text,
+  street text, zip text, city text, source text, tags text default '[]', notes text, tech_check text,
   created_at text, updated_at text);
 create table communications (id text primary key,
   customer_id text not null references customers(id) on delete cascade,
@@ -357,6 +393,7 @@ SQL);
   seed($p);
   seedExtraTemplates($p);
   seedServiceProducts($p);
+  seedTechCheckForm($p);
 }
 
 function seed(PDO $p): void {

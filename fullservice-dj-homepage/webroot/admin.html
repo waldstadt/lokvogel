@@ -205,6 +205,7 @@ th.num{text-align:right}
     <a onclick="showPage('cust')">← Kunden</a>
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="cdName"></div><div class="ps" id="cdSub"></div></div>
       <div><button class="btn g sm" onclick="openCustModal(curCust)">Bearbeiten</button>
+      <button class="btn g sm" onclick="openTechCheck()">🔍 Technik-Check</button>
       <button class="btn sm" onclick="newBookingFor(curCust.id)">+ Buchung</button></div></div>
     <div class="grid2" style="gap:16px;align-items:start">
       <div>
@@ -859,7 +860,8 @@ function openCustDetail(id){
   document.getElementById('cdData').innerHTML=
     row('E-Mail',c.email)+row('Telefon',c.phone)+row('WhatsApp',c.whatsapp)+
     row('Adresse',[c.street,[c.zip,c.city].filter(Boolean).join(' ')].filter(Boolean).join(', '))+
-    row('Tags',(c.tags||[]).join(', '))+row('Notizen',c.notes);
+    row('Tags',(c.tags||[]).join(', '))+row('Notizen',c.notes)+
+    (c.tech_check&&c.tech_check.date?row('Technik-Check',dt(c.tech_check.date)+' — '+(c.tech_check.recommendation||'')):'');
   var books=CACHE.bookings.filter(function(b){return b.customer_id===id});
   document.getElementById('cdBookings').innerHTML=books.map(function(b){
     return '<div style="padding:4px 0"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Auftrag')+'</a> <span class="b '+bookBadge(b.status)+'">'+b.status+'</span></div>';
@@ -2160,6 +2162,73 @@ function saveFriend(id){
     .then(function(){closeModal();toast('Gespeichert ✓');reloadFriends()}).catch(function(e){toast(e.message,1)});
 }
 function reloadFriends(){api('friends?select=*&order=sort').then(function(r){CACHE.friends=r||[];renderFriendAdmin()})}
+
+/* ===== Technik-Check (Protokoll am Kunden + Druckbericht) ===== */
+var TC_FUNK=['Alles funktioniert','Funktioniert mit Einschränkungen','Teilweise defekt','Wesentliche Defekte'];
+var TC_STAND=['Aktueller Stand der Technik','Solide, gebrauchstauglich','Veraltet, aber nutzbar','Technisch überholt'];
+var TC_POT=['hoch','mittel','gering'];
+var TC_EMPF=['Neu einstellen genügt','Gezielt ergänzen','Neu einstellen + ergänzen','Mittelfristig ersetzen','Neuanschaffung empfohlen'];
+function tcSel(id,opts,val){return '<select id="'+id+'">'+opts.map(function(o){return '<option'+(o===val?' selected':'')+'>'+o+'</option>'}).join('')+'</select>'}
+function openTechCheck(){
+  var t=(curCust&&curCust.tech_check)||{};
+  openModal('Technik-Check — '+esc(custName(curCust)),
+    '<div class="grid2"><div><label>Datum des Checks</label><input type="date" id="tcDate" value="'+(t.date||new Date().toISOString().slice(0,10))+'"></div>'+
+    '<div><label>Anlage / Ort</label><input id="tcWhere" value="'+esc(t.where||'')+'" placeholder="z. B. Saalanlage Vereinsheim Musterstraße"></div></div>'+
+    '<div class="sml mut" style="margin:10px 0 2px">— Vom Kunden (aus dem Vorab-Fragebogen übernehmen oder vor Ort erfragen) —</div>'+
+    '<label>Wofür wird die Tontechnik genutzt? / Anforderungen</label><textarea id="tcUse" style="min-height:52px">'+esc(t.use||'')+'</textarea>'+
+    '<label>Aktuelle Probleme</label><textarea id="tcProb" style="min-height:52px">'+esc(t.problems||'')+'</textarea>'+
+    '<label>Wünsche des Kunden</label><textarea id="tcWish" style="min-height:52px">'+esc(t.wishes||'')+'</textarea>'+
+    '<div class="sml mut" style="margin:10px 0 2px">— Befund —</div>'+
+    '<div class="grid2"><div><label>Funktionsstatus</label>'+tcSel('tcFunc',TC_FUNK,t.func)+'</div>'+
+    '<div><label>Stand der Technik</label>'+tcSel('tcStand',TC_STAND,t.stand)+'</div></div>'+
+    '<div class="grid3"><div><label>Klang (1–10)</label><input type="number" id="tcSound" min="1" max="10" value="'+(t.sound||'')+'"></div>'+
+    '<div><label>Potenzial Neueinstellung</label>'+tcSel('tcTune',TC_POT,t.tune)+'</div>'+
+    '<div><label>Potenzial Ergänzung</label>'+tcSel('tcAdd',TC_POT,t.add)+'</div></div>'+
+    '<label>Befund im Detail (was geprüft, was aufgefallen)</label><textarea id="tcFind" style="min-height:70px">'+esc(t.findings||'')+'</textarea>'+
+    '<div class="sml mut" style="margin:10px 0 2px">— Empfehlung —</div>'+
+    '<label>Empfehlung</label>'+tcSel('tcEmpf',TC_EMPF,t.recommendation)+
+    '<label>Begründung (verbessern vs. neu anschaffen — wirtschaftliche Einordnung)</label><textarea id="tcWhy" style="min-height:60px">'+esc(t.reasoning||'')+'</textarea>'+
+    '<label>Konkrete Maßnahmen (mit grobem Preisrahmen)</label><textarea id="tcSteps" style="min-height:60px">'+esc(t.steps||'')+'</textarea>'+
+    '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">'+
+    '<button class="btn" onclick="saveTechCheck()">💾 Speichern</button>'+
+    (t.date?'<button class="btn g" onclick="printTechCheck()">🖨 Bericht drucken / PDF</button>':'')+
+    '</div>'+
+    '<div class="mut sml" style="margin-top:8px">Tipp: Vorab-Fragen als Fragebogen senden (Fragebögen → „Technik-Check — Vorab-Fragen"), Abrechnung über Produkt TECH-CHECK.</div>');
+}
+function saveTechCheck(){
+  var t={date:v('tcDate'),where:v('tcWhere'),use:v('tcUse'),problems:v('tcProb'),wishes:v('tcWish'),
+    func:v('tcFunc'),stand:v('tcStand'),sound:v('tcSound')?Number(v('tcSound')):null,
+    tune:v('tcTune'),add:v('tcAdd'),findings:v('tcFind'),
+    recommendation:v('tcEmpf'),reasoning:v('tcWhy'),steps:v('tcSteps')};
+  api('customers?id=eq.'+curCust.id,{method:'PATCH',body:{tech_check:t}}).then(function(){
+    curCust.tech_check=t;toast('Technik-Check gespeichert ✓');openTechCheck();
+  }).catch(function(e){toast(e.message,1)});
+}
+function printTechCheck(){
+  var t=(curCust&&curCust.tech_check)||{},comp=S.company||{},c=curCust;
+  var pr=function(l,val){return val?'<tr><td style="padding:6px 12px 6px 0;color:#777;white-space:nowrap;vertical-align:top;width:190px">'+l+'</td><td style="padding:6px 0">'+esc(String(val)).replace(/\n/g,'<br>')+'</td></tr>':''};
+  var scale=t.sound?('<b>'+t.sound+' / 10</b> '+'●'.repeat(t.sound)+'○'.repeat(10-t.sound)):'';
+  document.getElementById('printArea').innerHTML=
+  '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.6">'+
+  '<div style="display:flex;justify-content:space-between;margin-bottom:26px"><div>'+
+  '<div style="font-size:20px;font-weight:700">'+esc(comp.name||'')+'</div><div style="color:#555">'+esc(comp.owner||'')+' · Veranstaltungstechnik</div></div>'+
+  '<div style="text-align:right;color:#555">'+esc(comp.street||'')+'<br>'+esc(comp.zip_city||'')+'<br>'+esc(comp.phone||'')+'</div></div>'+
+  '<div style="font-size:17px;font-weight:700;margin-bottom:2px">Technik-Check — Bericht</div>'+
+  '<div style="color:#555;margin-bottom:18px">'+esc(custName(c))+(t.where?' · '+esc(t.where):'')+' · '+dt(t.date)+'</div>'+
+  '<div style="font-weight:700;margin:14px 0 4px">1 · Ausgangslage</div>'+
+  '<table style="width:100%;border-collapse:collapse">'+pr('Nutzung & Anforderungen',t.use)+pr('Aktuelle Probleme',t.problems)+pr('Wünsche',t.wishes)+'</table>'+
+  '<div style="font-weight:700;margin:16px 0 4px">2 · Befund</div>'+
+  '<table style="width:100%;border-collapse:collapse">'+
+  pr('Funktionsstatus',t.func)+pr('Stand der Technik',t.stand)+'</table>'+
+  (scale?'<table style="width:100%;border-collapse:collapse"><tr><td style="padding:6px 12px 6px 0;color:#777;width:190px">Klangqualität</td><td style="padding:6px 0">'+scale+'</td></tr></table>':'')+
+  '<table style="width:100%;border-collapse:collapse">'+
+  pr('Potenzial Neueinstellung',t.tune)+pr('Potenzial Ergänzung',t.add)+pr('Details',t.findings)+'</table>'+
+  '<div style="font-weight:700;margin:16px 0 4px">3 · Empfehlung</div>'+
+  '<div style="border:1.5px solid #111;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px"><b>'+esc(t.recommendation||'')+'</b>'+(t.reasoning?'<br><span style="color:#333">'+esc(t.reasoning).replace(/\n/g,'<br>')+'</span>':'')+'</div>'+
+  (t.steps?'<div style="font-weight:700;margin:12px 0 4px">4 · Konkrete Maßnahmen</div><div style="white-space:pre-wrap">'+esc(t.steps)+'</div>':'')+
+  '<div style="margin-top:26px;color:#777;border-top:1px solid #ddd;padding-top:10px;font-size:10.5px">Dieser Bericht ist eine fachliche Einschätzung auf Basis der Prüfung vor Ort. Für alle empfohlenen Maßnahmen erstelle ich auf Wunsch ein Festpreis-Angebot — der Check wird bei Beauftragung verrechnet. '+esc(comp.name||'')+(comp.phone?' · '+esc(comp.phone):'')+'</div></div>';
+  window.print();
+}
 
 /* ===== Datensicherung ===== */
 function fmtBytes(b){return b>1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB'}
