@@ -843,6 +843,17 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         "Name: {$row['name']}\nE-Mail: " . ($row['email'] ?? '–') . "\nTelefon: " . ($row['phone'] ?? '–') .
         "\nAnlass: " . ($row['event_type'] ?? '–') . "\nDatum: " . ($row['event_date'] ?? '–') .
         "\nOrt: " . ($row['location'] ?? '–') . "\n\n" . ($row['message'] ?? ''));
+      /* Warme Eingangsbestätigung an den Interessenten — jeder soll sich sofort gut aufgehoben fühlen */
+      if (!empty($row['email'])) {
+        $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+        $vn = preg_split('/\s+/', trim($row['name']), 2)[0] ?? $row['name'];
+        sendMailSafe((string)$row['email'], 'Deine Anfrage ist angekommen 🙌',
+          "Hallo $vn,\n\ndanke für deine Anfrage — sie ist sicher bei mir gelandet!\n\n" .
+          "Ich melde mich persönlich bei dir, in der Regel innerhalb von 24 Stunden. " .
+          "Das hier ist die einzige automatische Mail, die du von mir bekommst — ab jetzt schreibst du direkt mit mir.\n\n" .
+          (($comp['phone'] ?? '') !== '' ? "Wenn es eilig ist, erreichst du mich unter " . $comp['phone'] . " (gern auch WhatsApp).\n\n" : '') .
+          "Bis gleich!\n" . ($comp['owner'] ?? 'Markus'));
+      }
       out(null, 201);
     } else fail('Nicht angemeldet.', 401);
   }
@@ -1237,6 +1248,11 @@ function dailyDigest(): array {
       on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
     ->execute([json_encode($cfg), now()]);
   $parts = [];
+  $iq = $p->query("select name, event_type, created_at from inquiries where status = 'neu'
+    and created_at < '" . gmdate('Y-m-d\TH:i:s\Z', time() - 86400) . "' order by created_at")->fetchAll();
+  foreach ($iq as $i)
+    $parts[] = '⏰ Anfrage wartet seit ' . max(1, (int)floor((time() - strtotime((string)$i['created_at'])) / 86400)) .
+      ' Tag(en) auf Antwort: ' . $i['name'] . ($i['event_type'] ? ' (' . $i['event_type'] . ')' : '');
   $od = $p->query("select count(*) c, coalesce(sum(total_gross - coalesce(deposit_deducted,0)),0) s from documents
     where doc_type not in ('angebot','lieferschein') and status = 'versendet' and due_date < '$today'")->fetch();
   if ((int)$od['c']) $parts[] = '⚠ ' . $od['c'] . ' überfällige Rechnung(en), zusammen ' . number_format((float)$od['s'], 2, ',', '.') . ' € — Zahlungserinnerung im Backoffice.';
@@ -1609,6 +1625,9 @@ function handlePortal(string $path, string $method, $body): never {
       $r = workshopInvoice($p, $sid);
       if (!empty($r['ok'])) $inv = ['number' => $r['number'], 'mailed' => !empty($r['mailed'])];
     }
+    if ($status === 'warteliste')
+      sendMailSafe($email, 'Du stehst auf der Warteliste — ich melde mich!',
+        "Hallo " . (preg_split('/\s+/', $name, 2)[0] ?? $name) . ",\n\ndanke für dein Interesse am Workshop „" . $w['title'] . "“ am " . $w['event_date'] . "!\n\nDer Termin ist aktuell voll — du stehst jetzt auf der Warteliste. Sobald ein Platz frei wird, melde ich mich sofort persönlich bei dir. Bezahlt wird erst, wenn du wirklich einen Platz hast.\n\nBis hoffentlich bald!\nMarkus");
     notifyOwner(($status === 'warteliste' ? '⏳ Warteliste' : '🎟 Workshop-Buchung') . ': ' . $w['title'],
       "Name: $name ($seats Platz/Plätze)\nE-Mail: $email\nTermin: " . $w['event_date'] .
       ($inv ? "\nRechnung: " . $inv['number'] . ($inv['mailed'] ? ' (automatisch gemailt)' : ' (Mailversand prüfen!)') : ''));

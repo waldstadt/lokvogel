@@ -167,3 +167,15 @@ postet sie nur noch auf Instagram). Timing-Logik:
   3–5 handverlesenen Kollegen über die Partner-Agentur (kostenlos),
   Bitte um volle Anschrift + Einwilligung zur Datenweitergabe.
   → Jede Absage wird so zum Vermittlungs-Lead (Provision).
+
+## Leitwert: Jeder Interessent fühlt sich persönlich gut aufgehoben (fix, 2026-08-26)
+
+Gilt unabhängig davon, ob Markus am Wunschtermin Zeit hat. Konsequenzen im System:
+- Sofortige warme Eingangsbestätigung auf jede Anfrage („die einzige
+  automatische Mail — ab jetzt schreibst du direkt mit mir", mit Handy/WhatsApp).
+- Tages-Digest warnt bei Anfragen, die > 24 h unbeantwortet sind.
+- Absagen nie kalt: immer persönlich per Mail mit Vermittlungsangebot.
+- Wartelisten-Kandidaten bekommen eine persönliche Bestätigung
+  („bezahlt wird erst, wenn du wirklich einen Platz hast").
+- Maßstab für alle künftigen Texte/Features: Würde sich ein unsicherer
+  Interessent damit gut behandelt fühlen? Wenn nein → umformulieren.
