@@ -348,7 +348,7 @@ footer a:hover{color:var(--acc)}
     <div class="reveal">
       <div class="kicker">Buchungsanfrage</div>
       <h2>Lasst uns über eure Feier sprechen</h2>
-      <p class="lead">Unverbindlich und kostenlos – ihr bekommt in der Regel innerhalb von 24 Stunden eine Antwort. Von mir persönlich, nicht vom Autoresponder.</p>
+      <p class="lead">Unverbindlich und kostenlos – ihr bekommt in der Regel innerhalb von 24 Stunden eine Antwort. Von mir persönlich, nicht vom Autoresponder. Und keine Sorge, wenn noch nichts feststeht: Kein Datum, keine Location, keine Ahnung, was ihr braucht? Genau dafür bin ich da – fragt einfach an.</p>
     </div>
     <div class="contact-grid">
       <div class="reveal">
@@ -364,8 +364,8 @@ footer a:hover{color:var(--acc)}
         </div>
         <div class="row">
           <div><label>Telefon</label><input type="tel" name="phone"></div>
-          <div><label>Datum der Feier</label><input type="date" name="event_date" onchange="checkDjDate(this.value)">
-            <div id="djAvail" style="font-size:12px;margin-top:5px"></div></div>
+          <div><label>Datum der Feier <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label><input type="date" name="event_date">
+            <div style="font-size:12px;margin-top:5px;color:var(--mut2)">Steht noch nicht fest? Einfach leer lassen — wir finden das zusammen heraus.</div></div>
         </div>
         <div class="row">
           <div><label>Anlass</label>
@@ -408,15 +408,6 @@ footer a:hover{color:var(--acc)}
 <script>
 /* ===== Backend: api.php liegt im selben Verzeichnis ===== */
 var API='api.php';
-function checkDjDate(d){
-  var el=document.getElementById('djAvail');
-  if(!d){el.textContent='';return}
-  fetch(API+'/portal/availability/dj?date='+d).then(function(r){return r.json()}).then(function(j){
-    el.innerHTML=j.free
-      ?'<span style="color:#9fd49f">✓ Dieser Termin ist voraussichtlich noch frei — fragt am besten gleich an!</span>'
-      :'<span style="color:var(--mut)">An diesem Datum bin ich bereits gebucht. Fragt trotzdem an — manchmal geht doch etwas, und sonst empfehle ich euch kostenlos einen passenden DJ aus meinem Partner-Netzwerk.</span>';
-  }).catch(function(){el.textContent=''});
-}
 
 document.getElementById('year').textContent=new Date().getFullYear();
 

@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 19;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 20;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -190,7 +190,36 @@ function upgrade(PDO $p): void {
     "alter table documents add column accepted_name text",
     "alter table documents add column accept_signature text",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+  if ($v < 20) upgradeBandeFlow($p);
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
+}
+
+/* v20: konsolidierte Vermittlungs-Mail + Anschrift-Feld im Vorauswahl-Bogen */
+function upgradeBandeFlow(PDO $p): void {
+  seedExtraTemplates($p);
+  try { $p->prepare('delete from email_templates where name = ?')
+    ->execute(['Termin belegt — DJ-Empfehlung (Partner-Netzwerk)']); } catch (PDOException $e) {}
+  try {
+    $p->prepare("update email_templates set subject = ?, body = ? where name = 'Termin belegt – DJ-Vermittlung'")
+      ->execute(['Euer Termin am {datum} – ich habe trotzdem eine Lösung für euch',
+"Hallo {vorname},\n\nvielen Dank für deine Anfrage – und jetzt zuerst die weniger gute Nachricht: An eurem Termin am {datum} bin ich leider schon fest gebucht.\n\nAber ich lasse euch damit nicht allein. Ich weiß aus vielen Gesprächen, wie mühsam die Suche jetzt weitergeht: zig Seiten durchklicken, DJs anschreiben, auf Antworten warten – und am Ende doch nicht wissen, wer wirklich gut ist. Genau das möchte ich euch abnehmen.\n\nWenn ihr mögt, empfehle ich euch drei bis fünf Kollegen, die an eurem Termin noch frei sind und von denen ich weiß, dass sie richtig gute Arbeit machen – handverlesen und passend zu eurer Feier, eurer Musikrichtung und eurer Location, nicht einfach irgendeine Liste. Dieser Service ist für euch komplett kostenlos.\n\nDie Vermittlung läuft über meine Partner-Agentur, die DJ Bande in Münster. Dort bin ich selbst als DJ gelistet und regelmäßig im Einsatz – ich kenne die Kollegen also nicht nur vom Papier, sondern von echten Veranstaltungen.\n\nDamit meine Vorauswahl sitzt, habe ich einen kurzen Online-Fragebogen für euch (keine 5 Minuten). Dort trägst du auch eure Anschrift ein, die ich für die Empfehlung brauche – deine E-Mail-Adresse habe ich ja schon:\n{fragebogen}\n\nZur Transparenz: Für eine erfolgreiche Vermittlung erhalte ich eine Aufwandsentschädigung von der Agentur. Für euch entstehen keine Kosten, und eure Preise vereinbart ihr direkt mit dem jeweiligen DJ. Eure Angaben gebe ich erst nach eurem Einverständnis weiter – das fragt der Bogen mit ab.\n\nViele Grüße\nMarkus Jankowski – DJ Lauschgift"]);
+  } catch (PDOException $e) {}
+  try {
+    $st = $p->query("select id, fields from form_templates where name like 'DJ-Vorauswahl%' limit 1");
+    $row = $st->fetch();
+    if ($row) {
+      $fields = json_decode((string)$row['fields'], true) ?: [];
+      $has = false;
+      foreach ($fields as $f) if (str_contains((string)($f['label'] ?? ''), 'Anschrift')) { $has = true; break; }
+      if (!$has) {
+        $pos = 3;
+        foreach ($fields as $i => $f) if (str_contains((string)($f['label'] ?? ''), 'Location')) { $pos = $i + 1; break; }
+        array_splice($fields, $pos, 0, [['label' => 'Eure vollständige Anschrift (Straße, PLZ, Ort) – wird für die Vermittlung benötigt', 'type' => 'text']]);
+        $p->prepare('update form_templates set fields = ? where id = ?')
+          ->execute([json_encode($fields, JSON_UNESCAPED_UNICODE), $row['id']]);
+      }
+    }
+  } catch (PDOException $e) {}
 }
 
 /* Vorab-Fragebogen für den Technik-Check, nur wenn noch nicht vorhanden */
@@ -569,14 +598,18 @@ Markus Jankowski – DJ Lauschgift"],
     [5, 'Termin belegt – DJ-Vermittlung', 'Euer Termin am {datum} – ich habe trotzdem eine Lösung für euch',
 "Hallo {vorname},
 
-vielen Dank für eure Anfrage – und erstmal die weniger gute Nachricht: An eurem Termin am {datum} bin ich leider bereits gebucht.
+vielen Dank für deine Anfrage – und jetzt zuerst die weniger gute Nachricht: An eurem Termin am {datum} bin ich leider schon fest gebucht.
 
-Aber ich lasse euch nicht hängen – und ich schicke euch auch nicht einfach irgendeine Liste. Ich wähle persönlich bis zu fünf Kollegen aus meinem Partner-Netzwerk aus, die wirklich zu eurer Feier passen: zu eurer Musikrichtung, eurer Location und der Art, wie ihr feiern wollt. Ich kenne die Kollegen und ihre Stärken – und ihr bekommt die Vorschläge direkt von mir.
+Aber ich lasse euch damit nicht allein. Ich weiß aus vielen Gesprächen, wie mühsam die Suche jetzt weitergeht: zig Seiten durchklicken, DJs anschreiben, auf Antworten warten – und am Ende doch nicht wissen, wer wirklich gut ist. Genau das möchte ich euch abnehmen.
 
-Damit meine Vorauswahl sitzt, habe ich einen kurzen Online-Fragebogen für euch (keine 5 Minuten):
+Wenn ihr mögt, empfehle ich euch drei bis fünf Kollegen, die an eurem Termin noch frei sind und von denen ich weiß, dass sie richtig gute Arbeit machen – handverlesen und passend zu eurer Feier, eurer Musikrichtung und eurer Location, nicht einfach irgendeine Liste. Dieser Service ist für euch komplett kostenlos.
+
+Die Vermittlung läuft über meine Partner-Agentur, die DJ Bande in Münster. Dort bin ich selbst als DJ gelistet und regelmäßig im Einsatz – ich kenne die Kollegen also nicht nur vom Papier, sondern von echten Veranstaltungen.
+
+Damit meine Vorauswahl sitzt, habe ich einen kurzen Online-Fragebogen für euch (keine 5 Minuten). Dort trägst du auch eure Anschrift ein, die ich für die Empfehlung brauche – deine E-Mail-Adresse habe ich ja schon:
 {fragebogen}
 
-Zur Transparenz: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision; für euch entstehen dadurch keine zusätzlichen Kosten, und die Preise vereinbart ihr direkt mit dem jeweiligen DJ. Eure Angaben gebe ich erst nach eurem Einverständnis weiter (das fragt der Bogen mit ab).
+Zur Transparenz: Für eine erfolgreiche Vermittlung erhalte ich eine Aufwandsentschädigung von der Agentur. Für euch entstehen keine Kosten, und eure Preise vereinbart ihr direkt mit dem jeweiligen DJ. Eure Angaben gebe ich erst nach eurem Einverständnis weiter – das fragt der Bogen mit ab.
 
 Viele Grüße
 Markus Jankowski – DJ Lauschgift"],
@@ -602,6 +635,7 @@ function seedFormTemplates(PDO $p): void {
        ['label'=>'Anlass eurer Feier','type'=>'select','options'=>['Hochzeit','Geburtstag','Firmenfeier','Sonstiges']],
        ['label'=>'Datum der Feier','type'=>'text'],
        ['label'=>'Location & Ort (Name reicht)','type'=>'text'],
+       ['label'=>'Eure vollständige Anschrift (Straße, PLZ, Ort) – wird für die Vermittlung benötigt','type'=>'text'],
        ['label'=>'Ungefähre Gästezahl','type'=>'text'],
        ['label'=>'Welche Musikrichtungen sollen auf jeden Fall laufen?','type'=>'textarea'],
        ['label'=>'Was darf auf KEINEN Fall laufen?','type'=>'textarea'],
@@ -1573,16 +1607,6 @@ function handlePortal(string $path, string $method, $body): never {
     out(['ok' => true, 'name' => $pt['name'], 'discount_pct' => (float)($defs['partner_discount_pct'] ?? 20)]);
   }
   /* Verfügbarkeit eines Artikels im Zeitraum (gegen alle nicht stornierten Aufträge) */
-  /* DJ-Verfügbarkeit für ein Datum (weiche Auskunft fürs Anfrageformular) */
-  if ($path === 'portal/availability/dj' && $method === 'GET') {
-    $d = (string)($_GET['date'] ?? '');
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) fail('Datum fehlt.');
-    $st = $p->prepare("select count(*) from bookings
-      where kind in ('dj','dj_technik') and status in ('gebucht','abgeschlossen')
-      and event_date <= ? and coalesce(nullif(end_date,''), event_date) >= ?");
-    $st->execute([$d, $d]);
-    out(['free' => (int)$st->fetchColumn() === 0]);
-  }
   if ($path === 'portal/availability' && $method === 'GET') {
     $eq = (string)($_GET['eq'] ?? ''); $from = (string)($_GET['from'] ?? ''); $to = (string)($_GET['to'] ?? '');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) fail('Zeitraum fehlt.');

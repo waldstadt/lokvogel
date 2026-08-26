@@ -155,3 +155,15 @@ postet sie nur noch auf Instagram). Timing-Logik:
   Workshop-Bestätigung.
 - ✅ Halloween-Minipage (halloween.html) — Kampagnenziel für Canva-
   Anzeigen ab September; 31.10.2026 ist ein Samstag.
+
+## Conversion-Regel: keine öffentliche Verfügbarkeitsanzeige (fix, 2026-08-26)
+
+- Die Homepage zeigt NIE in Echtzeit, ob ein Termin belegt ist — ein
+  „schon gebucht" vor dem Absenden vertreibt den Kunden, bevor Markus je
+  von ihm erfährt. Oberstes Ziel bleibt: Anfrage absenden, auch ohne
+  Datum, auch wenn noch alles unklar ist (Datum ist als optional markiert).
+- Absagen laufen IMMER persönlich per E-Mail — Vorlage „Termin belegt —
+  DJ-Empfehlung (Partner-Netzwerk)": Dank, ehrliche Absage, Angebot von
+  3–5 handverlesenen Kollegen über die Partner-Agentur (kostenlos),
+  Bitte um volle Anschrift + Einwilligung zur Datenweitergabe.
+  → Jede Absage wird so zum Vermittlungs-Lead (Provision).
