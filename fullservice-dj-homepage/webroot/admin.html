@@ -2178,6 +2178,7 @@ function openTechCheck(){
     '<label>Wofür wird die Tontechnik genutzt? / Anforderungen</label><textarea id="tcUse" style="min-height:52px">'+esc(t.use||'')+'</textarea>'+
     '<label>Aktuelle Probleme</label><textarea id="tcProb" style="min-height:52px">'+esc(t.problems||'')+'</textarea>'+
     '<label>Wünsche des Kunden</label><textarea id="tcWish" style="min-height:52px">'+esc(t.wishes||'')+'</textarea>'+
+    '<label>Budgetrahmen des Kunden</label><input id="tcBudget" value="'+esc(t.budget||'')+'" placeholder="z. B. 500–1.500 €, noch offen …">'+
     '<div class="sml mut" style="margin:10px 0 2px">— Befund —</div>'+
     '<div class="grid2"><div><label>Funktionsstatus</label>'+tcSel('tcFunc',TC_FUNK,t.func)+'</div>'+
     '<div><label>Stand der Technik</label>'+tcSel('tcStand',TC_STAND,t.stand)+'</div></div>'+
@@ -2185,21 +2186,65 @@ function openTechCheck(){
     '<div><label>Potenzial Neueinstellung</label>'+tcSel('tcTune',TC_POT,t.tune)+'</div>'+
     '<div><label>Potenzial Ergänzung</label>'+tcSel('tcAdd',TC_POT,t.add)+'</div></div>'+
     '<label>Befund im Detail (was geprüft, was aufgefallen)</label><textarea id="tcFind" style="min-height:70px">'+esc(t.findings||'')+'</textarea>'+
+    '<label>Fotos (Anlage, Verkabelung, Problemstellen)</label>'+
+    '<div id="tcPhotos" style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 6px"></div>'+
+    '<input type="file" accept="image/*" capture="environment" multiple id="tcPicIn" onchange="tcAddPhotos(this)">'+
+    '<div class="mut sml">Werden verkleinert, liegen zugriffsgeschützt auf dem Server und erscheinen im Bericht.</div>'+
     '<div class="sml mut" style="margin:10px 0 2px">— Empfehlung —</div>'+
     '<label>Empfehlung</label>'+tcSel('tcEmpf',TC_EMPF,t.recommendation)+
     '<label>Begründung (verbessern vs. neu anschaffen — wirtschaftliche Einordnung)</label><textarea id="tcWhy" style="min-height:60px">'+esc(t.reasoning||'')+'</textarea>'+
+    '<label>Meine persönliche Empfehlung (in deinen Worten — steht hervorgehoben im Bericht)</label><textarea id="tcPersonal" style="min-height:60px" placeholder="z. B. An eurer Stelle würde ich zuerst … — das bringt am meisten fürs Geld.">'+esc(t.personal||'')+'</textarea>'+
     '<label>Konkrete Maßnahmen (mit grobem Preisrahmen)</label><textarea id="tcSteps" style="min-height:60px">'+esc(t.steps||'')+'</textarea>'+
     '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">'+
     '<button class="btn" onclick="saveTechCheck()">💾 Speichern</button>'+
     (t.date?'<button class="btn g" onclick="printTechCheck()">🖨 Bericht drucken / PDF</button>':'')+
     '</div>'+
-    '<div class="mut sml" style="margin-top:8px">Tipp: Vorab-Fragen als Fragebogen senden (Fragebögen → „Technik-Check — Vorab-Fragen"), Abrechnung über Produkt TECH-CHECK.</div>');
+    '<div class="mut sml" style="margin-top:8px">Tipp: Vorab-Fragen als Fragebogen senden (Fragebögen → „Technik-Check — Vorab-Fragen"), Abrechnung über die Produkte TECH-CHECK / TECH-CHECK-PLUS.</div>');
+  TC_PHOTOS=(t.photos||[]).slice();
+  tcRenderPhotos();
+}
+var TC_PHOTOS=[];
+function tcRenderPhotos(){
+  var box=document.getElementById('tcPhotos');if(!box)return;
+  box.innerHTML=TC_PHOTOS.map(function(n,i){
+    return '<div style="position:relative"><img data-pic="'+n+'" style="width:86px;height:64px;object-fit:cover;border-radius:6px;background:#222">'+
+    '<a onclick="tcDelPhoto('+i+')" style="position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</a></div>';
+  }).join('');
+  box.querySelectorAll('img[data-pic]').forEach(function(img){
+    fetch('api.php/checkpic/get/'+img.dataset.pic,{headers:{Authorization:'Bearer '+TOKEN}})
+      .then(function(r){return r.ok?r.blob():null}).then(function(b){if(b)img.src=URL.createObjectURL(b)});
+  });
+}
+function tcAddPhotos(inp){
+  Array.from(inp.files||[]).forEach(function(f){
+    var img=new Image(),url=URL.createObjectURL(f);
+    img.onload=function(){
+      var mx=1600,sc=Math.min(1,mx/Math.max(img.width,img.height));
+      var c=document.createElement('canvas');c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function(bl){
+        fetch('api.php/checkpic/'+curCust.id,{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:bl})
+          .then(function(r){return r.json()})
+          .then(function(j){if(j.name){TC_PHOTOS.push(j.name);tcRenderPhotos()}else toast(j.error||'Upload fehlgeschlagen',1)})
+          .catch(function(e){toast(e.message,1)});
+      },'image/jpeg',0.85);
+    };
+    img.src=url;
+  });
+  inp.value='';
+}
+function tcDelPhoto(i){
+  var n=TC_PHOTOS[i];
+  fetch('api.php/checkpic/get/'+n,{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
+  TC_PHOTOS.splice(i,1);tcRenderPhotos();
 }
 function saveTechCheck(){
   var t={date:v('tcDate'),where:v('tcWhere'),use:v('tcUse'),problems:v('tcProb'),wishes:v('tcWish'),
+    budget:v('tcBudget'),
     func:v('tcFunc'),stand:v('tcStand'),sound:v('tcSound')?Number(v('tcSound')):null,
-    tune:v('tcTune'),add:v('tcAdd'),findings:v('tcFind'),
-    recommendation:v('tcEmpf'),reasoning:v('tcWhy'),steps:v('tcSteps')};
+    tune:v('tcTune'),add:v('tcAdd'),findings:v('tcFind'),photos:TC_PHOTOS.slice(),
+    recommendation:v('tcEmpf'),reasoning:v('tcWhy'),personal:v('tcPersonal'),steps:v('tcSteps')};
   api('customers?id=eq.'+curCust.id,{method:'PATCH',body:{tech_check:t}}).then(function(){
     curCust.tech_check=t;toast('Technik-Check gespeichert ✓');openTechCheck();
   }).catch(function(e){toast(e.message,1)});
@@ -2208,6 +2253,19 @@ function printTechCheck(){
   var t=(curCust&&curCust.tech_check)||{},comp=S.company||{},c=curCust;
   var pr=function(l,val){return val?'<tr><td style="padding:6px 12px 6px 0;color:#777;white-space:nowrap;vertical-align:top;width:190px">'+l+'</td><td style="padding:6px 0">'+esc(String(val)).replace(/\n/g,'<br>')+'</td></tr>':''};
   var scale=t.sound?('<b>'+t.sound+' / 10</b> '+'●'.repeat(t.sound)+'○'.repeat(10-t.sound)):'';
+  /* Fotos zuerst laden (geschützter Abruf), dann drucken */
+  var pics=t.photos||[];
+  Promise.all(pics.map(function(n){
+    return fetch('api.php/checkpic/get/'+n,{headers:{Authorization:'Bearer '+TOKEN}})
+      .then(function(r){return r.ok?r.blob():null}).then(function(b){return b?URL.createObjectURL(b):null})
+      .catch(function(){return null});
+  })).then(function(urls){renderTechCheckPrint(t,comp,c,pr,scale,urls.filter(Boolean))});
+}
+function renderTechCheckPrint(t,comp,c,pr,scale,picUrls){
+  var picHtml=picUrls.length?('<div style="font-weight:700;margin:16px 0 6px">Fotodokumentation</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'+
+    picUrls.map(function(u){return '<img src="'+u+'" style="width:100%;border-radius:6px">'}).join('')+'</div>'):'';
+  var personal=t.personal?('<div style="border-left:3px solid #111;padding:8px 0 8px 16px;margin:12px 0;font-size:12.5px"><b>Meine persönliche Empfehlung</b><br>'+esc(t.personal).replace(/\n/g,'<br>')+'</div>'):'';
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.6">'+
   '<div style="display:flex;justify-content:space-between;margin-bottom:26px"><div>'+
@@ -2216,15 +2274,17 @@ function printTechCheck(){
   '<div style="font-size:17px;font-weight:700;margin-bottom:2px">Technik-Check — Bericht</div>'+
   '<div style="color:#555;margin-bottom:18px">'+esc(custName(c))+(t.where?' · '+esc(t.where):'')+' · '+dt(t.date)+'</div>'+
   '<div style="font-weight:700;margin:14px 0 4px">1 · Ausgangslage</div>'+
-  '<table style="width:100%;border-collapse:collapse">'+pr('Nutzung & Anforderungen',t.use)+pr('Aktuelle Probleme',t.problems)+pr('Wünsche',t.wishes)+'</table>'+
+  '<table style="width:100%;border-collapse:collapse">'+pr('Nutzung & Anforderungen',t.use)+pr('Aktuelle Probleme',t.problems)+pr('Wünsche',t.wishes)+pr('Budgetrahmen',t.budget)+'</table>'+
   '<div style="font-weight:700;margin:16px 0 4px">2 · Befund</div>'+
   '<table style="width:100%;border-collapse:collapse">'+
   pr('Funktionsstatus',t.func)+pr('Stand der Technik',t.stand)+'</table>'+
   (scale?'<table style="width:100%;border-collapse:collapse"><tr><td style="padding:6px 12px 6px 0;color:#777;width:190px">Klangqualität</td><td style="padding:6px 0">'+scale+'</td></tr></table>':'')+
   '<table style="width:100%;border-collapse:collapse">'+
   pr('Potenzial Neueinstellung',t.tune)+pr('Potenzial Ergänzung',t.add)+pr('Details',t.findings)+'</table>'+
+  picHtml+
   '<div style="font-weight:700;margin:16px 0 4px">3 · Empfehlung</div>'+
   '<div style="border:1.5px solid #111;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px"><b>'+esc(t.recommendation||'')+'</b>'+(t.reasoning?'<br><span style="color:#333">'+esc(t.reasoning).replace(/\n/g,'<br>')+'</span>':'')+'</div>'+
+  personal+
   (t.steps?'<div style="font-weight:700;margin:12px 0 4px">4 · Konkrete Maßnahmen</div><div style="white-space:pre-wrap">'+esc(t.steps)+'</div>':'')+
   '<div style="margin-top:26px;color:#777;border-top:1px solid #ddd;padding-top:10px;font-size:10.5px">Dieser Bericht ist eine fachliche Einschätzung auf Basis der Prüfung vor Ort. Für alle empfohlenen Maßnahmen erstelle ich auf Wunsch ein Festpreis-Angebot — der Check wird bei Beauftragung verrechnet. '+esc(comp.name||'')+(comp.phone?' · '+esc(comp.phone):'')+'</div></div>';
   window.print();

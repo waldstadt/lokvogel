@@ -1338,6 +1338,26 @@ try {
     header('Content-Disposition: attachment; filename="' . $m[1] . '"');
     readfile($f); exit;
   }
+  /* Technik-Check-Fotos: geschützt in data/checkpics, Zugriff nur angemeldet */
+  if (preg_match('#^checkpic/([a-f0-9-]{30,40})$#', $path, $m) && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $raw = file_get_contents('php://input');
+    if (!$raw || strlen($raw) > 4 * 1024 * 1024) fail('Foto fehlt oder ist zu groß (max. 4 MB).');
+    if (@getimagesizefromstring($raw) === false) fail('Keine gültige Bilddatei.');
+    $dir = DATA_DIR . '/checkpics';
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    $name = $m[1] . '-' . bin2hex(random_bytes(4)) . '.jpg';
+    file_put_contents("$dir/$name", $raw);
+    out(['name' => $name], 201);
+  }
+  if (preg_match('#^checkpic/get/([a-f0-9-]{30,40}-[a-f0-9]{8}\.jpg)$#', $path, $m)) {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $f = DATA_DIR . '/checkpics/' . $m[1];
+    if ($method === 'DELETE') { @unlink($f); out(['ok' => true]); }
+    if (!is_file($f)) fail('Foto nicht gefunden.', 404);
+    header('Content-Type: image/jpeg');
+    readfile($f); exit;
+  }
   /* Ausweisfotos: liegen geschützt in data/ids, Abruf/Löschung nur angemeldet */
   if (preg_match('#^idfile/([a-f0-9-]{30,50}-(?:front|back)\.(?:jpg|png|webp))$#', $path, $m)) {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
