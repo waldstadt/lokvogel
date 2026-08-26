@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 22;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 23;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -205,6 +205,19 @@ function upgrade(PDO $p): void {
       unset($f);
       $p->prepare('update form_templates set fields = ? where id = ?')
         ->execute([json_encode($fields, JSON_UNESCAPED_UNICODE), $row['id']]);
+    }
+  } catch (PDOException $e) {}
+  if ($v < 23) try {
+    $st = $p->query("select id, fields from form_templates where name like 'DJ-Vorauswahl%' limit 1");
+    if ($row = $st->fetch()) {
+      $fields = array_values(array_filter(json_decode((string)$row['fields'], true) ?: [], function ($f) {
+        $l = (string)($f['label'] ?? '');
+        return !str_contains($l, 'Budget') && !str_contains($l, 'freie Trauung');
+      }));
+      $p->prepare('update form_templates set fields = ?, intro = ? where id = ?')
+        ->execute([json_encode($fields, JSON_UNESCAPED_UNICODE),
+          'Damit ich euch nicht irgendwelche, sondern wirklich passende DJs vorschlagen kann, beantwortet mir bitte kurz diese Fragen – dauert keine 5 Minuten. Die Vorschläge bekommt ihr danach direkt von mir. Und keine Sorge: Ihr bucht hier noch nichts. Vor einer Buchung führt ihr mit eurem Wunsch-DJ in Ruhe ein persönliches Infogespräch – das solltet ihr auch unbedingt tun. Dort klärt ihr alle Details wie Preis, Ablauf und Technik direkt miteinander.',
+          $row['id']]);
     }
   } catch (PDOException $e) {}
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
@@ -648,7 +661,7 @@ Markus Jankowski – DJ Lauschgift"],
 function seedFormTemplates(PDO $p): void {
   $tpls = [
     [1, 'DJ-Vorauswahl für eure Feier',
-     "Damit ich euch nicht irgendwelche, sondern wirklich passende DJs vorschlagen kann, beantwortet mir bitte kurz diese Fragen – dauert keine 5 Minuten. Die Vorschläge bekommt ihr danach direkt von mir.",
+     "Damit ich euch nicht irgendwelche, sondern wirklich passende DJs vorschlagen kann, beantwortet mir bitte kurz diese Fragen – dauert keine 5 Minuten. Die Vorschläge bekommt ihr danach direkt von mir. Und keine Sorge: Ihr bucht hier noch nichts. Vor einer Buchung führt ihr mit eurem Wunsch-DJ in Ruhe ein persönliches Infogespräch – das solltet ihr auch unbedingt tun. Dort klärt ihr alle Details wie Preis, Ablauf und Technik direkt miteinander.",
      [
        ['label'=>'Anlass eurer Feier','type'=>'select','options'=>['Hochzeit','Geburtstag','Firmenfeier','Sonstiges']],
        ['label'=>'Datum der Feier','type'=>'text'],
@@ -658,8 +671,6 @@ function seedFormTemplates(PDO $p): void {
        ['label'=>'Welche Musik hört ihr besonders gern? (Richtungen, Künstler, Lieblingslieder — was auf jeden Fall laufen soll)','type'=>'textarea'],
        ['label'=>'Und was mögt ihr überhaupt nicht? (darf auf keinen Fall laufen)','type'=>'textarea'],
        ['label'=>'Wie soll euer DJ auftreten?','type'=>'select','options'=>['Zurückhaltend im Hintergrund','Moderiert & animiert aktiv','Mischung aus beidem','Egal, Hauptsache gute Musik']],
-       ['label'=>'Euer ungefähres Budget für den DJ','type'=>'select','options'=>['bis 800 €','800–1.200 €','1.200–1.800 €','über 1.800 €','noch offen']],
-       ['label'=>'Braucht ihr zusätzlich Ton für Reden oder eine freie Trauung?','type'=>'select','options'=>['Ja','Nein','Weiß noch nicht']],
        ['label'=>'Sonst noch etwas, das der DJ wissen sollte?','type'=>'textarea'],
        ['label'=>'Ich bin einverstanden, dass meine Angaben zur DJ-Vermittlung an die Partner-Agentur DJ Bande (Münster) weitergegeben werden.','type'=>'checkbox'],
      ]],
