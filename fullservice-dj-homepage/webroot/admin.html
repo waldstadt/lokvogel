@@ -239,6 +239,7 @@ th.num{text-align:right}
       <button class="btn g sm" onclick="createDocFromBooking('angebot')">→ Angebot</button>
       <button class="btn g sm" onclick="createDocFromBooking('abschlag')">→ Abschlagsrechnung</button>
       <button class="btn sm" onclick="createDocFromBooking('rechnung')">→ Rechnung</button>
+      <button class="btn g sm" onclick="printPackliste()">📦 Packliste</button>
       <button class="btn g sm" onclick="createLieferschein()">📋 Lieferschein</button>
       <button class="btn g sm" onclick="printMietvertrag()">📄 Mietvertrag</button>
       <button class="btn g sm" onclick="openDigitalRental()">✍ Mietvertrag digital</button>
@@ -287,7 +288,8 @@ th.num{text-align:right}
   <!-- RECHNUNGEN -->
   <div class="pg" id="pg-inv">
     <div class="phead"><div><div class="pt">Rechnungen</div><div class="ps">inkl. Abschlags- und Schlussrechnungen</div></div>
-      <div><button class="btn g" onclick="openDocEditor(null,'abschlag')">+ Abschlag</button>
+      <div><button class="btn g sm" onclick="exportInvoicesCsv()">📊 CSV-Export</button>
+      <button class="btn g" onclick="openDocEditor(null,'abschlag')">+ Abschlag</button>
       <button class="btn" onclick="openDocEditor(null,'rechnung')">+ Neue Rechnung</button></div></div>
     <div id="invOverdue" class="sml" style="color:var(--red);margin-bottom:10px"></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Typ</th><th>Datum</th><th>Kunde</th><th class="num">Brutto</th><th>Fällig</th><th>Status</th></tr></thead><tbody id="invRows"></tbody></table></div>
@@ -494,6 +496,20 @@ th.num{text-align:right}
           <textarea id="sRental" style="min-height:160px;font-size:11px"></textarea>
           <div class="mut sml" style="margin-top:6px">Erscheint auf jedem gedruckten Mietvertrag (Buchungs-Detail → „📄 Mietvertrag“). Vor Livegang anwaltlich prüfen lassen.</div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveRental()">Speichern</button></div>
+        </div>
+        <div class="card"><h3>Kalender-Abo (iCal) <span class="mut sml" style="font-weight:400">— Termine automatisch im Handy-/PC-Kalender</span></h3>
+          <div class="sml mut" style="margin-bottom:8px">Diese URLs einmal als „Kalender abonnieren" ins Handy oder in Google/Apple/Outlook eintragen — drei Kalender in eigenen Farben, aktualisieren sich selbst. Nicht weitergeben (enthalten Kundendaten).</div>
+          <label>❓ Anfragen &amp; offene Angebote (vorläufig)</label><input id="icAnfragen" readonly onclick="this.select()" style="font-size:11px">
+          <label>🎧 Feste DJ-Buchungen</label><input id="icBuchungen" readonly onclick="this.select()" style="font-size:11px">
+          <label>🔩 Technikvermietung</label><input id="icTechnik" readonly onclick="this.select()" style="font-size:11px">
+        </div>
+        <div class="card"><h3>Packliste — Standard-Ausrüstung</h3>
+          <div class="grid2">
+            <div><label>Immer dabei (eine Zeile je Position)</label><textarea id="pkAlways" style="min-height:110px;font-size:11px"></textarea></div>
+            <div><label>Zusätzlich bei DJ-Auftritten</label><textarea id="pkDj" style="min-height:110px;font-size:11px"></textarea></div>
+          </div>
+          <div class="mut sml" style="margin:6px 0">Erscheint auf jeder Packliste (Buchungs-Detail → „📦 Packliste") zusätzlich zur zugeordneten Technik des Auftrags.</div>
+          <button class="btn sm" onclick="savePacking()">Speichern</button>
         </div>
         <div class="card"><h3>Website-Updates <span class="mut sml" style="font-weight:400">— Änderungen aus der Entwicklung live stellen, ohne FTP</span></h3>
           <div class="sml mut" style="margin-bottom:8px">So funktioniert's: Neue Versionen landen auf dem GitHub-Branch <code>live</code>. Der Server holt sie sich selbst — automatisch per Cronjob oder hier per Klick. Deine Daten (Datenbank, Uploads) bleiben unberührt, vor jedem Update wird gesichert.</div>
@@ -1276,7 +1292,9 @@ function updateDocTypeUI(t){
 function fillDocForm(){
   var d=curDoc;
   document.getElementById('docTitle').textContent=docTypeName(d.doc_type)+' '+d.number;
-  document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(d.status)+'">'+d.status+'</span>';
+  document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(d.status)+'">'+d.status+'</span>'+
+    (d.accepted_name?' · digital angenommen von <b style="color:var(--wh)">'+esc(d.accepted_name)+'</b>'+
+      (d.accept_signature?' <a onclick="showAcceptSig()">✍ Unterschrift ansehen</a>':''):'');
   document.getElementById('docType').value=d.doc_type;
   document.getElementById('docCust').value=d.customer_id||'';
   refreshBookOpts();
@@ -1292,6 +1310,10 @@ function fillDocForm(){
   document.getElementById('docOutro').value=d.outro_text||'';
   updateDocTypeUI(d.doc_type);
   renderItems();renderStatusBtns();applyDocLock();
+}
+function showAcceptSig(){
+  openModal('Unterschrift — '+esc(curDoc.number)+' · '+esc(curDoc.accepted_name||''),
+    '<img src="'+curDoc.accept_signature+'" style="background:#fff;border-radius:8px;max-width:100%;max-height:180px;display:block">');
 }
 function docLockedJs(d){return !!(d&&d.id&&['angebot','lieferschein'].indexOf(d.doc_type)<0&&d.status!=='entwurf')}
 function applyDocLock(){
@@ -1345,6 +1367,24 @@ function renderStatusBtns(){
   if(d.status!=='storniert')btns+='<button class="btn g sm" onclick="setDocStatus(\'storniert\')">Storno</button> ';
   document.getElementById('docStatusBtns').innerHTML=btns;
 }
+function exportInvoicesCsv(){
+  var year=prompt('Rechnungen welchen Jahres exportieren? (für den Steuerberater)',String(new Date().getFullYear()));
+  if(!year)return;
+  var list=CACHE.documents.filter(function(d){
+    return d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'&&d.status!=='entwurf'
+      &&(d.doc_date||'').slice(0,4)===year.trim();
+  }).sort(function(a,b){return (a.number||'').localeCompare(b.number||'')});
+  if(!list.length){toast('Keine Rechnungen im Jahr '+year+'.',1);return}
+  var num=function(n){return String(Number(n)||0).replace('.',',')};
+  var rows=[['Nummer','Typ','Datum','Kunde','Netto','USt','Brutto','Status','Bezahlt am'].join(';')];
+  list.forEach(function(d){
+    rows.push([d.number,docTypeName(d.doc_type),d.doc_date||'',(custName(d.customers)||'').replace(/;/g,','),
+      num(d.total_net),num(d.total_tax),num(d.total_gross),d.status,(d.paid_at||'').slice(0,10)].join(';'));
+  });
+  var blob=new Blob(['﻿'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rechnungen-'+year.trim()+'.csv';a.click();
+  toast(list.length+' Rechnungen exportiert ✓');
+}
 function isOverdue(d){
   return d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'&&d.status==='versendet'
     &&d.due_date&&d.due_date<new Date().toISOString().slice(0,10);
@@ -1361,8 +1401,10 @@ function composeReminderMail(){
     '<label>An</label><input id="remTo" value="'+esc(cust.email||'')+'">'+
     '<label>Betreff</label><input id="remSubject" value="'+esc(subj)+'">'+
     '<label>Text</label><textarea id="remBody" style="min-height:220px">'+esc(body)+'</textarea>'+
-    '<div style="margin-top:14px"><button class="btn" onclick="sendReminder()">📧 Im Mailprogramm öffnen</button></div>'+
-    '<div class="mut sml" style="margin-top:8px">Öffnet deine Mail-App mit fertigem Text — kurz prüfen, absenden, fertig. Der Vorgang wird in der Kunden-Timeline vermerkt.</div>');
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
+    '<button class="btn" onclick="adminSendMail(v(\'remTo\'),v(\'remSubject\'),document.getElementById(\'remBody\').value,curDoc.customer_id,closeModal)">📤 Direkt senden</button>'+
+    '<button class="btn g" onclick="sendReminder()">✉️ Im Mailprogramm öffnen</button></div>'+
+    '<div class="mut sml" style="margin-top:8px">Direkt senden verschickt sofort über deinen Server und protokolliert in der Timeline.</div>');
 }
 function sendReminder(){
   var d=curDoc,to=v('remTo');
@@ -2356,6 +2398,52 @@ function renderTechCheckPrint(t,comp,c,pr,scale,picUrls){
   window.print();
 }
 
+/* ===== Kalender-Abo + Packliste ===== */
+function loadIcal(){
+  fetch('api.php/ical/urls',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(j){
+    if(!j||!j.buchungen)return;
+    document.getElementById('icAnfragen').value=j.anfragen;
+    document.getElementById('icBuchungen').value=j.buchungen;
+    document.getElementById('icTechnik').value=j.technik;
+  }).catch(function(){});
+}
+var PK_ALWAYS_DEF='Kabelkiste (Strom, XLR, Klinke)\nVerlängerungskabel + Steckdosenleisten\nGaffa-Tape & Kabelbinder\nWerkzeug-Grundausstattung\nErsatzsicherungen & Ersatzkabel\nArbeitslicht / Taschenlampe';
+var PK_DJ_DEF='DJ-Controller / Player\nLaptop + Backup-USB-Sticks\nKopfhörer\nMikrofon (kabelgebunden als Backup)\nLaptopständer\nVisitenkarten';
+function renderPacking(){
+  var pk=S.packing||{};
+  var a=document.getElementById('pkAlways'),d=document.getElementById('pkDj');
+  if(a)a.value=pk.always!=null?pk.always:PK_ALWAYS_DEF;
+  if(d)d.value=pk.dj!=null?pk.dj:PK_DJ_DEF;
+}
+function savePacking(){
+  var pk={always:v('pkAlways'),dj:v('pkDj')};
+  api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'packing',value:pk}})
+    .then(function(){S.packing=pk;toast('Gespeichert ✓')}).catch(function(e){toast(e.message,1)});
+}
+function printPackliste(){
+  var b=curBook,comp=S.company||{},pk=S.packing||{};
+  var eq=(CACHE.be||[]).filter(function(x){return x.booking_id===b.id}).map(function(x){
+    var e=CACHE.equipment.find(function(q){return q.id===x.equipment_id})||{};
+    return x.qty+'× '+(e.name||'?')+(x.notes?' — '+x.notes:'');
+  });
+  var always=(pk.always!=null?pk.always:PK_ALWAYS_DEF).split('\n').filter(Boolean);
+  var dj=(b.kind!=='technik')?(pk.dj!=null?pk.dj:PK_DJ_DEF).split('\n').filter(Boolean):[];
+  var r=(b.rider&&typeof b.rider==='object')?b.rider:{};
+  var li=function(x){return '<div style="padding:5px 0;border-bottom:1px solid #eee">☐ &nbsp;'+esc(x)+'</div>'};
+  var sec=function(t,items){return items.length?('<div style="font-weight:700;margin:14px 0 4px">'+t+'</div>'+items.map(li).join('')):''};
+  document.getElementById('printArea').innerHTML=
+  '<div style="max-width:680px;margin:0 auto;padding:36px 20px;font-size:12px;line-height:1.5">'+
+  '<div style="font-size:17px;font-weight:700">📦 Packliste — '+esc(b.title||b.event_type||'Auftrag')+'</div>'+
+  '<div style="color:#555;margin-bottom:6px">'+dt(b.event_date)+(b.start_time?' · Beginn '+b.start_time.slice(0,5)+' Uhr':'')+
+  (r.setup_from?' · Aufbau ab '+r.setup_from.slice(0,5)+' Uhr':'')+
+  ((b.venue_name||b.venue_address)?' · '+esc([b.venue_name,b.venue_address].filter(Boolean).join(', ')):'')+'</div>'+
+  sec('Technik für diesen Auftrag',eq)+
+  sec('Immer dabei',always)+
+  sec('DJ-Standard',dj)+
+  '<div style="margin-top:20px;color:#777;border-top:1px solid #ddd;padding-top:8px;font-size:10.5px">Vor Abfahrt abhaken — nach der Veranstaltung dieselbe Liste für den Rückweg nutzen. '+esc(comp.name||'')+'</div></div>';
+  window.print();
+}
+
 /* ===== Website-Updates (Deployment) ===== */
 var DP_KEY='';
 function loadDeploy(){
@@ -2431,7 +2519,7 @@ function renderCmsReload(){
 
 /* ===== Einstellungen ===== */
 function renderSet(){
-  loadBackups();loadDeploy();
+  loadBackups();loadDeploy();loadIcal();renderPacking();
   var c=S.company||{},n=S.numbering||{},d=S.defaults||{};
   document.getElementById('sName').value=c.name||'';
   document.getElementById('sOwner').value=c.owner||'';
@@ -2844,9 +2932,18 @@ function openCompose(i,t,formLink){
     '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
     '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
-    '<button class="btn" onclick="copyReply()">📋 Text kopieren</button>'+
+    (i.email?'<button class="btn" onclick="adminSendMail(\''+esc(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+(i.customer_id||i.id||'')+'\',closeModal)">📤 Direkt senden</button>':'')+
+    '<button class="btn g" onclick="copyReply()">📋 Text kopieren</button>'+
     (i.email?'<button class="btn g" onclick="mailReply(\''+esc(i.email)+'\')">✉️ Im Mail-Programm öffnen</button>':'')+
     '</div><div class="sml mut" style="margin-top:8px">Tipp: Vor dem Senden prüfen, ob der Termin wirklich frei ist — die Vorlage geht davon aus.</div>');
+}
+function adminSendMail(to,subject,body,custId,cb){
+  fetch('api.php/sendmail',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+    body:JSON.stringify({to:to,subject:subject,body:body,customer_id:custId&&custId.length>30?custId:null})})
+    .then(function(r){return r.json()}).then(function(j){
+      if(j.mailed){toast('E-Mail versendet ✓ (in der Timeline protokolliert)');if(cb)cb()}
+      else toast(j.error||'Direktversand fehlgeschlagen — Firmen-E-Mail in den Einstellungen prüfen oder „Im Mail-Programm öffnen" nutzen.',1);
+    }).catch(function(e){toast(e.message,1)});
 }
 function copyReply(){
   var txt='Betreff: '+v('rSubject')+'\n\n'+document.getElementById('rBody').value;

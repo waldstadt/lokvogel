@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Lauschgift Veranstaltungstechnik – Technik mieten & Techniker buchen | Hemer</title>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"LocalBusiness","name":"Lauschgift Veranstaltungstechnik",
+"description":"Ton- und Lichttechnik für Veranstaltungen von 30 bis 200 Gästen: mieten, Techniker buchen, Festinstallation mit Wartung, Technik-Check und Tontechnik-Workshops. Lager in Hemer.",
+"address":{"@type":"PostalAddress","streetAddress":"Büttmecker Weg 35c","postalCode":"58675","addressLocality":"Hemer","addressCountry":"DE"},
+"telephone":"+4915236439373","url":"https://lauschgift.net/technik.html","areaServed":"Sauerland / NRW",
+"founder":{"@type":"Person","name":"Markus Jankowski"}}
+</script>
 <meta name="description" content="Lauschgift Veranstaltungstechnik: Profi-Ton- und Lichttechnik mieten oder Techniker inklusive Equipment buchen. Lager in Hemer, Abholung oder Lieferung mit Aufbau.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%233cc8b4'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -648,6 +655,20 @@ function loadWorkshops(){
     '<div><button class="btn ghost small" onclick="pickSondertermin()">Sondertermin anfragen</button></div></div>';
     document.getElementById('wsTermine').style.display='';
     document.getElementById('wsFallback').innerHTML='<a href="#wsTermine">Die nächsten Termine stehen unten ↓</a>';
+    /* Workshop-Termine als Event-Markup für Google */
+    var ld=document.createElement('script');ld.type='application/ld+json';
+    ld.textContent=JSON.stringify(list.map(function(w){
+      return {'@context':'https://schema.org','@type':'Event','name':w.title,
+        description:w.description||'Tontechnik-Workshop bei Lauschgift Veranstaltungstechnik',
+        startDate:w.event_date+(w.start_time?'T'+w.start_time.slice(0,5):''),
+        eventAttendanceMode:'https://schema.org/OfflineEventAttendanceMode',
+        location:{'@type':'Place',name:w.location||'Lager Hemer',
+          address:{'@type':'PostalAddress',addressLocality:'Hemer',postalCode:'58675',addressCountry:'DE'}},
+        organizer:{'@type':'Organization',name:'Lauschgift Veranstaltungstechnik',url:'https://lauschgift.net/technik.html'},
+        offers:{'@type':'Offer',price:w.price_net!=null?String(w.price_net):'',priceCurrency:'EUR',
+          availability:w.free>0?'https://schema.org/InStock':'https://schema.org/SoldOut'}};
+    }));
+    document.head.appendChild(ld);
   }).catch(function(){});
 }
 var wsWl=false;

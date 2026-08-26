@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>DJ Lauschgift – Hochzeits-DJ & Event-DJ | Deutschlandweit</title>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"LocalBusiness","name":"DJ Lauschgift",
+"description":"DJ für Hochzeiten, Geburtstage und Firmenfeiern – volle Tanzfläche ohne Schnickschnack. Über 20 Jahre Erfahrung, deutschlandweit im Einsatz.",
+"address":{"@type":"PostalAddress","streetAddress":"Büttmecker Weg 35c","postalCode":"58675","addressLocality":"Hemer","addressCountry":"DE"},
+"telephone":"+4915236439373","url":"https://lauschgift.net","priceRange":"ab 1.200 €",
+"areaServed":"Deutschland","founder":{"@type":"Person","name":"Markus Jankowski"}}
+</script>
 <meta name="description" content="DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23ff6f5b'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -357,7 +364,8 @@ footer a:hover{color:var(--acc)}
         </div>
         <div class="row">
           <div><label>Telefon</label><input type="tel" name="phone"></div>
-          <div><label>Datum der Feier</label><input type="date" name="event_date"></div>
+          <div><label>Datum der Feier</label><input type="date" name="event_date" onchange="checkDjDate(this.value)">
+            <div id="djAvail" style="font-size:12px;margin-top:5px"></div></div>
         </div>
         <div class="row">
           <div><label>Anlass</label>
@@ -400,6 +408,15 @@ footer a:hover{color:var(--acc)}
 <script>
 /* ===== Backend: api.php liegt im selben Verzeichnis ===== */
 var API='api.php';
+function checkDjDate(d){
+  var el=document.getElementById('djAvail');
+  if(!d){el.textContent='';return}
+  fetch(API+'/portal/availability/dj?date='+d).then(function(r){return r.json()}).then(function(j){
+    el.innerHTML=j.free
+      ?'<span style="color:#9fd49f">✓ Dieser Termin ist voraussichtlich noch frei — fragt am besten gleich an!</span>'
+      :'<span style="color:var(--mut)">An diesem Datum bin ich bereits gebucht. Fragt trotzdem an — manchmal geht doch etwas, und sonst empfehle ich euch kostenlos einen passenden DJ aus meinem Partner-Netzwerk.</span>';
+  }).catch(function(){el.textContent=''});
+}
 
 document.getElementById('year').textContent=new Date().getFullYear();
 

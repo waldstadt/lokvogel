@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 18;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 19;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -186,6 +186,10 @@ function upgrade(PDO $p): void {
     "alter table customers add column portal_invite_expires integer",
     "alter table bookings add column customer_notes text",
   ], portalAccountDdl()) as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+  if ($v < 19) foreach ([
+    "alter table documents add column accepted_name text",
+    "alter table documents add column accept_signature text",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -376,7 +380,8 @@ create table documents (id text primary key, share_token text, doc_type text not
   parent_id text, status text default 'entwurf', doc_date text, valid_until text, due_date text,
   tax_rate real default 19, is_small_business integer default 0, intro_text text, outro_text text,
   total_net real default 0, total_tax real default 0, total_gross real default 0,
-  deposit_deducted real default 0, sent_at text, paid_at text, created_at text, updated_at text);
+  deposit_deducted real default 0, sent_at text, paid_at text,
+  accepted_name text, accept_signature text, created_at text, updated_at text);
 create table email_templates (id text primary key, sort integer default 0, name text not null,
   subject text, body text, created_at text);
 create table products (id text primary key, sku text unique, sort integer default 0,
@@ -771,6 +776,10 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       $cols = array_keys($row);
       $p->prepare("insert into inquiries (" . implode(',', $cols) . ") values (" .
         implode(',', array_fill(0, count($cols), '?')) . ")")->execute(array_values($row));
+      notifyOwner('🔔 Neue Anfrage: ' . $row['name'] . ($row['event_type'] ?? '' ? ' — ' . $row['event_type'] : ''),
+        "Name: {$row['name']}\nE-Mail: " . ($row['email'] ?? '–') . "\nTelefon: " . ($row['phone'] ?? '–') .
+        "\nAnlass: " . ($row['event_type'] ?? '–') . "\nDatum: " . ($row['event_date'] ?? '–') .
+        "\nOrt: " . ($row['location'] ?? '–') . "\n\n" . ($row['message'] ?? ''));
       out(null, 201);
     } else fail('Nicht angemeldet.', 401);
   }
@@ -1058,6 +1067,127 @@ function workshopInvoice(PDO $p, string $signupId): array {
   return ['ok' => true, 'number' => $number, 'mailed' => $mailed, 'portal' => $portal];
 }
 
+/* Benachrichtigung an den Inhaber (Firmen-E-Mail aus den Einstellungen) */
+function notifyOwner(string $subject, string $body): bool {
+  $comp = json_decode(db()->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+  $to = trim((string)($comp['email'] ?? ''));
+  if ($to === '') return false;
+  return sendMailSafe($to, $subject, $body . "\n\n— automatische Benachrichtigung deines Backoffice\n" . baseUrl() . "/admin.html");
+}
+
+/* ---------- Kalender-Feeds (iCal) ---------- */
+function icalKey(): string {
+  $p = db();
+  $row = $p->query("select value from settings where key='ical'")->fetchColumn();
+  $cfg = $row ? (json_decode($row, true) ?: []) : [];
+  if (empty($cfg['key'])) {
+    $cfg['key'] = bin2hex(random_bytes(16));
+    $p->prepare("insert into settings (key, value, updated_at) values ('ical', ?, ?)
+        on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
+      ->execute([json_encode($cfg), now()]);
+  }
+  return $cfg['key'];
+}
+function icsEsc(string $s): string {
+  return str_replace(["\\", "\n", ",", ";"], ["\\\\", "\\n", "\\,", "\\;"], $s);
+}
+function icsEvent(string $uid, string $summary, string $dateStart, ?string $dateEnd, ?string $t1, ?string $t2, string $desc, string $loc, bool $tentative): string {
+  $out = "BEGIN:VEVENT\r\nUID:$uid@lauschgift\r\nDTSTAMP:" . gmdate('Ymd\THis\Z') . "\r\n";
+  if ($t1) {
+    $d1 = str_replace('-', '', $dateStart) . 'T' . str_replace(':', '', substr($t1, 0, 5)) . '00';
+    $endDate = $dateStart;
+    if ($t2 && $t2 < $t1) $endDate = gmdate('Y-m-d', strtotime($dateStart) + 86400);   // über Mitternacht
+    $d2 = str_replace('-', '', $endDate) . 'T' . str_replace(':', '', substr($t2 ?: $t1, 0, 5)) . '00';
+    $out .= "DTSTART:$d1\r\nDTEND:$d2\r\n";
+  } else {
+    $end = gmdate('Ymd', strtotime(($dateEnd && $dateEnd >= $dateStart ? $dateEnd : $dateStart)) + 86400);
+    $out .= 'DTSTART;VALUE=DATE:' . str_replace('-', '', $dateStart) . "\r\nDTEND;VALUE=DATE:$end\r\n";
+  }
+  $out .= 'SUMMARY:' . icsEsc($summary) . "\r\n";
+  if ($loc !== '') $out .= 'LOCATION:' . icsEsc($loc) . "\r\n";
+  if ($desc !== '') $out .= 'DESCRIPTION:' . icsEsc($desc) . "\r\n";
+  if ($tentative) $out .= "STATUS:TENTATIVE\r\n";
+  return $out . "END:VEVENT\r\n";
+}
+function serveIcal(string $typ): never {
+  $p = db();
+  $ev = '';
+  $custName = fn($b) => trim((string)($b['company'] ?: trim(($b['first_name'] ?? '') . ' ' . ($b['last_name'] ?? ''))));
+  if ($typ === 'anfragen') {
+    $q = $p->query("select b.*, c.first_name, c.last_name, c.company, c.phone from bookings b
+      join customers c on c.id = b.customer_id where b.status in ('anfrage','angebot')");
+    foreach ($q->fetchAll() as $b)
+      $ev .= icsEvent($b['id'], '? ' . ($b['title'] ?: $b['event_type'] ?: 'Anfrage') . ' (' . $b['status'] . ')',
+        $b['event_date'], $b['end_date'], $b['start_time'], $b['end_time'],
+        $custName($b) . ($b['phone'] ? ' · ' . $b['phone'] : '') . ($b['guests'] ? ' · ' . $b['guests'] . ' Gäste' : ''),
+        trim(($b['venue_name'] ?? '') . ' ' . ($b['venue_address'] ?? '')), true);
+    $qi = $p->query("select * from inquiries where status = 'neu' and event_date is not null and event_date != ''");
+    foreach ($qi->fetchAll() as $i)
+      $ev .= icsEvent('inq-' . $i['id'], '? Anfrage: ' . ($i['event_type'] ?: 'Feier') . ' — ' . $i['name'],
+        $i['event_date'], null, null, null,
+        trim(($i['email'] ?? '') . ' ' . ($i['phone'] ?? '')) . ($i['message'] ? ' · ' . mb_substr($i['message'], 0, 150) : ''),
+        (string)($i['location'] ?? ''), true);
+  } elseif ($typ === 'buchungen') {
+    $q = $p->query("select b.*, c.first_name, c.last_name, c.company, c.phone from bookings b
+      join customers c on c.id = b.customer_id
+      where b.status in ('gebucht','abgeschlossen') and b.kind in ('dj','dj_technik')");
+    foreach ($q->fetchAll() as $b) {
+      $r = json_decode((string)($b['rider'] ?? ''), true) ?: [];
+      $desc = $custName($b) . ($b['phone'] ? ' · ' . $b['phone'] : '') . ($b['guests'] ? ' · ' . $b['guests'] . ' Gäste' : '');
+      if (!empty($r['setup_from'])) $desc .= ' · Aufbau ab ' . substr($r['setup_from'], 0, 5);
+      if (!empty($r['contact_name'])) $desc .= ' · vor Ort: ' . $r['contact_name'] . (!empty($r['contact_phone']) ? ' ' . $r['contact_phone'] : '');
+      $ev .= icsEvent($b['id'], '🎧 ' . ($b['title'] ?: $b['event_type'] ?: 'Auftrag'),
+        $b['event_date'], $b['end_date'], $b['start_time'], $b['end_time'], $desc,
+        trim(($b['venue_name'] ?? '') . ' ' . ($b['venue_address'] ?? '')), false);
+    }
+  } else {   // technik
+    $q = $p->query("select b.*, c.first_name, c.last_name, c.company, c.phone from bookings b
+      join customers c on c.id = b.customer_id
+      where b.status in ('gebucht','abgeschlossen') and b.kind = 'technik'");
+    foreach ($q->fetchAll() as $b) {
+      $eq = $p->prepare('select be.qty, e.name from booking_equipment be join equipment e on e.id = be.equipment_id where be.booking_id = ?');
+      $eq->execute([$b['id']]);
+      $list = implode(', ', array_map(fn($x) => $x['qty'] . '× ' . $x['name'], $eq->fetchAll()));
+      $ev .= icsEvent($b['id'], '🔩 Vermietung: ' . ($b['title'] ?: 'Technik'),
+        $b['event_date'], $b['end_date'], $b['start_time'], $b['end_time'],
+        $custName($b) . ($b['phone'] ? ' · ' . $b['phone'] : '') . ($list ? ' · ' . $list : ''),
+        trim(($b['venue_name'] ?? '') . ' ' . ($b['venue_address'] ?? '')), false);
+    }
+  }
+  $names = ['anfragen' => 'Lauschgift · Anfragen', 'buchungen' => 'Lauschgift · Buchungen', 'technik' => 'Lauschgift · Vermietung'];
+  header('Content-Type: text/calendar; charset=utf-8');
+  header('Content-Disposition: inline; filename="' . $typ . '.ics"');
+  echo "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Lauschgift//Backoffice//DE\r\n" .
+    'X-WR-CALNAME:' . icsEsc($names[$typ]) . "\r\nX-PUBLISHED-TTL:PT30M\r\n" . $ev . "END:VCALENDAR\r\n";
+  exit;
+}
+
+/* Täglicher Check (läuft mit dem Backup-Cron): Digest an den Inhaber */
+function dailyDigest(): array {
+  $p = db();
+  $row = $p->query("select value from settings where key='digest'")->fetchColumn();
+  $cfg = $row ? (json_decode($row, true) ?: []) : [];
+  $today = gmdate('Y-m-d');
+  if (($cfg['last'] ?? '') === $today) return ['skipped' => 'heute schon gelaufen'];
+  $cfg['last'] = $today;
+  $p->prepare("insert into settings (key, value, updated_at) values ('digest', ?, ?)
+      on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
+    ->execute([json_encode($cfg), now()]);
+  $parts = [];
+  $od = $p->query("select count(*) c, coalesce(sum(total_gross - coalesce(deposit_deducted,0)),0) s from documents
+    where doc_type not in ('angebot','lieferschein') and status = 'versendet' and due_date < '$today'")->fetch();
+  if ((int)$od['c']) $parts[] = '⚠ ' . $od['c'] . ' überfällige Rechnung(en), zusammen ' . number_format((float)$od['s'], 2, ',', '.') . ' € — Zahlungserinnerung im Backoffice.';
+  $wt = $p->query("select c.first_name, c.last_name, c.company, max(d.paid_at) lastpaid from document_items i
+    join documents d on d.id = i.document_id join customers c on c.id = d.customer_id
+    where i.description like '%Wartungsvertrag%' and d.status = 'bezahlt'
+    group by d.customer_id having max(d.paid_at) < '" . gmdate('Y-m-d', time() - 330 * 86400) . "'")->fetchAll();
+  foreach ($wt as $w)
+    $parts[] = '🔧 Wartung fällig: ' . trim(($w['company'] ?: trim($w['first_name'] . ' ' . $w['last_name']))) . ' (letzte bezahlte Wartung: ' . substr((string)$w['lastpaid'], 0, 10) . ')';
+  if (!$parts) return ['sent' => false, 'reason' => 'nichts zu melden'];
+  $ok = notifyOwner('Dein Tages-Update: ' . count($parts) . ' Punkt(e)', implode("\n", $parts));
+  return ['sent' => $ok, 'items' => count($parts)];
+}
+
 /* ---------- Backup ---------- */
 function backupKey(): string {
   $p = db();
@@ -1270,12 +1400,24 @@ function handlePortal(string $path, string $method, $body): never {
     if (!in_array($kind, ['accept','decline','comment','callback','bande'])) fail('Unbekannte Aktion.');
     $msg = mb_substr(trim((string)($body['message'] ?? '')), 0, 4000);
     $phone = mb_substr(trim((string)($body['phone'] ?? '')), 0, 60);
-    if ($kind === 'accept' && $d['status'] !== 'storniert')
-      $p->prepare("update documents set status='angenommen', updated_at=? where id=?")->execute([now(), $d['id']]);
+    if ($kind === 'accept' && $d['status'] !== 'storniert') {
+      $accName = mb_substr(trim((string)($body['name'] ?? '')), 0, 120);
+      $sigRaw = (string)($body['signature'] ?? '');
+      $sig = ($sigRaw !== '' && decodeDataUrl($sigRaw, ['png'], 400 * 1024)) ? $sigRaw : null;
+      $p->prepare("update documents set status='angenommen', accepted_name=?, accept_signature=?, updated_at=? where id=?")
+        ->execute([$accName ?: null, $sig, now(), $d['id']]);
+      docAudit($p, $d['id'], 'angenommen', $d['number'] . ' — vom Kunden angenommen' . ($accName ? ' und unterschrieben: ' . $accName : '') . ' (Portal)');
+    }
     if ($kind === 'decline' && $d['status'] !== 'storniert')
       $p->prepare("update documents set status='abgelehnt', updated_at=? where id=?")->execute([now(), $d['id']]);
     $p->prepare('insert into doc_events (id,document_id,kind,message,phone,created_at) values (?,?,?,?,?,?)')
       ->execute([uuid(), $d['id'], $kind, $msg, $phone, now()]);
+    $labels = ['accept' => '🎉 Angebot ANGENOMMEN', 'decline' => 'Angebot abgelehnt', 'comment' => '💬 Frage zum Angebot',
+      'callback' => '📞 Rückruf gewünscht', 'bande' => 'DJ-Vermittlung gewünscht'];
+    notifyOwner($labels[$kind] . ': ' . $d['number'],
+      'Kunde: ' . trim(($d['company'] ?: $d['first_name'] . ' ' . $d['last_name'])) .
+      "\nDokument: " . $d['number'] . ' über ' . number_format((float)$d['total_gross'], 2, ',', '.') . ' €' .
+      ($msg !== '' ? "\n\nNachricht:\n$msg" : '') . ($phone !== '' ? "\nTelefon: $phone" : ''));
     out(['ok' => true], 201);
   }
   if (preg_match('#^portal/form/([a-f0-9]+)$#', $path, $m)) {
@@ -1300,6 +1442,7 @@ function handlePortal(string $path, string $method, $body): never {
           values (?,?,?,?,?,?,?,?)')
           ->execute([uuid(), $f['customer_id'], 'note', 'in', 'Fragebogen beantwortet: '.$f['title'], trim($sum), now(), now()]);
       }
+      notifyOwner('📋 Fragebogen beantwortet: ' . $f['title'], 'Die Antworten stehen in der Kunden-Timeline im Backoffice.');
       out(['ok' => true], 201);
     }
   }
@@ -1347,6 +1490,8 @@ function handlePortal(string $path, string $method, $body): never {
         values (?,?,?,?,?,?,?,?,?)')
       ->execute([uuid(), $r['cust_id'], $r['booking_id'], 'note', 'in', 'Mietvertrag digital unterschrieben',
         'Mietvertrag zur Buchung am '.$r['event_date'].' wurde online unterschrieben von: '.$name.'. Ausweiskopien (Vorder-/Rückseite) liegen geschützt im System.', now(), now()]);
+    notifyOwner('✍ Mietvertrag unterschrieben: ' . ($r['title'] ?: $r['event_date']),
+      "Unterschrieben von: $name\nTermin: " . $r['event_date'] . "\nAusweiskopien liegen geschützt im System.");
     out(['ok' => true], 201);
   }
   /* Workshops: öffentliche Termine mit freien Plätzen, Anmeldung mit Kapazitätsprüfung */
@@ -1401,6 +1546,9 @@ function handlePortal(string $path, string $method, $body): never {
       $r = workshopInvoice($p, $sid);
       if (!empty($r['ok'])) $inv = ['number' => $r['number'], 'mailed' => !empty($r['mailed'])];
     }
+    notifyOwner(($status === 'warteliste' ? '⏳ Warteliste' : '🎟 Workshop-Buchung') . ': ' . $w['title'],
+      "Name: $name ($seats Platz/Plätze)\nE-Mail: $email\nTermin: " . $w['event_date'] .
+      ($inv ? "\nRechnung: " . $inv['number'] . ($inv['mailed'] ? ' (automatisch gemailt)' : ' (Mailversand prüfen!)') : ''));
     out(['ok' => true, 'status' => $status, 'invoice' => $inv,
       'free' => max(0, $free - ($status === 'angemeldet' ? $seats : 0))], 201);
   }
@@ -1425,6 +1573,16 @@ function handlePortal(string $path, string $method, $body): never {
     out(['ok' => true, 'name' => $pt['name'], 'discount_pct' => (float)($defs['partner_discount_pct'] ?? 20)]);
   }
   /* Verfügbarkeit eines Artikels im Zeitraum (gegen alle nicht stornierten Aufträge) */
+  /* DJ-Verfügbarkeit für ein Datum (weiche Auskunft fürs Anfrageformular) */
+  if ($path === 'portal/availability/dj' && $method === 'GET') {
+    $d = (string)($_GET['date'] ?? '');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) fail('Datum fehlt.');
+    $st = $p->prepare("select count(*) from bookings
+      where kind in ('dj','dj_technik') and status in ('gebucht','abgeschlossen')
+      and event_date <= ? and coalesce(nullif(end_date,''), event_date) >= ?");
+    $st->execute([$d, $d]);
+    out(['free' => (int)$st->fetchColumn() === 0]);
+  }
   if ($path === 'portal/availability' && $method === 'GET') {
     $eq = (string)($_GET['eq'] ?? ''); $from = (string)($_GET['from'] ?? ''); $to = (string)($_GET['to'] ?? '');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) fail('Zeitraum fehlt.');
@@ -1488,7 +1646,36 @@ try {
   if ($path === 'cron/backup' && $method === 'GET') {
     $key = (string)($_GET['key'] ?? '');
     if ($key === '' || !hash_equals(backupKey(), $key)) { usleep(500000); fail('Ungültiger Schlüssel.', 401); }
-    out(runBackup());
+    $r = runBackup();
+    $r['digest'] = dailyDigest();
+    out($r);
+  }
+  /* Kalender-Abos (iCal): drei Feeds — Anfragen, feste DJ-Buchungen, Technikvermietung */
+  if (preg_match('#^ical/([a-f0-9]{32})/(anfragen|buchungen|technik)\.ics$#', $path, $m) && $method === 'GET') {
+    if (!hash_equals(icalKey(), $m[1])) { usleep(500000); fail('Ungültiger Schlüssel.', 401); }
+    serveIcal($m[2]);
+  }
+  if ($path === 'ical/urls' && $method === 'GET') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $k = icalKey(); $b = baseUrl();
+    out(['anfragen' => "$b/api.php/ical/$k/anfragen.ics",
+      'buchungen' => "$b/api.php/ical/$k/buchungen.ics",
+      'technik' => "$b/api.php/ical/$k/technik.ics"]);
+  }
+  /* Direktversand aus dem Backoffice */
+  if ($path === 'sendmail' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $to = trim((string)($body['to'] ?? ''));
+    $subject = trim((string)($body['subject'] ?? ''));
+    $text = (string)($body['body'] ?? '');
+    if ($to === '' || $subject === '' || trim($text) === '') fail('Empfänger, Betreff und Text erforderlich.');
+    $mailed = sendMailSafe($to, $subject, $text);
+    if ($mailed && !empty($body['customer_id'])) {
+      db()->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, created_at)
+          values (?,?,?,?,?,?,?,?)')
+        ->execute([uuid(), (string)$body['customer_id'], 'email', 'out', $subject, $text, now(), now()]);
+    }
+    out(['mailed' => $mailed]);
   }
   if ($path === 'backup/run' && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
