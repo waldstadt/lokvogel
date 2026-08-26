@@ -214,6 +214,8 @@ th.num{text-align:right}
       </div>
       <div>
         <div class="card"><h3>Stammdaten</h3><div id="cdData" class="sml"></div></div>
+        <div class="card"><h3>Kundenportal <button class="btn sm" style="float:right" onclick="portalInvite()">🔑 Einladungslink</button></h3>
+          <div id="cdPortal" class="sml mut">–</div></div>
         <div class="card"><h3>Buchungen</h3><div id="cdBookings" class="sml mut">–</div></div>
         <div class="card"><h3>Dokumente</h3><div id="cdDocs" class="sml mut">–</div></div>
       </div>
@@ -879,6 +881,7 @@ function openCustDetail(id){
     row('Adresse',[c.street,[c.zip,c.city].filter(Boolean).join(' ')].filter(Boolean).join(', '))+
     row('Tags',(c.tags||[]).join(', '))+row('Notizen',c.notes)+
     (c.tech_check&&c.tech_check.date?row('Technik-Check',dt(c.tech_check.date)+' — '+(c.tech_check.recommendation||'')):'');
+  renderCdPortal();
   var books=CACHE.bookings.filter(function(b){return b.customer_id===id});
   document.getElementById('cdBookings').innerHTML=books.map(function(b){
     return '<div style="padding:4px 0"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Auftrag')+'</a> <span class="b '+bookBadge(b.status)+'">'+b.status+'</span></div>';
@@ -994,7 +997,10 @@ function openBookDetail(id){
   document.getElementById('bdData').innerHTML=
     row('Anlass',b.event_type)+row('Zeit',[b.start_time,b.end_time].filter(Boolean).join(' – '))+
     row('Location',b.venue_name)+row('Adresse',b.venue_address)+row('Gäste',b.guests)+
-    row('Gage netto',b.fee_net?euro(b.fee_net):'')+row('Notizen',b.notes);
+    row('Gage netto',b.fee_net?euro(b.fee_net):'')+row('Notizen',b.notes)+
+    (b.customer_notes&&(b.customer_notes.schedule||b.customer_notes.music||b.customer_notes.agreements)
+      ?'<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b style="color:var(--acc)">Vom Kunden gepflegt'+(b.customer_notes.updated_at?' ('+dt(b.customer_notes.updated_at)+')':'')+':</b>'+
+       row('Programmablauf',b.customer_notes.schedule)+row('Musikwünsche',b.customer_notes.music)+row('Vereinbarungen',b.customer_notes.agreements)+'</div>':'');
   renderBe();renderRider();
   var docs=CACHE.documents.filter(function(d){return d.booking_id===id});
   document.getElementById('bdDocs').innerHTML=docs.map(function(d){
@@ -2179,6 +2185,49 @@ function saveFriend(id){
     .then(function(){closeModal();toast('Gespeichert ✓');reloadFriends()}).catch(function(e){toast(e.message,1)});
 }
 function reloadFriends(){api('friends?select=*&order=sort').then(function(r){CACHE.friends=r||[];renderFriendAdmin()})}
+
+/* ===== Kundenportal-Verwaltung ===== */
+function renderCdPortal(){
+  var c=curCust,el=document.getElementById('cdPortal');
+  var status=c.portal_hash?'<span class="b green">Zugang aktiv</span>':(c.portal_invite?'<span class="b blue">eingeladen</span>':'<span class="b grey">kein Zugang</span>');
+  api('customer_files?customer_id=eq.'+c.id+'&order=created_at.desc').then(function(files){
+    var fl=(files||[]).map(function(f){
+      return '<div style="padding:4px 0">'+(f.kind==='foto'?'🖼':'📄')+' <a onclick="adminOpenCustFile(\''+f.id+'\')">'+esc(f.name)+'</a> <span class="mut">('+Math.max(1,Math.round(f.size/1024))+' KB · '+dt(f.created_at)+')</span></div>';
+    }).join('');
+    el.innerHTML='Status: '+status+
+      '<div class="mut" style="margin:6px 0 4px">Der Kunde sieht dort alle Unterlagen (außer Entwürfe) und pflegt Programmablauf, Musikwünsche und Uploads.</div>'+
+      (fl?'<div style="margin-top:6px"><b style="color:var(--wh)">Vom Kunden hochgeladen:</b>'+fl+'</div>':'');
+  }).catch(function(){el.innerHTML='Status: '+status});
+}
+function portalInvite(){
+  var c=curCust;
+  fetch('api.php/custportal/invite/'+c.id,{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+    body:JSON.stringify({mail:false})})
+    .then(function(r){return r.json()}).then(function(j){
+      if(j.error){toast(j.error,1);return}
+      openModal('Portal-Einladung — '+esc(custName(c)),
+        '<div class="sml mut" style="margin-bottom:8px">Mit diesem Link setzt der Kunde einmalig sein Passwort (7 Tage gültig). Danach loggt er sich jederzeit mit E-Mail + Passwort ein.'+(j.has_account?' <b>Achtung: Es existiert schon ein Zugang — der Link setzt das Passwort neu.</b>':'')+'</div>'+
+        '<label>Einladungslink</label><input value="'+j.url+'" readonly onclick="this.select()">'+
+        '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn sm" onclick="navigator.clipboard.writeText(\''+j.url+'\');toast(\'Link kopiert ✓\')">📋 Kopieren</button>'+
+        (c.email?'<button class="btn g sm" onclick="portalInviteMail()">📧 Per E-Mail senden</button>':'')+'</div>');
+      curCust.portal_invite='x';renderCdPortal();
+    }).catch(function(e){toast(e.message,1)});
+}
+function portalInviteMail(){
+  fetch('api.php/custportal/invite/'+curCust.id,{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+    body:JSON.stringify({mail:true})})
+    .then(function(r){return r.json()}).then(function(j){
+      closeModal();
+      toast(j.mailed?'Einladung per E-Mail versendet ✓':'Mailversand fehlgeschlagen — Link bitte kopieren und manuell senden.',j.mailed?0:1);
+    }).catch(function(e){toast(e.message,1)});
+}
+function adminOpenCustFile(id){
+  fetch('api.php/custfile/'+id,{headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){if(!r.ok)throw new Error('Datei nicht gefunden.');return r.blob()})
+    .then(function(b){window.open(URL.createObjectURL(b),'_blank')})
+    .catch(function(e){toast(e.message,1)});
+}
 
 /* ===== Technik-Check (Protokoll am Kunden + Druckbericht) ===== */
 var TC_FUNK=['Alles funktioniert','Funktioniert mit Einschränkungen','Teilweise defekt','Wesentliche Defekte'];

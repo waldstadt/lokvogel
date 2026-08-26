@@ -26,14 +26,14 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 17;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 18;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
   'settings' => ['value'], 'site_content' => ['value'],
   'packages' => ['features'],
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
-  'products' => ['bundle'], 'bookings' => ['rider'], 'rental_contracts' => ['snapshot'],
+  'products' => ['bundle'], 'bookings' => ['rider', 'customer_notes'], 'rental_contracts' => ['snapshot'],
   'customers' => ['tags', 'tech_check'],
 ];
 const BOOL_COLS = [
@@ -49,7 +49,7 @@ const BOOL_COLS = [
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
-  'workshop_events','workshop_signups','doc_audit'];
+  'workshop_events','workshop_signups','doc_audit','customer_files'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -180,6 +180,12 @@ function upgrade(PDO $p): void {
     seedTechCheckForm($p);
   }
   if ($v < 17) seedServiceProducts($p);
+  if ($v < 18) foreach (array_merge([
+    "alter table customers add column portal_hash text",
+    "alter table customers add column portal_invite text",
+    "alter table customers add column portal_invite_expires integer",
+    "alter table bookings add column customer_notes text",
+  ], portalAccountDdl()) as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -231,6 +237,16 @@ function seedServiceProducts(PDO $p): void {
           values (?,?,?,?,?,?,?,?,?,1,?)')
         ->execute([uuid(), $sku, $s, $cat, $n, $d, $u, $pr, '[]', now()]);
   }
+}
+
+function portalAccountDdl(): array {
+  return [
+    "create table if not exists cust_tokens (token text primary key,
+      customer_id text not null references customers(id) on delete cascade, expires integer)",
+    "create table if not exists customer_files (id text primary key,
+      customer_id text not null references customers(id) on delete cascade,
+      booking_id text, kind text default 'dokument', name text, file text, size integer, created_at text)",
+  ];
 }
 
 function docAuditDdl(): string {
@@ -336,6 +352,7 @@ create table inquiries (id text primary key, name text not null, email text, pho
 create table customers (id text primary key, kind text default 'privat', status text default 'lead',
   first_name text, last_name text, company text, email text, phone text, whatsapp text,
   street text, zip text, city text, source text, tags text default '[]', notes text, tech_check text,
+  portal_hash text, portal_invite text, portal_invite_expires integer,
   created_at text, updated_at text);
 create table communications (id text primary key,
   customer_id text not null references customers(id) on delete cascade,
@@ -345,7 +362,7 @@ create table bookings (id text primary key,
   customer_id text not null references customers(id) on delete cascade,
   status text default 'anfrage', kind text default 'dj', event_type text, title text,
   event_date text not null, end_date text, start_time text, end_time text,
-  venue_name text, venue_address text, guests integer, fee_net real, notes text, rider text,
+  venue_name text, venue_address text, guests integer, fee_net real, notes text, rider text, customer_notes text,
   review_requested integer default 0, created_at text, updated_at text);
 create table booking_equipment (id text primary key,
   booking_id text not null references bookings(id) on delete cascade,
@@ -392,6 +409,7 @@ SQL);
   $p->exec(friendsDdl());
   foreach (workshopsDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
+  foreach (portalAccountDdl() as $sql) $p->exec($sql);
   seed($p);
   seedExtraTemplates($p);
   seedServiceProducts($p);
@@ -1070,8 +1088,162 @@ function runBackup(): array {
   return ['ok' => true, 'file' => $name, 'size' => filesize("$dir/$name"), 'kept' => count($files), 'pruned' => $deleted];
 }
 
+/* Kundenkonto: eingeloggter Kunde aus Bearer-Token */
+function custAuth(): ?array {
+  $h = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+  if (!preg_match('/Bearer\s+([a-f0-9]{64})/i', $h, $m)) return null;
+  $st = db()->prepare('select c.* from cust_tokens t join customers c on c.id = t.customer_id
+    where t.token = ? and t.expires > ?');
+  $st->execute([$m[1], time()]);
+  return $st->fetch() ?: null;
+}
+function custToken(PDO $p, string $custId): string {
+  $tok = bin2hex(random_bytes(32));
+  $p->prepare('insert into cust_tokens (token, customer_id, expires) values (?,?,?)')
+    ->execute([$tok, $custId, time() + 30 * 86400]);
+  $p->prepare('delete from cust_tokens where expires < ?')->execute([time()]);
+  return $tok;
+}
+
 function handlePortal(string $path, string $method, $body): never {
   $p = db();
+  /* ---- Kundenkonto ---- */
+  if ($path === 'portal/account/login' && $method === 'POST') {
+    $email = strtolower(trim((string)($body['email'] ?? '')));
+    $pass = (string)($body['password'] ?? '');
+    $st = $p->prepare('select * from customers where lower(email) = ? and portal_hash is not null');
+    $st->execute([$email]);
+    $c = $st->fetch();
+    if (!$c || !password_verify($pass, (string)$c['portal_hash'])) { usleep(500000); fail('E-Mail oder Passwort falsch.', 401); }
+    out(['token' => custToken($p, $c['id']), 'name' => trim(($c['company'] ?: trim($c['first_name'] . ' ' . $c['last_name'])))]);
+  }
+  if ($path === 'portal/account/set_password' && $method === 'POST') {
+    $inv = (string)($body['invite'] ?? '');
+    $pass = (string)($body['password'] ?? '');
+    if (!preg_match('/^[a-f0-9]{24,64}$/', $inv)) fail('Ungültiger Link.', 404);
+    if (strlen($pass) < 8) fail('Passwort bitte mit mindestens 8 Zeichen.');
+    $st = $p->prepare('select * from customers where portal_invite = ? and portal_invite_expires > ?');
+    $st->execute([$inv, time()]);
+    $c = $st->fetch();
+    if (!$c) fail('Dieser Einladungslink ist abgelaufen — bitte einen neuen anfordern.', 404);
+    $p->prepare('update customers set portal_hash = ?, portal_invite = null, portal_invite_expires = null where id = ?')
+      ->execute([password_hash($pass, PASSWORD_DEFAULT), $c['id']]);
+    out(['token' => custToken($p, $c['id']), 'email' => $c['email'],
+      'name' => trim(($c['company'] ?: trim($c['first_name'] . ' ' . $c['last_name'])))], 201);
+  }
+  if ($path === 'portal/account/forgot' && $method === 'POST') {
+    $email = strtolower(trim((string)($body['email'] ?? '')));
+    $st = $p->prepare('select * from customers where lower(email) = ? and portal_hash is not null');
+    $st->execute([$email]);
+    $c = $st->fetch();
+    if ($c) {
+      $inv = bin2hex(random_bytes(24));
+      $p->prepare('update customers set portal_invite = ?, portal_invite_expires = ? where id = ?')
+        ->execute([$inv, time() + 2 * 86400, $c['id']]);
+      sendMailSafe((string)$c['email'], 'Neues Passwort für deinen Kundenbereich',
+        "Hallo,\n\nüber diesen Link kannst du ein neues Passwort für deinen Kundenbereich setzen (48 Stunden gültig):\n" .
+        baseUrl() . "/portal.html?einladung=$inv\n\nFalls du das nicht warst, kannst du diese Mail ignorieren.\n");
+    }
+    out(['ok' => true]);   // keine Auskunft, ob die Adresse existiert
+  }
+  if (str_starts_with($path, 'portal/account/')) {
+    $me = custAuth();
+    if (!$me) fail('Bitte einloggen.', 401);
+    if ($path === 'portal/account/me' && $method === 'GET') {
+      $bk = $p->prepare("select id, title, event_type, event_date, end_date, status, kind, customer_notes
+        from bookings where customer_id = ? and status != 'storniert' order by event_date desc");
+      $bk->execute([$me['id']]);
+      $bookings = array_map(fn($b) => ['id' => $b['id'], 'title' => $b['title'] ?: $b['event_type'],
+        'event_date' => $b['event_date'], 'end_date' => $b['end_date'], 'status' => $b['status'], 'kind' => $b['kind'],
+        'notes' => json_decode((string)($b['customer_notes'] ?? ''), true) ?: (object)[]], $bk->fetchAll());
+      $dq = $p->prepare("select id, share_token, doc_type, number, status, doc_date, total_gross
+        from documents where customer_id = ? and status != 'entwurf' order by doc_date desc, created_at desc");
+      $dq->execute([$me['id']]);
+      $docs = [];
+      foreach ($dq->fetchAll() as $d) {
+        if (empty($d['share_token'])) {
+          $d['share_token'] = bin2hex(random_bytes(24));
+          $p->prepare('update documents set share_token = ? where id = ?')->execute([$d['share_token'], $d['id']]);
+        }
+        $docs[] = ['number' => $d['number'], 'doc_type' => $d['doc_type'], 'status' => $d['status'],
+          'doc_date' => $d['doc_date'], 'total_gross' => $d['total_gross'], 'token' => $d['share_token']];
+      }
+      $rc = $p->prepare("select r.token, r.status, r.signed_at, b.event_date from rental_contracts r
+        join bookings b on b.id = r.booking_id where b.customer_id = ?");
+      $rc->execute([$me['id']]);
+      $ff = $p->prepare('select id, booking_id, kind, name, size, created_at from customer_files where customer_id = ? order by created_at desc');
+      $ff->execute([$me['id']]);
+      out(['customer' => ['name' => trim(($me['company'] ?: trim($me['first_name'] . ' ' . $me['last_name']))), 'email' => $me['email']],
+        'bookings' => $bookings, 'documents' => $docs, 'rentals' => $rc->fetchAll(), 'files' => $ff->fetchAll()]);
+    }
+    if (preg_match('#^portal/account/booking/([a-f0-9-]{30,40})/notes$#', $path, $m) && $method === 'POST') {
+      $chk = $p->prepare('select id, title, event_type, event_date from bookings where id = ? and customer_id = ?');
+      $chk->execute([$m[1], $me['id']]);
+      $b = $chk->fetch();
+      if (!$b) fail('Termin nicht gefunden.', 404);
+      $notes = [
+        'schedule' => mb_substr(trim((string)($body['schedule'] ?? '')), 0, 6000),
+        'music' => mb_substr(trim((string)($body['music'] ?? '')), 0, 6000),
+        'agreements' => mb_substr(trim((string)($body['agreements'] ?? '')), 0, 6000),
+        'updated_at' => now(),
+      ];
+      $p->prepare('update bookings set customer_notes = ? where id = ?')
+        ->execute([json_encode($notes, JSON_UNESCAPED_UNICODE), $m[1]]);
+      $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, created_at)
+          values (?,?,?,?,?,?,?,?,?)')
+        ->execute([uuid(), $me['id'], $m[1], 'note', 'in', 'Kunde hat Termindetails aktualisiert',
+          'Termin ' . ($b['title'] ?: $b['event_type']) . ' am ' . $b['event_date'] . ' — Programmablauf/Musikwünsche/Vereinbarungen im Portal gepflegt.', now(), now()]);
+      out(['ok' => true], 201);
+    }
+    if ($path === 'portal/account/upload' && $method === 'POST') {
+      $raw = file_get_contents('php://input');
+      if (!$raw || strlen($raw) > MAX_UPLOAD) fail('Datei fehlt oder ist zu groß (max. 8 MB).');
+      $orig = mb_substr(preg_replace('/[^\w.\-() äöüÄÖÜß]/u', '_', (string)($_GET['name'] ?? 'datei')), 0, 120);
+      $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+      $isImg = @getimagesizefromstring($raw) !== false;
+      $allowedDocs = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv'];
+      if (!$isImg && !in_array($ext, $allowedDocs)) fail('Erlaubt: Bilder sowie PDF/Office/Text-Dateien.');
+      if (!$isImg && $ext === 'pdf' && !str_starts_with($raw, '%PDF')) fail('Keine gültige PDF-Datei.');
+      $kind = $isImg ? 'foto' : 'dokument';
+      $bookingId = (string)($_GET['booking'] ?? '');
+      if ($bookingId !== '') {
+        $chk = $p->prepare('select count(*) from bookings where id = ? and customer_id = ?');
+        $chk->execute([$bookingId, $me['id']]);
+        if (!(int)$chk->fetchColumn()) $bookingId = '';
+      }
+      $cnt = $p->prepare('select count(*) from customer_files where customer_id = ?');
+      $cnt->execute([$me['id']]);
+      if ((int)$cnt->fetchColumn() >= 60) fail('Maximal 60 Dateien pro Kunde — bitte alte Dateien löschen.');
+      $dir = DATA_DIR . '/custfiles';
+      if (!is_dir($dir)) mkdir($dir, 0755, true);
+      $id = uuid();
+      $file = $id . ($ext ? ".$ext" : ($isImg ? '.jpg' : ''));
+      file_put_contents("$dir/$file", $raw);
+      $p->prepare('insert into customer_files (id, customer_id, booking_id, kind, name, file, size, created_at) values (?,?,?,?,?,?,?,?)')
+        ->execute([$id, $me['id'], $bookingId ?: null, $kind, $orig, $file, strlen($raw), now()]);
+      out(['ok' => true, 'id' => $id, 'kind' => $kind, 'name' => $orig], 201);
+    }
+    if (preg_match('#^portal/account/file/([a-f0-9-]{30,40})$#', $path, $m)) {
+      $st = $p->prepare('select * from customer_files where id = ? and customer_id = ?');
+      $st->execute([$m[1], $me['id']]);
+      $f = $st->fetch();
+      if (!$f) fail('Datei nicht gefunden.', 404);
+      $full = DATA_DIR . '/custfiles/' . $f['file'];
+      if ($method === 'DELETE') {
+        @unlink($full);
+        $p->prepare('delete from customer_files where id = ?')->execute([$m[1]]);
+        out(['ok' => true]);
+      }
+      if (!is_file($full)) fail('Datei nicht gefunden.', 404);
+      $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
+      $mime = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp',
+        'gif' => 'image/gif', 'pdf' => 'application/pdf', 'txt' => 'text/plain', 'csv' => 'text/csv'][$ext] ?? 'application/octet-stream';
+      header('Content-Type: ' . $mime);
+      header('Content-Disposition: inline; filename="' . rawurlencode((string)$f['name']) . '"');
+      readfile($full); exit;
+    }
+    fail('Unbekannter Konto-Endpunkt.', 404);
+  }
   if (preg_match('#^portal/offer/([a-f0-9]+)$#', $path, $m) && $method === 'GET') {
     $d = portalDoc($m[1], (string)($_GET['plz'] ?? ''));
     $it = $p->prepare('select pos, description, note, qty, unit, unit_price, discount_value, discount_type from document_items where document_id = ? order by pos');
@@ -1337,6 +1509,39 @@ try {
     header('Content-Type: application/gzip');
     header('Content-Disposition: attachment; filename="' . $m[1] . '"');
     readfile($f); exit;
+  }
+  /* Kundenportal-Verwaltung (nur angemeldet): Einladungslink + Dateizugriff */
+  if (preg_match('#^custportal/invite/([a-f0-9-]{30,40})$#', $path, $m) && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    $st = $p->prepare('select * from customers where id = ?');
+    $st->execute([$m[1]]);
+    $c = $st->fetch();
+    if (!$c) fail('Kunde nicht gefunden.', 404);
+    $inv = bin2hex(random_bytes(24));
+    $p->prepare('update customers set portal_invite = ?, portal_invite_expires = ? where id = ?')
+      ->execute([$inv, time() + 7 * 86400, $c['id']]);
+    $url = baseUrl() . '/portal.html?einladung=' . $inv;
+    $mailed = false;
+    if (!empty($body['mail']) && $c['email']) {
+      $mailed = sendMailSafe((string)$c['email'], 'Dein Zugang zum Kundenbereich',
+        "Hallo " . trim((string)$c['first_name']) . ",\n\nhier ist dein persönlicher Zugang zu meinem Kundenbereich — dort findest du alle Unterlagen (Angebote, Rechnungen, Verträge) und kannst Programmablauf, Musikwünsche und Fotos eurer Location hinterlegen:\n\n$url\n\nEinfach öffnen und ein Passwort setzen (Link ist 7 Tage gültig).\n\nViele Grüße\nMarkus");
+    }
+    out(['ok' => true, 'url' => $url, 'mailed' => $mailed, 'has_account' => !empty($c['portal_hash'])], 201);
+  }
+  if (preg_match('#^custfile/([a-f0-9-]{30,40})$#', $path, $m) && $method === 'GET') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    $st = $p->prepare('select * from customer_files where id = ?');
+    $st->execute([$m[1]]);
+    $f = $st->fetch();
+    if (!$f || !is_file(DATA_DIR . '/custfiles/' . $f['file'])) fail('Datei nicht gefunden.', 404);
+    $ext = strtolower(pathinfo((string)$f['file'], PATHINFO_EXTENSION));
+    $mime = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp',
+      'gif' => 'image/gif', 'pdf' => 'application/pdf', 'txt' => 'text/plain', 'csv' => 'text/csv'][$ext] ?? 'application/octet-stream';
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: inline; filename="' . rawurlencode((string)$f['name']) . '"');
+    readfile(DATA_DIR . '/custfiles/' . $f['file']); exit;
   }
   /* Deployment-Konfiguration (data/deploy.json) — nur angemeldet; Token wird nie zurückgegeben */
   if ($path === 'deploy/config' && in_array($method, ['GET', 'POST'])) {

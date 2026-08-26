@@ -85,7 +85,7 @@ footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
 <script>
 var API='api.php';
 var qs=new URLSearchParams(location.search);
-var OFFER=qs.get('a'),FORM=qs.get('f'),MV=qs.get('mv');
+var OFFER=qs.get('a'),FORM=qs.get('f'),MV=qs.get('mv'),INVITE=qs.get('einladung');
 var PLZ=sessionStorage.getItem('portal_plz')||'';
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
 function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
@@ -450,10 +450,156 @@ function submitRental(){
     }).catch(function(e){document.getElementById('mvSend').disabled=false;err(e.message)});
 }
 
+/* ===================== KUNDENKONTO ===================== */
+var CTOK=localStorage.getItem('cust_tok')||'',ME=null;
+function cfetch(p,opt){opt=opt||{};opt.headers=Object.assign({},opt.headers||{},{Authorization:'Bearer '+CTOK});return fetch(API+'/'+p,opt)}
+function renderSetPw(){
+  app('<div class="card"><div class="kicker">Dein Kundenbereich</div><h1>Passwort festlegen</h1>'+
+    '<p class="sub">Einmal ein Passwort setzen — danach kommst du jederzeit mit E-Mail und Passwort an alle Unterlagen.</p>'+
+    '<div class="msg err" id="spMsg" style="display:none"></div>'+
+    '<label>Passwort (min. 8 Zeichen)</label><input type="password" id="spPw1">'+
+    '<label>Passwort wiederholen</label><input type="password" id="spPw2">'+
+    '<div style="margin-top:16px"><button class="btn" onclick="doSetPw()">Zugang aktivieren</button></div></div>');
+}
+function doSetPw(){
+  var p1=document.getElementById('spPw1').value,p2=document.getElementById('spPw2').value,m=document.getElementById('spMsg');
+  function err(t){m.style.display='block';m.textContent=t}
+  if(p1.length<8){err('Bitte mindestens 8 Zeichen.');return}
+  if(p1!==p2){err('Die Passwörter stimmen nicht überein.');return}
+  fetch(API+'/portal/account/set_password',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({invite:INVITE,password:p1})})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s>=400)throw new Error(res.j.error||'Fehlgeschlagen.');
+      CTOK=res.j.token;localStorage.setItem('cust_tok',CTOK);
+      history.replaceState(null,'',location.pathname);
+      loadAccount();
+    }).catch(function(e){err(e.message)});
+}
+function renderLogin(msg){
+  app('<div class="card"><div class="kicker">Dein Kundenbereich</div><h1>Anmelden</h1>'+
+    '<p class="sub">Alle Unterlagen an einem Ort: Angebote, Rechnungen, Verträge — plus Programmablauf, Musikwünsche und Fotos eurer Location.</p>'+
+    '<div class="msg err" id="liMsg" style="display:'+(msg?'block':'none')+'">'+esc(msg||'')+'</div>'+
+    '<label>E-Mail</label><input type="email" id="liMail" autocomplete="email">'+
+    '<label>Passwort</label><input type="password" id="liPw" autocomplete="current-password">'+
+    '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="doLogin()">Anmelden</button>'+
+    '<a onclick="doForgot()" style="cursor:pointer;font-size:13px">Passwort vergessen?</a></div>'+
+    '<p class="sub" style="margin-top:18px;font-size:13px">Noch keinen Zugang? Den persönlichen Einladungslink bekommst du direkt von mir.</p></div>');
+  document.getElementById('liPw').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
+}
+function doLogin(){
+  fetch(API+'/portal/account/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:document.getElementById('liMail').value.trim(),password:document.getElementById('liPw').value})})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s>=400)throw new Error(res.j.error||'Anmeldung fehlgeschlagen.');
+      CTOK=res.j.token;localStorage.setItem('cust_tok',CTOK);loadAccount();
+    }).catch(function(e){var m=document.getElementById('liMsg');m.style.display='block';m.textContent=e.message});
+}
+function doForgot(){
+  var mail=document.getElementById('liMail').value.trim();
+  if(!mail){var m=document.getElementById('liMsg');m.style.display='block';m.textContent='Bitte erst deine E-Mail-Adresse eintragen, dann auf „Passwort vergessen" klicken.';return}
+  fetch(API+'/portal/account/forgot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:mail})})
+    .then(function(){var m=document.getElementById('liMsg');m.className='msg ok';m.style.display='block';
+      m.textContent='Wenn zu dieser Adresse ein Zugang existiert, ist gerade eine E-Mail mit einem Link unterwegs.'});
+}
+function logout(){CTOK='';localStorage.removeItem('cust_tok');renderLogin()}
+var TYPE_LABEL={angebot:'Angebot',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'};
+function loadAccount(){
+  cfetch('portal/account/me').then(function(r){
+    if(r.status===401){renderLogin();return null}
+    return r.json();
+  }).then(function(me){
+    if(!me)return;
+    ME=me;renderAccount();
+  }).catch(function(){renderLogin('Verbindungsfehler — bitte später erneut versuchen.')});
+}
+function renderAccount(){
+  var me=ME;
+  var docs=me.documents.map(function(d){
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap">'+
+    '<div><b>'+(TYPE_LABEL[d.doc_type]||d.doc_type)+' '+esc(d.number)+'</b> <span style="color:var(--mut);font-size:13px">· '+dt(d.doc_date)+' · '+d.status+'</span></div>'+
+    '<a href="?a='+d.token+'">Ansehen / PDF →</a></div>';
+  }).join('')||'<p class="sub">Noch keine Unterlagen.</p>';
+  var rentals=(me.rentals||[]).map(function(r){
+    return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>Mietvertrag</b> <span style="color:var(--mut);font-size:13px">· Termin '+dt(r.event_date)+' · '+(r.status==='unterschrieben'?'unterschrieben ✓':'offen')+'</span> &nbsp;<a href="?mv='+r.token+'">Öffnen →</a></div>';
+  }).join('');
+  var books=me.bookings.map(function(b,i){
+    var n=b.notes||{};
+    return '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">'+esc(b.title||'Termin')+' <span style="color:var(--mut);font-size:13px;font-weight:400">· '+dt(b.event_date)+'</span></h2>'+
+    '<p class="sub" style="font-size:13px;margin:6px 0 4px">Hier könnt ihr alles pflegen, was ich für euren Termin wissen soll — ich sehe Änderungen sofort.</p>'+
+    '<label>Programmablauf (Zeiten, Reden, Programmpunkte)</label><textarea id="nS'+i+'" style="min-height:80px" placeholder="z. B. 18:00 Empfang · 19:00 Essen · 20:30 Rede Chef · 21:00 Party …">'+esc(n.schedule||'')+'</textarea>'+
+    '<label>Musikwünsche &amp; No-Gos</label><textarea id="nM'+i+'" style="min-height:80px" placeholder="Wünsche, Lieblingslieder, was auf keinen Fall laufen darf …">'+esc(n.music||'')+'</textarea>'+
+    '<label>Vereinbarungen &amp; Sonstiges</label><textarea id="nA'+i+'" style="min-height:60px" placeholder="Was wir besprochen haben, Ansprechpartner vor Ort, Besonderheiten …">'+esc(n.agreements||'')+'</textarea>'+
+    '<div style="margin-top:12px;display:flex;gap:12px;align-items:center"><button class="btn" onclick="saveNotes('+i+')">Speichern</button><span id="nOk'+i+'" style="color:#9fd49f;font-size:13px;display:none">Gespeichert ✓</span></div></div>';
+  }).join('');
+  var files=(me.files||[]).map(function(f){
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)">'+
+    '<div>'+(f.kind==='foto'?'🖼':'📄')+' '+esc(f.name)+' <span style="color:var(--mut);font-size:12px">('+Math.max(1,Math.round(f.size/1024))+' KB)</span></div>'+
+    '<div><a onclick="openFile(\''+f.id+'\')" style="cursor:pointer">Öffnen</a> &nbsp;<a onclick="delFile(\''+f.id+'\')" style="cursor:pointer;color:#e0a0a0">Löschen</a></div></div>';
+  }).join('')||'<p class="sub" style="font-size:13px">Noch keine Dateien — ladet gern Fotos eurer Location oder Dokumente hoch.</p>';
+  app('<div class="card"><div class="kicker">Dein Kundenbereich</div><h1>Hallo, '+esc(me.customer.name)+'!</h1>'+
+    '<p class="sub">Hier findest du alle Unterlagen und kannst alles für eure Termine pflegen. <a onclick="logout()" style="cursor:pointer">Abmelden</a></p></div>'+
+    '<div class="card"><h2>📁 Meine Unterlagen</h2>'+docs+rentals+'</div>'+
+    books+
+    '<div class="card"><h2>📷 Fotos &amp; Dokumente</h2>'+
+    '<p class="sub" style="font-size:13px">Locationfotos helfen mir enorm bei der Planung — Raum, Bühne, Stromanschlüsse, Parkplatz. Auch Dokumente (z. B. Ablaufpläne als PDF) sind willkommen.</p>'+
+    '<div id="fileList">'+files+'</div>'+
+    '<div style="margin-top:12px"><input type="file" id="fUp" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" onchange="uploadFiles(this)">'+
+    '<div class="msg" id="fUpMsg" style="display:none;margin-top:8px"></div></div></div>');
+}
+function saveNotes(i){
+  var b=ME.bookings[i];
+  cfetch('portal/account/booking/'+b.id+'/notes',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({schedule:document.getElementById('nS'+i).value,music:document.getElementById('nM'+i).value,agreements:document.getElementById('nA'+i).value})})
+    .then(function(r){if(!r.ok)throw new Error();
+      var ok=document.getElementById('nOk'+i);ok.style.display='';setTimeout(function(){ok.style.display='none'},2500);
+    }).catch(function(){alert('Speichern fehlgeschlagen — bitte erneut versuchen.')});
+}
+function uploadFiles(inp){
+  var files=Array.from(inp.files||[]);inp.value='';
+  var m=document.getElementById('fUpMsg');
+  var chain=Promise.resolve();
+  files.forEach(function(f){
+    chain=chain.then(function(){
+      return (f.type.indexOf('image/')===0?shrinkImage(f):Promise.resolve(f)).then(function(blob){
+        return cfetch('portal/account/upload?name='+encodeURIComponent(f.name),{method:'POST',body:blob})
+          .then(function(r){return r.json()}).then(function(j){if(j.error)throw new Error(j.error)});
+      });
+    });
+  });
+  chain.then(function(){m.style.display='block';m.className='msg ok';m.textContent='Hochgeladen ✓';loadAccount()})
+    .catch(function(e){m.style.display='block';m.className='msg err';m.textContent=e.message||'Upload fehlgeschlagen.'});
+}
+function shrinkImage(f){
+  return new Promise(function(res){
+    var img=new Image(),url=URL.createObjectURL(f);
+    img.onload=function(){
+      var mx=2000,sc=Math.min(1,mx/Math.max(img.width,img.height));
+      var c=document.createElement('canvas');c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function(b){res(b||f)},'image/jpeg',0.87);
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);res(f)};
+    img.src=url;
+  });
+}
+function openFile(id){
+  cfetch('portal/account/file/'+id).then(function(r){if(!r.ok)throw new Error();return r.blob()})
+    .then(function(b){window.open(URL.createObjectURL(b),'_blank')}).catch(function(){alert('Datei konnte nicht geladen werden.')});
+}
+function delFile(id){
+  if(!confirm('Datei wirklich löschen?'))return;
+  cfetch('portal/account/file/'+id,{method:'DELETE'}).then(function(){loadAccount()});
+}
+
 if(OFFER)loadOffer();
 else if(FORM)loadForm();
 else if(MV)loadRental();
-else app('<div class="card"><h2>Kein gültiger Link</h2><p class="sub" style="margin-top:8px">Dieser Bereich ist nur über persönliche Links erreichbar, die ihr von mir bekommt.</p></div>');
+else if(INVITE)renderSetPw();
+else if(CTOK)loadAccount();
+else renderLogin();
 </script>
 </body>
 </html>
