@@ -124,7 +124,7 @@ postet sie nur noch auf Instagram). Timing-Logik:
 - To-do Seite: technik.html oben zielgruppen-orientiert einleiten
   („Für wen") statt direkt mit dem Mietkatalog zu starten.
 
-## Neuer Leistungsbereich: Festinstallation + Wartung (Idee 2026-08-25)
+## Festinstallation + Wartung — ✅ UMGESETZT (HWK-Go liegt vor, 2026-08-26)
 
 - Zielgruppe: Schulen, Vereine, Bars/Kneipen, „die es ordentlich haben
   wollen" — dieselbe Nische wie Verleih, nur dauerhaft. Wiederkehrender
@@ -137,11 +137,11 @@ postet sie nur noch auf Instagram). Timing-Logik:
   - DGUV-V3-Geräteprüfung nur durch Elektrofachkraft; Option: Lehrgang
     „Elektrofachkraft für festgelegte Tätigkeiten" (HWK-Kurs, kein Meister)
     → Prüf-Teil selbst anbieten = USP im Wartungsvertrag.
-- Seite: dritte Säule auf technik.html („Festinstallation & Wartung")
-  erst NACH HWK-Klärung bauen; Wording: „steckerfertig installiert,
-  Elektroarbeiten am Hausnetz durch Partnerbetrieb".
-- Angebots-Idee: Wartungsvertrag als Produkt im Katalog (jährlich/halb-
-  jährlich, Pauschale) — planbar, kündigt Kundenbindung an.
+- ✅ Sektion auf technik.html live (Vereinsheim/Schule/Kneipe, Elektro-Partner-Abgrenzung).
+- ✅ Produkte im Katalog: WARTUNG-01 (249 €/Jahr) und INST-CHECK (89 € pauschal,
+  wird verrechnet) — Preise bitte prüfen/anpassen.
+- Noch offen: Lehrgang „Elektrofachkraft für festgelegte Tätigkeiten"
+  (dann DGUV-V3-Prüfung selbst anbieten = USP im Wartungsvertrag).
 
 ## Erledigt im Nacht-Paket (2026-08-25)
 

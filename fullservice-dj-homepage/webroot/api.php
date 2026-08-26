@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 14;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 15;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -173,7 +173,26 @@ function upgrade(PDO $p): void {
     try { $p->exec(docAuditDdl()); } catch (PDOException $e) {}
     seedExtraTemplates($p);
   }
+  if ($v < 15) seedServiceProducts($p);
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
+}
+
+/* Service-Produkte für Festinstallation & Wartung, nur wenn SKU noch fehlt */
+function seedServiceProducts(PDO $p): void {
+  $rows = [
+    ['WARTUNG-01', 20, 'Service', 'Wartungsvertrag Beschallungsanlage (jährlich)',
+     'Jährlicher Funktions-Check, Reinigung, Firmware-Updates und Nachmessen einer fest installierten Anlage — inkl. Kurzbericht für Träger/Vorstand. Verschleiß wird früh erkannt statt am Veranstaltungstag.', 'Jahr', 249.0],
+    ['INST-CHECK', 21, 'Service', 'Bestandsaufnahme & Beratung vor Ort',
+     'Raum, Nutzung und vorhandene Technik aufnehmen; Empfehlung mit Festpreis-Angebot für die Installation. Wird bei Beauftragung verrechnet.', 'pausch.', 89.0],
+  ];
+  foreach ($rows as [$sku, $s, $cat, $n, $d, $u, $pr]) {
+    $c = $p->prepare('select count(*) from products where sku = ?');
+    $c->execute([$sku]);
+    if (!(int)$c->fetchColumn())
+      $p->prepare('insert into products (id,sku,sort,category,name,description,unit,price_net,bundle,active,created_at)
+          values (?,?,?,?,?,?,?,?,?,1,?)')
+        ->execute([uuid(), $sku, $s, $cat, $n, $d, $u, $pr, '[]', now()]);
+  }
 }
 
 function docAuditDdl(): string {
@@ -337,6 +356,7 @@ SQL);
   $p->exec(docAuditDdl());
   seed($p);
   seedExtraTemplates($p);
+  seedServiceProducts($p);
 }
 
 function seed(PDO $p): void {

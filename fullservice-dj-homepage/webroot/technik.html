@@ -146,6 +146,7 @@ footer a:hover{color:var(--acc)}
       <a href="#fuer-wen">Für wen</a>
       <a href="#mieten">Technik mieten</a>
       <a href="#techniker">Techniker buchen</a>
+      <a href="#installation">Installation</a>
       <a href="#partner">Für Kollegen</a>
       <a href="#workshops">Workshops</a>
       <a href="#konditionen">Konditionen</a>
@@ -170,6 +171,7 @@ footer a:hover{color:var(--acc)}
       <a class="chip" onclick="pickAnlass('fw-reden','Firmen-/Vereinsfeier mit Reden')">🎤 Feier mit Reden</a>
       <a class="chip" onclick="pickAnlass('fw-live','Livemusik / Singer-Songwriter')">🎸 Livemusik</a>
       <a class="chip" onclick="pickAnlass('fw-kneipe','Kneipen-/Gastro-Event')">🍺 Kneipen-Event</a>
+      <a class="chip" onclick="document.getElementById('installation').scrollIntoView({behavior:'smooth'})">🔩 Festinstallation</a>
     </div>
     <div class="badges">
       <div class="badge"><b>24 h</b><span>= 1 Miettag</span></div>
@@ -252,6 +254,56 @@ footer a:hover{color:var(--acc)}
         </ul>
       </div>
     </div>
+  </div>
+</section>
+
+<section id="installation" style="background:var(--bg2)">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="kicker">Festinstallation &amp; Wartung</div>
+      <h2>Einmal ordentlich — statt jedes Jahr Flickwerk</h2>
+      <p class="lead">Für Schulen, Vereine, Bars und Kneipen, die es ordentlich haben wollen: Ich plane und installiere eure Beschallung fest im Raum — und halte sie mit einem Wartungsvertrag dauerhaft in Schuss.</p>
+    </div>
+    <div class="trio">
+      <div class="card reveal">
+        <h3>🏛 Vereinsheim</h3>
+        <p class="prob">„Die Anlage brummt seit Jahren, das Mischpult hat 40 Regler und keiner weiß mehr, wie es mal eingestellt war."</p>
+        <p class="sol">Einmal sauber aufgebaut, eingemessen und mit festen Presets versehen: Einschalten, Regler auf — läuft. Mit beschrifteter Anleitung, die auch der nächste Vorstand versteht.</p>
+      </div>
+      <div class="card reveal">
+        <h3>🏫 Schule &amp; Aula</h3>
+        <p class="prob">„Jede Einschulung dasselbe Chaos: Mikrofon pfeift, Kabel quer durch die Aula, und die Hälfte versteht die Rede nicht."</p>
+        <p class="sol">Feste Sprachbeschallung mit Funkmikrofonen, kindersicher montiert und narrensicher bedienbar — plus jährlicher Check, damit es zur nächsten Veranstaltung einfach funktioniert.</p>
+      </div>
+      <div class="card reveal">
+        <h3>🍺 Bar &amp; Kneipe</h3>
+        <p class="prob">„Hintergrundmusik klingt blechern, und sobald mal ein Musiker spielt, wird stundenlang improvisiert."</p>
+        <p class="sol">Eine Anlage, die beides kann: abends angenehmer Klang auf Gesprächslautstärke, am Live-Abend druckvoll — mit vorbereitetem Anschluss für Gesang und Gitarre.</p>
+      </div>
+    </div>
+    <div class="duo">
+      <div class="card reveal">
+        <h3>So läuft's</h3>
+        <ul>
+          <li>Bestandsaufnahme vor Ort: Raum, Nutzung, vorhandene Technik</li>
+          <li>Festes Angebot — Technik, Montage und Einrichtung aus einer Hand</li>
+          <li>Montage, Signalverkabelung und steckerfertiger Anschluss</li>
+          <li>Einmessen auf den Raum + feste, beschriftete Presets</li>
+          <li>Einweisung &amp; Kurzanleitung — jeder im Team kann es bedienen</li>
+        </ul>
+      </div>
+      <div class="card reveal">
+        <h3>Wartung &amp; Pflege</h3>
+        <ul>
+          <li>Jährlicher Funktions-Check aller Komponenten</li>
+          <li>Reinigung, Firmware-Updates, Nachmessen</li>
+          <li>Verschleiß früh erkannt statt Ausfall am Veranstaltungstag</li>
+          <li>Dokumentation für Träger und Vorstand</li>
+        </ul>
+        <div style="margin-top:18px"><a class="btn" href="#anfrage" onclick="pickInstallation()">Bestandsaufnahme anfragen</a></div>
+      </div>
+    </div>
+    <p class="rent-note reveal" style="margin-top:20px">Sauber getrennt: Ich montiere, verkable (Signal- und Lautsprecherleitungen) und schließe steckerfertig an. Arbeiten am Hausstromnetz übernimmt ein Elektro-Partnerbetrieb — fachgerecht und dokumentiert.</p>
   </div>
 </section>
 
@@ -396,6 +448,7 @@ footer a:hover{color:var(--acc)}
               <option>Technik mieten</option>
               <option>Techniker inkl. Technik buchen</option>
               <option>Workshop besuchen</option>
+              <option>Festinstallation / Wartung</option>
               <option>Beratung / Sonstiges</option>
             </select>
           </div>
@@ -630,6 +683,11 @@ function sendWs(){
     .finally(function(){btn.disabled=false});
 }
 loadWorkshops();
+function pickInstallation(){
+  var f=document.getElementById('inqForm');
+  if(f&&f.event_type)f.event_type.value='Festinstallation / Wartung';
+  if(f&&f.message&&!f.message.value)f.message.value='Bestandsaufnahme für Festinstallation gewünscht. Raum/Nutzung: ';
+}
 function pickWorkshop(){
   var f=document.getElementById('inqForm');
   if(f&&f.event_type)f.event_type.value='Workshop besuchen';
