@@ -1338,6 +1338,25 @@ try {
     header('Content-Disposition: attachment; filename="' . $m[1] . '"');
     readfile($f); exit;
   }
+  /* Deployment-Konfiguration (data/deploy.json) — nur angemeldet; Token wird nie zurückgegeben */
+  if ($path === 'deploy/config' && in_array($method, ['GET', 'POST'])) {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $file = DATA_DIR . '/deploy.json';
+    $cfg = is_file($file) ? (json_decode((string)file_get_contents($file), true) ?: []) : [];
+    if ($method === 'POST') {
+      $cfg['repo'] = trim((string)($body['repo'] ?? $cfg['repo'] ?? ''));
+      $cfg['branch'] = trim((string)($body['branch'] ?? $cfg['branch'] ?? 'live')) ?: 'live';
+      $cfg['subdir'] = trim((string)($body['subdir'] ?? $cfg['subdir'] ?? 'fullservice-dj-homepage/webroot'));
+      if (!empty($body['token'])) $cfg['token'] = trim((string)$body['token']);
+      if (empty($cfg['key'])) $cfg['key'] = bin2hex(random_bytes(16));
+      if ($cfg['repo'] === '' || !preg_match('#^[\w.-]+/[\w.-]+$#', $cfg['repo'])) fail('Repository bitte als owner/name angeben.');
+      file_put_contents($file, json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    }
+    out(['repo' => $cfg['repo'] ?? '', 'branch' => $cfg['branch'] ?? 'live',
+      'subdir' => $cfg['subdir'] ?? '', 'key' => $cfg['key'] ?? '',
+      'has_token' => !empty($cfg['token']),
+      'last_sha' => $cfg['last_sha'] ?? null, 'last_time' => $cfg['last_time'] ?? null]);
+  }
   /* Technik-Check-Fotos: geschützt in data/checkpics, Zugriff nur angemeldet */
   if (preg_match('#^checkpic/([a-f0-9-]{30,40})$#', $path, $m) && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);

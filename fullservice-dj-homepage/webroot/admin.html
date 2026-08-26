@@ -493,6 +493,23 @@ th.num{text-align:right}
           <div class="mut sml" style="margin-top:6px">Erscheint auf jedem gedruckten Mietvertrag (Buchungs-Detail → „📄 Mietvertrag“). Vor Livegang anwaltlich prüfen lassen.</div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveRental()">Speichern</button></div>
         </div>
+        <div class="card"><h3>Website-Updates <span class="mut sml" style="font-weight:400">— Änderungen aus der Entwicklung live stellen, ohne FTP</span></h3>
+          <div class="sml mut" style="margin-bottom:8px">So funktioniert's: Neue Versionen landen auf dem GitHub-Branch <code>live</code>. Der Server holt sie sich selbst — automatisch per Cronjob oder hier per Klick. Deine Daten (Datenbank, Uploads) bleiben unberührt, vor jedem Update wird gesichert.</div>
+          <div class="grid3">
+            <div><label>GitHub-Repository</label><input id="dpRepo" placeholder="waldstadt/lokvogel"></div>
+            <div><label>Branch</label><input id="dpBranch" placeholder="live"></div>
+            <div><label>GitHub-Token <span class="mut" id="dpTokState"></span></label><input id="dpToken" type="password" placeholder="github_pat_… (nur zum Ändern ausfüllen)"></div>
+          </div>
+          <div class="mut sml" style="margin:4px 0 8px">Token: github.com → Settings → Developer settings → Fine-grained tokens → nur dieses Repository, nur „Contents: Read". Wird sicher in <code>data/</code> gespeichert und nie wieder angezeigt.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn sm" onclick="saveDeploy()">Speichern</button>
+            <button class="btn g sm" onclick="deployStatus()">Status prüfen</button>
+            <button class="btn g sm" onclick="deployRun()">⬆ Jetzt aktualisieren</button>
+          </div>
+          <div id="dpInfo" class="sml mut" style="margin-top:8px"></div>
+          <label style="margin-top:10px">Cronjob-URL für automatische Updates (z. B. alle 15 Minuten)</label>
+          <input id="dpCron" readonly onclick="this.select()" style="font-size:11px">
+        </div>
         <div class="card"><h3>Datensicherung <button class="btn sm" style="float:right" onclick="runBackupNow()">💾 Backup jetzt</button></h3>
           <div class="sml mut" style="margin-bottom:8px">Snapshots der Datenbank landen geschützt in <code>data/backups/</code> (die letzten 14 werden behalten). Für automatische tägliche Sicherung: bei All-Inkl (KAS → Tools → Cronjobs) einen täglichen Cronjob auf diese URL anlegen:</div>
           <input id="bkUrl" readonly onclick="this.select()" style="font-size:11px">
@@ -2290,6 +2307,51 @@ function renderTechCheckPrint(t,comp,c,pr,scale,picUrls){
   window.print();
 }
 
+/* ===== Website-Updates (Deployment) ===== */
+var DP_KEY='';
+function loadDeploy(){
+  fetch('api.php/deploy/config',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(c){
+    if(!c)return;
+    DP_KEY=c.key||'';
+    document.getElementById('dpRepo').value=c.repo||'waldstadt/lokvogel';
+    document.getElementById('dpBranch').value=c.branch||'live';
+    document.getElementById('dpTokState').textContent=c.has_token?'(hinterlegt ✓)':'(fehlt)';
+    document.getElementById('dpCron').value=DP_KEY?location.origin+location.pathname.replace(/[^\/]*$/,'')+'deploy.php?key='+DP_KEY+'&action=run':'— erst speichern —';
+    if(c.last_sha)document.getElementById('dpInfo').textContent='Installiert: '+c.last_sha.slice(0,7)+' vom '+new Date(c.last_time).toLocaleString('de-DE');
+  }).catch(function(){});
+}
+function saveDeploy(){
+  var body={repo:v('dpRepo'),branch:v('dpBranch')||'live'};
+  if(v('dpToken'))body.token=v('dpToken');
+  fetch('api.php/deploy/config',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json()}).then(function(c){
+      if(c.error){toast(c.error,1);return}
+      document.getElementById('dpToken').value='';
+      toast('Gespeichert ✓');loadDeploy();
+    }).catch(function(e){toast(e.message,1)});
+}
+function deployStatus(){
+  if(!DP_KEY){toast('Erst speichern.',1);return}
+  document.getElementById('dpInfo').textContent='Prüfe …';
+  fetch('deploy.php?key='+DP_KEY+'&action=status').then(function(r){return r.json()}).then(function(j){
+    document.getElementById('dpInfo').innerHTML=j.error?('⚠ '+esc(j.error)):
+      (j.update_verfuegbar
+        ?'🟠 Update verfügbar: „'+esc(j.github_commit||'')+'“ ('+(j.github||'').slice(0,7)+') — installiert: '+((j.installiert||'—').slice(0,7))
+        :'🟢 Aktuell ('+(j.github||'').slice(0,7)+') — „'+esc(j.github_commit||'')+'“');
+  }).catch(function(e){document.getElementById('dpInfo').textContent='Fehler: '+e.message});
+}
+function deployRun(){
+  if(!DP_KEY){toast('Erst speichern.',1);return}
+  if(!confirm('Website jetzt auf den Stand des live-Branches aktualisieren?\nDatenbank und Uploads bleiben unberührt, es wird vorher gesichert.'))return;
+  document.getElementById('dpInfo').textContent='Update läuft …';
+  fetch('deploy.php?key='+DP_KEY+'&action=run').then(function(r){return r.json()}).then(function(j){
+    if(j.error){document.getElementById('dpInfo').textContent='⚠ '+j.error;toast(j.error,1);return}
+    document.getElementById('dpInfo').innerHTML='✅ '+esc(j.message||'')+(j.commit?' — „'+esc(j.commit)+'“':'')+(j.dateien?' ('+j.dateien+' Dateien)':'');
+    toast('Update installiert ✓ — Seite neu laden (F5), um die neue Version zu sehen.');
+    loadDeploy();
+  }).catch(function(e){document.getElementById('dpInfo').textContent='Fehler: '+e.message});
+}
+
 /* ===== Datensicherung ===== */
 function fmtBytes(b){return b>1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB'}
 function loadBackups(){
@@ -2320,7 +2382,7 @@ function renderCmsReload(){
 
 /* ===== Einstellungen ===== */
 function renderSet(){
-  loadBackups();
+  loadBackups();loadDeploy();
   var c=S.company||{},n=S.numbering||{},d=S.defaults||{};
   document.getElementById('sName').value=c.name||'';
   document.getElementById('sOwner').value=c.owner||'';

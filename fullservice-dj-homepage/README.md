@@ -52,6 +52,28 @@ Inhalte lassen sich dann weder ändern noch löschen (serverseitig
 erzwungen). Änderungen laufen über Korrekturrechnung oder Storno; jede
 Anlage und jeder Statuswechsel steht im Änderungsprotokoll der Rechnung.
 
+## Gemeinsame Weiterentwicklung & Live-Stellen (ohne FTP)
+
+Der Server aktualisiert sich selbst vom GitHub-Branch **`live`**:
+
+1. Änderungswunsch an Claude geben (neue Session auf diesem Repo genügt —
+   CONTENT-BACKLOG.md und README halten den Kontext).
+2. Claude baut und testet auf dem Entwicklungs-Branch.
+3. Live stellen = auf den Branch `live` pushen/mergen.
+4. Der Server holt sich den Stand selbst: automatisch per All-Inkl-Cronjob
+   auf die `deploy.php?key=…&action=run`-URL (z. B. alle 15 Minuten) oder
+   sofort per Klick im Backoffice (Einstellungen → Website-Updates).
+
+`deploy.php` ersetzt nur Code-Dateien — `data/` (Datenbank, Backups,
+Ausweis-/Check-Fotos) und `uploads/` bleiben unberührt. Vor jedem Update:
+Datenbank-Snapshot + Kopie der ersetzten Dateien nach `data/deploy-backup/`
+(die letzten 5 bleiben). Datenbank-Migrationen laufen beim ersten Aufruf der
+neuen Version automatisch (PRAGMA user_version).
+
+Einrichtung einmalig im Backoffice: Repository (`waldstadt/lokvogel`),
+Branch `live` und ein Fine-grained GitHub-Token (nur dieses Repo, nur
+„Contents: Read"). Bei öffentlichem Repository geht es auch ohne Token.
+
 ## Zugriffsmodell / Datenschutz
 
 - Ohne Login liefert die API **nur** Website-Inhalte (Texte, Pakete, FAQ,
