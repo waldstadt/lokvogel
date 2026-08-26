@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 20;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 21;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -190,19 +190,38 @@ function upgrade(PDO $p): void {
     "alter table documents add column accepted_name text",
     "alter table documents add column accept_signature text",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
-  if ($v < 20) upgradeBandeFlow($p);
+  if ($v < 21) upgradeBandeFlow($p);
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
-/* v20: konsolidierte Vermittlungs-Mail + Anschrift-Feld im Vorauswahl-Bogen */
+/* Vermittlungs-Mail „Termin belegt" — eine Quelle für Seed und Migration */
+function bandeMailSubject(): string {
+  return 'Euer Termin am {datum} – ich habe trotzdem eine Lösung für euch';
+}
+function bandeMailBody(): string {
+  return "Hallo {vorname},
+
+danke für eure Anfrage! Die weniger gute Nachricht zuerst: An eurem Termin am {datum} bin ich leider schon fest gebucht.
+
+Aber ich lasse euch nicht allein suchen. Wenn ihr mögt, empfehle ich euch drei bis fünf Kollegen, die an eurem Termin noch frei sind und richtig gute Arbeit machen – handverlesen, passend zu eurer Feier und komplett kostenlos. Die Vermittlung läuft über meine Partner-Agentur DJ Bande (Münster), bei der ich selbst als DJ im Einsatz bin – ich kenne die Kollegen von echten Veranstaltungen, nicht vom Papier.
+
+Damit meine Vorauswahl passt, füllt kurz diesen Bogen aus (keine 5 Minuten – er fragt auch eure Anschrift und euer Einverständnis zur Weitergabe ab):
+{fragebogen}
+
+Zur Transparenz: Für eine Vermittlung erhalte ich eine Aufwandsentschädigung von der Agentur. Für euch kostet das nichts – eure Preise vereinbart ihr direkt mit dem DJ.
+
+Viele Grüße
+Markus";
+}
+
+/* v20/v21: konsolidierte Vermittlungs-Mail + Anschrift-Feld im Vorauswahl-Bogen */
 function upgradeBandeFlow(PDO $p): void {
   seedExtraTemplates($p);
   try { $p->prepare('delete from email_templates where name = ?')
     ->execute(['Termin belegt — DJ-Empfehlung (Partner-Netzwerk)']); } catch (PDOException $e) {}
   try {
     $p->prepare("update email_templates set subject = ?, body = ? where name = 'Termin belegt – DJ-Vermittlung'")
-      ->execute(['Euer Termin am {datum} – ich habe trotzdem eine Lösung für euch',
-"Hallo {vorname},\n\nvielen Dank für deine Anfrage – und jetzt zuerst die weniger gute Nachricht: An eurem Termin am {datum} bin ich leider schon fest gebucht.\n\nAber ich lasse euch damit nicht allein. Ich weiß aus vielen Gesprächen, wie mühsam die Suche jetzt weitergeht: zig Seiten durchklicken, DJs anschreiben, auf Antworten warten – und am Ende doch nicht wissen, wer wirklich gut ist. Genau das möchte ich euch abnehmen.\n\nWenn ihr mögt, empfehle ich euch drei bis fünf Kollegen, die an eurem Termin noch frei sind und von denen ich weiß, dass sie richtig gute Arbeit machen – handverlesen und passend zu eurer Feier, eurer Musikrichtung und eurer Location, nicht einfach irgendeine Liste. Dieser Service ist für euch komplett kostenlos.\n\nDie Vermittlung läuft über meine Partner-Agentur, die DJ Bande in Münster. Dort bin ich selbst als DJ gelistet und regelmäßig im Einsatz – ich kenne die Kollegen also nicht nur vom Papier, sondern von echten Veranstaltungen.\n\nDamit meine Vorauswahl sitzt, habe ich einen kurzen Online-Fragebogen für euch (keine 5 Minuten). Dort trägst du auch eure Anschrift ein, die ich für die Empfehlung brauche – deine E-Mail-Adresse habe ich ja schon:\n{fragebogen}\n\nZur Transparenz: Für eine erfolgreiche Vermittlung erhalte ich eine Aufwandsentschädigung von der Agentur. Für euch entstehen keine Kosten, und eure Preise vereinbart ihr direkt mit dem jeweiligen DJ. Eure Angaben gebe ich erst nach eurem Einverständnis weiter – das fragt der Bogen mit ab.\n\nViele Grüße\nMarkus Jankowski – DJ Lauschgift"]);
+      ->execute([bandeMailSubject(), bandeMailBody()]);
   } catch (PDOException $e) {}
   try {
     $st = $p->query("select id, fields from form_templates where name like 'DJ-Vorauswahl%' limit 1");
@@ -595,24 +614,7 @@ Und falls euch später noch etwas einfällt (Fotos, Fragen, die nächste Feier �
 
 Viele Grüße und alles Gute
 Markus Jankowski – DJ Lauschgift"],
-    [5, 'Termin belegt – DJ-Vermittlung', 'Euer Termin am {datum} – ich habe trotzdem eine Lösung für euch',
-"Hallo {vorname},
-
-vielen Dank für deine Anfrage – und jetzt zuerst die weniger gute Nachricht: An eurem Termin am {datum} bin ich leider schon fest gebucht.
-
-Aber ich lasse euch damit nicht allein. Ich weiß aus vielen Gesprächen, wie mühsam die Suche jetzt weitergeht: zig Seiten durchklicken, DJs anschreiben, auf Antworten warten – und am Ende doch nicht wissen, wer wirklich gut ist. Genau das möchte ich euch abnehmen.
-
-Wenn ihr mögt, empfehle ich euch drei bis fünf Kollegen, die an eurem Termin noch frei sind und von denen ich weiß, dass sie richtig gute Arbeit machen – handverlesen und passend zu eurer Feier, eurer Musikrichtung und eurer Location, nicht einfach irgendeine Liste. Dieser Service ist für euch komplett kostenlos.
-
-Die Vermittlung läuft über meine Partner-Agentur, die DJ Bande in Münster. Dort bin ich selbst als DJ gelistet und regelmäßig im Einsatz – ich kenne die Kollegen also nicht nur vom Papier, sondern von echten Veranstaltungen.
-
-Damit meine Vorauswahl sitzt, habe ich einen kurzen Online-Fragebogen für euch (keine 5 Minuten). Dort trägst du auch eure Anschrift ein, die ich für die Empfehlung brauche – deine E-Mail-Adresse habe ich ja schon:
-{fragebogen}
-
-Zur Transparenz: Für eine erfolgreiche Vermittlung erhalte ich eine Aufwandsentschädigung von der Agentur. Für euch entstehen keine Kosten, und eure Preise vereinbart ihr direkt mit dem jeweiligen DJ. Eure Angaben gebe ich erst nach eurem Einverständnis weiter – das fragt der Bogen mit ab.
-
-Viele Grüße
-Markus Jankowski – DJ Lauschgift"],
+    [5, 'Termin belegt – DJ-Vermittlung', bandeMailSubject(), bandeMailBody()],
   ];
   foreach ($tpls as [$s,$n,$sub,$b])
     $ins('email_templates', ['sort'=>$s,'name'=>$n,'subject'=>$sub,'body'=>$b]);
