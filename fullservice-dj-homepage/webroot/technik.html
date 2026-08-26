@@ -452,7 +452,7 @@ footer a:hover{color:var(--acc)}
     </div>
     <div class="contact-grid">
       <div class="reveal">
-        <div class="c-item"><div class="cl">Telefon / WhatsApp</div><div class="cv"><a href="tel:+4915236439373" id="cPhone">01523 6439373</a></div></div>
+        <div class="c-item"><div class="cl">Telefon / WhatsApp</div><div class="cv"><a href="tel:+4915236439373" id="cPhone">01523 6439373</a></div><a id="cWa" href="https://wa.me/4915236439373?text=Hallo%20Markus%2C%20ich%20habe%20eine%20Frage%20zur%20Technik%3A%20" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:13px;border:1px solid var(--line);border-radius:20px;padding:6px 14px">💬 Per WhatsApp schreiben</a></div>
         <div class="c-item" id="cMailWrap" style="display:none"><div class="cl">E-Mail</div><div class="cv"><a href="#" id="cMail"></a></div></div>
         <div class="c-item"><div class="cl">Lager &amp; Abholung</div><div class="cv" id="cAddr">Büttmecker Weg 35c, 58675 Hemer</div></div>
       </div>
@@ -605,7 +605,9 @@ sfetch('site_content?select=key,value').then(function(rows){
   }
   if(c.contact){
     if(c.contact.phone){document.getElementById('cPhone').textContent=c.contact.phone;
-      document.getElementById('cPhone').href='tel:'+c.contact.phone.replace(/[^\d+]/g,'')}
+      document.getElementById('cPhone').href='tel:'+c.contact.phone.replace(/[^\d+]/g,'');
+      var wd=c.contact.phone.replace(/\D/g,'');if(wd.charAt(0)==='0')wd='49'+wd.slice(1);
+      var wa=document.getElementById('cWa');if(wa)wa.href='https://wa.me/'+wd+'?text='+'Hallo%20Markus%2C%20ich%20habe%20eine%20Frage%20zur%20Technik%3A%20'}
     if(c.contact.email){document.getElementById('cMailWrap').style.display='';
       document.getElementById('cMail').textContent=c.contact.email;
       document.getElementById('cMail').href='mailto:'+c.contact.email}

@@ -847,11 +847,15 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       if (!empty($row['email'])) {
         $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
         $vn = preg_split('/\s+/', trim($row['name']), 2)[0] ?? $row['name'];
+        $waDigits = preg_replace('/\D/', '', (string)($comp['phone'] ?? ''));
+        if ($waDigits !== '' && $waDigits[0] === '0') $waDigits = '49' . substr($waDigits, 1);
         sendMailSafe((string)$row['email'], 'Deine Anfrage ist angekommen 🙌',
           "Hallo $vn,\n\ndanke für deine Anfrage — sie ist sicher bei mir gelandet!\n\n" .
           "Ich melde mich persönlich bei dir, in der Regel innerhalb von 24 Stunden. " .
           "Das hier ist die einzige automatische Mail, die du von mir bekommst — ab jetzt schreibst du direkt mit mir.\n\n" .
-          (($comp['phone'] ?? '') !== '' ? "Wenn es eilig ist, erreichst du mich unter " . $comp['phone'] . " (gern auch WhatsApp).\n\n" : '') .
+          (($comp['phone'] ?? '') !== '' ?
+            "Wenn es eilig ist, erreichst du mich unter " . $comp['phone'] . " — am schnellsten per WhatsApp:\n" .
+            "https://wa.me/" . $waDigits . "\n\n" : '') .
           "Bis gleich!\n" . ($comp['owner'] ?? 'Markus'));
       }
       out(null, 201);
