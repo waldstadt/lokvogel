@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Lauschgift Backoffice</title>
+<title>lauschgift.net · Backoffice</title>
 <link href="fonts.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -132,7 +132,8 @@ th.num{text-align:right}
 <!-- ===== LOGIN ===== -->
 <div class="login" id="loginView">
   <form class="lb" id="loginForm">
-    <h1>Lauschgift <b>Backoffice</b></h1>
+    <h1 id="liBrand">lauschgift.net</h1>
+    <div style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);font-weight:700;margin:2px 0 10px">Backoffice</div>
     <div class="s">Fullservice DJ Homepage · Verwaltung</div>
     <label>E-Mail</label><input type="email" id="liEmail" autocomplete="username" required>
     <label>Passwort</label><input type="password" id="liPass" autocomplete="current-password" required>
@@ -145,7 +146,7 @@ th.num{text-align:right}
 <!-- ===== APP ===== -->
 <div class="app" id="appView">
   <div class="side">
-    <div class="slogo">DJ <b>Lauschgift</b></div>
+    <div class="slogo"><span id="sbBrand">lauschgift.net</span><div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);margin-top:2px">Backoffice</div></div>
     <div class="sn" id="nav">
       <a data-pg="dash" class="a">📊 Dashboard</a>
       <div class="grp">Vertrieb</div>
@@ -214,7 +215,7 @@ th.num{text-align:right}
       </div>
       <div>
         <div class="card"><h3>Stammdaten</h3><div id="cdData" class="sml"></div></div>
-        <div class="card"><h3>Kundenportal <button class="btn sm" style="float:right" onclick="portalInvite()">🔑 Einladungslink</button></h3>
+        <div class="card"><h3>Kunden-Backoffice <button class="btn sm" style="float:right" onclick="portalInvite()">🔑 Einladungslink</button></h3>
           <div id="cdPortal" class="sml mut">–</div></div>
         <div class="card"><h3>Buchungen</h3><div id="cdBookings" class="sml mut">–</div></div>
         <div class="card"><h3>Dokumente</h3><div id="cdDocs" class="sml mut">–</div></div>
@@ -672,8 +673,16 @@ function loadAll(){
     CACHE.docEvents=r[12]||[];CACHE.forms=r[13]||[];CACHE.formTpls=r[14]||[];CACHE.upsells=r[15]||[];
     CACHE.reviews=r[16]||[];CACHE.products=r[17]||[];CACHE.partners=r[18]||[];
     CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
+    applyBrand();
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
+}
+/* Markenname aus den Einstellungen (Website-Domain, sonst Firmenname) im Kopf & Titel */
+function applyBrand(){
+  var c=S.company||{};
+  var b=String(c.website||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'')||c.name||'lauschgift.net';
+  var el=document.getElementById('sbBrand');if(el)el.textContent=b;
+  document.title=b+' \u00b7 Backoffice';
 }
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();

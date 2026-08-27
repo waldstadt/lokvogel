@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Kundenbereich – DJ Lauschgift</title>
+<title>Kunden-Backoffice – lauschgift.net</title>
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23ff6f5b'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
 <link href="fonts.css" rel="stylesheet">
@@ -75,7 +75,7 @@ footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
 <div class="wrap">
   <div class="logo">
     <svg viewBox="0 0 32 32"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>
-    <b>lauschgift<i>.</i></b>&nbsp;<span class="sub">Kundenbereich</span>
+    <b>lauschgift<i>.</i></b>&nbsp;<span class="sub">Kunden-Backoffice</span>
   </div>
   <div id="app"><div class="card"><div class="sub">Wird geladen …</div></div></div>
   <footer id="foot"></footer>
@@ -489,7 +489,7 @@ function submitRental(){
 var CTOK=localStorage.getItem('cust_tok')||'',ME=null;
 function cfetch(p,opt){opt=opt||{};opt.headers=Object.assign({},opt.headers||{},{Authorization:'Bearer '+CTOK});return fetch(API+'/'+p,opt)}
 function renderSetPw(){
-  app('<div class="card"><div class="kicker">Dein Kundenbereich</div><h1>Passwort festlegen</h1>'+
+  app('<div class="card"><div class="kicker">Dein Kunden-Backoffice</div><h1>Passwort festlegen</h1>'+
     '<p class="sub">Einmal ein Passwort setzen — danach kommst du jederzeit mit E-Mail und Passwort an alle Unterlagen.</p>'+
     '<div class="msg err" id="spMsg" style="display:none"></div>'+
     '<label>Passwort (min. 8 Zeichen)</label><input type="password" id="spPw1">'+
@@ -512,7 +512,7 @@ function doSetPw(){
     }).catch(function(e){err(e.message)});
 }
 function renderLogin(msg){
-  app('<div class="card"><div class="kicker">Dein Kundenbereich</div><h1>Anmelden</h1>'+
+  app('<div class="card"><div class="kicker">Dein Kunden-Backoffice</div><h1>Anmelden</h1>'+
     '<p class="sub">Alle Unterlagen an einem Ort: Angebote, Rechnungen, Verträge — plus Programmablauf, Musikwünsche und Fotos eurer Location.</p>'+
     '<div class="msg err" id="liMsg" style="display:'+(msg?'block':'none')+'">'+esc(msg||'')+'</div>'+
     '<label>E-Mail</label><input type="email" id="liMail" autocomplete="email">'+
@@ -573,7 +573,7 @@ function renderAccount(){
     '<div>'+(f.kind==='foto'?'🖼':'📄')+' '+esc(f.name)+' <span style="color:var(--mut);font-size:12px">('+Math.max(1,Math.round(f.size/1024))+' KB)</span></div>'+
     '<div><a onclick="openFile(\''+f.id+'\')" style="cursor:pointer">Öffnen</a> &nbsp;<a onclick="delFile(\''+f.id+'\')" style="cursor:pointer;color:#e0a0a0">Löschen</a></div></div>';
   }).join('')||'<p class="sub" style="font-size:13px">Noch keine Dateien — ladet gern Fotos eurer Location oder Dokumente hoch.</p>';
-  app('<div class="card"><div class="kicker">Dein Kundenbereich</div><h1>Hallo, '+esc(me.customer.name)+'!</h1>'+
+  app('<div class="card"><div class="kicker">Dein Kunden-Backoffice</div><h1>Hallo, '+esc(me.customer.name)+'!</h1>'+
     '<p class="sub">Hier findest du alle Unterlagen und kannst alles für eure Termine pflegen. <a onclick="logout()" style="cursor:pointer">Abmelden</a></p></div>'+
     '<div class="card"><h2>📁 Meine Unterlagen</h2>'+docs+rentals+'</div>'+
     books+

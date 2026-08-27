@@ -1387,8 +1387,8 @@ function handlePortal(string $path, string $method, $body): never {
       $inv = bin2hex(random_bytes(24));
       $p->prepare('update customers set portal_invite = ?, portal_invite_expires = ? where id = ?')
         ->execute([$inv, time() + 2 * 86400, $c['id']]);
-      sendMailSafe((string)$c['email'], 'Neues Passwort für deinen Kundenbereich',
-        "Hallo,\n\nüber diesen Link kannst du ein neues Passwort für deinen Kundenbereich setzen (48 Stunden gültig):\n" .
+      sendMailSafe((string)$c['email'], 'Neues Passwort für dein Kunden-Backoffice',
+        "Hallo,\n\nüber diesen Link kannst du ein neues Passwort für dein Kunden-Backoffice setzen (48 Stunden gültig):\n" .
         baseUrl() . "/portal.html?einladung=$inv\n\nFalls du das nicht warst, kannst du diese Mail ignorieren.\n");
     }
     out(['ok' => true]);   // keine Auskunft, ob die Adresse existiert
@@ -1945,8 +1945,8 @@ try {
     $url = baseUrl() . '/portal.html?einladung=' . $inv;
     $mailed = false;
     if (!empty($body['mail']) && $c['email']) {
-      $mailed = sendMailSafe((string)$c['email'], 'Dein Zugang zum Kundenbereich',
-        "Hallo " . trim((string)$c['first_name']) . ",\n\nhier ist dein persönlicher Zugang zu meinem Kundenbereich — dort findest du alle Unterlagen (Angebote, Rechnungen, Verträge) und kannst Programmablauf, Musikwünsche und Fotos eurer Location hinterlegen:\n\n$url\n\nEinfach öffnen und ein Passwort setzen (Link ist 7 Tage gültig).\n\nViele Grüße\nMarkus");
+      $mailed = sendMailSafe((string)$c['email'], 'Dein Zugang zum Kunden-Backoffice',
+        "Hallo " . trim((string)$c['first_name']) . ",\n\nhier ist dein persönlicher Zugang zu deinem Kunden-Backoffice — dort findest du alle Unterlagen (Angebote, Rechnungen, Verträge) und kannst Programmablauf, Musikwünsche und Fotos eurer Location hinterlegen:\n\n$url\n\nEinfach öffnen und ein Passwort setzen (Link ist 7 Tage gültig).\n\nViele Grüße\nMarkus");
     }
     out(['ok' => true, 'url' => $url, 'mailed' => $mailed, 'has_account' => !empty($c['portal_hash'])], 201);
   }
