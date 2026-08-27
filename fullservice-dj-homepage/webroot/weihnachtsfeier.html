@@ -6,8 +6,8 @@
 <title>DJ &amp; Technik für eure Weihnachtsfeier | DJ Lauschgift, Hemer</title>
 <meta name="description" content="Weihnachtsfeier ohne Stress: DJ und komplette Ton- & Lichttechnik aus einer Hand. Reden klar verständlich, volle Tanzfläche, faire Preise. Jetzt Termin sichern – die guten Dezember-Termine sind ab Oktober weg.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23ff6f5b'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<link href="fonts.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -165,6 +165,17 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 
 <script>
 var API='api.php';
+/* Schriftstil aus dem CMS übernehmen (Dateien liegen lokal unter fonts/) */
+var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif"};
+fetch(API+'/rest/site_content?select=key,value').then(function(r){return r.json()}).then(function(rows){
+  rows.forEach(function(row){
+    if(row.key==='theme'&&row.value&&FONT_HEADS[row.value.font]&&row.value.font!=='grotesk'){
+      var s=document.createElement('style');
+      s.textContent='h1,h2,h3,h4,.kicker,.btn,.logo .wm{font-family:'+FONT_HEADS[row.value.font]+' !important}';
+      document.head.appendChild(s);
+    }
+  });
+}).catch(function(){});
 /* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */
 try{var _tp=JSON.stringify({p:'weihnachtsfeier.html',r:document.referrer||''});
 navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}

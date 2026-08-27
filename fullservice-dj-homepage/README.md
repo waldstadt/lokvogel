@@ -117,6 +117,11 @@ Branch `live` und ein Fine-grained GitHub-Token (nur dieses Repo, nur
 - **Website-CMS:** Alle Texte, Fotos (Upload auf den eigenen Server),
   Leistungspakete, FAQ, Verleih-Artikel, Kontaktdaten, SEO und
   Farbschema (Presets + freie Farbwahl) — Änderungen sind sofort live.
+  Dazu drei wählbare Schriftstile (Markant/Freundlich/Elegant); alle
+  Schriften liegen als Variable Fonts lokal unter `webroot/fonts/`,
+  es wird keine Verbindung zu Google Fonts aufgebaut. Die Website setzt
+  keine Tracking-Cookies — ein Cookie-Banner ist nicht nötig (steht so
+  auch in der Datenschutzerklärung).
 
 ## Bewusst noch nicht in v1 (Ausbau-Ideen)
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Lauschgift Backoffice</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="fonts.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0f1012;--cd:#17181c;--cd2:#1e1f24;--bdr:#2a2c32;--acc:#ff6f5b;--acch:#ff8d7c;
@@ -386,7 +386,16 @@ th.num{text-align:right}
       <div class="grid3">
         <div><label>Akzentfarbe</label><input type="color" id="thPrimary" style="height:36px;padding:2px"></div>
         <div><label>Hintergrund</label><input type="color" id="thBg" style="height:36px;padding:2px"></div>
-        <div style="align-self:end"><button class="btn sm" onclick="saveTheme()">Design speichern</button></div>
+        <div><label>Schriftstil <span class="mut sml" style="text-transform:none;letter-spacing:0">(Überschriften)</span></label>
+          <select id="thFont">
+            <option value="grotesk">Markant — Space Grotesk</option>
+            <option value="outfit">Freundlich — Outfit</option>
+            <option value="playfair">Elegant — Playfair Display</option>
+          </select></div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <button class="btn sm" onclick="saveTheme()">Design speichern</button>
+        <span class="mut sml">Alle Schriften liegen fest auf dem eigenen Server (kein Google Fonts). Die Farben gelten für die DJ-Seite; der Schriftstil gilt für alle Seiten. Technik-Seite (Petrol) und Halloween (Orange) behalten bewusst ihre eigene Farbwelt.</span>
       </div>
     </div>
     <div class="grid2" style="gap:16px;align-items:start">
@@ -2085,6 +2094,7 @@ function renderCms(){
   var th=c.theme||{};
   document.getElementById('thPrimary').value=th.primary||'#c9a227';
   document.getElementById('thBg').value=th.bg||'#0d0d0f';
+  document.getElementById('thFont').value=['grotesk','outfit','playfair'].indexOf(th.font)>=0?th.font:'grotesk';
   document.getElementById('themeRow').innerHTML=THEMES.map(function(t){
     return '<span class="theme-sw'+(th.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+t.n+'" onclick="pickTheme(\''+t.n+'\')"></span>';
   }).join('')+'<span class="sml mut" style="margin-left:8px">Preset wählen oder Farben frei einstellen</span>';
@@ -2098,7 +2108,7 @@ function pickTheme(name){
   document.querySelectorAll('.theme-sw').forEach(function(el){el.classList.toggle('sel',el.title===name)});
 }
 function saveTheme(){
-  var val={preset:(CACHE.content.theme&&CACHE.content.theme.preset)||'custom',primary:v('thPrimary'),bg:v('thBg')};
+  var val={preset:(CACHE.content.theme&&CACHE.content.theme.preset)||'custom',primary:v('thPrimary'),bg:v('thBg'),font:v('thFont')};
   upsertContent('theme',val);
 }
 function saveContent(key){

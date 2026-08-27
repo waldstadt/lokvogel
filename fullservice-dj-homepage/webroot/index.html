@@ -13,8 +13,8 @@
 </script>
 <meta name="description" content="DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23ff6f5b'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<link href="fonts.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -348,7 +348,7 @@ footer a:hover{color:var(--acc)}
     <div class="reveal">
       <div class="kicker">Buchungsanfrage</div>
       <h2>Lasst uns über eure Feier sprechen</h2>
-      <p class="lead">Unverbindlich und kostenlos – ihr bekommt in der Regel innerhalb von 24 Stunden eine Antwort. Von mir persönlich, nicht vom Autoresponder. Und keine Sorge, wenn noch nichts feststeht: Kein Datum, keine Location, keine Ahnung, was ihr braucht? Genau dafür bin ich da – fragt einfach an.</p>
+      <p class="lead">Unverbindlich und kostenlos – ihr bekommt in der Regel innerhalb von 24 Stunden eine persönliche Antwort, nicht vom Autoresponder. Kein Datum, keine Location, keine Ahnung, was ihr braucht? Macht nichts – genau dafür bin ich da. Fragt einfach an.</p>
     </div>
     <div class="contact-grid">
       <div class="reveal">
@@ -518,6 +518,7 @@ function applyContent(rows){
     document.documentElement.style.setProperty('--acc',c.theme.primary);
     if(c.theme.bg)document.documentElement.style.setProperty('--bg',c.theme.bg);
   }
+  if(c.theme)applyFont(c.theme.font);
   if(c.guarantee){
     if(c.guarantee.title)document.getElementById('gTitle').textContent=c.guarantee.title;
     if(c.guarantee.text)document.getElementById('gText').textContent=c.guarantee.text;
@@ -537,6 +538,14 @@ function applyContent(rows){
     if(c.seo.title)document.title=c.seo.title;
     if(c.seo.description){var m=document.querySelector('meta[name=description]');if(m)m.content=c.seo.description}
   }
+}
+/* Schriftstil aus dem CMS (alle Dateien liegen lokal unter fonts/) */
+var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif"};
+function applyFont(f){
+  if(!FONT_HEADS[f]||f==='grotesk')return;
+  var s=document.createElement('style');
+  s.textContent='h1,h2,h3,h4,.gro,.kicker,.btn,.logo .wm,.badge b,.step .n,.pack .price{font-family:'+FONT_HEADS[f]+' !important}';
+  document.head.appendChild(s);
 }
 var LEGAL_TITLES={impressum:'Impressum',datenschutz:'Datenschutzerklärung',agb:'AGB'};
 function openLegal(key){
