@@ -1,6 +1,6 @@
 <?php
 /**
- * Fullservice DJ Homepage — Backend-API (Supabase-Ersatz für Shared Hosting)
+ * Fullservice DJ Homepage – Backend-API (Supabase-Ersatz für Shared Hosting)
  * ---------------------------------------------------------------------------
  * Eine Datei, SQLite-Datenbank, keine Abhängigkeiten. Läuft auf jedem
  * PHP-8-Hosting (z. B. All-Inkl). Die Datenbank inkl. Startdaten legt sich
@@ -198,7 +198,7 @@ function upgrade(PDO $p): void {
       foreach ($fields as &$f) {
         $l = (string)($f['label'] ?? '');
         if (str_contains($l, 'auf jeden Fall laufen') && !str_contains($l, 'besonders gern'))
-          $f['label'] = 'Welche Musik hört ihr besonders gern? (Richtungen, Künstler, Lieblingslieder — was auf jeden Fall laufen soll)';
+          $f['label'] = 'Welche Musik hört ihr besonders gern? (Richtungen, Künstler, Lieblingslieder – was auf jeden Fall laufen soll)';
         if (str_contains($l, 'KEINEN Fall'))
           $f['label'] = 'Und was mögt ihr überhaupt nicht? (darf auf keinen Fall laufen)';
       }
@@ -209,7 +209,7 @@ function upgrade(PDO $p): void {
   } catch (PDOException $e) {}
   if ($v < 24) foreach (statsNewsletterDdl() as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   if ($v < 25) try {
-    /* Datenschutztext um Cookies/Schriftarten/Statistik/Newsletter ergänzen — nur solange er noch der alte Seed ist */
+    /* Datenschutztext um Cookies/Schriftarten/Statistik/Newsletter ergänzen – nur solange er noch der alte Seed ist */
     $st = $p->query("select value from site_content where key='legal'");
     $legal = json_decode((string)$st->fetchColumn(), true);
     if (is_array($legal) && !str_contains((string)($legal['datenschutz'] ?? ''), 'Schriftarten')) {
@@ -251,7 +251,7 @@ function statsNewsletterDdl(): array {
   ];
 }
 
-/* Vermittlungs-Mail „Termin belegt" — eine Quelle für Seed und Migration */
+/* Vermittlungs-Mail „Termin belegt" – eine Quelle für Seed und Migration */
 function bandeMailSubject(): string {
   return 'Euer Termin am {datum} – ich habe trotzdem eine Lösung für euch';
 }
@@ -275,7 +275,7 @@ Markus";
 function upgradeBandeFlow(PDO $p): void {
   seedExtraTemplates($p);
   try { $p->prepare('delete from email_templates where name = ?')
-    ->execute(['Termin belegt — DJ-Empfehlung (Partner-Netzwerk)']); } catch (PDOException $e) {}
+    ->execute(['Termin belegt – DJ-Empfehlung (Partner-Netzwerk)']); } catch (PDOException $e) {}
   try {
     $p->prepare("update email_templates set subject = ?, body = ? where name = 'Termin belegt – DJ-Vermittlung'")
       ->execute([bandeMailSubject(), bandeMailBody()]);
@@ -300,7 +300,7 @@ function upgradeBandeFlow(PDO $p): void {
 
 /* Vorab-Fragebogen für den Technik-Check, nur wenn noch nicht vorhanden */
 function seedTechCheckForm(PDO $p): void {
-  $name = 'Technik-Check — Vorab-Fragen';
+  $name = 'Technik-Check – Vorab-Fragen';
   $c = $p->prepare('select count(*) from form_templates where name = ?');
   $c->execute([$name]);
   if ((int)$c->fetchColumn()) return;
@@ -312,7 +312,7 @@ function seedTechCheckForm(PDO $p): void {
     ['label' => 'Was muss die Anlage können? (eure Anforderungen)', 'type' => 'textarea'],
     ['label' => 'Wo liegen aktuell die Probleme? (Brummen, Pfeifen, zu leise, unverständlich …)', 'type' => 'textarea'],
     ['label' => 'Was wünscht ihr euch am Ende? (z. B. „Reden versteht man bis hinten", „einfacher bedienbar")', 'type' => 'textarea'],
-    ['label' => 'Was ist an Technik vorhanden? (Hersteller/Modelle, so gut ihr es wisst — Fotos gern per Mail)', 'type' => 'textarea'],
+    ['label' => 'Was ist an Technik vorhanden? (Hersteller/Modelle, so gut ihr es wisst – Fotos gern per Mail)', 'type' => 'textarea'],
     ['label' => 'Wie alt ist die Anlage ungefähr?', 'type' => 'select',
      'options' => ['unter 5 Jahre', '5–10 Jahre', '10–20 Jahre', 'älter/unbekannt']],
     ['label' => 'Wer bedient die Technik normalerweise?', 'type' => 'select',
@@ -322,7 +322,7 @@ function seedTechCheckForm(PDO $p): void {
   ];
   $p->prepare('insert into form_templates (id, sort, name, intro, fields) values (?,?,?,?,?)')
     ->execute([uuid(), 10, $name,
-      'Damit ich beim Termin direkt loslegen kann, beantwortet mir vorab kurz diese Fragen — dauert keine 5 Minuten. Beim Check vor Ort prüfe ich dann alles durch und ihr bekommt einen schriftlichen Bericht mit klarer Empfehlung.',
+      'Damit ich beim Termin direkt loslegen kann, beantwortet mir vorab kurz diese Fragen – dauert keine 5 Minuten. Beim Check vor Ort prüfe ich dann alles durch und ihr bekommt einen schriftlichen Bericht mit klarer Empfehlung.',
       json_encode($fields, JSON_UNESCAPED_UNICODE)]);
 }
 
@@ -330,13 +330,13 @@ function seedTechCheckForm(PDO $p): void {
 function seedServiceProducts(PDO $p): void {
   $rows = [
     ['WARTUNG-01', 20, 'Service', 'Wartungsvertrag Beschallungsanlage (jährlich)',
-     'Jährlicher Funktions-Check, Reinigung, Firmware-Updates und Nachmessen einer fest installierten Anlage — inkl. Kurzbericht für Träger/Vorstand. Verschleiß wird früh erkannt statt am Veranstaltungstag.', 'Jahr', 249.0],
+     'Jährlicher Funktions-Check, Reinigung, Firmware-Updates und Nachmessen einer fest installierten Anlage – inkl. Kurzbericht für Träger/Vorstand. Verschleiß wird früh erkannt statt am Veranstaltungstag.', 'Jahr', 249.0],
     ['INST-CHECK', 21, 'Service', 'Bestandsaufnahme & Beratung vor Ort',
      'Raum, Nutzung und vorhandene Technik aufnehmen; Empfehlung mit Festpreis-Angebot für die Installation. Wird bei Beauftragung verrechnet.', 'pausch.', 89.0],
     ['TECH-CHECK', 22, 'Service', 'Technik-Check bestehende Anlage',
      'Kompletter Check eurer vorhandenen Tontechnik vor Ort: Funktionsprüfung aller Komponenten, Klang-Bewertung, Einstellungs- und Ergänzungs-Potenzial. Schriftlicher Bericht mit klarer Empfehlung: neu einstellen, ergänzen oder ersetzen. Wird bei Folgeauftrag verrechnet. Gilt für eine Anlage/einen Raum.', 'pausch.', 149.0],
     ['TECH-CHECK-PLUS', 23, 'Service', 'Technik-Check: weitere Anlage / weiterer Raum',
-     'Zusätzliche Anlage oder zusätzlicher Raum im selben Termin — inkl. Aufnahme im selben Bericht.', 'Stk.', 79.0],
+     'Zusätzliche Anlage oder zusätzlicher Raum im selben Termin – inkl. Aufnahme im selben Bericht.', 'Stk.', 79.0],
   ];
   foreach ($rows as [$sku, $s, $cat, $n, $d, $u, $pr]) {
     $c = $p->prepare('select count(*) from products where sku = ?');
@@ -390,11 +390,11 @@ function assertItemsUnlocked(PDO $p, string $wsql, array $args): void {
 function seedExtraTemplates(PDO $p): void {
   $extra = [
     [90, 'Zahlungserinnerung (freundlich)', 'Kleine Erinnerung: Rechnung {nr}',
-      "Hallo {vorname},\n\nich hoffe, es ist alles gut angekommen! Mir ist aufgefallen, dass die Rechnung {nr} über {betrag} (fällig am {faellig}) noch offen ist.\n\nBestimmt ist sie nur untergegangen — hier ist der Link zum Ansehen und als PDF:\n{link}\n\nFalls die Zahlung schon unterwegs ist: einfach ignorieren, dann hat sich das überschnitten.\n\nViele Grüße\nMarkus"],
-    [91, 'Angebots-Begleitmail', 'Euer Angebot ist fertig 🎉',
-      "Hallo {vorname},\n\ndanke für das gute Gespräch! Euer Angebot ist fertig und wartet hier auf euch:\n{link}\n\nIhr könnt es direkt online ansehen, Fragen zu einzelnen Positionen stellen oder mit einem Klick annehmen. Login ist eure Postleitzahl.\n\nWenn euch etwas nicht passt: sagt es mir einfach — wir biegen das hin.\n\nViele Grüße\nMarkus"],
-    [92, 'Workshop-Bestätigung (Zahlung eingegangen)', 'Dein Platz ist fix! 🎚',
-      "Hallo {vorname},\n\ndeine Zahlung ist da — damit ist dein Workshop-Platz verbindlich reserviert!\n\nWann: {datum}\nWo: Lager Hemer, Büttmecker Weg 35c\n\nBring gern dein eigenes Equipment-Problem mit — wir schauen uns echte Fälle an. Getränke gehen auf mich.\n\nBis bald!\nMarkus"],
+      "Hallo {vorname},\n\nich hoffe, es ist alles gut angekommen! Mir ist aufgefallen, dass die Rechnung {nr} über {betrag} (fällig am {faellig}) noch offen ist.\n\nBestimmt ist sie nur untergegangen – hier ist der Link zum Ansehen und als PDF:\n{link}\n\nFalls die Zahlung schon unterwegs ist: einfach ignorieren, dann hat sich das überschnitten.\n\nViele Grüße\nMarkus"],
+    [91, 'Angebots-Begleitmail', 'Euer Angebot ist fertig',
+      "Hallo {vorname},\n\ndanke für das gute Gespräch! Euer Angebot ist fertig und wartet hier auf euch:\n{link}\n\nIhr könnt es direkt online ansehen, Fragen zu einzelnen Positionen stellen oder mit einem Klick annehmen. Login ist eure Postleitzahl.\n\nWenn euch etwas nicht passt: sagt es mir einfach – wir biegen das hin.\n\nViele Grüße\nMarkus"],
+    [92, 'Workshop-Bestätigung (Zahlung eingegangen)', 'Dein Platz ist fix!',
+      "Hallo {vorname},\n\ndeine Zahlung ist da – damit ist dein Workshop-Platz verbindlich reserviert!\n\nWann: {datum}\nWo: Lager Hemer, Büttmecker Weg 35c\n\nBring gern dein eigenes Equipment-Problem mit – wir schauen uns echte Fälle an. Getränke gehen auf mich.\n\nBis bald!\nMarkus"],
   ];
   foreach ($extra as [$s, $n, $sub, $b]) {
     $c = $p->prepare('select count(*) from email_templates where name = ?');
@@ -437,7 +437,7 @@ function rentalContractDefault(): string {
   return "§ 1 Mietgegenstand und Mietzeit\nVermietet werden die im Vertrag aufgeführten Geräte für den genannten Zeitraum. Ein Miettag entspricht 24 Stunden ab Übergabe; jeder weitere Tag wird mit 50 % des Tagespreises berechnet. Übergabe und Rückgabe erfolgen, sofern nicht anders vereinbart, am Lager des Vermieters in Hemer.\n\n§ 2 Zustand, Einweisung und Nutzung\nDie Geräte werden in geprüftem, funktionsfähigem Zustand übergeben; der Mieter erhält eine kurze Einweisung. Die Nutzung erfolgt sachgemäß und nur durch den Mieter bzw. von ihm beauftragte, eingewiesene Personen.\n\n§ 3 Haftung des Mieters\nDer Mieter haftet ab Übergabe bis zur Rückgabe für Verlust, Diebstahl und Beschädigung der Mietsachen in Höhe des Wiederbeschaffungswerts bzw. der Reparaturkosten. Mängel und Schäden sind unverzüglich zu melden.\n\n§ 4 Rückgabe\nDie Rückgabe erfolgt vollständig, gereinigt und ordnungsgemäß verpackt zum vereinbarten Zeitpunkt. Bei verspäteter Rückgabe wird je angefangenem Tag der Folgetagespreis berechnet.\n\n§ 5 Kaution\nEine vereinbarte Kaution wird bei vollständiger, unbeschädigter Rückgabe erstattet.\n\n§ 6 Schlussbestimmungen\nEs gelten ergänzend die AGB des Vermieters. Es gilt deutsches Recht.";
 }
 
-/* Datenschutzerklärung — eine Quelle für Seed und Migration (v25) */
+/* Datenschutzerklärung – eine Quelle für Seed und Migration (v25) */
 function datenschutzText(): string {
   return "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer, Telefon 01523 6439373.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Cookies und lokale Speicherung\nDiese Website verwendet keine Cookies zu Werbe- oder Tracking-Zwecken und bindet keine Dienste ein, die solche Cookies setzen. Ein Cookie-Banner ist deshalb nicht erforderlich. Nur im Kundenportal und im Partner-Bereich wird nach eurer aktiven Anmeldung ein technisch notwendiges Sitzungsmerkmal im Browser gespeichert (Local/Session Storage), damit ihr angemeldet bleibt (§ 25 Abs. 2 TDDDG).\n\n4. Schriftarten\nAlle Schriftarten liegen lokal auf dem Server dieser Website. Beim Seitenaufruf wird keine Verbindung zu Google Fonts oder anderen Drittanbietern aufgebaut.\n\n5. Reichweitenmessung\nZur Verbesserung des Angebots wird anonym gezählt, wie oft die einzelnen Seiten aufgerufen werden (nur Datum, Seitenname und ggf. die Domain der verweisenden Website). Dabei werden weder IP-Adressen noch Cookies oder sonstige Kennungen gespeichert – ein Bezug zu einzelnen Personen ist nicht möglich (Art. 6 Abs. 1 lit. f DSGVO).\n\n6. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n7. Newsletter\nFür den Workshop-Newsletter speichere ich eure E-Mail-Adresse erst nach Bestätigung über den zugesandten Link (Double-Opt-in) auf Grundlage eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Jede Mail enthält einen Abmeldelink; nach der Abmeldung erhaltet ihr keine weiteren Mails. Es wird kein Versanddienstleister eingesetzt – der Versand erfolgt über den eigenen Server.\n\n8. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n9. Digitaler Mietvertrag und Ausweiskopie\nBei der Vermietung von Veranstaltungstechnik könnt ihr den Mietvertrag digital abschließen. Dabei werden eure Unterschrift sowie – mit eurer ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 20 PAuswG) – Fotos der Vorder- und Rückseite eures Personalausweises verarbeitet und in einem zugriffsgeschützten Bereich des eigenen Servers gespeichert. Nicht benötigte Angaben dürft ihr vor dem Fotografieren schwärzen. Die Ausweiskopien dienen ausschließlich der Absicherung des Mietverhältnisses und werden nach vollständiger Rückgabe der Mietsachen gelöscht.\n\n10. Kundenportal\nIm Kundenportal könnt ihr euch mit E-Mail-Adresse und Passwort anmelden, um eure Unterlagen einzusehen und Angaben zu eurer Feier zu pflegen. Das Passwort wird ausschließlich verschlüsselt (als Hash) gespeichert; alle Inhalte liegen auf dem eigenen Server dieser Website (Art. 6 Abs. 1 lit. b DSGVO).\n\n11. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: bitte nach juristischer Prüfung ergänzen.";
 }
@@ -553,7 +553,7 @@ function seed(PDO $p): void {
     ['services', '{"title":"Das bekommt ihr","text":"Vom Sektempfang bis zum letzten Song: Musik, Ton für die freie Trauung, dezentes Licht passend zur Location – und ein Plan B für alle Fälle. Ihr feiert, ich kümmere mich um den Rest.","image":""}'],
     ['prices', json_encode([
       'title' => 'Was kostet das?',
-      'text' => 'Ob Hochzeit, Geburtstag oder Firmenfeier, spielt für den Preis keine Rolle – bei mir zahlt niemand einen „Hochzeitsaufschlag“. Ich rechne nach Auslastung, Arbeitsstunden und Technikaufwand. Ihr bekommt ein individuelles Angebot mit klaren Posten, zugeschnitten auf eure Feier.',
+      'text' => 'Ob Hochzeit, Geburtstag oder Firmenfeier, spielt für den Preis keine Rolle – bei mir zahlt niemand einen „Hochzeitsaufschlag“. Ich rechne nach Termin (Haupt- oder Nebensaison), Arbeitsstunden und Technikaufwand. Ihr bekommt ein individuelles Angebot mit klaren Posten, zugeschnitten auf eure Feier.',
       'from' => 1200,
       'examples' => [
         ['title' => 'Hochzeit', 'scope' => 'Sektempfang bis offenes Ende, Ton für die freie Trauung, dezentes Licht', 'price' => 'ca. 1.550 €'],
@@ -597,7 +597,7 @@ function seed(PDO $p): void {
   $ins('equipment', ['sort'=>1,'name'=>'Nebelmaschine klein','slug'=>'nebelmaschine-klein','category'=>'Effekt',
     'description'=>'Kompakte Nebelmaschine inkl. Fluid – ideal für Partykeller und kleine Räume.','day_rate'=>25,'qty_total'=>1]);
 
-  /* E-Mail-Antwortvorlagen — Platzhalter: {vorname} {name} {datum} {anlass} {ort} */
+  /* E-Mail-Antwortvorlagen – Platzhalter: {vorname} {name} {datum} {anlass} {ort} */
   $tpls = [
     [1, 'Hochzeit – Erstantwort', 'Eure Hochzeit am {datum} – Rückmeldung von DJ Lauschgift',
 "Hallo {vorname},
@@ -664,7 +664,7 @@ Damit ich euch Verfügbarkeit und Preis nennen kann, brauche ich nur noch:
 Viele Grüße
 Markus Jankowski – Lauschgift Veranstaltungstechnik"],
     [6, 'Nach der Feier – Danke & Bewertung',
-     'Danke für eure Feier am {datum}! 🎉',
+     'Danke für eure Feier am {datum}!',
 "Hallo {vorname},
 
 was für ein Abend! Vielen Dank, dass ich eure Feier begleiten durfte – ihr wart ein großartiges Publikum, und ich hoffe, ihr habt genauso viel Spaß gehabt wie ich.
@@ -673,7 +673,7 @@ Eine kleine Bitte zum Schluss: Bewertungen sind für mich als selbstständigen D
 
 {bewertungen}
 
-Und falls euch später noch etwas einfällt (Fotos, Fragen, die nächste Feier 😉): Meldet euch jederzeit.
+Und falls euch später noch etwas einfällt (Fotos, Fragen oder die nächste Feier): Meldet euch jederzeit.
 
 Viele Grüße und alles Gute
 Markus Jankowski – DJ Lauschgift"],
@@ -686,7 +686,7 @@ Markus Jankowski – DJ Lauschgift"],
   seedUpsells($p);
   seedProducts($p);
 
-  /* Beispiel-Location als Vorlage — erst nach Bearbeitung auf 'öffentlich' stellen */
+  /* Beispiel-Location als Vorlage – erst nach Bearbeitung auf 'öffentlich' stellen */
   $ins('locations', ['sort'=>1,'name'=>'Beispiel-Location (bitte ersetzen)','city'=>'Musterstadt','region'=>'NRW',
     'description'=>'Kurz beschreiben, warum du dort so gerne auflegst und was das Team besonders gut macht.',
     'website'=>'','public'=>0]);
@@ -702,7 +702,7 @@ function seedFormTemplates(PDO $p): void {
        ['label'=>'Location & Ort (Name reicht)','type'=>'text'],
        ['label'=>'Eure vollständige Anschrift (Straße, PLZ, Ort) – wird für die Vermittlung benötigt','type'=>'text'],
        ['label'=>'Ungefähre Gästezahl','type'=>'text'],
-       ['label'=>'Welche Musik hört ihr besonders gern? (Richtungen, Künstler, Lieblingslieder — was auf jeden Fall laufen soll)','type'=>'textarea'],
+       ['label'=>'Welche Musik hört ihr besonders gern? (Richtungen, Künstler, Lieblingslieder – was auf jeden Fall laufen soll)','type'=>'textarea'],
        ['label'=>'Und was mögt ihr überhaupt nicht? (darf auf keinen Fall laufen)','type'=>'textarea'],
        ['label'=>'Wie soll euer DJ auftreten?','type'=>'select','options'=>['Zurückhaltend im Hintergrund','Moderiert & animiert aktiv','Mischung aus beidem','Egal, Hauptsache gute Musik']],
        ['label'=>'Sonst noch etwas, das der DJ wissen sollte?','type'=>'textarea'],
@@ -745,7 +745,7 @@ function seedProducts(PDO $p): void {
     ['sku'=>'DJ-100','qty'=>1],['sku'=>'TON-200','qty'=>1],['sku'=>'LICHT-300','qty'=>1],
   ]);
   $p->prepare('insert into products (id,sku,sort,category,name,description,unit,price_net,bundle,created_at) values (?,?,?,?,?,?,?,?,?,?)')
-    ->execute([uuid(),'PAKET-500',9,'Pakete','Hochzeit Komplett','Rundum-sorglos: DJ-Abend Basis, Ton für die freie Trauung und Ambiente-Licht — als eine Position im Angebot.','pausch.',1450,$bundle,now()]);
+    ->execute([uuid(),'PAKET-500',9,'Pakete','Hochzeit Komplett','Rundum-sorglos: DJ-Abend Basis, Ton für die freie Trauung und Ambiente-Licht – als eine Position im Angebot.','pausch.',1450,$bundle,now()]);
 }
 
 function seedUpsells(PDO $p): void {
@@ -873,22 +873,22 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       $cols = array_keys($row);
       $p->prepare("insert into inquiries (" . implode(',', $cols) . ") values (" .
         implode(',', array_fill(0, count($cols), '?')) . ")")->execute(array_values($row));
-      notifyOwner('🔔 Neue Anfrage: ' . $row['name'] . ($row['event_type'] ?? '' ? ' — ' . $row['event_type'] : ''),
+      notifyOwner('Neue Anfrage: ' . $row['name'] . ($row['event_type'] ?? '' ? ' – ' . $row['event_type'] : ''),
         "Name: {$row['name']}\nE-Mail: " . ($row['email'] ?? '–') . "\nTelefon: " . ($row['phone'] ?? '–') .
         "\nAnlass: " . ($row['event_type'] ?? '–') . "\nDatum: " . ($row['event_date'] ?? '–') .
         "\nOrt: " . ($row['location'] ?? '–') . "\n\n" . ($row['message'] ?? ''));
-      /* Warme Eingangsbestätigung an den Interessenten — jeder soll sich sofort gut aufgehoben fühlen */
+      /* Warme Eingangsbestätigung an den Interessenten – jeder soll sich sofort gut aufgehoben fühlen */
       if (!empty($row['email'])) {
         $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
         $vn = preg_split('/\s+/', trim($row['name']), 2)[0] ?? $row['name'];
         $waDigits = preg_replace('/\D/', '', (string)($comp['phone'] ?? ''));
         if ($waDigits !== '' && $waDigits[0] === '0') $waDigits = '49' . substr($waDigits, 1);
-        sendMailSafe((string)$row['email'], 'Deine Anfrage ist angekommen 🙌',
-          "Hallo $vn,\n\ndanke für deine Anfrage — sie ist sicher bei mir gelandet!\n\n" .
+        sendMailSafe((string)$row['email'], 'Deine Anfrage ist angekommen',
+          "Hallo $vn,\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet!\n\n" .
           "Ich melde mich persönlich bei dir, in der Regel innerhalb von 24 Stunden. " .
-          "Das hier ist die einzige automatische Mail, die du von mir bekommst — ab jetzt schreibst du direkt mit mir.\n\n" .
+          "Das hier ist die einzige automatische Mail, die du von mir bekommst – ab jetzt schreibst du direkt mit mir.\n\n" .
           (($comp['phone'] ?? '') !== '' ?
-            "Wenn es eilig ist, erreichst du mich unter " . $comp['phone'] . " — am schnellsten per WhatsApp:\n" .
+            "Wenn es eilig ist, erreichst du mich unter " . $comp['phone'] . " – am schnellsten per WhatsApp:\n" .
             "https://wa.me/" . $waDigits . "\n\n" : '') .
           "Bis gleich!\n" . ($comp['owner'] ?? 'Markus'));
       }
@@ -952,7 +952,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       if (!$where) fail('PATCH ohne Filter verweigert.', 400);
       $row = array_intersect_key(is_array($body) ? $body : [], array_flip(tableCols($t)));
       if (!$row) fail('Nichts zu ändern.');
-      /* GoBD: festgeschriebene Rechnungen — nur Status-/Versandfelder änderbar, Inhalte nie */
+      /* GoBD: festgeschriebene Rechnungen – nur Status-/Versandfelder änderbar, Inhalte nie */
       if ($t === 'documents') {
         $chk = $p->prepare("select * from documents$wsql"); $chk->execute($args);
         $before = $chk->fetchAll();
@@ -990,7 +990,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         $chk = $p->prepare("select * from documents$wsql"); $chk->execute($args);
         foreach ($chk->fetchAll() as $b) {
           if (docLockedRow($b))
-            fail('Rechnung ' . $b['number'] . ' ist festgeschrieben (GoBD) und kann nicht gelöscht werden — bitte stornieren.', 409);
+            fail('Rechnung ' . $b['number'] . ' ist festgeschrieben (GoBD) und kann nicht gelöscht werden – bitte stornieren.', 409);
           docAudit($p, $b['id'], 'gelöscht', $b['number'] . ' (' . $b['doc_type'] . ', Entwurf)');
         }
       }
@@ -1150,7 +1150,7 @@ function workshopInvoice(PDO $p, string $signupId): array {
         (string)($defs['invoice_outro'] ?? ''), $net, $tax, $net + $tax, now()]);
     $p->prepare('insert into document_items (id, document_id, pos, description, qty, unit, unit_price)
         values (?,?,?,?,?,?,?)')
-      ->execute([uuid(), $docId, 1, 'Workshop: ' . $dTitle . ' — Teilnahme', $seats, $seats > 1 ? 'Plätze' : 'Platz', $price]);
+      ->execute([uuid(), $docId, 1, 'Workshop: ' . $dTitle . ' – Teilnahme', $seats, $seats > 1 ? 'Plätze' : 'Platz', $price]);
     $p->prepare('update workshop_signups set invoice_id = ? where id = ?')->execute([$docId, $signupId]);
     docAudit($p, $docId, 'erstellt', $number . ' (rechnung, automatisch aus Workshop-Buchung)');
     $p->commit();
@@ -1165,16 +1165,16 @@ function workshopInvoice(PDO $p, string $signupId): array {
     "danke für deine Anmeldung zum Workshop „" . $s['w_title'] . "“ am " . $s['w_date'] . "!\n\n" .
     "Hier ist deine Rechnung $number (" . number_format($net + $tax, 2, ',', '.') . " €):\n$portal\n" .
     "Login: deine Postleitzahl ($custZip). Dort kannst du die Rechnung ansehen und als PDF speichern.\n\n" .
-    "Mit Zahlungseingang ist dein Platz verbindlich reserviert. Zahlbar bis $due per Überweisung — die Bankverbindung steht auf der Rechnung.\n\n" .
+    "Mit Zahlungseingang ist dein Platz verbindlich reserviert. Zahlbar bis $due per Überweisung – die Bankverbindung steht auf der Rechnung.\n\n" .
     "Bis bald im Workshop!\n" . ($comp['owner'] ?? '') . "\n" . ($comp['name'] ?? '') .
     ($comp['phone'] ?? '' ? "\n" . $comp['phone'] : '');
-  $mailed = sendMailSafe((string)$s['email'], "Rechnung $number — dein Workshop-Platz am " . $s['w_date'], $bodyTxt);
+  $mailed = sendMailSafe((string)$s['email'], "Rechnung $number – dein Workshop-Platz am " . $s['w_date'], $bodyTxt);
   $p->prepare('update documents set status = ?, sent_at = ? where id = ?')
     ->execute([$mailed ? 'versendet' : 'entwurf', $mailed ? now() : null, $docId]);
   $p->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, created_at)
       values (?,?,?,?,?,?,?,?)')
     ->execute([uuid(), $cid, $mailed ? 'email' : 'note', 'out',
-      'Workshop-Rechnung ' . $number . ($mailed ? ' automatisch versendet' : ' erstellt (Mailversand fehlgeschlagen — bitte manuell senden)'),
+      'Workshop-Rechnung ' . $number . ($mailed ? ' automatisch versendet' : ' erstellt (Mailversand fehlgeschlagen – bitte manuell senden)'),
       'Workshop: ' . $dTitle . ' · ' . $seats . ' Platz/Plätze · ' . number_format($net + $tax, 2, ',', '.') . " €\nPortal-Link: $portal", now(), now()]);
   return ['ok' => true, 'number' => $number, 'mailed' => $mailed, 'portal' => $portal];
 }
@@ -1184,7 +1184,7 @@ function notifyOwner(string $subject, string $body): bool {
   $comp = json_decode(db()->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
   $to = trim((string)($comp['email'] ?? ''));
   if ($to === '') return false;
-  return sendMailSafe($to, $subject, $body . "\n\n— automatische Benachrichtigung deines Backoffice\n" . baseUrl() . "/admin.html");
+  return sendMailSafe($to, $subject, $body . "\n\n– automatische Benachrichtigung deines Backoffice\n" . baseUrl() . "/admin.html");
 }
 
 /* ---------- Kalender-Feeds (iCal) ---------- */
@@ -1229,13 +1229,13 @@ function serveIcal(string $typ): never {
     $q = $p->query("select b.*, c.first_name, c.last_name, c.company, c.phone from bookings b
       join customers c on c.id = b.customer_id where b.status in ('anfrage','angebot')");
     foreach ($q->fetchAll() as $b)
-      $ev .= icsEvent($b['id'], '? ' . ($b['title'] ?: $b['event_type'] ?: 'Anfrage') . ' (' . $b['status'] . ')',
+      $ev .= icsEvent($b['id'], 'Anfrage: ' . ($b['title'] ?: $b['event_type'] ?: 'Feier') . ' (' . $b['status'] . ')',
         $b['event_date'], $b['end_date'], $b['start_time'], $b['end_time'],
         $custName($b) . ($b['phone'] ? ' · ' . $b['phone'] : '') . ($b['guests'] ? ' · ' . $b['guests'] . ' Gäste' : ''),
         trim(($b['venue_name'] ?? '') . ' ' . ($b['venue_address'] ?? '')), true);
     $qi = $p->query("select * from inquiries where status = 'neu' and event_date is not null and event_date != ''");
     foreach ($qi->fetchAll() as $i)
-      $ev .= icsEvent('inq-' . $i['id'], '? Anfrage: ' . ($i['event_type'] ?: 'Feier') . ' — ' . $i['name'],
+      $ev .= icsEvent('inq-' . $i['id'], 'Anfrage: ' . ($i['event_type'] ?: 'Feier') . ' – ' . $i['name'],
         $i['event_date'], null, null, null,
         trim(($i['email'] ?? '') . ' ' . ($i['phone'] ?? '')) . ($i['message'] ? ' · ' . mb_substr($i['message'], 0, 150) : ''),
         (string)($i['location'] ?? ''), true);
@@ -1248,7 +1248,7 @@ function serveIcal(string $typ): never {
       $desc = $custName($b) . ($b['phone'] ? ' · ' . $b['phone'] : '') . ($b['guests'] ? ' · ' . $b['guests'] . ' Gäste' : '');
       if (!empty($r['setup_from'])) $desc .= ' · Aufbau ab ' . substr($r['setup_from'], 0, 5);
       if (!empty($r['contact_name'])) $desc .= ' · vor Ort: ' . $r['contact_name'] . (!empty($r['contact_phone']) ? ' ' . $r['contact_phone'] : '');
-      $ev .= icsEvent($b['id'], '🎧 ' . ($b['title'] ?: $b['event_type'] ?: 'Auftrag'),
+      $ev .= icsEvent($b['id'], 'DJ: ' . ($b['title'] ?: $b['event_type'] ?: 'Auftrag'),
         $b['event_date'], $b['end_date'], $b['start_time'], $b['end_time'], $desc,
         trim(($b['venue_name'] ?? '') . ' ' . ($b['venue_address'] ?? '')), false);
     }
@@ -1260,7 +1260,7 @@ function serveIcal(string $typ): never {
       $eq = $p->prepare('select be.qty, e.name from booking_equipment be join equipment e on e.id = be.equipment_id where be.booking_id = ?');
       $eq->execute([$b['id']]);
       $list = implode(', ', array_map(fn($x) => $x['qty'] . '× ' . $x['name'], $eq->fetchAll()));
-      $ev .= icsEvent($b['id'], '🔩 Vermietung: ' . ($b['title'] ?: 'Technik'),
+      $ev .= icsEvent($b['id'], 'Vermietung: ' . ($b['title'] ?: 'Technik'),
         $b['event_date'], $b['end_date'], $b['start_time'], $b['end_time'],
         $custName($b) . ($b['phone'] ? ' · ' . $b['phone'] : '') . ($list ? ' · ' . $list : ''),
         trim(($b['venue_name'] ?? '') . ' ' . ($b['venue_address'] ?? '')), false);
@@ -1289,17 +1289,17 @@ function dailyDigest(): array {
   $iq = $p->query("select name, event_type, created_at from inquiries where status = 'neu'
     and created_at < '" . gmdate('Y-m-d\TH:i:s\Z', time() - 86400) . "' order by created_at")->fetchAll();
   foreach ($iq as $i)
-    $parts[] = '⏰ Anfrage wartet seit ' . max(1, (int)floor((time() - strtotime((string)$i['created_at'])) / 86400)) .
+    $parts[] = 'Anfrage wartet seit ' . max(1, (int)floor((time() - strtotime((string)$i['created_at'])) / 86400)) .
       ' Tag(en) auf Antwort: ' . $i['name'] . ($i['event_type'] ? ' (' . $i['event_type'] . ')' : '');
   $od = $p->query("select count(*) c, coalesce(sum(total_gross - coalesce(deposit_deducted,0)),0) s from documents
     where doc_type not in ('angebot','lieferschein') and status = 'versendet' and due_date < '$today'")->fetch();
-  if ((int)$od['c']) $parts[] = '⚠ ' . $od['c'] . ' überfällige Rechnung(en), zusammen ' . number_format((float)$od['s'], 2, ',', '.') . ' € — Zahlungserinnerung im Backoffice.';
+  if ((int)$od['c']) $parts[] = $od['c'] . ' überfällige Rechnung(en), zusammen ' . number_format((float)$od['s'], 2, ',', '.') . ' € – Zahlungserinnerung im Backoffice.';
   $wt = $p->query("select c.first_name, c.last_name, c.company, max(d.paid_at) lastpaid from document_items i
     join documents d on d.id = i.document_id join customers c on c.id = d.customer_id
     where i.description like '%Wartungsvertrag%' and d.status = 'bezahlt'
     group by d.customer_id having max(d.paid_at) < '" . gmdate('Y-m-d', time() - 330 * 86400) . "'")->fetchAll();
   foreach ($wt as $w)
-    $parts[] = '🔧 Wartung fällig: ' . trim(($w['company'] ?: trim($w['first_name'] . ' ' . $w['last_name']))) . ' (letzte bezahlte Wartung: ' . substr((string)$w['lastpaid'], 0, 10) . ')';
+    $parts[] = 'Wartung fällig: ' . trim(($w['company'] ?: trim($w['first_name'] . ' ' . $w['last_name']))) . ' (letzte bezahlte Wartung: ' . substr((string)$w['lastpaid'], 0, 10) .')';
   if (!$parts) return ['sent' => false, 'reason' => 'nichts zu melden'];
   $ok = notifyOwner('Dein Tages-Update: ' . count($parts) . ' Punkt(e)', implode("\n", $parts));
   return ['sent' => $ok, 'items' => count($parts)];
@@ -1372,7 +1372,7 @@ function handlePortal(string $path, string $method, $body): never {
     $st = $p->prepare('select * from customers where portal_invite = ? and portal_invite_expires > ?');
     $st->execute([$inv, time()]);
     $c = $st->fetch();
-    if (!$c) fail('Dieser Einladungslink ist abgelaufen — bitte einen neuen anfordern.', 404);
+    if (!$c) fail('Dieser Einladungslink ist abgelaufen – bitte einen neuen anfordern.', 404);
     $p->prepare('update customers set portal_hash = ?, portal_invite = null, portal_invite_expires = null where id = ?')
       ->execute([password_hash($pass, PASSWORD_DEFAULT), $c['id']]);
     out(['token' => custToken($p, $c['id']), 'email' => $c['email'],
@@ -1439,7 +1439,7 @@ function handlePortal(string $path, string $method, $body): never {
       $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, created_at)
           values (?,?,?,?,?,?,?,?,?)')
         ->execute([uuid(), $me['id'], $m[1], 'note', 'in', 'Kunde hat Termindetails aktualisiert',
-          'Termin ' . ($b['title'] ?: $b['event_type']) . ' am ' . $b['event_date'] . ' — Programmablauf/Musikwünsche/Vereinbarungen im Portal gepflegt.', now(), now()]);
+          'Termin ' . ($b['title'] ?: $b['event_type']) . ' am ' . $b['event_date'] . ' – Programmablauf/Musikwünsche/Vereinbarungen im Portal gepflegt.', now(), now()]);
       out(['ok' => true], 201);
     }
     if ($path === 'portal/account/upload' && $method === 'POST') {
@@ -1460,7 +1460,7 @@ function handlePortal(string $path, string $method, $body): never {
       }
       $cnt = $p->prepare('select count(*) from customer_files where customer_id = ?');
       $cnt->execute([$me['id']]);
-      if ((int)$cnt->fetchColumn() >= 60) fail('Maximal 60 Dateien pro Kunde — bitte alte Dateien löschen.');
+      if ((int)$cnt->fetchColumn() >= 60) fail('Maximal 60 Dateien pro Kunde – bitte alte Dateien löschen.');
       $dir = DATA_DIR . '/custfiles';
       if (!is_dir($dir)) mkdir($dir, 0755, true);
       $id = uuid();
@@ -1523,14 +1523,14 @@ function handlePortal(string $path, string $method, $body): never {
       $sig = ($sigRaw !== '' && decodeDataUrl($sigRaw, ['png'], 400 * 1024)) ? $sigRaw : null;
       $p->prepare("update documents set status='angenommen', accepted_name=?, accept_signature=?, updated_at=? where id=?")
         ->execute([$accName ?: null, $sig, now(), $d['id']]);
-      docAudit($p, $d['id'], 'angenommen', $d['number'] . ' — vom Kunden angenommen' . ($accName ? ' und unterschrieben: ' . $accName : '') . ' (Portal)');
+      docAudit($p, $d['id'], 'angenommen', $d['number'] . ' – vom Kunden angenommen' . ($accName ? ' und unterschrieben: ' . $accName : '') . ' (Portal)');
     }
     if ($kind === 'decline' && $d['status'] !== 'storniert')
       $p->prepare("update documents set status='abgelehnt', updated_at=? where id=?")->execute([now(), $d['id']]);
     $p->prepare('insert into doc_events (id,document_id,kind,message,phone,created_at) values (?,?,?,?,?,?)')
       ->execute([uuid(), $d['id'], $kind, $msg, $phone, now()]);
-    $labels = ['accept' => '🎉 Angebot ANGENOMMEN', 'decline' => 'Angebot abgelehnt', 'comment' => '💬 Frage zum Angebot',
-      'callback' => '📞 Rückruf gewünscht', 'bande' => 'DJ-Vermittlung gewünscht'];
+    $labels = ['accept' => 'Angebot ANGENOMMEN', 'decline' => 'Angebot abgelehnt', 'comment' => 'Frage zum Angebot',
+      'callback' => 'Rückruf gewünscht', 'bande' => 'DJ-Vermittlung gewünscht'];
     notifyOwner($labels[$kind] . ': ' . $d['number'],
       'Kunde: ' . trim(($d['company'] ?: $d['first_name'] . ' ' . $d['last_name'])) .
       "\nDokument: " . $d['number'] . ' über ' . number_format((float)$d['total_gross'], 2, ',', '.') . ' €' .
@@ -1559,7 +1559,7 @@ function handlePortal(string $path, string $method, $body): never {
           values (?,?,?,?,?,?,?,?)')
           ->execute([uuid(), $f['customer_id'], 'note', 'in', 'Fragebogen beantwortet: '.$f['title'], trim($sum), now(), now()]);
       }
-      notifyOwner('📋 Fragebogen beantwortet: ' . $f['title'], 'Die Antworten stehen in der Kunden-Timeline im Backoffice.');
+      notifyOwner('Fragebogen beantwortet: ' . $f['title'], 'Die Antworten stehen in der Kunden-Timeline im Backoffice.');
       out(['ok' => true], 201);
     }
   }
@@ -1607,7 +1607,7 @@ function handlePortal(string $path, string $method, $body): never {
         values (?,?,?,?,?,?,?,?,?)')
       ->execute([uuid(), $r['cust_id'], $r['booking_id'], 'note', 'in', 'Mietvertrag digital unterschrieben',
         'Mietvertrag zur Buchung am '.$r['event_date'].' wurde online unterschrieben von: '.$name.'. Ausweiskopien (Vorder-/Rückseite) liegen geschützt im System.', now(), now()]);
-    notifyOwner('✍ Mietvertrag unterschrieben: ' . ($r['title'] ?: $r['event_date']),
+    notifyOwner('Mietvertrag unterschrieben: ' . ($r['title'] ?: $r['event_date']),
       "Unterschrieben von: $name\nTermin: " . $r['event_date'] . "\nAusweiskopien liegen geschützt im System.");
     out(['ok' => true], 201);
   }
@@ -1644,7 +1644,7 @@ function handlePortal(string $path, string $method, $body): never {
     $zip = mb_substr(trim((string)($body['zip'] ?? '')), 0, 10);
     $city = mb_substr(trim((string)($body['city'] ?? '')), 0, 80);
     if ((float)($w['price_net'] ?? 0) > 0 && ($street === '' || $zip === '' || $city === ''))
-      fail('Bitte Anschrift angeben (Straße, PLZ, Ort) — sie wird für die Rechnung benötigt.');
+      fail('Bitte Anschrift angeben (Straße, PLZ, Ort) – sie wird für die Rechnung benötigt.');
     $dup = $p->prepare("select count(*) from workshop_signups where workshop_id = ? and email = ? and status in ('angemeldet','warteliste')");
     $dup->execute([$w['id'], $email]);
     if ((int)$dup->fetchColumn()) fail('Mit dieser E-Mail-Adresse bist du für diesen Termin schon angemeldet bzw. auf der Warteliste.', 409);
@@ -1664,9 +1664,9 @@ function handlePortal(string $path, string $method, $body): never {
       if (!empty($r['ok'])) $inv = ['number' => $r['number'], 'mailed' => !empty($r['mailed'])];
     }
     if ($status === 'warteliste')
-      sendMailSafe($email, 'Du stehst auf der Warteliste — ich melde mich!',
-        "Hallo " . (preg_split('/\s+/', $name, 2)[0] ?? $name) . ",\n\ndanke für dein Interesse am Workshop „" . $w['title'] . "“ am " . $w['event_date'] . "!\n\nDer Termin ist aktuell voll — du stehst jetzt auf der Warteliste. Sobald ein Platz frei wird, melde ich mich sofort persönlich bei dir. Bezahlt wird erst, wenn du wirklich einen Platz hast.\n\nBis hoffentlich bald!\nMarkus");
-    notifyOwner(($status === 'warteliste' ? '⏳ Warteliste' : '🎟 Workshop-Buchung') . ': ' . $w['title'],
+      sendMailSafe($email, 'Du stehst auf der Warteliste – ich melde mich!',
+        "Hallo " . (preg_split('/\s+/', $name, 2)[0] ?? $name) . ",\n\ndanke für dein Interesse am Workshop „" . $w['title'] . "“ am " . $w['event_date'] . "!\n\nDer Termin ist aktuell voll – du stehst jetzt auf der Warteliste. Sobald ein Platz frei wird, melde ich mich sofort persönlich bei dir. Bezahlt wird erst, wenn du wirklich einen Platz hast.\n\nBis hoffentlich bald!\nMarkus");
+    notifyOwner(($status === 'warteliste' ? 'Warteliste' : 'Workshop-Buchung') . ': ' . $w['title'],
       "Name: $name ($seats Platz/Plätze)\nE-Mail: $email\nTermin: " . $w['event_date'] .
       ($inv ? "\nRechnung: " . $inv['number'] . ($inv['mailed'] ? ' (automatisch gemailt)' : ' (Mailversand prüfen!)') : ''));
     out(['ok' => true, 'status' => $status, 'invoice' => $inv,
@@ -1730,31 +1730,31 @@ function handlePortal(string $path, string $method, $body): never {
     }
     $vn = $name !== '' ? (preg_split('/\s+/', $name, 2)[0] ?? $name) : 'du';
     $link = baseUrl() . '/api.php/portal/newsletter/confirm/' . $token;
-    $mailed = sendMailSafe($email, 'Nur noch ein Klick — dann bist du dabei',
+    $mailed = sendMailSafe($email, 'Nur noch ein Klick – dann bist du dabei',
       ($vn === 'du' ? "Hallo,\n\n" : "Hallo $vn,\n\n") .
       "schön, dass du bei neuen Workshop-Terminen als Erstes Bescheid wissen willst! " .
       "Bestätige kurz deine Anmeldung, damit ich sicher weiß, dass die Adresse dir gehört:\n\n$link\n\n" .
       "Du bekommst danach nur Post, wenn es wirklich etwas gibt: neue Termine, neue Themen, freie Plätze. " .
       "Abmelden geht jederzeit mit einem Klick.\n\n" .
-      "Falls du das nicht warst, ignoriere diese Mail einfach — dann passiert nichts.\n\nBis bald!\nMarkus");
+      "Falls du das nicht warst, ignoriere diese Mail einfach – dann passiert nichts.\n\nBis bald!\nMarkus");
     out(['ok' => true, 'mailed' => $mailed], 201);
   }
   if (preg_match('#^portal/newsletter/(confirm|unsubscribe)/([a-f0-9]{32})$#', $path, $m) && $method === 'GET') {
     $st = $p->prepare('select * from newsletter where token = ?');
     $st->execute([$m[2]]);
     $row = $st->fetch();
-    $ok = false; $title = 'Link ungültig'; $text = 'Dieser Link ist nicht mehr gültig. Melde dich einfach neu an — oder schreib mir kurz.';
+    $ok = false; $title = 'Link ungültig'; $text = 'Dieser Link ist nicht mehr gültig. Melde dich einfach neu an – oder schreib mir kurz.';
     if ($row && $m[1] === 'confirm') {
       if (!$row['confirmed_at']) {
         $p->prepare('update newsletter set confirmed_at=?, unsubscribed_at=null where id=?')->execute([now(), $row['id']]);
-        notifyOwner('📬 Neuer Newsletter-Abonnent', 'E-Mail: ' . $row['email'] . ($row['name'] ? "\nName: " . $row['name'] : '') . "\nQuelle: " . ($row['source'] ?: '–'));
+        notifyOwner('Neuer Newsletter-Abonnent', 'E-Mail: ' . $row['email'] . ($row['name'] ? "\nName: " . $row['name'] : '') . "\nQuelle: " . ($row['source'] ?: '–'));
       }
       $ok = true; $title = 'Das hat geklappt ✓';
       $text = 'Du bist dabei! Sobald es neue Workshop-Termine oder Themen gibt, bekommst du als Erstes Bescheid.';
     } elseif ($row && $m[1] === 'unsubscribe') {
       $p->prepare('update newsletter set unsubscribed_at=? where id=?')->execute([now(), $row['id']]);
       $ok = true; $title = 'Du bist abgemeldet';
-      $text = 'Alles klar — du bekommst keine weiteren Mails von mir. Danke, dass du dabei warst!';
+      $text = 'Alles klar – du bekommst keine weiteren Mails von mir. Danke, dass du dabei warst!';
     }
     header('Content-Type: text/html; charset=utf-8');
     echo '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' .
@@ -1803,7 +1803,7 @@ try {
     handleRest($m[1], $method, $q, $body, $prefer);
   }
   if (preg_match('#^storage/(.+)$#', $path, $m) && $method === 'POST') handleUpload($m[1]);
-  /* Rechnung zu einer Workshop-Anmeldung erzeugen + mailen (z. B. beim Nachrücken) — nur angemeldet */
+  /* Rechnung zu einer Workshop-Anmeldung erzeugen + mailen (z. B. beim Nachrücken) – nur angemeldet */
   if (preg_match('#^workshop/([a-f0-9-]{30,40})/invoice$#', $path, $m) && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
     out(workshopInvoice(db(), $m[1]), 201);
@@ -1818,7 +1818,7 @@ try {
     $r['digest'] = dailyDigest();
     out($r);
   }
-  /* Kalender-Abos (iCal): drei Feeds — Anfragen, feste DJ-Buchungen, Technikvermietung */
+  /* Kalender-Abos (iCal): drei Feeds – Anfragen, feste DJ-Buchungen, Technikvermietung */
   if (preg_match('#^ical/([a-f0-9]{32})/(anfragen|buchungen|technik)\.ics$#', $path, $m) && $method === 'GET') {
     if (!hash_equals(icalKey(), $m[1])) { usleep(500000); fail('Ungültiger Schlüssel.', 401); }
     serveIcal($m[2]);
@@ -1830,7 +1830,7 @@ try {
       'buchungen' => "$b/api.php/ical/$k/buchungen.ics",
       'technik' => "$b/api.php/ical/$k/technik.ics"]);
   }
-  /* Anonyme Reichweiten-Zählung: nur Tag, Seitenname und Referrer-Domain — keine IPs, keine Cookies.
+  /* Anonyme Reichweiten-Zählung: nur Tag, Seitenname und Referrer-Domain – keine IPs, keine Cookies.
      sendBeacon schickt text/plain, daher wird der Body hier selbst gelesen. */
   if ($path === 'track' && $method === 'POST') {
     $b = json_decode(file_get_contents('php://input'), true) ?: [];
@@ -1883,7 +1883,7 @@ try {
       $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
       $to = (string)($comp['email'] ?? '');
       if ($to === '') fail('Für die Testmail muss in den Einstellungen eine Firmen-E-Mail hinterlegt sein.');
-      out(['mailed' => sendMailSafe($to, '[TEST] ' . $subject, $text . "\n\n—\nAbmelden: (Link wird beim echten Versand je Empfänger eingefügt)")]);
+      out(['mailed' => sendMailSafe($to, '[TEST] ' . $subject, $text . "\n\n–\nAbmelden: (Link wird beim echten Versand je Empfänger eingefügt)")]);
     }
     $subs = $p->query("select * from newsletter where confirmed_at is not null and unsubscribed_at is null")->fetchAll();
     $sent = 0; $failed = 0;
@@ -1891,7 +1891,7 @@ try {
       $unsub = baseUrl() . '/api.php/portal/newsletter/unsubscribe/' . $s['token'];
       $personal = str_replace('{vorname}',
         $s['name'] ? (preg_split('/\s+/', (string)$s['name'], 2)[0] ?? $s['name']) : 'Musikfreund', $text);
-      if (sendMailSafe((string)$s['email'], $subject, $personal . "\n\n—\nDu bekommst diese Mail, weil du dich für Workshop-News angemeldet hast.\nAbmelden mit einem Klick: $unsub"))
+      if (sendMailSafe((string)$s['email'], $subject, $personal . "\n\n–\nDu bekommst diese Mail, weil du dich für Workshop-News angemeldet hast.\nAbmelden mit einem Klick: $unsub"))
         $sent++; else $failed++;
     }
     out(['sent' => $sent, 'failed' => $failed, 'total' => count($subs)]);
@@ -1946,7 +1946,7 @@ try {
     $mailed = false;
     if (!empty($body['mail']) && $c['email']) {
       $mailed = sendMailSafe((string)$c['email'], 'Dein Zugang zum Kunden-Backoffice',
-        "Hallo " . trim((string)$c['first_name']) . ",\n\nhier ist dein persönlicher Zugang zu deinem Kunden-Backoffice — dort findest du alle Unterlagen (Angebote, Rechnungen, Verträge) und kannst Programmablauf, Musikwünsche und Fotos eurer Location hinterlegen:\n\n$url\n\nEinfach öffnen und ein Passwort setzen (Link ist 7 Tage gültig).\n\nViele Grüße\nMarkus");
+        "Hallo " . trim((string)$c['first_name']) . ",\n\nhier ist dein persönlicher Zugang zu deinem Kunden-Backoffice – dort findest du alle Unterlagen (Angebote, Rechnungen, Verträge) und kannst Programmablauf, Musikwünsche und Fotos eurer Location hinterlegen:\n\n$url\n\nEinfach öffnen und ein Passwort setzen (Link ist 7 Tage gültig).\n\nViele Grüße\nMarkus");
     }
     out(['ok' => true, 'url' => $url, 'mailed' => $mailed, 'has_account' => !empty($c['portal_hash'])], 201);
   }
@@ -1964,7 +1964,7 @@ try {
     header('Content-Disposition: inline; filename="' . rawurlencode((string)$f['name']) . '"');
     readfile(DATA_DIR . '/custfiles/' . $f['file']); exit;
   }
-  /* Deployment-Konfiguration (data/deploy.json) — nur angemeldet; Token wird nie zurückgegeben */
+  /* Deployment-Konfiguration (data/deploy.json) – nur angemeldet; Token wird nie zurückgegeben */
   if ($path === 'deploy/config' && in_array($method, ['GET', 'POST'])) {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
     $file = DATA_DIR . '/deploy.json';

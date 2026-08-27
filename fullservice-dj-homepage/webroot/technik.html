@@ -17,6 +17,8 @@
 <link href="fonts.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+.ic{width:17px;height:17px;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block}
+
 :root{
   --bg:#0e1213; --bg2:#131819; --card:#181e20; --line:#26302f;
   --acc:#3cc8b4; --acc2:#5fdcc9; --txt:#eef2f0; --mut:#9aa8a3; --mut2:#697672;
@@ -158,7 +160,7 @@ footer a:hover{color:var(--acc)}
       <a href="#partner">Für Kollegen</a>
       <a href="#workshops">Workshops</a>
       <a href="#konditionen">Konditionen</a>
-      <a href="index.html" class="switch">🎧 Zur DJ-Seite</a>
+      <a href="index.html" class="switch"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg> Zur DJ-Seite</a>
       <a href="#anfrage" class="btn small">Anfragen</a>
     </div>
   </div>
@@ -176,10 +178,10 @@ footer a:hover{color:var(--acc)}
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:26px;align-items:center">
       <span style="font-size:12px;color:var(--mut)">Was plant ihr?</span>
-      <a class="chip" onclick="pickAnlass('fw-reden','Firmen-/Vereinsfeier mit Reden')">🎤 Feier mit Reden</a>
-      <a class="chip" onclick="pickAnlass('fw-live','Livemusik / Singer-Songwriter')">🎸 Livemusik</a>
-      <a class="chip" onclick="pickAnlass('fw-kneipe','Kneipen-/Gastro-Event')">🍺 Kneipen-Event</a>
-      <a class="chip" onclick="document.getElementById('installation').scrollIntoView({behavior:'smooth'})">🔩 Festinstallation</a>
+      <a class="chip" onclick="pickAnlass('fw-reden','Firmen-/Vereinsfeier mit Reden')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg> Feier mit Reden</a>
+      <a class="chip" onclick="pickAnlass('fw-live','Livemusik / Singer-Songwriter')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Livemusik</a>
+      <a class="chip" onclick="pickAnlass('fw-kneipe','Kneipen-/Gastro-Event')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 11h1a3 3 0 0 1 0 6h-1"/><path d="M9 12v6"/><path d="M13 12v6"/><path d="M14 7.5c-1 0-1.44.5-3 .5s-2-.5-3-.5-1.72.5-2.5.5a2.5 2.5 0 0 1 0-5c.78 0 1.57.5 2.5.5S9.44 2 11 2s2 1.5 3 1.5a2.5 2.5 0 0 1 0 5z"/><path d="M5 8v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/></svg> Kneipen-Event</a>
+      <a class="chip" onclick="document.getElementById('installation').scrollIntoView({behavior:'smooth'})"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> Festinstallation</a>
     </div>
     <div class="badges">
       <div class="badge"><b>24 h</b><span>= 1 Miettag</span></div>
@@ -198,22 +200,22 @@ footer a:hover{color:var(--acc)}
     </div>
     <div class="trio">
       <div class="card reveal" id="fw-reden">
-        <h3>🎤 Reden &amp; Firmenfeiern</h3>
+        <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg> Reden &amp; Firmenfeiern</h3>
         <p class="prob">„Der Chef hält die Rede des Jahres – und ab Reihe drei versteht niemand mehr ein Wort. Das Mikro pfeift, einer fummelt hektisch am Mischpult."</p>
-        <p class="sol">Sprachverständlichkeit ist meine Kernkompetenz: die passenden Funkmikrofone, eine sauber eingestellte Anlage, dezentes Licht – und ich bleibe daneben stehen, bis der letzte Applaus vorbei ist.</p>
+        <p class="sol">Dass man jedes Wort versteht, ist genau mein Ding: die passenden Funkmikrofone, eine sauber eingestellte Anlage, dezentes Licht. Und ich bleibe daneben stehen, bis der letzte Applaus vorbei ist.</p>
       </div>
       <div class="card reveal" id="fw-live">
-        <h3>🎸 Singer-Songwriter &amp; kleine Bands</h3>
+        <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Singer-Songwriter &amp; kleine Bands</h3>
         <p class="prob">„Handgemachte Musik über eine Party-Box klingt schnell nach Dosenkonzert. Und die Hausanlage der Location war nie für Livemusik gedacht."</p>
         <p class="sol">Kompakte Anlagen mit erwachsenem Klang (u. a. Seeburg Acoustic Line) und Monitoring, das Rückkopplung gar nicht erst entstehen lässt. Euer Sound – nur größer.</p>
       </div>
       <div class="card reveal" id="fw-kneipe">
-        <h3>🍺 Kneipen &amp; Gastro-Events</h3>
+        <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 11h1a3 3 0 0 1 0 6h-1"/><path d="M9 12v6"/><path d="M13 12v6"/><path d="M14 7.5c-1 0-1.44.5-3 .5s-2-.5-3-.5-1.72.5-2.5.5a2.5 2.5 0 0 1 0-5c.78 0 1.57.5 2.5.5S9.44 2 11 2s2 1.5 3 1.5a2.5 2.5 0 0 1 0 5z"/><path d="M5 8v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/></svg> Kneipen &amp; Gastro-Events</h3>
         <p class="prob">„Volle Kneipe, niedrige Decke, Gäste direkt vor der Box – einmal falsch aufgebaut, und der Abend ist anstrengend statt gemütlich."</p>
         <p class="sol">Ich kenne genau diese Räume: wenig Stellfläche, kurze Aufbauzeiten, Nachbarn. Technik, die in die Ecke passt und trotzdem den Raum füllt – geliefert, aufgebaut, nachts wieder weg.</p>
       </div>
     </div>
-    <p class="statement reveal">Eine große Bühne mit viel Platz gut klingen zu lassen ist kein Hexenwerk. <b>Die kleine Location ist die Königsdisziplin</b> – enge Räume, schwierige Akustik, Publikum mittendrin. Genau dafür habe ich mein Lager zusammengestellt: hochwertige, kompakte Technik statt möglichst viel für möglichst wenig.</p>
+    <p class="statement reveal">Enge Räume, schwierige Akustik, Publikum mittendrin: <b>Genau für solche Läden habe ich mein Lager zusammengestellt.</b> Hochwertige, kompakte Technik statt möglichst viel für möglichst wenig.</p>
   </div>
 </section>
 
@@ -240,7 +242,7 @@ footer a:hover{color:var(--acc)}
     <div class="reveal">
       <div class="kicker">Full-Service</div>
       <h2>Techniker buchen – inklusive Technik</h2>
-      <p class="lead">Ihr wollt euch um nichts kümmern? Dann bucht mich als Techniker mitsamt Licht- und Tontechnik – geplant, geliefert, aufgebaut, betreut und wieder abgebaut.</p>
+      <p class="lead">Ihr wollt euch um nichts kümmern? Dann bucht mich als Techniker mitsamt Licht- und Tontechnik: Ich plane, liefere, baue auf, bleibe den Abend über da und räume hinterher wieder weg.</p>
     </div>
     <div class="duo">
       <div class="card reveal">
@@ -269,40 +271,40 @@ footer a:hover{color:var(--acc)}
   <div class="wrap">
     <div class="reveal">
       <div class="kicker">Festinstallation &amp; Wartung</div>
-      <h2>Einmal ordentlich — statt jedes Jahr Flickwerk</h2>
-      <p class="lead">Für Schulen, Vereine, Bars und Kneipen, die es ordentlich haben wollen: Ich plane und installiere eure Beschallung fest im Raum — und halte sie mit einem Wartungsvertrag dauerhaft in Schuss.</p>
+      <h2>Einmal ordentlich – statt jedes Jahr Flickwerk</h2>
+      <p class="lead">Für Schulen, Vereine, Bars und Kneipen, die es ordentlich haben wollen: Ich plane und installiere eure Beschallung fest im Raum – und halte sie mit einem Wartungsvertrag dauerhaft in Schuss.</p>
     </div>
     <div class="trio">
       <div class="card reveal">
-        <h3>🏛 Vereinsheim</h3>
+        <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Vereinsheim</h3>
         <p class="prob">„Die Anlage brummt seit Jahren, das Mischpult hat 40 Regler und keiner weiß mehr, wie es mal eingestellt war."</p>
-        <p class="sol">Einmal sauber aufgebaut, eingemessen und mit festen Presets versehen: Einschalten, Regler auf — läuft. Mit beschrifteter Anleitung, die auch der nächste Vorstand versteht.</p>
+        <p class="sol">Einmal sauber aufgebaut, eingemessen und mit festen Presets versehen: Einschalten, Regler auf – läuft. Mit beschrifteter Anleitung, die auch der nächste Vorstand versteht.</p>
       </div>
       <div class="card reveal">
-        <h3>🏫 Schule &amp; Aula</h3>
+        <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 2 12 2 12 0v-5"/></svg> Schule &amp; Aula</h3>
         <p class="prob">„Jede Einschulung dasselbe Chaos: Mikrofon pfeift, Kabel quer durch die Aula, und die Hälfte versteht die Rede nicht."</p>
-        <p class="sol">Feste Sprachbeschallung mit Funkmikrofonen, kindersicher montiert und narrensicher bedienbar — plus jährlicher Check, damit es zur nächsten Veranstaltung einfach funktioniert.</p>
+        <p class="sol">Feste Sprachbeschallung mit Funkmikrofonen, kindersicher montiert und narrensicher bedienbar – plus jährlicher Check, damit es zur nächsten Veranstaltung einfach funktioniert.</p>
       </div>
       <div class="card reveal">
-        <h3>🍺 Bar &amp; Kneipe</h3>
+        <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 11h1a3 3 0 0 1 0 6h-1"/><path d="M9 12v6"/><path d="M13 12v6"/><path d="M14 7.5c-1 0-1.44.5-3 .5s-2-.5-3-.5-1.72.5-2.5.5a2.5 2.5 0 0 1 0-5c.78 0 1.57.5 2.5.5S9.44 2 11 2s2 1.5 3 1.5a2.5 2.5 0 0 1 0 5z"/><path d="M5 8v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/></svg> Bar &amp; Kneipe</h3>
         <p class="prob">„Hintergrundmusik klingt blechern, und sobald mal ein Musiker spielt, wird stundenlang improvisiert."</p>
-        <p class="sol">Eine Anlage, die beides kann: abends angenehmer Klang auf Gesprächslautstärke, am Live-Abend druckvoll — mit vorbereitetem Anschluss für Gesang und Gitarre.</p>
+        <p class="sol">Eine Anlage, die beides kann: abends angenehmer Klang auf Gesprächslautstärke, am Live-Abend druckvoll – mit vorbereitetem Anschluss für Gesang und Gitarre.</p>
       </div>
     </div>
     <div class="card reveal" style="background:var(--card);border:1px solid var(--acc);border-radius:14px;padding:26px 24px;margin-top:36px">
-      <h3 style="margin-bottom:8px">🔍 Der Technik-Check — wisst endlich, woran ihr seid</h3>
+      <h3 style="margin-bottom:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Der Technik-Check: damit ihr wisst, woran ihr seid</h3>
       <p style="font-size:14px;color:var(--mut);margin-bottom:14px">Ihr habt schon eine Anlage, aber keiner weiß, was sie noch taugt? Ich prüfe sie komplett durch und ihr bekommt einen <b style="color:var(--txt)">schriftlichen Bericht</b>, der diese Fragen beantwortet:</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 28px;font-size:13.5px;color:var(--mut)" class="tc-list">
-        <div>✔ Funktioniert noch alles — und wie lange noch?</div>
+        <div>✔ Funktioniert noch alles – und wie lange noch?</div>
         <div>✔ Wie ist der Stand der Technik einzuordnen?</div>
-        <div>✔ Wie gut ist der Klang — ehrlich, auf einer Skala?</div>
+        <div>✔ Wie gut ist der Klang – ehrlich, auf einer Skala?</div>
         <div>✔ Holt eine Neueinstellung deutlich mehr heraus?</div>
         <div>✔ Lohnen sich einzelne neue Komponenten?</div>
         <div>✔ Verbessern oder langfristig neu anschaffen?</div>
       </div>
       <div style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <a class="btn small" href="#anfrage" onclick="pickTechCheck()">Technik-Check anfragen</a>
-        <span style="font-size:12px;color:var(--mut2)">Pauschalpreis für eine Anlage — jede weitere Anlage bzw. jeder weitere Raum im selben Termin zum kleinen Aufpreis. Wird bei einem Folgeauftrag verrechnet. Keine Verkaufsshow: Wenn eure Anlage gut ist, steht das genau so im Bericht.</span>
+        <span style="font-size:12px;color:var(--mut2)">Pauschalpreis für eine Anlage – jede weitere Anlage bzw. jeder weitere Raum im selben Termin zum kleinen Aufpreis. Wird bei einem Folgeauftrag verrechnet. Keine Verkaufsshow: Wenn eure Anlage gut ist, steht das genau so im Bericht.</span>
       </div>
     </div>
     <div class="duo">
@@ -310,10 +312,10 @@ footer a:hover{color:var(--acc)}
         <h3>So läuft's</h3>
         <ul>
           <li>Bestandsaufnahme vor Ort: Raum, Nutzung, vorhandene Technik</li>
-          <li>Festes Angebot — Technik, Montage und Einrichtung aus einer Hand</li>
+          <li>Festes Angebot – Technik, Montage und Einrichtung aus einer Hand</li>
           <li>Montage, Signalverkabelung und steckerfertiger Anschluss</li>
           <li>Einmessen auf den Raum + feste, beschriftete Presets</li>
-          <li>Einweisung &amp; Kurzanleitung — jeder im Team kann es bedienen</li>
+          <li>Einweisung &amp; Kurzanleitung – jeder im Team kann es bedienen</li>
         </ul>
       </div>
       <div class="card reveal">
@@ -327,7 +329,7 @@ footer a:hover{color:var(--acc)}
         <div style="margin-top:18px"><a class="btn" href="#anfrage" onclick="pickInstallation()">Bestandsaufnahme anfragen</a></div>
       </div>
     </div>
-    <p class="rent-note reveal" style="margin-top:20px">Sauber getrennt: Ich montiere, verkable (Signal- und Lautsprecherleitungen) und schließe steckerfertig an. Arbeiten am Hausstromnetz übernimmt ein Elektro-Partnerbetrieb — fachgerecht und dokumentiert.</p>
+    <p class="rent-note reveal" style="margin-top:20px">Sauber getrennt: Ich montiere, verkable (Signal- und Lautsprecherleitungen) und schließe steckerfertig an. Arbeiten am Hausstromnetz übernimmt ein Elektro-Partnerbetrieb – fachgerecht und dokumentiert.</p>
   </div>
 </section>
 
@@ -370,7 +372,7 @@ footer a:hover{color:var(--acc)}
     </div>
     <div class="duo">
       <div class="card reveal">
-        <h3>🎧 Kurs für DJs &amp; Alleinunterhalter</h3>
+        <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg> Kurs für DJs &amp; Alleinunterhalter</h3>
         <p>Für mobile DJs, die ihre Anlage selbst aufstellen und anschließen – mit eigener oder gemieteter Technik. Und für alle, die wissen wollen, wie es hinter ihrem Mischpult weitergeht.</p>
         <ul>
           <li>Die Signalkette verstehen: vom Pult bis zur Box</li>
@@ -381,7 +383,7 @@ footer a:hover{color:var(--acc)}
         </ul>
       </div>
       <div class="card reveal">
-        <h3>🎤 Kurs für Livemusik</h3>
+        <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg> Kurs für Livemusik</h3>
         <p>Für Sängerinnen und Sänger, Singer-Songwriter (klassisch Gesang &amp; Gitarre) und Bandmitglieder, die verstehen wollen, was da auf der Bühne eigentlich passiert.</p>
         <ul>
           <li>Warum brummt die Gitarre – und wie kriegt man es weg?</li>
@@ -411,7 +413,7 @@ footer a:hover{color:var(--acc)}
             <div><label>Ort *</label><input id="wsCity" autocomplete="address-level2"></div>
           </div>
         </div>
-        <div class="sml" style="color:var(--mut2);margin-top:6px">Die Anschrift brauche ich für deine Rechnung — sie kommt direkt nach der Buchung per E-Mail, zahlbar per Überweisung. Mit Zahlungseingang ist dein Platz fix.</div>
+        <div class="sml" style="color:var(--mut2);margin-top:6px">Die Anschrift brauche ich für deine Rechnung – sie kommt direkt nach der Buchung per E-Mail, zahlbar per Überweisung. Mit Zahlungseingang ist dein Platz fix.</div>
         <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
           <div class="sml" style="color:var(--mut);margin-bottom:4px">Drei kurze Fragen, damit ich den Workshop auf euch zuschneiden kann:</div>
           <label>Was machst du musikalisch? *</label><input id="wsQ1" placeholder="z. B. Ich lege Techno mit XDJ auf / spiele Gitarre in einer Coverband …">
@@ -426,7 +428,7 @@ footer a:hover{color:var(--acc)}
       </div>
     </div>
     <div class="reveal" style="margin-top:44px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 24px;max-width:560px">
-      <h3 style="font-size:17px;margin-bottom:6px">📬 Neue Termine zuerst erfahren</h3>
+      <h3 style="font-size:17px;margin-bottom:6px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Neue Termine zuerst erfahren</h3>
       <p style="font-size:13.5px;color:var(--mut);margin-bottom:14px">Kein Termin dabei oder gerade keine Zeit? Trag dich ein – ich schreibe dir nur, wenn es wirklich etwas gibt: neue Workshop-Termine, neue Themen oder freie Plätze. Abmelden geht jederzeit mit einem Klick.</p>
       <div class="msg" id="nlMsg" style="display:none"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -461,7 +463,7 @@ footer a:hover{color:var(--acc)}
     </div>
     <div class="contact-grid">
       <div class="reveal">
-        <div class="c-item"><div class="cl">Telefon / WhatsApp</div><div class="cv"><a href="tel:+4915236439373" id="cPhone">01523 6439373</a></div><a id="cWa" href="https://wa.me/4915236439373?text=Hallo%20Markus%2C%20ich%20habe%20eine%20Frage%20zur%20Technik%3A%20" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:13px;border:1px solid var(--line);border-radius:20px;padding:6px 14px">💬 Per WhatsApp schreiben</a></div>
+        <div class="c-item"><div class="cl">Telefon / WhatsApp</div><div class="cv"><a href="tel:+4915236439373" id="cPhone">01523 6439373</a></div><a id="cWa" href="https://wa.me/4915236439373?text=Hallo%20Markus%2C%20ich%20habe%20eine%20Frage%20zur%20Technik%3A%20" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:13px;border:1px solid var(--line);border-radius:20px;padding:6px 14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Per WhatsApp schreiben</a></div>
         <div class="c-item" id="cMailWrap" style="display:none"><div class="cl">E-Mail</div><div class="cv"><a href="#" id="cMail"></a></div></div>
         <div class="c-item"><div class="cl">Lager &amp; Abholung</div><div class="cv" id="cAddr">Büttmecker Weg 35c, 58675 Hemer</div></div>
       </div>
@@ -502,7 +504,7 @@ footer a:hover{color:var(--acc)}
       <svg viewBox="0 0 32 32" aria-hidden="true"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>
       <span class="wm" style="font-size:15px">lauschgift<i>.</i><small>Veranstaltungstechnik</small></span>
     </a>
-    <div>© <span id="year"></span> Markus Jankowski · Hemer &nbsp;·&nbsp; <a href="index.html">🎧 DJ Lauschgift</a></div>
+    <div>© <span id="year"></span> Markus Jankowski · Hemer &nbsp;·&nbsp; <a href="index.html">Zur DJ-Seite: DJ Lauschgift</a></div>
     <div><a onclick="openLegal('impressum')">Impressum</a> &nbsp;·&nbsp; <a onclick="openLegal('datenschutz')">Datenschutz</a> &nbsp;·&nbsp; <a onclick="openLegal('agb')">AGB</a></div>
   </div>
 </footer>
@@ -542,7 +544,7 @@ function partnerPrice(e){
   return Math.round(Number(e.day_rate||0)*(100-PARTNER.discount_pct))/100;
 }
 function renderRent(){
-  document.getElementById('partnerBadge').innerHTML=PARTNER?('🤝 Partnerpreise aktiv für <b style="color:var(--txt)">'+esc(PARTNER.name)+'</b>'):'';
+  document.getElementById('partnerBadge').innerHTML=PARTNER?('Partnerpreise aktiv für <b style="color:var(--txt)">'+esc(PARTNER.name)+'</b>'):'';
   document.getElementById('rentGrid').innerHTML=EQ.map(function(e){
     var img=e.image_url?' style="background-image:url(\''+esc(e.image_url)+'\')"':'';
     var icon=e.image_url?'':'♪';
@@ -556,7 +558,7 @@ function renderRent(){
     var addon='';
     if(e.addon_id){
       var a=EQ.find(function(x){return x.id===e.addon_id});
-      if(a)addon='<div class="addon">Passt dazu: <b>'+esc(a.name)+'</b> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag) — einfach mit anfragen.</div>';
+      if(a)addon='<div class="addon">Passt dazu: <b>'+esc(a.name)+'</b> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag) – einfach mit anfragen.</div>';
     }
     return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
       (e.category?'<div class="rc">'+esc(e.category)+'</div>':'')+
@@ -659,7 +661,7 @@ function loadWorkshops(){
     WS=list;
     document.getElementById('wsGrid').innerHTML=list.map(function(w,i){
       var full=w.free<=0;
-      var aud=w.audience==='dj'?'🎧 DJs & Alleinunterhalter':(w.audience==='live'?'🎤 Livemusik':'');
+      var aud=w.audience==='dj'?'DJs & Alleinunterhalter':(w.audience==='live'?'Livemusik':'');
       return '<div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 20px">'+
         '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:6px">'+wsDate(w)+'</div>'+
         (aud?'<div style="display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:12px;padding:3px 10px;color:var(--mut);margin-bottom:8px">'+aud+'</div>':'')+
@@ -673,8 +675,8 @@ function loadWorkshops(){
         '</div>';
     }).join('')+
     '<div style="background:transparent;border:1px dashed var(--line);border-radius:14px;padding:22px 20px;display:flex;flex-direction:column;justify-content:center">'+
-    '<h4 style="font-size:16px;margin-bottom:6px">🗓 Kein Termin passt?</h4>'+
-    '<p style="font-size:13px;color:var(--mut);margin-bottom:12px">Ab 3 Personen mache ich auch einen Sondertermin nur für eure Gruppe — Band, DJ-Crew oder Verein, Inhalte nach euren Themen.</p>'+
+    '<h4 style="font-size:16px;margin-bottom:6px">Kein Termin passt?</h4>'+
+    '<p style="font-size:13px;color:var(--mut);margin-bottom:12px">Ab 3 Personen mache ich auch einen Sondertermin nur für eure Gruppe – Band, DJ-Crew oder Verein, Inhalte nach euren Themen.</p>'+
     '<div><button class="btn ghost small" onclick="pickSondertermin()">Sondertermin anfragen</button></div></div>';
     document.getElementById('wsTermine').style.display='';
     document.getElementById('wsFallback').innerHTML='<a href="#wsTermine">Die nächsten Termine stehen unten ↓</a>';
@@ -697,7 +699,7 @@ function loadWorkshops(){
 var wsWl=false;
 function openWsForm(i,wl){
   wsSel=WS[i];wsWl=!!wl;
-  document.getElementById('wsFormTitle').textContent=wsSel.title+' — '+wsDate(wsSel)+(wsWl?' · Warteliste':'');
+  document.getElementById('wsFormTitle').textContent=wsSel.title+' – '+wsDate(wsSel)+(wsWl?' · Warteliste':'');
   document.getElementById('wsSend').textContent=wsWl?'Auf die Warteliste setzen':'Platz verbindlich reservieren';
   var m=document.getElementById('wsMsg');m.style.display='none';
   var f=document.getElementById('wsForm');f.style.display='';
@@ -715,9 +717,9 @@ function sendWs(){
   var name=document.getElementById('wsName').value.trim(),mail=document.getElementById('wsMail').value.trim();
   if(!name||!mail){err('Bitte Name und E-Mail angeben.');return}
   var street=document.getElementById('wsStreet').value.trim(),zip=document.getElementById('wsZip').value.trim(),city=document.getElementById('wsCity').value.trim();
-  if(wsSel.price_net>0&&(!street||!zip||!city)){err('Bitte Anschrift angeben (Straße, PLZ, Ort) — sie wird für die Rechnung benötigt.');return}
+  if(wsSel.price_net>0&&(!street||!zip||!city)){err('Bitte Anschrift angeben (Straße, PLZ, Ort) – sie wird für die Rechnung benötigt.');return}
   var q1=document.getElementById('wsQ1').value.trim(),q2=document.getElementById('wsQ2').value.trim(),q3=document.getElementById('wsQ3').value.trim();
-  if(!q1||!q2||!q3){err('Bitte beantworte kurz die drei Fragen — so kann ich den Workshop auf euch zuschneiden.');return}
+  if(!q1||!q2||!q3){err('Bitte beantworte kurz die drei Fragen – so kann ich den Workshop auf euch zuschneiden.');return}
   btn.disabled=true;
   fetch(API+'/portal/workshops/'+wsSel.id+'/signup',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({name:name,email:mail,phone:document.getElementById('wsPhone').value.trim(),
@@ -734,11 +736,11 @@ function sendWs(){
       m.style.display='block';m.className='msg ok';
       var inv=res.j.invoice;
       m.textContent=res.j.status==='warteliste'
-        ?'Du stehst auf der Warteliste ✓ Wird ein Platz frei, melde ich mich sofort bei dir — bezahlt wird erst dann.'
+        ?'Du stehst auf der Warteliste ✓ Wird ein Platz frei, melde ich mich sofort bei dir – bezahlt wird erst dann.'
         :(inv&&inv.mailed
-          ?'Platz reserviert ✓ Deine Rechnung '+inv.number+' ist unterwegs an '+mail+' — mit Link zum Ansehen und als PDF. Mit Zahlungseingang ist dein Platz fix.'
+          ?'Platz reserviert ✓ Deine Rechnung '+inv.number+' ist unterwegs an '+mail+' – mit Link zum Ansehen und als PDF. Mit Zahlungseingang ist dein Platz fix.'
           :(inv
-            ?'Platz reserviert ✓ Deine Rechnung '+inv.number+' ist erstellt — du bekommst sie in Kürze per E-Mail. Mit Zahlungseingang ist dein Platz fix.'
+            ?'Platz reserviert ✓ Deine Rechnung '+inv.number+' ist erstellt – du bekommst sie in Kürze per E-Mail. Mit Zahlungseingang ist dein Platz fix.'
             :'Platz reserviert ✓ Du bekommst eine Bestätigung per E-Mail.'));
       loadWorkshops();
     }).catch(function(e){err(esc(e.message))})
@@ -756,7 +758,7 @@ function nlSignup(){
     .then(function(res){
       if(res.s>=400)throw new Error(res.j.error||'Anmeldung fehlgeschlagen.');
       m.style.display='block';m.className='msg ok';
-      m.textContent=res.j.already?'Du bist schon dabei — alles gut!':'Fast geschafft! Schau in dein Postfach und klick den Bestätigungslink.';
+      m.textContent=res.j.already?'Du bist schon dabei – alles gut!':'Fast geschafft! Schau in dein Postfach und klick den Bestätigungslink.';
       document.getElementById('nlMail').value='';
     }).catch(function(e){m.style.display='block';m.className='msg err';m.textContent=e.message})
     .finally(function(){btn.disabled=false});
@@ -778,7 +780,7 @@ function pickWorkshop(){
 }
 function pickAnlass(cardId,label){
   var f=document.getElementById('inqForm');
-  if(f&&f.message&&!f.message.value)f.message.value='Anlass: '+label+' — ';
+  if(f&&f.message&&!f.message.value)f.message.value='Anlass: '+label+' – ';
   var c=document.getElementById(cardId);
   if(c){c.scrollIntoView({behavior:'smooth',block:'center'});
     c.style.borderColor='var(--acc)';setTimeout(function(){c.style.borderColor=''},2500)}

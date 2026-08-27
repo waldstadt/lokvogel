@@ -17,6 +17,8 @@
 <link href="fonts.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+.ic{width:17px;height:17px;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block}
+
 :root{
   --bg:#0f1012; --bg2:#15161a; --card:#1a1c21; --line:#282b32;
   --acc:#ff6f5b; --acc2:#ff8d7c; --txt:#f2f0ec; --mut:#a3a29b; --mut2:#6f6e68;
@@ -192,7 +194,7 @@ footer a:hover{color:var(--acc)}
       <a href="#ueber">Über mich</a>
       <a href="#preise">Preise</a>
       <a href="#faq">FAQ</a>
-      <a href="technik.html" class="switch">🎚 Veranstaltungstechnik</a>
+      <a href="technik.html" class="switch"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg> Veranstaltungstechnik</a>
       <a href="#anfrage" class="btn small">Anfragen</a>
     </div>
   </div>
@@ -276,7 +278,7 @@ footer a:hover{color:var(--acc)}
     <div class="price-strip reveal">
       <div>
         <h3>Eine Feier mit mir beginnt bei <span style="color:var(--acc)" id="priceFrom">1.200&nbsp;€</span></h3>
-        <p id="priceText">Ob Hochzeit, Geburtstag oder Firmenfeier, spielt für den Preis keine Rolle – bei mir zahlt niemand einen „Hochzeitsaufschlag“. Ich rechne nach Auslastung, Arbeitsstunden und Technikaufwand. Ihr bekommt ein individuelles Angebot mit klaren Posten, zugeschnitten auf eure Feier.</p>
+        <p id="priceText">Ob Hochzeit, Geburtstag oder Firmenfeier, spielt für den Preis keine Rolle – bei mir zahlt niemand einen „Hochzeitsaufschlag“. Ich rechne nach Termin (Haupt- oder Nebensaison), Arbeitsstunden und Technikaufwand. Ihr bekommt ein individuelles Angebot mit klaren Posten, zugeschnitten auf eure Feier.</p>
         <p id="priceNote" style="margin-top:12px;font-size:14px;color:var(--txt)"><span style="color:var(--acc);font-weight:600">Gut zu wissen:</span> Das gilt für klassische Abendveranstaltungen am Wochenende in der Hauptsaison. Tagsüber, montags bis donnerstags oder im November, Januar, Februar und März kalkuliere ich deutlich günstiger. Fragt einfach mit eurem Termin an.</p>
       </div>
       <a href="#anfrage" class="btn">Angebot anfragen</a>
@@ -348,11 +350,11 @@ footer a:hover{color:var(--acc)}
     <div class="reveal">
       <div class="kicker">Buchungsanfrage</div>
       <h2>Lasst uns über eure Feier sprechen</h2>
-      <p class="lead">Unverbindlich und kostenlos – ihr bekommt in der Regel innerhalb von 24 Stunden eine persönliche Antwort, nicht vom Autoresponder. Kein Datum, keine Location, keine Ahnung, was ihr braucht? Macht nichts – genau dafür bin ich da. Fragt einfach an.</p>
+      <p class="lead">Unverbindlich und kostenlos – ihr bekommt in der Regel innerhalb von 24 Stunden eine persönliche Antwort, nicht vom Autoresponder. Ihr wisst noch nicht genau, wann, wo und was ihr braucht? Kein Problem – genau dabei helfe ich euch. Fragt einfach an.</p>
     </div>
     <div class="contact-grid">
       <div class="reveal">
-        <div class="c-item"><div class="cl">Telefon / WhatsApp</div><div class="cv"><a href="tel:+4915236439373" id="cPhone">01523 6439373</a></div><a id="cWa" href="https://wa.me/4915236439373?text=Hallo%20Markus%2C%20ich%20habe%20eine%20Frage%20zu%20unserer%20Feier%3A%20" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:13px;border:1px solid var(--line);border-radius:20px;padding:6px 14px">💬 Per WhatsApp schreiben</a></div>
+        <div class="c-item"><div class="cl">Telefon / WhatsApp</div><div class="cv"><a href="tel:+4915236439373" id="cPhone">01523 6439373</a></div><a id="cWa" href="https://wa.me/4915236439373?text=Hallo%20Markus%2C%20ich%20habe%20eine%20Frage%20zu%20unserer%20Feier%3A%20" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:13px;border:1px solid var(--line);border-radius:20px;padding:6px 14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Per WhatsApp schreiben</a></div>
         <div class="c-item" id="cMailWrap" style="display:none"><div class="cl">E-Mail</div><div class="cv"><a href="#" id="cMail"></a></div></div>
         <div class="c-item"><div class="cl">Lager &amp; Abholung</div><div class="cv" id="cAddr">Büttmecker Weg 35c, 58675 Hemer</div></div>
       </div>
@@ -365,7 +367,7 @@ footer a:hover{color:var(--acc)}
         <div class="row">
           <div><label>Telefon</label><input type="tel" name="phone"></div>
           <div><label>Datum der Feier <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label><input type="date" name="event_date">
-            <div style="font-size:12px;margin-top:5px;color:var(--mut2)">Steht noch nicht fest? Einfach leer lassen — wir finden das zusammen heraus.</div></div>
+            <div style="font-size:12px;margin-top:5px;color:var(--mut2)">Steht noch nicht fest? Einfach leer lassen – wir finden das zusammen heraus.</div></div>
         </div>
         <div class="row">
           <div><label>Anlass</label>
@@ -574,7 +576,7 @@ sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
   if(!r.length)return;
   document.getElementById('locGrid').innerHTML=r.map(function(l){
     var img=l.image_url?' style="background-image:url(\''+esc(l.image_url)+'\')"':'';
-    var icon=l.image_url?'':'📍';
+    var icon=l.image_url?'':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
     var meta=[l.city,l.region].filter(Boolean).join(' · ');
     return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
       (meta?'<div class="rc">'+esc(meta)+'</div>':'')+

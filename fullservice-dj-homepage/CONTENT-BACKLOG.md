@@ -203,3 +203,14 @@ Gilt unabhängig davon, ob Markus am Wunschtermin Zeit hat. Konsequenzen im Syst
   verordnung Bruttopreise (inkl. USt). Vor Livegang klären: entweder
   brutto ausweisen oder Vermietung klar auf Gewerbe/Vereine begrenzen.
   → gehört mit in die anwaltliche Prüfung.
+
+## Stilregeln Text & Grafik (fix, 2026-08-27)
+
+- Keine Emojis in Kundentexten, Mails oder auf den Seiten. Wo ein Symbol
+  hilft, kommt ein schlichtes Inline-SVG-Icon (Linienstil, erbt die
+  Textfarbe) zum Einsatz – Icon-Satz liegt direkt im HTML der Seiten.
+- Gedankenstrich sparsam einsetzen, immer Halbgeviertstrich („–",
+  nie „—"). Dreier-Aufzählungen und Parallelismen nicht häufen.
+- Textbausteine nie wortgleich auf mehreren Seiten wiederholen –
+  gleiche Aussage, andere Formulierung.
+- Prüffrage vor Veröffentlichung: Würde Markus das am Telefon so sagen?

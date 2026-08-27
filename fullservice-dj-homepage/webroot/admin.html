@@ -6,6 +6,8 @@
 <link href="fonts.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+.ic{width:15px;height:15px;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;margin-right:7px;opacity:.85}
+
 :root{--bg:#0f1012;--cd:#17181c;--cd2:#1e1f24;--bdr:#2a2c32;--acc:#ff6f5b;--acch:#ff8d7c;
 --wh:#ecebe6;--gl:#8f8c84;--gll:#b0ada4;--red:#d05555;--grn:#5aa05a;--blu:#5588dd;--yel:#d8a839}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--wh);font-size:13px;line-height:1.5}
@@ -148,24 +150,24 @@ th.num{text-align:right}
   <div class="side">
     <div class="slogo"><span id="sbBrand">lauschgift.net</span><div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);margin-top:2px">Backoffice</div></div>
     <div class="sn" id="nav">
-      <a data-pg="dash" class="a">📊 Dashboard</a>
+      <a data-pg="dash" class="a"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
       <div class="grp">Vertrieb</div>
-      <a data-pg="inq">📥 Anfragen <span class="cnt-b" id="inqBadge" style="display:none">0</span></a>
-      <a data-pg="cust">👥 Kunden</a>
-      <a data-pg="book">📅 Buchungen</a>
-      <a data-pg="tpl">✉️ Vorlagen</a>
-      <a data-pg="forms">📋 Fragebögen</a>
+      <a data-pg="inq"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Anfragen <span class="cnt-b" id="inqBadge" style="display:none">0</span></a>
+      <a data-pg="cust"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Kunden</a>
+      <a data-pg="book"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Buchungen</a>
+      <a data-pg="tpl"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Vorlagen</a>
+      <a data-pg="forms"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>Fragebögen</a>
       <div class="grp">Finanzen</div>
-      <a data-pg="prod">📦 Produkte</a>
-      <a data-pg="quotes">📝 Angebote</a>
-      <a data-pg="inv">🧾 Rechnungen</a>
-      <a data-pg="stats">📈 Statistik</a>
+      <a data-pg="prod"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>Produkte</a>
+      <a data-pg="quotes"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Angebote</a>
+      <a data-pg="inv"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Rechnungen</a>
+      <a data-pg="stats"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>Statistik</a>
       <div class="grp">Betrieb</div>
-      <a data-pg="tech">🎚 Technik</a>
+      <a data-pg="tech"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>Technik</a>
       <div class="grp">Website</div>
-      <a data-pg="cms">🖥 Inhalte</a>
+      <a data-pg="cms"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Inhalte</a>
       <div class="grp">System</div>
-      <a data-pg="set">⚙️ Einstellungen</a>
+      <a data-pg="set"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Einstellungen</a>
     </div>
     <div class="sbot"><button onclick="logout()">Abmelden</button></div>
   </div>
@@ -206,7 +208,7 @@ th.num{text-align:right}
     <a onclick="showPage('cust')">← Kunden</a>
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="cdName"></div><div class="ps" id="cdSub"></div></div>
       <div><button class="btn g sm" onclick="openCustModal(curCust)">Bearbeiten</button>
-      <button class="btn g sm" onclick="openTechCheck()">🔍 Technik-Check</button>
+      <button class="btn g sm" onclick="openTechCheck()">Technik-Check</button>
       <button class="btn sm" onclick="newBookingFor(curCust.id)">+ Buchung</button></div></div>
     <div class="grid2" style="gap:16px;align-items:start">
       <div>
@@ -215,7 +217,7 @@ th.num{text-align:right}
       </div>
       <div>
         <div class="card"><h3>Stammdaten</h3><div id="cdData" class="sml"></div></div>
-        <div class="card"><h3>Kunden-Backoffice <button class="btn sm" style="float:right" onclick="portalInvite()">🔑 Einladungslink</button></h3>
+        <div class="card"><h3>Kunden-Backoffice <button class="btn sm" style="float:right" onclick="portalInvite()">Einladungslink</button></h3>
           <div id="cdPortal" class="sml mut">–</div></div>
         <div class="card"><h3>Buchungen</h3><div id="cdBookings" class="sml mut">–</div></div>
         <div class="card"><h3>Dokumente</h3><div id="cdDocs" class="sml mut">–</div></div>
@@ -240,32 +242,32 @@ th.num{text-align:right}
       <button class="btn g sm" onclick="createDocFromBooking('angebot')">→ Angebot</button>
       <button class="btn g sm" onclick="createDocFromBooking('abschlag')">→ Abschlagsrechnung</button>
       <button class="btn sm" onclick="createDocFromBooking('rechnung')">→ Rechnung</button>
-      <button class="btn g sm" onclick="printPackliste()">📦 Packliste</button>
-      <button class="btn g sm" onclick="createLieferschein()">📋 Lieferschein</button>
-      <button class="btn g sm" onclick="printMietvertrag()">📄 Mietvertrag</button>
-      <button class="btn g sm" onclick="openDigitalRental()">✍ Mietvertrag digital</button>
-      <button class="btn r sm" onclick="openStornoModal()">⚠ Storno</button></div></div>
+      <button class="btn g sm" onclick="printPackliste()">Packliste</button>
+      <button class="btn g sm" onclick="createLieferschein()">Lieferschein</button>
+      <button class="btn g sm" onclick="printMietvertrag()">Mietvertrag</button>
+      <button class="btn g sm" onclick="openDigitalRental()">Mietvertrag digital</button>
+      <button class="btn r sm" onclick="openStornoModal()">Storno</button></div></div>
     <div class="grid2" style="gap:16px;align-items:start">
       <div class="card"><h3>Details</h3><div id="bdData" class="sml"></div></div>
       <div class="card"><h3>Technik für diesen Auftrag <button class="btn sm" style="float:right" onclick="openBeModal()">+ Technik</button></h3>
         <div id="bdEquip" class="sml mut">Keine Technik zugeordnet.</div></div>
     </div>
-    <div class="card"><h3>Rider / Einsatzblatt <span style="float:right"><button class="btn g sm" onclick="printRider()">🖨 Drucken</button> <button class="btn sm" onclick="openRiderModal()">Bearbeiten</button></span></h3>
+    <div class="card"><h3>Rider / Einsatzblatt <span style="float:right"><button class="btn g sm" onclick="printRider()">Drucken</button> <button class="btn sm" onclick="openRiderModal()">Bearbeiten</button></span></h3>
       <div id="bdRider" class="sml mut">–</div></div>
     <div class="card"><h3>Dokumente zu diesem Auftrag</h3><div id="bdDocs" class="sml mut">–</div></div>
   </div>
 
   <!-- E-MAIL-VORLAGEN -->
   <div class="pg" id="pg-tpl">
-    <div class="phead"><div><div class="pt">E-Mail-Vorlagen</div><div class="ps">Antwort-Bausteine für Anfragen — Platzhalter: {vorname} {name} {datum} {anlass} {ort}</div></div>
+    <div class="phead"><div><div class="pt">E-Mail-Vorlagen</div><div class="ps">Antwort-Bausteine für Anfragen – Platzhalter: {vorname} {name} {datum} {anlass} {ort}</div></div>
       <button class="btn" onclick="openTplModal()">+ Neue Vorlage</button></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Betreff</th><th class="num">Sortierung</th></tr></thead><tbody id="tplRows"></tbody></table></div>
-    <div class="card"><h3>Upsell-Extras <span class="mut sml" style="font-weight:400">— erscheinen im Kundenportal unter jedem Angebot und per „+ Extra“ im Editor</span> <button class="btn sm" style="float:right" onclick="openUpModal()">+ Extra</button></h3><div id="upList" class="sml"></div></div>
+    <div class="card"><h3>Upsell-Extras <span class="mut sml" style="font-weight:400">– erscheinen im Kundenportal unter jedem Angebot und per „+ Extra“ im Editor</span> <button class="btn sm" style="float:right" onclick="openUpModal()">+ Extra</button></h3><div id="upList" class="sml"></div></div>
   </div>
 
   <!-- FRAGEBÖGEN -->
   <div class="pg" id="pg-forms">
-    <div class="phead"><div><div class="pt">Fragebögen</div><div class="ps">Online-Bögen statt E-Mail-Pingpong — Kunde bekommt einen Link, Antworten landen hier und in der Kunden-Timeline</div></div>
+    <div class="phead"><div><div class="pt">Fragebögen</div><div class="ps">Online-Bögen statt E-Mail-Pingpong – Kunde bekommt einen Link, Antworten landen hier und in der Kunden-Timeline</div></div>
       <button class="btn" onclick="openNewFormModal()">+ Fragebogen erstellen</button></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Erstellt</th><th>Titel</th><th>Für</th><th>Status</th><th></th></tr></thead><tbody id="formRows"></tbody></table></div>
     <div class="card"><h3>Bogen-Vorlagen <button class="btn sm" style="float:right" onclick="openFtModal()">+ Vorlage</button></h3><div id="ftList" class="sml"></div></div>
@@ -273,7 +275,7 @@ th.num{text-align:right}
 
   <!-- PRODUKTE -->
   <div class="pg" id="pg-prod">
-    <div class="phead"><div><div class="pt">Produktkatalog</div><div class="ps">Artikel mit Nummern &amp; Kategorien — per „+ Artikel“ blitzschnell ins Angebot. Pakete bündeln mehrere Artikel zu einer Position.</div></div>
+    <div class="phead"><div><div class="pt">Produktkatalog</div><div class="ps">Artikel mit Nummern &amp; Kategorien – per „+ Artikel“ blitzschnell ins Angebot. Pakete bündeln mehrere Artikel zu einer Position.</div></div>
       <button class="btn" onclick="openProdModal()">+ Neuer Artikel</button></div>
     <input type="text" id="prodSearch" placeholder="Suchen (Nummer, Name, Kategorie) …" oninput="renderProducts()" style="margin-bottom:12px">
     <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Name</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis netto</th><th>Typ</th><th>Status</th></tr></thead><tbody id="prodRows"></tbody></table></div>
@@ -289,7 +291,7 @@ th.num{text-align:right}
   <!-- RECHNUNGEN -->
   <div class="pg" id="pg-inv">
     <div class="phead"><div><div class="pt">Rechnungen</div><div class="ps">inkl. Abschlags- und Schlussrechnungen</div></div>
-      <div><button class="btn g sm" onclick="exportInvoicesCsv()">📊 CSV-Export</button>
+      <div><button class="btn g sm" onclick="exportInvoicesCsv()">CSV-Export</button>
       <button class="btn g" onclick="openDocEditor(null,'abschlag')">+ Abschlag</button>
       <button class="btn" onclick="openDocEditor(null,'rechnung')">+ Neue Rechnung</button></div></div>
     <div id="invOverdue" class="sml" style="color:var(--red);margin-bottom:10px"></div>
@@ -301,12 +303,12 @@ th.num{text-align:right}
     <a id="docBack" onclick="showPage('inv')">← Zurück</a>
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="docTitle">Dokument</div><div class="ps" id="docSub"></div></div>
       <div>
-        <button class="btn g sm" onclick="printDoc()">🖨 Drucken / PDF</button>
-        <button class="btn g sm" onclick="shareDoc()">🔗 Kundenlink</button>
+        <button class="btn g sm" onclick="printDoc()">Drucken / PDF</button>
+        <button class="btn g sm" onclick="shareDoc()">Kundenlink</button>
         <span id="docStatusBtns"></span>
-        <button class="btn sm" id="docSaveBtn" onclick="saveDoc()">💾 Speichern</button>
+        <button class="btn sm" id="docSaveBtn" onclick="saveDoc()">Speichern</button>
       </div></div>
-    <div id="docLockNote" style="display:none;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--gll)">🔒 <b>Festgeschrieben (GoBD):</b> Diese Rechnung wurde versendet — Inhalte lassen sich nicht mehr ändern. Für Änderungen eine <a onclick="korrekturDoc()">Korrekturrechnung erstellen</a> oder die Rechnung stornieren. <a onclick="openAuditModal()" style="float:right">📜 Änderungsprotokoll</a></div>
+    <div id="docLockNote" style="display:none;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--gll)"> <b>Festgeschrieben (GoBD):</b>Diese Rechnung wurde versendet – Inhalte lassen sich nicht mehr ändern. Für Änderungen eine <a onclick="korrekturDoc()">Korrekturrechnung erstellen</a>oder die Rechnung stornieren. <a onclick="openAuditModal()" style="float:right">Änderungsprotokoll</a></div>
     <div class="card">
       <div class="grid4">
         <div><label>Kunde *</label><select id="docCust"></select></div>
@@ -330,7 +332,7 @@ th.num{text-align:right}
       </div>
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
     </div>
-    <div class="card"><h3>Positionen <span style="float:right" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()">📦 + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()">✨ + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button></span></h3>
+    <div class="card"><h3>Positionen <span style="float:right" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()"> + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()"> + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button></span></h3>
       <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel netto</div><div>Gesamt</div><div></div></div>
       <div id="docItems"></div>
       <div class="totals" id="docTotals"></div>
@@ -348,7 +350,7 @@ th.num{text-align:right}
       <div class="card"><h3>Aufträge nach Anlass</h3><div id="statTypes" class="sml"></div></div>
       <div class="card"><h3>Anfrage-Quellen</h3><div id="statSources" class="sml"></div></div>
     </div>
-    <div class="card"><h3>🌐 Website-Besucher <span class="mut sml" style="font-weight:400">(anonym gezählt — ohne Cookies, ohne IP-Speicherung)</span>
+    <div class="card"><h3>Website-Besucher <span class="mut sml" style="font-weight:400">(anonym gezählt – ohne Cookies, ohne IP-Speicherung)</span>
       <select id="webDays" style="width:120px;float:right" onchange="loadWebStats()"><option value="30">30 Tage</option><option value="7">7 Tage</option><option value="90">90 Tage</option><option value="365">365 Tage</option></select></h3>
       <div class="tiles" id="webTiles" style="margin-top:8px"></div>
       <div id="webChart" style="margin-top:12px"></div></div>
@@ -363,18 +365,18 @@ th.num{text-align:right}
     <div class="phead"><div><div class="pt">Technik</div><div class="ps">Bestand, Verleihpreise &amp; Homepage-Anzeige</div></div>
       <button class="btn" onclick="openEqModal()">+ Neuer Artikel</button></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Heute im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
-    <div class="card"><h3>Miet-Partner (DJs, Bands, Musiker, Techniker) <span class="mut sml" style="font-weight:400">— registrieren sich über die Technik-Seite, du schaltest frei und teilst den Code mit</span></h3><div id="partnerList" class="sml"></div></div>
-    <div class="card"><h3>Workshop-Termine <span class="mut sml" style="font-weight:400">— buchbar auf der Technik-Seite, Rechnung geht automatisch per E-Mail raus</span> <button class="btn sm" style="float:right" onclick="openWsModal()">+ Termin</button></h3>
+    <div class="card"><h3>Miet-Partner (DJs, Bands, Musiker, Techniker) <span class="mut sml" style="font-weight:400">– registrieren sich über die Technik-Seite, du schaltest frei und teilst den Code mit</span></h3><div id="partnerList" class="sml"></div></div>
+    <div class="card"><h3>Workshop-Termine <span class="mut sml" style="font-weight:400">– buchbar auf der Technik-Seite, Rechnung geht automatisch per E-Mail raus</span> <button class="btn sm" style="float:right" onclick="openWsModal()">+ Termin</button></h3>
       <div id="wsAdminList" class="sml"></div></div>
-    <div class="card"><h3>📬 Workshop-Newsletter <span class="mut sml" style="font-weight:400">— Anmeldung über die Technik-Seite, Double-Opt-in</span></h3>
+    <div class="card"><h3>Workshop-Newsletter <span class="mut sml" style="font-weight:400">– Anmeldung über die Technik-Seite, Double-Opt-in</span></h3>
       <div id="nlAdminList" class="sml mut">–</div>
       <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px">
         <label>Betreff</label><input id="nlSubject" placeholder="z. B. Neue Workshop-Termine im November">
-        <label>Text <span class="mut sml" style="text-transform:none;letter-spacing:0">— {vorname} wird je Empfänger ersetzt, Abmeldelink kommt automatisch ans Ende</span></label>
+        <label>Text <span class="mut sml" style="text-transform:none;letter-spacing:0">– {vorname} wird je Empfänger ersetzt, Abmeldelink kommt automatisch ans Ende</span></label>
         <textarea id="nlBody" style="min-height:120px" placeholder="Hallo {vorname},&#10;&#10;es gibt neue Termine …"></textarea>
         <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn g sm" onclick="nlAdminSend(true)">✉️ Testmail an mich</button>
-          <button class="btn sm" id="nlSendBtn" onclick="nlAdminSend(false)">📤 An alle Abonnenten senden</button>
+          <button class="btn g sm" onclick="nlAdminSend(true)">Testmail an mich</button>
+          <button class="btn sm" id="nlSendBtn" onclick="nlAdminSend(false)">An alle Abonnenten senden</button>
         </div>
       </div></div>
   </div>
@@ -389,9 +391,9 @@ th.num{text-align:right}
         <div><label>Hintergrund</label><input type="color" id="thBg" style="height:36px;padding:2px"></div>
         <div><label>Schriftstil <span class="mut sml" style="text-transform:none;letter-spacing:0">(Überschriften)</span></label>
           <select id="thFont">
-            <option value="grotesk">Markant — Space Grotesk</option>
-            <option value="outfit">Freundlich — Outfit</option>
-            <option value="playfair">Elegant — Playfair Display</option>
+            <option value="grotesk">Markant – Space Grotesk</option>
+            <option value="outfit">Freundlich – Outfit</option>
+            <option value="playfair">Elegant – Playfair Display</option>
           </select></div>
       </div>
       <div style="margin-top:8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
@@ -405,12 +407,12 @@ th.num{text-align:right}
           <label>Unterzeile (Kicker)</label><input id="cHeroSub">
           <label>Text</label><textarea id="cHeroText"></textarea>
           <label>Button-Text</label><input id="cHeroCta">
-          <label>Hintergrundbild</label><div style="display:flex;gap:8px"><input id="cHeroImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upHero" onchange="uploadImg(this,'cHeroImg')"><button class="btn g sm" onclick="document.getElementById('upHero').click()">📤</button></div>
+          <label>Hintergrundbild</label><div style="display:flex;gap:8px"><input id="cHeroImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upHero" onchange="uploadImg(this,'cHeroImg')"><button class="btn g sm" onclick="document.getElementById('upHero').click()">Hochladen</button></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('hero')">Speichern</button></div></div>
         <div class="card"><h3>Über mich</h3>
           <label>Überschrift</label><input id="cAboutTitle">
           <label>Text</label><textarea id="cAboutText" style="min-height:110px"></textarea>
-          <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">📤</button></div>
+          <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">Hochladen</button></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('about')">Speichern</button></div></div>
         <div class="card"><h3>Preise-Text</h3>
           <label>„ab“-Preis (€)</label><input type="number" id="cPriceFrom">
@@ -443,15 +445,15 @@ th.num{text-align:right}
         <div class="card"><h3>FAQ <button class="btn sm" style="float:right" onclick="openFaqModal()">+ Frage</button></h3><div id="faqAdminList" class="sml"></div></div>
         <div class="card"><h3>Location-Empfehlungen <button class="btn sm" style="float:right" onclick="openLocModal()">+ Location</button></h3><div id="locAdminList" class="sml"></div></div>
         <div class="card"><h3>Freunde &amp; Empfehlungen <button class="btn sm" style="float:right" onclick="openFriendModal()">+ Empfehlung</button></h3>
-          <div class="mut sml" style="margin-bottom:8px">Fotografen, Musiker, Planer, Kollegen — erscheinen auf der DJ-Homepage. Gegenseitige Verlinkung hilft beim Google-Ranking.</div>
+          <div class="mut sml" style="margin-bottom:8px">Fotografen, Musiker, Planer, Kollegen – erscheinen auf der DJ-Homepage. Gegenseitige Verlinkung hilft beim Google-Ranking.</div>
           <div id="friendAdminList" class="sml"></div></div>
         <div class="card"><h3>Bewertungen <button class="btn sm" style="float:right" onclick="openRevModal()">+ Bewertung</button></h3>
-          <label>Google-Bewertungslink (am besten der „Rezension schreiben“-Link — wird auch in Mails verwendet)</label><input id="cRevGoogle" placeholder="https://g.page/r/…">
-          <label>DJ-Bande-Profil (URL, nur zum Lesen verlinkt — Bewertungen sammelt die Agentur selbst)</label><input id="cRevBande" placeholder="https://www.dj-bande.de/…">
+          <label>Google-Bewertungslink (am besten der „Rezension schreiben“-Link – wird auch in Mails verwendet)</label><input id="cRevGoogle" placeholder="https://g.page/r/…">
+          <label>DJ-Bande-Profil (URL, nur zum Lesen verlinkt – Bewertungen sammelt die Agentur selbst)</label><input id="cRevBande" placeholder="https://www.dj-bande.de/…">
           <label>Kurzfazit (z. B. „Ø 5,0 ★ aus 87 Bewertungen“)</label><input id="cRevTagline">
           <div style="margin:10px 0"><button class="btn sm" onclick="saveContent('reviews')">Links speichern</button></div>
           <div id="revAdminList" class="sml"></div>
-          <div class="mut sml" style="margin-top:8px">Tipp: Bewertungen wörtlich mit Name nur übernehmen, wenn der Kunde zugestimmt hat — sonst kürzen/anonymisieren (z. B. „Lisa H.“).</div></div>
+          <div class="mut sml" style="margin-top:8px">Tipp: Bewertungen wörtlich mit Name nur übernehmen, wenn der Kunde zugestimmt hat – sonst kürzen/anonymisieren (z. B. „Lisa H.“).</div></div>
         <div class="card"><h3>SEO</h3>
           <label>Seitentitel</label><input id="cSeoTitle">
           <label>Beschreibung</label><textarea id="cSeoDesc" style="min-height:46px"></textarea>
@@ -488,7 +490,7 @@ th.num{text-align:right}
           <div><label>Steuernummer</label><input id="sTaxId"></div>
           <div><label>USt-IdNr. (optional)</label><input id="sVatId"></div>
         </div>
-        <label style="margin-top:12px"><input type="checkbox" id="sSmall" style="width:auto;margin-right:6px"><b>Umsatzsteuer AUS</b> — Kleinunternehmer nach §19 UStG: Dokumente werden ohne USt. erstellt, inkl. Pflichthinweis</label>
+        <label style="margin-top:12px"><input type="checkbox" id="sSmall" style="width:auto;margin-right:6px"><b>Umsatzsteuer AUS</b> – Kleinunternehmer nach §19 UStG: Dokumente werden ohne USt. erstellt, inkl. Pflichthinweis</label>
         <div style="margin-top:12px"><button class="btn sm" onclick="saveCompany()">Speichern</button></div>
       </div>
       <div>
@@ -521,46 +523,46 @@ th.num{text-align:right}
           </div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveNumbering()">Speichern</button></div>
         </div>
-        <div class="card"><h3>Mietvertrag — Vertragsbedingungen</h3>
+        <div class="card"><h3>Mietvertrag – Vertragsbedingungen</h3>
           <textarea id="sRental" style="min-height:160px;font-size:11px"></textarea>
-          <div class="mut sml" style="margin-top:6px">Erscheint auf jedem gedruckten Mietvertrag (Buchungs-Detail → „📄 Mietvertrag“). Vor Livegang anwaltlich prüfen lassen.</div>
+          <div class="mut sml" style="margin-top:6px">Erscheint auf jedem gedruckten Mietvertrag (Buchungs-Detail → „ Mietvertrag“). Vor Livegang anwaltlich prüfen lassen.</div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveRental()">Speichern</button></div>
         </div>
-        <div class="card"><h3>Kalender-Abo (iCal) <span class="mut sml" style="font-weight:400">— Termine automatisch im Handy-/PC-Kalender</span></h3>
-          <div class="sml mut" style="margin-bottom:8px">Diese URLs einmal als „Kalender abonnieren" ins Handy oder in Google/Apple/Outlook eintragen — drei Kalender in eigenen Farben, aktualisieren sich selbst. Nicht weitergeben (enthalten Kundendaten).</div>
-          <label>❓ Anfragen &amp; offene Angebote (vorläufig)</label><input id="icAnfragen" readonly onclick="this.select()" style="font-size:11px">
-          <label>🎧 Feste DJ-Buchungen</label><input id="icBuchungen" readonly onclick="this.select()" style="font-size:11px">
-          <label>🔩 Technikvermietung</label><input id="icTechnik" readonly onclick="this.select()" style="font-size:11px">
+        <div class="card"><h3>Kalender-Abo (iCal) <span class="mut sml" style="font-weight:400">– Termine automatisch im Handy-/PC-Kalender</span></h3>
+          <div class="sml mut" style="margin-bottom:8px">Diese URLs einmal als „Kalender abonnieren" ins Handy oder in Google/Apple/Outlook eintragen – drei Kalender in eigenen Farben, aktualisieren sich selbst. Nicht weitergeben (enthalten Kundendaten).</div>
+          <label>Anfragen &amp; offene Angebote (vorläufig)</label><input id="icAnfragen"readonly onclick="this.select()" style="font-size:11px">
+          <label>Feste DJ-Buchungen</label><input id="icBuchungen"readonly onclick="this.select()" style="font-size:11px">
+          <label>Technikvermietung</label><input id="icTechnik"readonly onclick="this.select()" style="font-size:11px">
         </div>
-        <div class="card"><h3>Packliste — Standard-Ausrüstung</h3>
+        <div class="card"><h3>Packliste – Standard-Ausrüstung</h3>
           <div class="grid2">
             <div><label>Immer dabei (eine Zeile je Position)</label><textarea id="pkAlways" style="min-height:110px;font-size:11px"></textarea></div>
             <div><label>Zusätzlich bei DJ-Auftritten</label><textarea id="pkDj" style="min-height:110px;font-size:11px"></textarea></div>
           </div>
-          <div class="mut sml" style="margin:6px 0">Erscheint auf jeder Packliste (Buchungs-Detail → „📦 Packliste") zusätzlich zur zugeordneten Technik des Auftrags.</div>
+          <div class="mut sml" style="margin:6px 0">Erscheint auf jeder Packliste (Buchungs-Detail → „ Packliste") zusätzlich zur zugeordneten Technik des Auftrags.</div>
           <button class="btn sm" onclick="savePacking()">Speichern</button>
         </div>
-        <div class="card"><h3>Website-Updates <span class="mut sml" style="font-weight:400">— Änderungen aus der Entwicklung live stellen, ohne FTP</span></h3>
-          <div class="sml mut" style="margin-bottom:8px">So funktioniert's: Neue Versionen landen auf dem GitHub-Branch <code>live</code>. Der Server holt sie sich selbst — automatisch per Cronjob oder hier per Klick. Deine Daten (Datenbank, Uploads) bleiben unberührt, vor jedem Update wird gesichert.</div>
+        <div class="card"><h3>Website-Updates <span class="mut sml" style="font-weight:400">– Änderungen aus der Entwicklung live stellen, ohne FTP</span></h3>
+          <div class="sml mut" style="margin-bottom:8px">So funktioniert's: Neue Versionen landen auf dem GitHub-Branch <code>live</code>. Der Server holt sie sich selbst – automatisch per Cronjob oder hier per Klick. Deine Daten (Datenbank, Uploads) bleiben unberührt, vor jedem Update wird gesichert.</div>
           <div class="grid3">
             <div><label>GitHub-Repository</label><input id="dpRepo" placeholder="waldstadt/lokvogel"></div>
             <div><label>Branch</label><input id="dpBranch" placeholder="live"></div>
             <div><label>GitHub-Token <span class="mut" id="dpTokState"></span></label><input id="dpToken" type="password" placeholder="github_pat_… (nur zum Ändern ausfüllen)"></div>
           </div>
-          <div class="mut sml" style="margin:4px 0 8px">Token: github.com → Settings → Developer settings → Fine-grained tokens → nur dieses Repository, nur „Contents: Read". Wird sicher in <code>data/</code> gespeichert und nie wieder angezeigt.</div>
+          <div class="mut sml" style="margin:4px 0 8px">Token: github.com → Settings → Developer settings → Fine-grained tokens → nur dieses Repository, nur „Contents: Read". Wird sicher in <code>data/</code>gespeichert und nie wieder angezeigt.</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn sm" onclick="saveDeploy()">Speichern</button>
             <button class="btn g sm" onclick="deployStatus()">Status prüfen</button>
-            <button class="btn g sm" onclick="deployRun()">⬆ Jetzt aktualisieren</button>
+            <button class="btn g sm" onclick="deployRun()">Jetzt aktualisieren</button>
           </div>
           <div id="dpInfo" class="sml mut" style="margin-top:8px"></div>
           <label style="margin-top:10px">Cronjob-URL für automatische Updates (z. B. alle 15 Minuten)</label>
           <input id="dpCron" readonly onclick="this.select()" style="font-size:11px">
         </div>
-        <div class="card"><h3>Datensicherung <button class="btn sm" style="float:right" onclick="runBackupNow()">💾 Backup jetzt</button></h3>
+        <div class="card"><h3>Datensicherung <button class="btn sm" style="float:right" onclick="runBackupNow()">Backup jetzt</button></h3>
           <div class="sml mut" style="margin-bottom:8px">Snapshots der Datenbank landen geschützt in <code>data/backups/</code> (die letzten 14 werden behalten). Für automatische tägliche Sicherung: bei All-Inkl (KAS → Tools → Cronjobs) einen täglichen Cronjob auf diese URL anlegen:</div>
           <input id="bkUrl" readonly onclick="this.select()" style="font-size:11px">
-          <div class="sml mut" style="margin:8px 0 4px">Wichtig: Backups liegen auf demselben Server — lade dir regelmäßig eins per Klick herunter (externe Kopie).</div>
+          <div class="sml mut" style="margin:8px 0 4px">Wichtig: Backups liegen auf demselben Server – lade dir regelmäßig eins per Klick herunter (externe Kopie).</div>
           <div id="bkList" class="sml mut">–</div>
         </div>
       </div>
@@ -700,23 +702,23 @@ function renderWsAdmin(){
     list.map(function(w){
       var b=wsBooked(w.id),wl=wsWaitlist(w.id);
       return '<tr><td>'+dt(w.event_date)+(w.start_time?' '+w.start_time.slice(0,5):'')+'</td>'+
-      '<td><a onclick="openWsDetail(\''+w.id+'\')">'+(w.audience==='dj'?'🎧 ':w.audience==='live'?'🎤 ':'')+esc(w.title)+'</a></td>'+
+      '<td><a onclick="openWsDetail(\''+w.id+'\')">'+(w.audience==='dj'?' ':w.audience==='live'?' ':'')+esc(w.title)+'</a></td>'+
       '<td class="num">'+(w.price_net!=null?euro(w.price_net):'–')+'</td>'+
       '<td class="num">'+b+' / '+(w.capacity||0)+(b>=(w.capacity||0)?' <span class="b red">voll</span>':'')+
       (wl?' <span class="b blue">+'+wl+' WL</span>':'')+'</td>'+
       '<td>'+(w.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</td>'+
       '<td><a onclick="openWsModal(\''+w.id+'\')">Bearbeiten</a></td></tr>';
-    }).join('')+'</tbody></table>'):'<span class="mut">Noch keine Termine — lege den ersten an, dann erscheint er buchbar auf der Technik-Seite.</span>';
+    }).join('')+'</tbody></table>'):'<span class="mut">Noch keine Termine – lege den ersten an, dann erscheint er buchbar auf der Technik-Seite.</span>';
 }
 function openWsModal(id){
   var w=id?(CACHE.wsEvents||[]).find(function(x){return x.id===id}):{};w=w||{};
   openModal(id?'Termin bearbeiten':'Neuer Workshop-Termin',
     '<div class="grid2"><div><label>Kurs-Schiene *</label><select id="wAud" onchange="wsAudPreset()">'+
-    '<option value="dj"'+(w.audience==='dj'?' selected':'')+'>🎧 DJs & Alleinunterhalter</option>'+
-    '<option value="live"'+(w.audience==='live'?' selected':'')+'>🎤 Livemusik (Gesang, Band)</option>'+
+    '<option value="dj"'+(w.audience==='dj'?'selected':'')+'>DJs & Alleinunterhalter</option>'+
+    '<option value="live"'+(w.audience==='live'?'selected':'')+'>Livemusik (Gesang, Band)</option>'+
     '<option value=""'+(!w.audience?' selected':'')+'>Offen / gemischt</option></select></div>'+
     '<div><label>Titel *</label><input id="wTitle" value="'+esc(w.title||'')+'" placeholder="wird je Schiene vorgeschlagen"></div></div>'+
-    '<label>Kurzbeschreibung</label><input id="wDesc" value="'+esc(w.description||'')+'" placeholder="z. B. Grundlagen: Gain, EQ, Feedback — Praxis am Pult">'+
+    '<label>Kurzbeschreibung</label><input id="wDesc" value="'+esc(w.description||'')+'" placeholder="z. B. Grundlagen: Gain, EQ, Feedback – Praxis am Pult">'+
     '<div class="grid3"><div><label>Datum *</label><input type="date" id="wDate" value="'+(w.event_date||'')+'"></div>'+
     '<div><label>Beginn</label><input type="time" id="wStart" value="'+(w.start_time||'')+'"></div>'+
     '<div><label>Ende</label><input type="time" id="wEnd" value="'+(w.end_time||'')+'"></div></div>'+
@@ -728,8 +730,8 @@ function openWsModal(id){
     (id?' <button class="btn r" onclick="delRow(\'workshop_events\',\''+id+'\',reloadWs)">Löschen</button>':'')+'</div>');
 }
 var WS_PRESETS={
-  dj:{title:'Tontechnik für DJs & Alleinunterhalter',desc:'Signalkette, Aufbau, Gain & Troubleshooting — Praxis am eigenen Setup'},
-  live:{title:'Tontechnik für Livemusik',desc:'Brummen, Monitor-Feedback, Mikrofon & Soundcheck — für Gesang, Gitarre & Band'}
+  dj:{title:'Tontechnik für DJs & Alleinunterhalter',desc:'Signalkette, Aufbau, Gain & Troubleshooting – Praxis am eigenen Setup'},
+  live:{title:'Tontechnik für Livemusik',desc:'Brummen, Monitor-Feedback, Mikrofon & Soundcheck – für Gesang, Gitarre & Band'}
 };
 function wsAudPreset(){
   var p=WS_PRESETS[v('wAud')];if(!p)return;
@@ -768,10 +770,10 @@ function openWsDetail(id){
         ?'<a onclick="wsPromote(\''+s.id+'\',\''+id+'\')">nachrücken ↑</a>'
         :''))+'</td></tr>';
   }).join('');
-  openModal('Teilnehmer — '+esc(w.title)+' am '+dt(w.event_date),
+  openModal('Teilnehmer – '+esc(w.title)+' am '+dt(w.event_date),
     '<div class="sml mut" style="margin-bottom:10px">Belegt: <b style="color:var(--wh)">'+wsBooked(id)+' / '+(w.capacity||0)+'</b>'+
     (wsWaitlist(id)?' · Warteliste: <b style="color:var(--wh)">'+wsWaitlist(id)+'</b>':'')+
-    (w.price_net!=null?' · Preis p. P.: '+euro(w.price_net):'')+' — Bezahlung vor Ort oder per Rechnung.</div>'+
+    (w.price_net!=null?' · Preis p. P.: '+euro(w.price_net):'')+' – Bezahlung vor Ort oder per Rechnung.</div>'+
     (sg.length?('<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Kontakt</th><th class="num">Plätze</th><th>Antworten</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>')
       :'<span class="mut">Noch keine Anmeldungen.</span>'));
 }
@@ -779,15 +781,15 @@ function wsPromote(sid,wid){
   var w=(CACHE.wsEvents||[]).find(function(x){return x.id===wid});
   var s=(CACHE.wsSignups||[]).find(function(x){return x.id===sid});
   var free=(w.capacity||0)-wsBooked(wid);
-  if((s.seats||1)>free&&!confirm('Achtung: Der Termin hat nur noch '+free+' freie Plätze — nachrücken lassen und überbuchen?'))return;
+  if((s.seats||1)>free&&!confirm('Achtung: Der Termin hat nur noch '+free+' freie Plätze – nachrücken lassen und überbuchen?'))return;
   api('workshop_signups?id=eq.'+sid,{method:'PATCH',body:{status:'angemeldet'}})
     .then(function(){
       return fetch('api.php/workshop/'+sid+'/invoice',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}})
         .then(function(r){return r.json()}).catch(function(){return {}});
     })
     .then(function(inv){
-      if(inv&&inv.ok)toast(inv.mailed?('Nachgerückt ✓ Rechnung '+inv.number+' wurde automatisch gemailt.')
-        :('Nachgerückt ✓ Rechnung '+inv.number+' erstellt — Mailversand prüfen/manuell senden.'));
+      if(inv&&inv.ok)toast(inv.mailed?('Nachgerückt ✓ Rechnung '+inv.number+'wurde automatisch gemailt.')
+        :('Nachgerückt ✓ Rechnung '+inv.number+'erstellt – Mailversand prüfen/manuell senden.'));
       else toast('Nachgerückt ✓ (keine Rechnung: '+((inv&&inv.reason)||'siehe Termin-Preis')+')');
       refreshDocs();
       return api('workshop_signups?select=*&order=created_at.desc');
@@ -829,20 +831,20 @@ function renderDash(){
   document.getElementById('dashFollow').innerHTML=fups.slice(0,6).map(function(c){
     var cu=CACHE.customers.find(function(x){return x.id===c.customer_id});
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openCustDetail(\''+c.customer_id+'\')">'+esc(custName(cu))+'</a> <span class="mut">'+esc(c.subject||c.channel)+' · fällig '+dt(c.followup_at)+'</span> <a class="sml" onclick="markFollowDone(\''+c.id+'\')">✓ erledigt</a></div>';
-  }).join('')||'Nichts fällig. 👍';
+  }).join('')||'Nichts fällig.';
   document.getElementById('dashInq').innerHTML=newInq.slice(0,6).map(function(i){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="viewInq(\''+i.id+'\')">'+esc(i.name)+'</a> <span class="mut">'+esc(i.event_type||'')+' '+(i.event_date?('· '+dt(i.event_date)):'')+'</span></div>';
   }).join('')||'Keine neuen Anfragen.';
   document.getElementById('dashOpenInv').innerHTML=openInv.slice(0,6).map(function(d){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> <span class="mut">'+esc(custName(d.customers))+' · '+euro(d.total_gross)+(d.due_date?' · fällig '+dt(d.due_date):'')+'</span></div>';
-  }).join('')||'Alles bezahlt. 🎉';
-  var EV_LBL={accept:'✅ Angenommen',decline:'❌ Abgelehnt',comment:'💬 Kommentar',callback:'📞 Rückruf-Wunsch',bande:'🤝 DJ-Bande-Opt-in'};
+  }).join('')||'Alles bezahlt.';
+  var EV_LBL={accept:'Angenommen',decline:'Abgelehnt',comment:'Kommentar',callback:'Rückruf-Wunsch',bande:'DJ-Bande-Opt-in'};
   var unseen=(CACHE.docEvents||[]).filter(function(e){return !e.seen});
   document.getElementById('dashPortal').innerHTML=unseen.slice(0,8).map(function(e){
     var d=CACHE.documents.find(function(x){return x.id===e.document_id});
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openEventDoc(\''+e.id+'\',\''+e.document_id+'\')">'+(EV_LBL[e.kind]||e.kind)+'</a> <span class="mut">'+(d?esc(d.number)+' · '+esc(custName(d.customers)):'')+' · '+dtt(e.created_at)+'</span>'+
       (e.message?'<div class="mut sml" style="white-space:pre-wrap">„'+esc(e.message.slice(0,140))+'“</div>':'')+
-      (e.phone?'<div class="mut sml">☎ '+esc(e.phone)+'</div>':'')+'</div>';
+      (e.phone?'<div class="mut sml"> '+esc(e.phone)+'</div>':'')+'</div>';
   }).join('')||'Keine neuen Reaktionen.';
   var answered=(CACHE.forms||[]).filter(function(f){return f.status==='beantwortet'});
   document.getElementById('dashForms').innerHTML=answered.slice(0,5).map(function(f){
@@ -853,8 +855,8 @@ function renderDash(){
   }).sort(function(a,b){return a.event_date<b.event_date?1:-1});
   document.getElementById('dashReviews').innerHTML=pastNoRev.slice(0,6).map(function(b){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(b.title||b.event_type||'Auftrag')+' <span class="mut">'+dt(b.event_date)+' · '+esc(custName(b.customers))+'</span> '+
-    '<button class="btn sm" style="float:right" onclick="composeReviewMail(\''+b.id+'\')">✉️ Danke &amp; Bewertung</button></div>';
-  }).join('')||'Alle vergangenen Feiern sind angeschrieben. 👍';
+    '<button class="btn sm" style="float:right" onclick="composeReviewMail(\''+b.id+'\')">Danke &amp; Bewertung</button></div>';
+  }).join('')||'Alle vergangenen Feiern sind angeschrieben.';
 }
 function openEventDoc(evId,docId){
   api('doc_events?id=eq.'+evId,{method:'PATCH',body:{seen:1}}).then(function(){
@@ -886,9 +888,9 @@ function viewInq(id){
     '<label>Antworten mit Vorlage</label>'+
     '<div style="display:flex;gap:8px"><select id="replyTpl">'+
     (CACHE.tpls||[]).map(function(t){return '<option value="'+t.id+'">'+esc(t.name)+'</option>'}).join('')+
-    '</select><button class="btn" style="white-space:nowrap" onclick="composeReply(\''+i.id+'\')">✍️ Verfassen</button></div></div>'+
+    '</select><button class="btn" style="white-space:nowrap" onclick="composeReply(\''+i.id+'\')">Verfassen</button></div></div>'+
     '<div style="margin-top:14px">'+
-    (i.customer_id?'':'<button class="btn g" onclick="inqToCust(\''+i.id+'\')">→ In CRM übernehmen</button> ')+
+    (i.customer_id?'':'<button class="btn g" onclick="inqToCust(\''+i.id+'\')">→ In CRM übernehmen</button>')+
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'erledigt\')">Erledigt</button> '+
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'archiviert\')">Archivieren</button></div>');
 }
@@ -935,7 +937,7 @@ function openCustDetail(id){
     row('E-Mail',c.email)+row('Telefon',c.phone)+row('WhatsApp',c.whatsapp)+
     row('Adresse',[c.street,[c.zip,c.city].filter(Boolean).join(' ')].filter(Boolean).join(', '))+
     row('Tags',(c.tags||[]).join(', '))+row('Notizen',c.notes)+
-    (c.tech_check&&c.tech_check.date?row('Technik-Check',dt(c.tech_check.date)+' — '+(c.tech_check.recommendation||'')):'');
+    (c.tech_check&&c.tech_check.date?row('Technik-Check',dt(c.tech_check.date)+' – '+(c.tech_check.recommendation||'')):'');
   renderCdPortal();
   var books=CACHE.bookings.filter(function(b){return b.customer_id===id});
   document.getElementById('cdBookings').innerHTML=books.map(function(b){
@@ -949,7 +951,7 @@ function openCustDetail(id){
   showPage('custd');
 }
 function row(l,v){return v?('<div style="padding:3px 0"><span class="mut" style="display:inline-block;width:90px">'+l+'</span>'+esc(v).replace(/\n/g,'<br>')+'</div>'):''}
-var CH_ICON={email:'✉️',whatsapp:'💬',phone:'📞',meeting:'🤝',note:'📝'};
+var CH_ICON={email:'',whatsapp:'',phone:'',meeting:'',note:''};
 var CH_NAME={email:'E-Mail',whatsapp:'WhatsApp',phone:'Telefonat',meeting:'Treffen',note:'Notiz'};
 function renderComms(){
   var list=CACHE.comms.filter(function(c){return c.customer_id===curCust.id});
@@ -1005,7 +1007,7 @@ function saveCust(id){
     .catch(function(e){toast(e.message,1)});
 }
 function delCust(id){
-  if(!confirm('Kunden inkl. Timeline und Buchungen wirklich löschen? (Dokumente bleiben erhalten, wenn vorhanden — dann schlägt das Löschen fehl.)'))return;
+  if(!confirm('Kunden inkl. Timeline und Buchungen wirklich löschen? (Dokumente bleiben erhalten, wenn vorhanden – dann schlägt das Löschen fehl.)'))return;
   api('customers?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();showPage('cust');loadAll()})
     .catch(function(){toast('Nicht möglich – es existieren Dokumente zu diesem Kunden.',1)});
 }
@@ -1098,9 +1100,9 @@ function eqAvailable(eqId,b,excludeBeId){
 function openBeModal(){
   var opts=CACHE.equipment.filter(function(e){return e.status==='aktiv'}).map(function(e){
     var av=eqAvailable(e.id,curBook);
-    return '<option value="'+e.id+'"'+(av<=0?' disabled':'')+'>'+esc(e.name)+' — verfügbar: '+av+'/'+e.qty_total+(av<=0?' (KONFLIKT!)':'')+'</option>';
+    return '<option value="'+e.id+'"'+(av<=0?' disabled':'')+'>'+esc(e.name)+' – verfügbar: '+av+'/'+e.qty_total+(av<=0?' (KONFLIKT!)':'')+'</option>';
   }).join('');
-  openModal('Technik zuordnen — '+dt(curBook.event_date),
+  openModal('Technik zuordnen – '+dt(curBook.event_date),
     '<label>Artikel (Verfügbarkeit im Zeitraum geprüft)</label><select id="beEq">'+opts+'</select>'+
     '<div class="grid2"><div><label>Menge</label><input type="number" id="beQty" value="1" min="1"></div>'+
     '<div><label>Preis gesamt netto (leer = automatisch)</label><input type="number" id="bePrice" step="0.01" placeholder="auto"></div></div>'+
@@ -1170,7 +1172,7 @@ function travelCost(km){
 function renderRider(){
   var r=riderOf(curBook),el=document.getElementById('bdRider');
   var filled=Object.keys(r).some(function(k){return r[k]!=null&&r[k]!==''});
-  if(!filled){el.innerHTML='Noch kein Rider — mit „Bearbeiten“ alles Wichtige zum Einsatz von Anfang an erfassen: Personenzahl, Location-Adresse, Ansprechpartner, Strom, Parken, Anfahrt …';return}
+  if(!filled){el.innerHTML='Noch kein Rider – mit „Bearbeiten“ alles Wichtige zum Einsatz von Anfang an erfassen: Personenzahl, Location-Adresse, Ansprechpartner, Strom, Parken, Anfahrt …';return}
   var tc=r.distance_km?travelCost(r.distance_km):0;
   el.innerHTML='<div class="grid2" style="gap:0 24px">'+
     row('Personen',r.guests)+row('Aufbau ab',r.setup_from)+
@@ -1184,7 +1186,7 @@ function renderRider(){
 }
 function openRiderModal(){
   var b=curBook,r=riderOf(b);
-  openModal('Rider / Einsatzblatt — '+dt(b.event_date),
+  openModal('Rider / Einsatzblatt – '+dt(b.event_date),
     '<div class="grid3"><div><label>Personen / Gäste</label><input type="number" id="rGuests" value="'+(r.guests!=null?r.guests:(b.guests||''))+'"></div>'+
     '<div><label>Aufbau ab</label><input type="time" id="rSetup" value="'+(r.setup_from||'')+'"></div>'+
     '<div><label>Entfernung einfach (km)</label><input type="number" id="rKm" value="'+(r.distance_km||'')+'" oninput="riderKmHint()"></div></div>'+
@@ -1205,7 +1207,7 @@ function openRiderModal(){
 function riderKmHint(){
   var km=Number(v('rKm'))||0,rate=travelRate(),free=travelFree();
   document.getElementById('rKmHint').innerHTML=km?
-    ('Reisekosten: <b style="color:var(--wh)">'+euro(travelCost(km))+'</b> netto — '+Math.max(0,km-free)+' km berechnet × 2 (hin &amp; zurück) × '+euro(rate)+'/km'+(free?' ('+free+' Freikilometer)':'')+'. Fließt automatisch als Position „Anfahrt“ in Angebot/Rechnung. Satz in den Einstellungen.'):'';
+    ('Reisekosten: <b style="color:var(--wh)">'+euro(travelCost(km))+'</b> netto – '+Math.max(0,km-free)+' km berechnet × 2 (hin &amp; zurück) × '+euro(rate)+'/km'+(free?' ('+free+' Freikilometer)':'')+'. Fließt automatisch als Position „Anfahrt“ in Angebot/Rechnung. Satz in den Einstellungen.'):'';
 }
 function saveRider(){
   var r={guests:v('rGuests')?Number(v('rGuests')):null,setup_from:v('rSetup')||null,
@@ -1272,9 +1274,9 @@ function renderInv(){
   }).join('')||'<tr><td colspan="7" class="mut">Noch keine Rechnungen.</td></tr>';
   var od=list.filter(isOverdue);
   var el=document.getElementById('invOverdue');
-  if(el)el.innerHTML=od.length?('⚠ <b>'+od.length+'</b> überfällige Rechnung'+(od.length>1?'en':'')+' — insgesamt '+
+  if(el)el.innerHTML=od.length?(' <b>'+od.length+'</b>überfällige Rechnung'+(od.length>1?'en':'')+' – insgesamt '+
     euro(od.reduce(function(s,d){return s+Number(d.total_gross)-Number(d.deposit_deducted||0)},0))+
-    '. Öffne die Rechnung und nutze „✉ Zahlungserinnerung".'):'';
+    '. Öffne die Rechnung und nutze „ Zahlungserinnerung".'):'';
 }
 
 var curDoc=null,curItems=[];
@@ -1333,7 +1335,7 @@ function fillDocForm(){
   document.getElementById('docTitle').textContent=docTypeName(d.doc_type)+' '+d.number;
   document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(d.status)+'">'+d.status+'</span>'+
     (d.accepted_name?' · digital angenommen von <b style="color:var(--wh)">'+esc(d.accepted_name)+'</b>'+
-      (d.accept_signature?' <a onclick="showAcceptSig()">✍ Unterschrift ansehen</a>':''):'');
+      (d.accept_signature?' <a onclick="showAcceptSig()">Unterschrift ansehen</a>':''):'');
   document.getElementById('docType').value=d.doc_type;
   document.getElementById('docCust').value=d.customer_id||'';
   refreshBookOpts();
@@ -1351,7 +1353,7 @@ function fillDocForm(){
   renderItems();renderStatusBtns();applyDocLock();
 }
 function showAcceptSig(){
-  openModal('Unterschrift — '+esc(curDoc.number)+' · '+esc(curDoc.accepted_name||''),
+  openModal('Unterschrift – '+esc(curDoc.number)+' · '+esc(curDoc.accepted_name||''),
     '<img src="'+curDoc.accept_signature+'" style="background:#fff;border-radius:8px;max-width:100%;max-height:180px;display:block">');
 }
 function docLockedJs(d){return !!(d&&d.id&&['angebot','lieferschein'].indexOf(d.doc_type)<0&&d.status!=='entwurf')}
@@ -1375,16 +1377,16 @@ function korrekturDoc(){
   curDoc.outro_text=src.outro_text;
   curItems=items;
   fillDocForm();
-  toast('Korrektur-Entwurf angelegt — Original '+src.number+' ggf. noch stornieren.');
+  toast('Korrektur-Entwurf angelegt – Original '+src.number+' ggf. noch stornieren.');
 }
 function openAuditModal(){
   if(!curDoc.id)return;
   api('doc_audit?document_id=eq.'+curDoc.id+'&order=created_at.desc').then(function(rows){
-    openModal('Änderungsprotokoll — '+esc(curDoc.number),
+    openModal('Änderungsprotokoll – '+esc(curDoc.number),
       (rows&&rows.length?rows.map(function(a){
         return '<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)" class="sml">'+
         '<span class="mut">'+new Date(a.created_at).toLocaleString('de-DE')+' · '+esc(a.user_email||'')+'</span><br>'+
-        '<b>'+esc(a.action)+'</b> — '+esc(a.detail||'')+'</div>';
+        '<b>'+esc(a.action)+'</b> – '+esc(a.detail||'')+'</div>';
       }).join(''):'<span class="mut sml">Keine Einträge.</span>')+
       '<div class="mut sml" style="margin-top:10px">Automatisch geführt (GoBD): Anlage, Statuswechsel und Änderungsversuche.</div>');
   }).catch(function(e){toast(e.message,1)});
@@ -1392,17 +1394,17 @@ function openAuditModal(){
 function renderStatusBtns(){
   var d=curDoc,btns='';
   if(!d.id){document.getElementById('docStatusBtns').innerHTML='';return}
-  if(d.status==='entwurf')btns+='<button class="btn g sm" onclick="setDocStatus(\'versendet\')">→ Versendet</button> ';
+  if(d.status==='entwurf')btns+='<button class="btn g sm" onclick="setDocStatus(\'versendet\')">→ Versendet</button>';
   if(d.doc_type==='angebot'&&d.status==='versendet')
-    btns+='<button class="btn g sm" onclick="setDocStatus(\'angenommen\')">✓ Angenommen</button> <button class="btn g sm" onclick="setDocStatus(\'abgelehnt\')">✕ Abgelehnt</button> ';
+    btns+='<button class="btn g sm" onclick="setDocStatus(\'angenommen\')">✓ Angenommen</button> <button class="btn g sm" onclick="setDocStatus(\'abgelehnt\')">✕ Abgelehnt</button>';
   if(d.doc_type!=='angebot'&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
     btns+='<button class="btn g sm" onclick="setDocStatus(\'bezahlt\')">€ Bezahlt</button> ';
   if(d.doc_type==='angebot'&&d.status==='angenommen')
-    btns+='<button class="btn g sm" onclick="docToInvoice(\'abschlag\')">→ Abschlag</button> <button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button> ';
+    btns+='<button class="btn g sm" onclick="docToInvoice(\'abschlag\')">→ Abschlag</button> <button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button>';
   if(d.doc_type==='abschlag'&&d.status==='bezahlt')
-    btns+='<button class="btn g sm" onclick="docToInvoice(\'schluss\')">→ Schlussrechnung</button> ';
+    btns+='<button class="btn g sm" onclick="docToInvoice(\'schluss\')">→ Schlussrechnung</button>';
   if(d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
-    btns+='<button class="btn g sm" onclick="composeReminderMail()">✉ Zahlungserinnerung</button> ';
+    btns+='<button class="btn g sm" onclick="composeReminderMail()">Zahlungserinnerung</button>';
   if(d.status!=='storniert')btns+='<button class="btn g sm" onclick="setDocStatus(\'storniert\')">Storno</button> ';
   document.getElementById('docStatusBtns').innerHTML=btns;
 }
@@ -1422,7 +1424,7 @@ function exportInvoicesCsv(){
   });
   var blob=new Blob(['﻿'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rechnungen-'+year.trim()+'.csv';a.click();
-  toast(list.length+' Rechnungen exportiert ✓');
+  toast(list.length+'Rechnungen exportiert ✓');
 }
 function isOverdue(d){
   return d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'&&d.status==='versendet'
@@ -1436,13 +1438,13 @@ function composeReminderMail(){
     '{betrag}':euro(d.total_gross),'{faellig}':dt(d.due_date),'{link}':link,'{datum}':dt(d.due_date)};
   var fill=function(s){return (s||'').replace(/\{vorname\}|\{name\}|\{nr\}|\{betrag\}|\{faellig\}|\{link\}|\{datum\}/g,function(m){return map[m]!==undefined?map[m]:m})};
   var subj=fill(tpl.subject),body=fill(tpl.body);
-  openModal('Zahlungserinnerung — '+esc(d.number),
+  openModal('Zahlungserinnerung – '+esc(d.number),
     '<label>An</label><input id="remTo" value="'+esc(cust.email||'')+'">'+
     '<label>Betreff</label><input id="remSubject" value="'+esc(subj)+'">'+
     '<label>Text</label><textarea id="remBody" style="min-height:220px">'+esc(body)+'</textarea>'+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
-    '<button class="btn" onclick="adminSendMail(v(\'remTo\'),v(\'remSubject\'),document.getElementById(\'remBody\').value,curDoc.customer_id,closeModal)">📤 Direkt senden</button>'+
-    '<button class="btn g" onclick="sendReminder()">✉️ Im Mailprogramm öffnen</button></div>'+
+    '<button class="btn" onclick="adminSendMail(v(\'remTo\'),v(\'remSubject\'),document.getElementById(\'remBody\').value,curDoc.customer_id,closeModal)">Direkt senden</button>'+
+    '<button class="btn g" onclick="sendReminder()">Im Mailprogramm öffnen</button></div>'+
     '<div class="mut sml" style="margin-top:8px">Direkt senden verschickt sofort über deinen Server und protokolliert in der Timeline.</div>');
 }
 function sendReminder(){
@@ -1478,7 +1480,7 @@ function renderItems(){
     '<input value="'+euro(sum)+'" disabled class="num">'+
     (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)">✕</a>')+'</div>'+
     '<div style="padding-left:42px;padding-right:34px;display:flex;gap:6px">'+
-    '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="ℹ Erklärung für das Kundenportal (erscheint beim Drüberfahren) — optional" style="font-size:10px;padding:5px 8px;color:var(--gll)">'+
+    '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Erklärung für das Kundenportal (erscheint beim Drüberfahren) – optional" style="font-size:10px;padding:5px 8px;color:var(--gll)">'+
     '<input type="number" step="0.01" value="'+(it.discount_value||0)+'" oninput="itSet('+i+',\'discount_value\',this.value)" title="Rabatt auf diese Position" style="width:74px;font-size:10px;padding:5px 8px" placeholder="Rabatt">'+
     '<select onchange="itSet('+i+',\'discount_type\',this.value)" style="width:52px;font-size:10px;padding:5px 4px">'+
     '<option value="pct"'+(it.discount_type!=='eur'?' selected':'')+'>%</option><option value="eur"'+(it.discount_type==='eur'?' selected':'')+'>€</option></select>'+
@@ -1558,7 +1560,7 @@ function saveDoc(){
 }
 
 function askAbschlag(total,label,cb){
-  openModal('Abschlagsrechnung — Höhe festlegen',
+  openModal('Abschlagsrechnung – Höhe festlegen',
     '<div class="sml mut" style="margin-bottom:10px">Gesamtwert der Leistung: <b style="color:var(--wh)">'+euro(total)+' netto</b></div>'+
     '<div class="grid2"><div><label>Art</label><select id="abType"><option value="pct">Prozent vom Gesamtwert</option><option value="eur">Pauschalbetrag (€ netto)</option></select></div>'+
     '<div><label>Wert</label><input type="number" step="0.01" id="abVal" value="50"></div></div>'+
@@ -1624,7 +1626,7 @@ function stornoDays(){
 function stornoTier(){var d=stornoDays();return STORNO_TIERS.find(function(t){return d>=t.minDays})}
 function stornoRecalc(){
   var d=stornoDays(),t=stornoTier();
-  document.getElementById('stInfo').innerHTML='Absage <b style="color:var(--wh)">'+d+' Tage</b> vor dem Termin → Staffel „'+t.label+'“ = <b style="color:var(--acc)">'+t.pct+' %</b> (AGB § 5)';
+  document.getElementById('stInfo').innerHTML='Absage <b style="color:var(--wh)">'+d+'Tage</b>vor dem Termin → Staffel „'+t.label+'“ = <b style="color:var(--acc)">'+t.pct+' %</b> (AGB § 5)';
   document.getElementById('stPct').value=t.pct;
   var base=Number(v('stBase'))||0;
   document.getElementById('stUmb').value=Math.round(base*t.pct/100*0.5*100)/100;
@@ -1639,7 +1641,7 @@ function stornoMode(){
 function openStornoModal(){
   var b=curBook;if(!b)return;
   var today=new Date().toISOString().slice(0,10);
-  openModal('Storno abwickeln — '+esc(b.title||b.event_type||'Auftrag'),
+  openModal('Storno abwickeln – '+esc(b.title||b.event_type||'Auftrag'),
     '<div class="grid2"><div><label>Eingang der Absage</label><input type="date" id="stEingang" value="'+today+'" onchange="stornoRecalc()"></div>'+
     '<div><label>Vereinbarte Vergütung netto (€)</label><input type="number" step="0.01" id="stBase" value="'+bookingBaseNet(b)+'" oninput="stornoRecalc()"></div></div>'+
     '<div class="sml mut" id="stInfo" style="margin:4px 0 10px"></div>'+
@@ -1647,7 +1649,7 @@ function openStornoModal(){
     '<option value="staffel">Storno-Staffel berechnen (gemäß AGB § 5)</option>'+
     '<option value="kosten">Nur tatsächlich entstandene Kosten berechnen</option>'+
     '<option value="ersatz">Ersatztermin vereinbaren (Umbuchung)</option>'+
-    '<option value="kulanz">Kulanz — nichts berechnen</option></select>'+
+    '<option value="kulanz">Kulanz – nichts berechnen</option></select>'+
     '<div id="grpStaffel"><div class="grid3">'+
     '<div><label>Storno-Satz (%)</label><input type="number" id="stPct"></div>'+
     '<div><label>Ersparte Fahrtkosten (€, Abzug)</label><input type="number" step="0.01" id="stFahrt" value="0"></div>'+
@@ -1659,8 +1661,8 @@ function openStornoModal(){
     '<label>Beschreibung sonstige Kosten</label><input id="stKSonstTxt" placeholder="z. B. bereits gekauftes Verbrauchsmaterial"></div>'+
     '<div id="grpErsatz" style="display:none"><div class="grid2">'+
     '<div><label>Neuer Termin</label><input type="date" id="stNeu"></div>'+
-    '<div><label>Umbuchungspauschale netto (€) — Vorschlag: 50 % des Staffelbetrags</label><input type="number" step="0.01" id="stUmb"></div></div>'+
-    '<div class="sml mut" style="margin-bottom:6px">Faustregel: Fällt der neue Termin auf einen schwach nachgefragten Slot (Mo–Do, tagsüber, Nebensaison), kannst du die Pauschale senken oder erlassen — er blockiert kaum anderes Geschäft. Ein Samstag in der Hauptsaison blockiert dagegen einen vollen Buchungsplatz: Pauschale eher halten. Bei 0 € wird keine Rechnung erzeugt, sofern auch keine Kosten anfallen.</div></div>'+
+    '<div><label>Umbuchungspauschale netto (€) – Vorschlag: 50 % des Staffelbetrags</label><input type="number" step="0.01" id="stUmb"></div></div>'+
+    '<div class="sml mut" style="margin-bottom:6px">Faustregel: Fällt der neue Termin auf einen schwach nachgefragten Slot (Mo–Do, tagsüber, Nebensaison), kannst du die Pauschale senken oder erlassen – er blockiert kaum anderes Geschäft. Ein Samstag in der Hauptsaison blockiert dagegen einen vollen Buchungsplatz: Pauschale eher halten. Bei 0 € wird keine Rechnung erzeugt, sofern auch keine Kosten anfallen.</div></div>'+
     '<label style="margin-top:8px"><input type="checkbox" id="stMark" style="width:auto;margin-right:6px" checked>Ursprüngliche Buchung auf „storniert“ setzen</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="runStorno()">Abwickeln</button></div>');
   stornoRecalc();
@@ -1690,7 +1692,7 @@ function runStorno(){
       customer_id:b.customer_id,status:'gebucht',kind:b.kind,event_type:b.event_type,
       title:(b.title||b.event_type||'Auftrag')+' (Ersatztermin)',event_date:neu,
       start_time:b.start_time,end_time:b.end_time,venue_name:b.venue_name,venue_address:b.venue_address,
-      guests:b.guests,fee_net:b.fee_net,notes:'Umbuchung — ursprünglicher Termin: '+dt(b.event_date)}}).then(function(r){return r[0]});
+      guests:b.guests,fee_net:b.fee_net,notes:'Umbuchung – ursprünglicher Termin: '+dt(b.event_date)}}).then(function(r){return r[0]});
     jobs.push(stornoNote('Absage vom '+dt(v('stEingang'))+' ('+days+' Tage vorher). Umbuchung auf Ersatztermin '+dt(v('stNeu'))+' vereinbart; Umbuchungspauschale: '+euro(Number(v('stUmb'))||0)+' netto.'));
   }
 
@@ -1729,7 +1731,7 @@ function runStorno(){
 
   newBookingP.then(function(nb){
     if(!items.length){
-      Promise.all(jobs).then(function(){closeModal();toast(m==='ersatz'?'Umgebucht ✓ — neue Buchung angelegt, keine Rechnung.':'Abgewickelt ✓ — keine Rechnung erzeugt.');loadAll()});
+      Promise.all(jobs).then(function(){closeModal();toast(m==='ersatz'?'Umgebucht ✓ – neue Buchung angelegt, keine Rechnung.':'Abgewickelt ✓ – keine Rechnung erzeugt.');loadAll()});
       return;
     }
     Promise.all(jobs).then(function(){
@@ -1741,7 +1743,7 @@ function runStorno(){
         document.getElementById('docIntro').value=intro;
         curItems=items.map(function(it,i){it.pos=i+1;return it});
         renderItems();
-        toast('Entwurf vorbereitet — prüfen, ggf. anpassen und speichern.');
+        toast('Entwurf vorbereitet – prüfen, ggf. anpassen und speichern.');
       },250);
     });
   }).catch(function(e){toast(e.message,1)});
@@ -1780,7 +1782,7 @@ function bookEquipList(b){
 }
 function createLieferschein(){
   var b=curBook,list=bookEquipList(b);
-  if(!list.length){toast('Keine Technik zugeordnet — erst Technik zum Auftrag hinzufügen.',1);return}
+  if(!list.length){toast('Keine Technik zugeordnet – erst Technik zum Auftrag hinzufügen.',1);return}
   var nn=nextNumber('lieferschein');
   api('documents',{method:'POST',prefer:'return=representation',body:{
     doc_type:'lieferschein',number:nn.number,customer_id:b.customer_id,booking_id:b.id,status:'versendet',
@@ -1801,8 +1803,8 @@ function printLieferschein(d,list){
     return '<tr><td style="padding:8px;border-bottom:1px solid #ddd">'+(i+1)+'</td>'+
     '<td style="padding:8px;border-bottom:1px solid #ddd">'+esc(it.name)+(it.notes?'<div style="font-size:10px;color:#666">'+esc(it.notes)+'</div>':'')+'</td>'+
     '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:right">'+it.qty+'</td>'+
-    '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:center">☐</td>'+
-    '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:center">☐</td></tr>';
+    '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:center"></td>'+
+    '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:center"></td></tr>';
   }).join('');
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
@@ -1816,14 +1818,14 @@ function printLieferschein(d,list){
   '<th style="padding:8px;text-align:left">Pos</th><th style="padding:8px;text-align:left">Artikel</th><th style="padding:8px;text-align:right">Menge</th><th style="padding:8px">Übergeben</th><th style="padding:8px">Zurück</th></tr></thead><tbody>'+rows+'</tbody></table>'+
   '<p style="color:#555;font-size:11px;margin-bottom:34px">Der Empfänger bestätigt den Erhalt der aufgeführten Artikel in einwandfreiem, geprüftem Zustand. Für Vermietungen gelten Mietvertrag und AGB.</p>'+
   '<div style="display:flex;gap:40px;margin-top:30px">'+
-  '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift — Übergabe</div></div>'+
-  '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift — Rückgabe</div></div></div></div>';
+  '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift – Übergabe</div></div>'+
+  '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift – Rückgabe</div></div></div></div>';
   window.print();
 }
 function printMietvertrag(rc){
   var b=curBook,snap=rc&&rc.snapshot?rc.snapshot:null;
   var list=snap?snap.items:bookEquipList(b);
-  if(!list.length){toast('Keine Technik zugeordnet — der Mietvertrag listet die Mietsachen aus dem Auftrag.',1);return}
+  if(!list.length){toast('Keine Technik zugeordnet – der Mietvertrag listet die Mietsachen aus dem Auftrag.',1);return}
   var comp=S.company||{},cust=CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
   var days=snap?snap.days:rentDays(b);
   var total=list.reduce(function(s,it){return s+it.price},0);
@@ -1835,7 +1837,7 @@ function printMietvertrag(rc){
   }).join('');
   var terms=snap?(snap.terms||''):((S.rental_contract&&S.rental_contract.text)||'');
   var mieterSig=rc&&rc.status==='unterschrieben'
-    ?'<div style="flex:1"><img src="'+rc.signature+'" style="max-height:60px;display:block;margin-bottom:2px"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">'+esc(rc.signed_name)+' — digital unterschrieben am '+dt(rc.signed_at)+' (Ausweiskopie liegt vor)</div></div>'
+    ?'<div style="flex:1"><img src="'+rc.signature+'" style="max-height:60px;display:block;margin-bottom:2px"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">'+esc(rc.signed_name)+' – digital unterschrieben am '+dt(rc.signed_at)+' (Ausweiskopie liegt vor)</div></div>'
     :'<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift Mieter</div></div>';
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:11px;line-height:1.55">'+
@@ -1860,9 +1862,9 @@ function printMietvertrag(rc){
 function openDigitalRental(){
   var b=curBook,cust=CACHE.customers.find(function(c){return c.id===b.customer_id});
   if(!cust){toast('Kunde nicht gefunden.',1);return}
-  if(!bookEquipList(b).length){toast('Keine Technik zugeordnet — bitte erst Mietsachen zuordnen.',1);return}
+  if(!bookEquipList(b).length){toast('Keine Technik zugeordnet – bitte erst Mietsachen zuordnen.',1);return}
   var ensureZip=cust.zip?Promise.resolve():(function(){
-    var z=prompt('Der Kunde hat noch keine PLZ hinterlegt — sie dient als Login fürs Portal.\nPLZ des Kunden:');
+    var z=prompt('Der Kunde hat noch keine PLZ hinterlegt – sie dient als Login fürs Portal.\nPLZ des Kunden:');
     if(!z)return Promise.reject(new Error('Ohne PLZ kein Kundenlink.'));
     return api('customers?id=eq.'+cust.id,{method:'PATCH',body:{zip:z.trim()}}).then(function(){cust.zip=z.trim()});
   })();
@@ -1877,24 +1879,24 @@ function openDigitalRental(){
 function showRentalModal(rc){
   window._mvRc=rc;
   var url=portalUrl('mv',rc.token);
-  var html='<div class="sml mut" style="margin-bottom:10px">Der Kunde öffnet den Link auf Smartphone oder Tablet, fotografiert seinen Ausweis (Vorder- und Rückseite) und unterschreibt direkt auf dem Display — geht auch vor Ort auf deinem iPad. Login: seine Postleitzahl.</div>';
+  var html='<div class="sml mut" style="margin-bottom:10px">Der Kunde öffnet den Link auf Smartphone oder Tablet, fotografiert seinen Ausweis (Vorder- und Rückseite) und unterschreibt direkt auf dem Display – geht auch vor Ort auf deinem iPad. Login: seine Postleitzahl.</div>';
   if(rc.status==='unterschrieben'){
-    html+='<div style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px">✅ <b>Unterschrieben</b> am '+dt(rc.signed_at)+' von '+esc(rc.signed_name)+'</div>'+
+    html+='<div style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px"> <b>Unterschrieben</b>am '+dt(rc.signed_at)+'von '+esc(rc.signed_name)+'</div>'+
     '<img src="'+rc.signature+'" alt="Unterschrift" style="background:#fff;border-radius:8px;max-width:100%;max-height:110px;display:block;margin-bottom:12px">'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-    (rc.id_front?'<button class="btn g sm" onclick="viewIdFile(\''+rc.id_front+'\')">🪪 Ausweis Vorderseite</button>':'')+
-    (rc.id_back?'<button class="btn g sm" onclick="viewIdFile(\''+rc.id_back+'\')">🪪 Ausweis Rückseite</button>':'')+
-    '<button class="btn sm" onclick="closeModal();printMietvertrag(window._mvRc)">🖨 Vertrag drucken</button>'+
+    (rc.id_front?'<button class="btn g sm" onclick="viewIdFile(\''+rc.id_front+'\')">Ausweis Vorderseite</button>':'')+
+    (rc.id_back?'<button class="btn g sm" onclick="viewIdFile(\''+rc.id_back+'\')">Ausweis Rückseite</button>':'')+
+    '<button class="btn sm" onclick="closeModal();printMietvertrag(window._mvRc)">Vertrag drucken</button>'+
     ((rc.id_front||rc.id_back)?'<button class="btn r sm" onclick="purgeIdFiles()">Ausweisfotos löschen</button>':'')+'</div>'+
-    '<div class="mut sml" style="margin-top:10px">DSGVO: Die Ausweisfotos dienen nur der Absicherung der Vermietung — nach vollständiger, unbeschädigter Rückgabe hier löschen.</div>';
+    '<div class="mut sml" style="margin-top:10px">DSGVO: Die Ausweisfotos dienen nur der Absicherung der Vermietung – nach vollständiger, unbeschädigter Rückgabe hier löschen.</div>';
   }else{
     html+='<label>Kundenlink</label><input value="'+url+'" readonly onclick="this.select()">'+
     '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'+
-    '<button class="btn sm" onclick="navigator.clipboard.writeText(\''+url+'\');toast(\'Link kopiert ✓\')">📋 Link kopieren</button>'+
+    '<button class="btn sm" onclick="navigator.clipboard.writeText(\''+url+'\');toast(\'Link kopiert ✓\')">Link kopieren</button>'+
     '<a class="btn g sm" href="'+url+'" target="_blank" style="text-decoration:none">↗ Öffnen (z. B. auf dem iPad)</a></div>'+
     '<div class="mut sml" style="margin-top:10px">Status: noch nicht unterschrieben. Sobald der Kunde abschließt, erscheint hier Unterschrift + Ausweiskopie, und in der Kunden-Timeline landet ein Eintrag.</div>';
   }
-  openModal('Digitaler Mietvertrag — '+dt(curBook.event_date),html);
+  openModal('Digitaler Mietvertrag – '+dt(curBook.event_date),html);
 }
 function viewIdFile(name){
   fetch('api.php/idfile/'+name,{headers:{Authorization:'Bearer '+TOKEN}})
@@ -2035,7 +2037,7 @@ function openEqModal(id){
     '<div class="grid2"><div><label>Partner-Preis €/Tag (leer = Rabatt % aus Einstellungen)</label><input type="number" step="0.01" id="ePartner" value="'+(e.partner_rate!=null?e.partner_rate:'')+'"></div>'+
     '<div><label>Zubehör-Empfehlung („passt dazu“)</label><select id="eAddon"><option value="">–</option>'+
     (CACHE.equipment||[]).filter(function(x){return x.id!==e.id}).map(function(x){return '<option value="'+x.id+'"'+(e.addon_id===x.id?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select></div></div>'+
-    '<label>Bild</label><div style="display:flex;gap:8px"><input id="eImg" value="'+esc(e.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upEq" onchange="uploadImg(this,\'eImg\')"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">📤</button></div>'+
+    '<label>Bild</label><div style="display:flex;gap:8px"><input id="eImg" value="'+esc(e.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upEq" onchange="uploadImg(this,\'eImg\')"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">Hochladen</button></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="ePub" style="width:auto;margin-right:6px" '+(e.public!==false?'checked':'')+'>Auf Homepage anzeigen (mietbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveEq(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delEq(\''+id+'\')">Löschen</button>':'')+'</div>');
@@ -2145,7 +2147,7 @@ function saveContent(key){
 }
 function upsertContent(key,val){
   api('site_content',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:key,value:val}})
-    .then(function(){CACHE.content[key]=val;toast('„'+key+'“ gespeichert ✓ — Homepage ist aktualisiert.')})
+    .then(function(){CACHE.content[key]=val;toast('„'+key+'“ gespeichert ✓ – Homepage ist aktualisiert.')})
     .catch(function(e){toast(e.message,1)});
 }
 function uploadImg(inp,targetId){
@@ -2158,7 +2160,7 @@ function uploadImg(inp,targetId){
     return r.json();
   }).then(function(j){
     document.getElementById(targetId).value=j.url;
-    toast('Bild hochgeladen ✓ — jetzt Speichern klicken.');
+    toast('Bild hochgeladen ✓ – jetzt Speichern klicken.');
   }).catch(function(e){toast(e.message,1)});
   inp.value='';
 }
@@ -2227,7 +2229,7 @@ function openLocModal(id){
     '<label>Warum empfehle ich sie? (kurz)</label><textarea id="lDesc">'+esc(l.description||'')+'</textarea>'+
     '<div class="grid2"><div><label>Website der Location</label><input id="lWeb" value="'+esc(l.website||'')+'" placeholder="https://…"></div>'+
     '<div><label>Sortierung</label><input type="number" id="lSort" value="'+(l.sort||0)+'"></div></div>'+
-    '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">📤</button></div>'+
+    '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">Hochladen</button></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="lPub" style="width:auto;margin-right:6px" '+(l.public?'checked':'')+'>Auf Homepage anzeigen</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveLoc(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'locations\',\''+id+'\',reloadLocs)">Löschen</button>':'')+'</div>');
@@ -2274,7 +2276,7 @@ function renderCdPortal(){
   var status=c.portal_hash?'<span class="b green">Zugang aktiv</span>':(c.portal_invite?'<span class="b blue">eingeladen</span>':'<span class="b grey">kein Zugang</span>');
   api('customer_files?customer_id=eq.'+c.id+'&order=created_at.desc').then(function(files){
     var fl=(files||[]).map(function(f){
-      return '<div style="padding:4px 0">'+(f.kind==='foto'?'🖼':'📄')+' <a onclick="adminOpenCustFile(\''+f.id+'\')">'+esc(f.name)+'</a> <span class="mut">('+Math.max(1,Math.round(f.size/1024))+' KB · '+dt(f.created_at)+')</span></div>';
+      return '<div style="padding:4px 0">'+(f.kind==='foto'?'':'')+' <a onclick="adminOpenCustFile(\''+f.id+'\')">'+esc(f.name)+'</a> <span class="mut">('+Math.max(1,Math.round(f.size/1024))+'KB · '+dt(f.created_at)+')</span></div>';
     }).join('');
     el.innerHTML='Status: '+status+
       '<div class="mut" style="margin:6px 0 4px">Der Kunde sieht dort alle Unterlagen (außer Entwürfe) und pflegt Programmablauf, Musikwünsche und Uploads.</div>'+
@@ -2287,12 +2289,12 @@ function portalInvite(){
     body:JSON.stringify({mail:false})})
     .then(function(r){return r.json()}).then(function(j){
       if(j.error){toast(j.error,1);return}
-      openModal('Portal-Einladung — '+esc(custName(c)),
-        '<div class="sml mut" style="margin-bottom:8px">Mit diesem Link setzt der Kunde einmalig sein Passwort (7 Tage gültig). Danach loggt er sich jederzeit mit E-Mail + Passwort ein.'+(j.has_account?' <b>Achtung: Es existiert schon ein Zugang — der Link setzt das Passwort neu.</b>':'')+'</div>'+
+      openModal('Portal-Einladung – '+esc(custName(c)),
+        '<div class="sml mut" style="margin-bottom:8px">Mit diesem Link setzt der Kunde einmalig sein Passwort (7 Tage gültig). Danach loggt er sich jederzeit mit E-Mail + Passwort ein.'+(j.has_account?' <b>Achtung: Es existiert schon ein Zugang – der Link setzt das Passwort neu.</b>':'')+'</div>'+
         '<label>Einladungslink</label><input value="'+j.url+'" readonly onclick="this.select()">'+
         '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'+
-        '<button class="btn sm" onclick="navigator.clipboard.writeText(\''+j.url+'\');toast(\'Link kopiert ✓\')">📋 Kopieren</button>'+
-        (c.email?'<button class="btn g sm" onclick="portalInviteMail()">📧 Per E-Mail senden</button>':'')+'</div>');
+        '<button class="btn sm" onclick="navigator.clipboard.writeText(\''+j.url+'\');toast(\'Link kopiert ✓\')">Kopieren</button>'+
+        (c.email?'<button class="btn g sm" onclick="portalInviteMail()">Per E-Mail senden</button>':'')+'</div>');
       curCust.portal_invite='x';renderCdPortal();
     }).catch(function(e){toast(e.message,1)});
 }
@@ -2301,7 +2303,7 @@ function portalInviteMail(){
     body:JSON.stringify({mail:true})})
     .then(function(r){return r.json()}).then(function(j){
       closeModal();
-      toast(j.mailed?'Einladung per E-Mail versendet ✓':'Mailversand fehlgeschlagen — Link bitte kopieren und manuell senden.',j.mailed?0:1);
+      toast(j.mailed?'Einladung per E-Mail versendet ✓':'Mailversand fehlgeschlagen – Link bitte kopieren und manuell senden.',j.mailed?0:1);
     }).catch(function(e){toast(e.message,1)});
 }
 function adminOpenCustFile(id){
@@ -2319,15 +2321,15 @@ var TC_EMPF=['Neu einstellen genügt','Gezielt ergänzen','Neu einstellen + erg�
 function tcSel(id,opts,val){return '<select id="'+id+'">'+opts.map(function(o){return '<option'+(o===val?' selected':'')+'>'+o+'</option>'}).join('')+'</select>'}
 function openTechCheck(){
   var t=(curCust&&curCust.tech_check)||{};
-  openModal('Technik-Check — '+esc(custName(curCust)),
+  openModal('Technik-Check – '+esc(custName(curCust)),
     '<div class="grid2"><div><label>Datum des Checks</label><input type="date" id="tcDate" value="'+(t.date||new Date().toISOString().slice(0,10))+'"></div>'+
     '<div><label>Anlage / Ort</label><input id="tcWhere" value="'+esc(t.where||'')+'" placeholder="z. B. Saalanlage Vereinsheim Musterstraße"></div></div>'+
-    '<div class="sml mut" style="margin:10px 0 2px">— Vom Kunden (aus dem Vorab-Fragebogen übernehmen oder vor Ort erfragen) —</div>'+
+    '<div class="sml mut" style="margin:10px 0 2px">– Vom Kunden (aus dem Vorab-Fragebogen übernehmen oder vor Ort erfragen) –</div>'+
     '<label>Wofür wird die Tontechnik genutzt? / Anforderungen</label><textarea id="tcUse" style="min-height:52px">'+esc(t.use||'')+'</textarea>'+
     '<label>Aktuelle Probleme</label><textarea id="tcProb" style="min-height:52px">'+esc(t.problems||'')+'</textarea>'+
     '<label>Wünsche des Kunden</label><textarea id="tcWish" style="min-height:52px">'+esc(t.wishes||'')+'</textarea>'+
     '<label>Budgetrahmen des Kunden</label><input id="tcBudget" value="'+esc(t.budget||'')+'" placeholder="z. B. 500–1.500 €, noch offen …">'+
-    '<div class="sml mut" style="margin:10px 0 2px">— Befund —</div>'+
+    '<div class="sml mut" style="margin:10px 0 2px">– Befund –</div>'+
     '<div class="grid2"><div><label>Funktionsstatus</label>'+tcSel('tcFunc',TC_FUNK,t.func)+'</div>'+
     '<div><label>Stand der Technik</label>'+tcSel('tcStand',TC_STAND,t.stand)+'</div></div>'+
     '<div class="grid3"><div><label>Klang (1–10)</label><input type="number" id="tcSound" min="1" max="10" value="'+(t.sound||'')+'"></div>'+
@@ -2338,16 +2340,16 @@ function openTechCheck(){
     '<div id="tcPhotos" style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 6px"></div>'+
     '<input type="file" accept="image/*" capture="environment" multiple id="tcPicIn" onchange="tcAddPhotos(this)">'+
     '<div class="mut sml">Werden verkleinert, liegen zugriffsgeschützt auf dem Server und erscheinen im Bericht.</div>'+
-    '<div class="sml mut" style="margin:10px 0 2px">— Empfehlung —</div>'+
+    '<div class="sml mut" style="margin:10px 0 2px">– Empfehlung –</div>'+
     '<label>Empfehlung</label>'+tcSel('tcEmpf',TC_EMPF,t.recommendation)+
-    '<label>Begründung (verbessern vs. neu anschaffen — wirtschaftliche Einordnung)</label><textarea id="tcWhy" style="min-height:60px">'+esc(t.reasoning||'')+'</textarea>'+
-    '<label>Meine persönliche Empfehlung (in deinen Worten — steht hervorgehoben im Bericht)</label><textarea id="tcPersonal" style="min-height:60px" placeholder="z. B. An eurer Stelle würde ich zuerst … — das bringt am meisten fürs Geld.">'+esc(t.personal||'')+'</textarea>'+
+    '<label>Begründung (verbessern vs. neu anschaffen – wirtschaftliche Einordnung)</label><textarea id="tcWhy" style="min-height:60px">'+esc(t.reasoning||'')+'</textarea>'+
+    '<label>Meine persönliche Empfehlung (in deinen Worten – steht hervorgehoben im Bericht)</label><textarea id="tcPersonal" style="min-height:60px" placeholder="z. B. An eurer Stelle würde ich zuerst … – das bringt am meisten fürs Geld.">'+esc(t.personal||'')+'</textarea>'+
     '<label>Konkrete Maßnahmen (mit grobem Preisrahmen)</label><textarea id="tcSteps" style="min-height:60px">'+esc(t.steps||'')+'</textarea>'+
     '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">'+
-    '<button class="btn" onclick="saveTechCheck()">💾 Speichern</button>'+
-    (t.date?'<button class="btn g" onclick="printTechCheck()">🖨 Bericht drucken / PDF</button>':'')+
+    '<button class="btn" onclick="saveTechCheck()">Speichern</button>'+
+    (t.date?'<button class="btn g" onclick="printTechCheck()">Bericht drucken / PDF</button>':'')+
     '</div>'+
-    '<div class="mut sml" style="margin-top:8px">Tipp: Vorab-Fragen als Fragebogen senden (Fragebögen → „Technik-Check — Vorab-Fragen"), Abrechnung über die Produkte TECH-CHECK / TECH-CHECK-PLUS.</div>');
+    '<div class="mut sml" style="margin-top:8px">Tipp: Vorab-Fragen als Fragebogen senden (Fragebögen → „Technik-Check – Vorab-Fragen"), Abrechnung über die Produkte TECH-CHECK / TECH-CHECK-PLUS.</div>');
   TC_PHOTOS=(t.photos||[]).slice();
   tcRenderPhotos();
 }
@@ -2400,7 +2402,7 @@ function saveTechCheck(){
 function printTechCheck(){
   var t=(curCust&&curCust.tech_check)||{},comp=S.company||{},c=curCust;
   var pr=function(l,val){return val?'<tr><td style="padding:6px 12px 6px 0;color:#777;white-space:nowrap;vertical-align:top;width:190px">'+l+'</td><td style="padding:6px 0">'+esc(String(val)).replace(/\n/g,'<br>')+'</td></tr>':''};
-  var scale=t.sound?('<b>'+t.sound+' / 10</b> '+'●'.repeat(t.sound)+'○'.repeat(10-t.sound)):'';
+  var scale=t.sound?('<b>'+t.sound+' / 10</b> '+''.repeat(t.sound)+''.repeat(10-t.sound)):'';
   /* Fotos zuerst laden (geschützter Abruf), dann drucken */
   var pics=t.photos||[];
   Promise.all(pics.map(function(n){
@@ -2419,7 +2421,7 @@ function renderTechCheckPrint(t,comp,c,pr,scale,picUrls){
   '<div style="display:flex;justify-content:space-between;margin-bottom:26px"><div>'+
   '<div style="font-size:20px;font-weight:700">'+esc(comp.name||'')+'</div><div style="color:#555">'+esc(comp.owner||'')+' · Veranstaltungstechnik</div></div>'+
   '<div style="text-align:right;color:#555">'+esc(comp.street||'')+'<br>'+esc(comp.zip_city||'')+'<br>'+esc(comp.phone||'')+'</div></div>'+
-  '<div style="font-size:17px;font-weight:700;margin-bottom:2px">Technik-Check — Bericht</div>'+
+  '<div style="font-size:17px;font-weight:700;margin-bottom:2px">Technik-Check – Bericht</div>'+
   '<div style="color:#555;margin-bottom:18px">'+esc(custName(c))+(t.where?' · '+esc(t.where):'')+' · '+dt(t.date)+'</div>'+
   '<div style="font-weight:700;margin:14px 0 4px">1 · Ausgangslage</div>'+
   '<table style="width:100%;border-collapse:collapse">'+pr('Nutzung & Anforderungen',t.use)+pr('Aktuelle Probleme',t.problems)+pr('Wünsche',t.wishes)+pr('Budgetrahmen',t.budget)+'</table>'+
@@ -2434,7 +2436,7 @@ function renderTechCheckPrint(t,comp,c,pr,scale,picUrls){
   '<div style="border:1.5px solid #111;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px"><b>'+esc(t.recommendation||'')+'</b>'+(t.reasoning?'<br><span style="color:#333">'+esc(t.reasoning).replace(/\n/g,'<br>')+'</span>':'')+'</div>'+
   personal+
   (t.steps?'<div style="font-weight:700;margin:12px 0 4px">4 · Konkrete Maßnahmen</div><div style="white-space:pre-wrap">'+esc(t.steps)+'</div>':'')+
-  '<div style="margin-top:26px;color:#777;border-top:1px solid #ddd;padding-top:10px;font-size:10.5px">Dieser Bericht ist eine fachliche Einschätzung auf Basis der Prüfung vor Ort. Für alle empfohlenen Maßnahmen erstelle ich auf Wunsch ein Festpreis-Angebot — der Check wird bei Beauftragung verrechnet. '+esc(comp.name||'')+(comp.phone?' · '+esc(comp.phone):'')+'</div></div>';
+  '<div style="margin-top:26px;color:#777;border-top:1px solid #ddd;padding-top:10px;font-size:10.5px">Dieser Bericht ist eine fachliche Einschätzung auf Basis der Prüfung vor Ort. Für alle empfohlenen Maßnahmen erstelle ich auf Wunsch ein Festpreis-Angebot – der Check wird bei Beauftragung verrechnet. '+esc(comp.name||'')+(comp.phone?' · '+esc(comp.phone):'')+'</div></div>';
   window.print();
 }
 
@@ -2465,13 +2467,13 @@ function loadWebStats(){
           var t=new Date(x.d).toLocaleDateString('de-DE',{day:'numeric',month:'short'})+': '+x.v+' Aufrufe'+(x.q?', '+x.q+' Anfrage(n)':'');
           return '<div title="'+t+'" style="flex:1;height:'+h+'px;border-radius:2px 2px 0 0;background:'+(x.q?'var(--acc,#e8a33d)':'rgba(255,255,255,.22)')+'"></div>';
         }).join('')+'</div>'+
-        '<div class="mut sml" style="margin-top:6px">Farbige Balken = Tage mit Anfragen. Gezählt wird je Seitenaufruf, komplett anonym.'+(j.views_total?'':' Noch keine Daten — die Zählung startet, sobald die Seiten live sind.')+'</div>';
+        '<div class="mut sml" style="margin-top:6px">Farbige Balken = Tage mit Anfragen. Gezählt wird je Seitenaufruf, komplett anonym.'+(j.views_total?'':' Noch keine Daten – die Zählung startet, sobald die Seiten live sind.')+'</div>';
       document.getElementById('webPages').innerHTML=(j.pages||[]).map(function(pg){
         return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(pg.page)+'<span style="float:right">'+pg.views+'</span></div>';
       }).join('')||'Noch keine Daten.';
       document.getElementById('webRefs').innerHTML=(j.refs||[]).map(function(rf){
         return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(rf.ref)+'<span style="float:right">'+rf.views+'</span></div>';
-      }).join('')||'Noch keine Referrer erfasst — z. B. Google-Treffer oder Links von anderen Seiten tauchen hier auf.';
+      }).join('')||'Noch keine Referrer erfasst – z. B. Google-Treffer oder Links von anderen Seiten tauchen hier auf.';
     }).catch(function(){});
 }
 
@@ -2482,7 +2484,7 @@ function loadNewsletter(){
     var conf=rows.filter(function(s){return s.confirmed_at&&!s.unsubscribed_at});
     var pend=rows.filter(function(s){return !s.confirmed_at&&!s.unsubscribed_at});
     var off=rows.filter(function(s){return s.unsubscribed_at});
-    document.getElementById('nlSendBtn').textContent='📤 An '+conf.length+' Abonnenten senden';
+    document.getElementById('nlSendBtn').textContent='An '+conf.length+'Abonnenten senden';
     document.getElementById('nlAdminList').innerHTML=
       '<div class="mut" style="margin-bottom:8px">'+conf.length+' bestätigt · '+pend.length+' unbestätigt · '+off.length+' abgemeldet</div>'+
       (conf.map(function(s){
@@ -2509,8 +2511,8 @@ function nlAdminSend(test){
     body:JSON.stringify({subject:subject,body:body,test:!!test})})
     .then(function(r){return r.json()}).then(function(j){
       if(j.error){toast(j.error,1);return}
-      toast(test?(j.mailed?'Testmail verschickt ✓':'Testmail fehlgeschlagen — Firmen-E-Mail in den Einstellungen prüfen'):
-        ('Versendet ✓ '+j.sent+' von '+j.total+(j.failed?' — '+j.failed+' fehlgeschlagen':'')),test&&!j.mailed?1:0);
+      toast(test?(j.mailed?'Testmail verschickt ✓':'Testmail fehlgeschlagen – Firmen-E-Mail in den Einstellungen prüfen'):
+        ('Versendet ✓ '+j.sent+'von '+j.total+(j.failed?' – '+j.failed+'fehlgeschlagen':'')),test&&!j.mailed?1:0);
     }).catch(function(e){toast(e.message,1)});
 }
 
@@ -2539,23 +2541,23 @@ function printPackliste(){
   var b=curBook,comp=S.company||{},pk=S.packing||{};
   var eq=(CACHE.be||[]).filter(function(x){return x.booking_id===b.id}).map(function(x){
     var e=CACHE.equipment.find(function(q){return q.id===x.equipment_id})||{};
-    return x.qty+'× '+(e.name||'?')+(x.notes?' — '+x.notes:'');
+    return x.qty+'× '+(e.name||'?')+(x.notes?' – '+x.notes:'');
   });
   var always=(pk.always!=null?pk.always:PK_ALWAYS_DEF).split('\n').filter(Boolean);
   var dj=(b.kind!=='technik')?(pk.dj!=null?pk.dj:PK_DJ_DEF).split('\n').filter(Boolean):[];
   var r=(b.rider&&typeof b.rider==='object')?b.rider:{};
-  var li=function(x){return '<div style="padding:5px 0;border-bottom:1px solid #eee">☐ &nbsp;'+esc(x)+'</div>'};
+  var li=function(x){return '<div style="padding:5px 0;border-bottom:1px solid #eee">&nbsp;'+esc(x)+'</div>'};
   var sec=function(t,items){return items.length?('<div style="font-weight:700;margin:14px 0 4px">'+t+'</div>'+items.map(li).join('')):''};
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:680px;margin:0 auto;padding:36px 20px;font-size:12px;line-height:1.5">'+
-  '<div style="font-size:17px;font-weight:700">📦 Packliste — '+esc(b.title||b.event_type||'Auftrag')+'</div>'+
+  '<div style="font-size:17px;font-weight:700">Packliste – '+esc(b.title||b.event_type||'Auftrag')+'</div>'+
   '<div style="color:#555;margin-bottom:6px">'+dt(b.event_date)+(b.start_time?' · Beginn '+b.start_time.slice(0,5)+' Uhr':'')+
   (r.setup_from?' · Aufbau ab '+r.setup_from.slice(0,5)+' Uhr':'')+
   ((b.venue_name||b.venue_address)?' · '+esc([b.venue_name,b.venue_address].filter(Boolean).join(', ')):'')+'</div>'+
   sec('Technik für diesen Auftrag',eq)+
   sec('Immer dabei',always)+
   sec('DJ-Standard',dj)+
-  '<div style="margin-top:20px;color:#777;border-top:1px solid #ddd;padding-top:8px;font-size:10.5px">Vor Abfahrt abhaken — nach der Veranstaltung dieselbe Liste für den Rückweg nutzen. '+esc(comp.name||'')+'</div></div>';
+  '<div style="margin-top:20px;color:#777;border-top:1px solid #ddd;padding-top:8px;font-size:10.5px">Vor Abfahrt abhaken – nach der Veranstaltung dieselbe Liste für den Rückweg nutzen. '+esc(comp.name||'')+'</div></div>';
   window.print();
 }
 
@@ -2568,7 +2570,7 @@ function loadDeploy(){
     document.getElementById('dpRepo').value=c.repo||'waldstadt/lokvogel';
     document.getElementById('dpBranch').value=c.branch||'live';
     document.getElementById('dpTokState').textContent=c.has_token?'(hinterlegt ✓)':'(fehlt)';
-    document.getElementById('dpCron').value=DP_KEY?location.origin+location.pathname.replace(/[^\/]*$/,'')+'deploy.php?key='+DP_KEY+'&action=run':'— erst speichern —';
+    document.getElementById('dpCron').value=DP_KEY?location.origin+location.pathname.replace(/[^\/]*$/,'')+'deploy.php?key='+DP_KEY+'&action=run':'– erst speichern –';
     if(c.last_sha)document.getElementById('dpInfo').textContent='Installiert: '+c.last_sha.slice(0,7)+' vom '+new Date(c.last_time).toLocaleString('de-DE');
   }).catch(function(){});
 }
@@ -2586,10 +2588,10 @@ function deployStatus(){
   if(!DP_KEY){toast('Erst speichern.',1);return}
   document.getElementById('dpInfo').textContent='Prüfe …';
   fetch('deploy.php?key='+DP_KEY+'&action=status').then(function(r){return r.json()}).then(function(j){
-    document.getElementById('dpInfo').innerHTML=j.error?('⚠ '+esc(j.error)):
+    document.getElementById('dpInfo').innerHTML=j.error?(' '+esc(j.error)):
       (j.update_verfuegbar
-        ?'🟠 Update verfügbar: „'+esc(j.github_commit||'')+'“ ('+(j.github||'').slice(0,7)+') — installiert: '+((j.installiert||'—').slice(0,7))
-        :'🟢 Aktuell ('+(j.github||'').slice(0,7)+') — „'+esc(j.github_commit||'')+'“');
+        ?'Update verfügbar: „'+esc(j.github_commit||'')+'“ ('+(j.github||'').slice(0,7)+') – installiert: '+((j.installiert||'–').slice(0,7))
+        :'Aktuell ('+(j.github||'').slice(0,7)+') – „'+esc(j.github_commit||'')+'“');
   }).catch(function(e){document.getElementById('dpInfo').textContent='Fehler: '+e.message});
 }
 function deployRun(){
@@ -2597,9 +2599,9 @@ function deployRun(){
   if(!confirm('Website jetzt auf den Stand des live-Branches aktualisieren?\nDatenbank und Uploads bleiben unberührt, es wird vorher gesichert.'))return;
   document.getElementById('dpInfo').textContent='Update läuft …';
   fetch('deploy.php?key='+DP_KEY+'&action=run').then(function(r){return r.json()}).then(function(j){
-    if(j.error){document.getElementById('dpInfo').textContent='⚠ '+j.error;toast(j.error,1);return}
-    document.getElementById('dpInfo').innerHTML='✅ '+esc(j.message||'')+(j.commit?' — „'+esc(j.commit)+'“':'')+(j.dateien?' ('+j.dateien+' Dateien)':'');
-    toast('Update installiert ✓ — Seite neu laden (F5), um die neue Version zu sehen.');
+    if(j.error){document.getElementById('dpInfo').textContent=' '+j.error;toast(j.error,1);return}
+    document.getElementById('dpInfo').innerHTML=' '+esc(j.message||'')+(j.commit?' – „'+esc(j.commit)+'“':'')+(j.dateien?' ('+j.dateien+'Dateien)':'');
+    toast('Update installiert ✓ – Seite neu laden (F5), um die neue Version zu sehen.');
     loadDeploy();
   }).catch(function(e){document.getElementById('dpInfo').textContent='Fehler: '+e.message});
 }
@@ -2611,8 +2613,8 @@ function loadBackups(){
     if(!j||!j.key)return;
     document.getElementById('bkUrl').value=location.origin+location.pathname.replace(/[^\/]*$/,'')+'api.php/cron/backup?key='+j.key;
     document.getElementById('bkList').innerHTML=(j.files&&j.files.length)?j.files.map(function(f){
-      return '<div style="padding:4px 0">📦 <a onclick="dlBackup(\''+f.name+'\')">'+f.name+'</a> <span class="mut">('+fmtBytes(f.size)+')</span></div>';
-    }).join(''):'Noch keine Backups — „Backup jetzt" klicken oder Cronjob einrichten.';
+      return '<div style="padding:4px 0"> <a onclick="dlBackup(\''+f.name+'\')">'+f.name+'</a> <span class="mut">('+fmtBytes(f.size)+')</span></div>';
+    }).join(''):'Noch keine Backups – „Backup jetzt" klicken oder Cronjob einrichten.';
   }).catch(function(){});
 }
 function runBackupNow(){
@@ -2692,7 +2694,7 @@ function shareDoc(){
   var cust=CACHE.customers.find(function(c){return c.id===curDoc.customer_id});
   if(!cust){toast('Kunde nicht gefunden.',1);return}
   var ensureZip=cust.zip?Promise.resolve():(function(){
-    var z=prompt('Der Kunde hat noch keine PLZ hinterlegt — sie dient als Login fürs Portal.\nPLZ des Kunden:');
+    var z=prompt('Der Kunde hat noch keine PLZ hinterlegt – sie dient als Login fürs Portal.\nPLZ des Kunden:');
     if(!z)return Promise.reject(new Error('Ohne PLZ kein Kundenlink.'));
     return api('customers?id=eq.'+cust.id,{method:'PATCH',body:{zip:z.trim()}}).then(function(){cust.zip=z.trim()});
   })();
@@ -2703,7 +2705,7 @@ function shareDoc(){
       var d=CACHE.documents.find(function(x){return x.id===curDoc.id});if(d)d.share_token=t;return t});
   }).then(function(t){
     var url=portalUrl('a',t);
-    navigator.clipboard.writeText(url).then(function(){toast('Kundenlink kopiert ✓ — Login: PLZ '+cust.zip)})
+    navigator.clipboard.writeText(url).then(function(){toast('Kundenlink kopiert ✓ – Login: PLZ '+cust.zip)})
       .catch(function(){prompt('Kundenlink (kopieren mit Strg+C):',url)});
   }).catch(function(e){toast(e.message,1)});
 }
@@ -2717,7 +2719,7 @@ function renderForms(){
     '<td><span class="b '+(STB[f.status]||'grey')+'">'+f.status+'</span></td>'+
     '<td style="white-space:nowrap">'+
     (f.status==='beantwortet'?'<button class="btn sm" onclick="viewFormAnswers(\''+f.id+'\')">Antworten</button> ':
-      '<button class="btn g sm" onclick="copyFormLink(\''+f.token+'\')">🔗 Link</button> ')+
+      '<button class="btn g sm" onclick="copyFormLink(\''+f.token+'\')">Link</button>')+
     '<a onclick="delRow(\'forms\',\''+f.id+'\',reloadForms)" style="color:var(--red)">✕</a></td></tr>';
   }).join('')||'<tr><td colspan="5" class="mut">Noch keine Fragebögen verschickt.</td></tr>';
   document.getElementById('ftList').innerHTML=(CACHE.formTpls||[]).map(function(t){
@@ -2732,7 +2734,7 @@ function copyFormLink(token){
 function openNewFormModal(){
   openModal('Fragebogen erstellen',
     '<label>Vorlage</label><select id="nfTpl">'+(CACHE.formTpls||[]).map(function(t){return '<option value="'+t.id+'">'+esc(t.name)+'</option>'}).join('')+'</select>'+
-    '<label>Kunde (optional — Antworten landen dann in der Timeline)</label><select id="nfCust"><option value="">–</option>'+
+    '<label>Kunde (optional – Antworten landen dann in der Timeline)</label><select id="nfCust"><option value="">–</option>'+
     CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custName(c))+'</option>'}).join('')+'</select>'+
     '<div style="margin-top:14px"><button class="btn" onclick="createForm()">Erstellen &amp; Link kopieren</button></div>');
 }
@@ -2764,7 +2766,7 @@ function openFtModal(id){
   openModal(id?'Bogen-Vorlage bearbeiten':'Neue Bogen-Vorlage',
     '<label>Name *</label><input id="ftName" value="'+esc(t.name||'')+'">'+
     '<label>Einleitung</label><textarea id="ftIntro" style="min-height:56px">'+esc(t.intro||'')+'</textarea>'+
-    '<label>Fragen — eine pro Zeile: Frage | Typ | Optionen (Typ: text, textarea, select, checkbox)</label>'+
+    '<label>Fragen – eine pro Zeile: Frage | Typ | Optionen (Typ: text, textarea, select, checkbox)</label>'+
     '<textarea id="ftFields" style="min-height:180px;font-size:11px">'+esc(lines)+'</textarea>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveFt(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'form_templates\',\''+id+'\',reloadForms)">Löschen</button>':'')+'</div>');
@@ -2800,7 +2802,7 @@ function openTplModal(id){
     '<div><label>Sortierung</label><input type="number" id="tSort" value="'+(t.sort||0)+'"></div></div>'+
     '<label>Betreff</label><input id="tSubject" value="'+esc(t.subject||'')+'">'+
     '<label>Text</label><textarea id="tBody" style="min-height:260px">'+esc(t.body||'')+'</textarea>'+
-    '<div class="sml mut" style="margin-top:6px">Platzhalter: {vorname} {name} {datum} {anlass} {ort} — werden beim Antworten automatisch aus der Anfrage gefüllt.</div>'+
+    '<div class="sml mut" style="margin-top:6px">Platzhalter: {vorname} {name} {datum} {anlass} {ort} – werden beim Antworten automatisch aus der Anfrage gefüllt.</div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveTpl(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'email_templates\',\''+id+'\',reloadTpls)">Löschen</button>':'')+'</div>');
 }
@@ -2845,8 +2847,8 @@ function openProdModal(id){
     '<label>Name *</label><input id="pName" value="'+esc(p.name||'')+'">'+
     '<label>Beschreibung (erscheint als Erklärung im Kundenportal)</label><textarea id="pDesc">'+esc(p.description||'')+'</textarea>'+
     '<div class="grid2"><div><label>Einheit</label><input id="pUnit" value="'+esc(p.unit||'Stk.')+'"></div>'+
-    '<div><label>Preis netto (€) — bei Paketen leer = Summe der Bestandteile</label><input type="number" step="0.01" id="pPrice" value="'+(p.price_net!=null?p.price_net:'')+'"></div></div>'+
-    '<label>Paket-Bestandteile (eine Zeile je Artikel: Artikelnummer | Menge) — leer = normaler Artikel</label>'+
+    '<div><label>Preis netto (€) – bei Paketen leer = Summe der Bestandteile</label><input type="number" step="0.01" id="pPrice" value="'+(p.price_net!=null?p.price_net:'')+'"></div></div>'+
+    '<label>Paket-Bestandteile (eine Zeile je Artikel: Artikelnummer | Menge) – leer = normaler Artikel</label>'+
     '<textarea id="pBundle" style="min-height:70px;font-size:11px" placeholder="DJ-100 | 1&#10;TON-200 | 1">'+esc(bundleLines)+'</textarea>'+
     '<label style="margin-top:12px"><input type="checkbox" id="pActive" style="width:auto;margin-right:6px" '+(p.active!==false?'checked':'')+'>Aktiv (im „+ Artikel“-Picker sichtbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveProd(\''+(id||'')+'\')">Speichern</button>'+
@@ -2869,7 +2871,7 @@ function saveProd(id){
 function reloadProds(){api('products?select=*&order=sort').then(function(r){CACHE.products=r||[];renderProducts()})}
 function openProductPicker(){
   var list=(CACHE.products||[]).filter(function(p){return p.active});
-  if(!list.length){toast('Keine aktiven Artikel — unter Produkte anlegen.',1);return}
+  if(!list.length){toast('Keine aktiven Artikel – unter Produkte anlegen.',1);return}
   openModal('Artikel einfügen',
     '<input type="text" id="ppSearch" placeholder="Suchen …" oninput="renderPicker()" style="margin-bottom:10px">'+
     '<div id="ppList" style="max-height:420px;overflow-y:auto"></div>');
@@ -2900,7 +2902,7 @@ function insertProduct(id){
     }).join(', ');
     note=(note?note+' ':'')+'Enthalten: '+comps+'.';
   }
-  curItems.push({pos:curItems.length+1,description:(p.sku?p.sku+' — ':'')+p.name,note:note,
+  curItems.push({pos:curItems.length+1,description:(p.sku?p.sku+' – ':'')+p.name,note:note,
     qty:1,unit:p.unit||'Stk.',unit_price:prodPrice(p)});
   closeModal();renderItems();toast('„'+p.name+'“ eingefügt ✓');
 }
@@ -2912,7 +2914,7 @@ function renderPartners(){
   el.innerHTML=(CACHE.partners||[]).map(function(pt){
     return '<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)"><b>'+esc(pt.name)+'</b> <span class="mut">'+(KIND[pt.kind]||pt.kind)+(pt.company?' · '+esc(pt.company):'')+' · '+esc(pt.email||'')+'</span> '+
     (pt.status==='freigeschaltet'?
-      '<span class="b green">Code: '+esc(pt.code)+'</span> <a class="sml" onclick="navigator.clipboard.writeText(\''+esc(pt.code)+'\').then(function(){toast(\'Code kopiert ✓\')})">📋</a>':
+      '<span class="b green">Code: '+esc(pt.code)+'</span> <a class="sml" onclick="navigator.clipboard.writeText(\''+esc(pt.code)+'\').then(function(){toast(\'Code kopiert ✓\')})"></a>':
       '<span class="b gold">beantragt</span> <button class="btn sm" onclick="approvePartner(\''+pt.id+'\')">Freischalten</button>')+
     ' <a onclick="delRow(\'partners\',\''+pt.id+'\',reloadPartners)" style="color:var(--red)">✕</a></div>';
   }).join('')||'<span class="mut">Keine Partner-Anträge.</span>';
@@ -2920,7 +2922,7 @@ function renderPartners(){
 function approvePartner(id){
   var code=Array.from(crypto.getRandomValues(new Uint8Array(4))).map(function(b){return b.toString(16).padStart(2,'0')}).join('').toUpperCase();
   api('partners?id=eq.'+id,{method:'PATCH',body:{status:'freigeschaltet',code:code}})
-    .then(function(){toast('Freigeschaltet ✓ — Code: '+code+' (dem Partner mitteilen)');reloadPartners()})
+    .then(function(){toast('Freigeschaltet ✓ – Code: '+code+' (dem Partner mitteilen)');reloadPartners()})
     .catch(function(e){toast(e.message,1)});
 }
 function reloadPartners(){api('partners?select=*&order=created_at.desc').then(function(r){CACHE.partners=r||[];renderPartners()})}
@@ -2999,7 +3001,7 @@ function saveUp(id){
 function reloadUps(){api('upsells?select=*&order=sort').then(function(r){CACHE.upsells=r||[];renderUpsells()})}
 function openUpsellPicker(){
   var list=(CACHE.upsells||[]).filter(function(u){return u.active});
-  if(!list.length){toast('Keine aktiven Extras — unter Vorlagen anlegen.',1);return}
+  if(!list.length){toast('Keine aktiven Extras – unter Vorlagen anlegen.',1);return}
   openModal('Extra als Position einfügen',list.map(function(u){
     return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:10px;align-items:center">'+
     '<div><b>'+esc(u.title)+'</b> <span class="mut">'+euro(u.price_net)+'</span><div class="mut sml">'+esc(u.description||'')+'</div></div>'+
@@ -3047,23 +3049,23 @@ function openCompose(i,t,formLink){
     '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
     '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
-    (i.email?'<button class="btn" onclick="adminSendMail(\''+esc(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+(i.customer_id||i.id||'')+'\',closeModal)">📤 Direkt senden</button>':'')+
-    '<button class="btn g" onclick="copyReply()">📋 Text kopieren</button>'+
-    (i.email?'<button class="btn g" onclick="mailReply(\''+esc(i.email)+'\')">✉️ Im Mail-Programm öffnen</button>':'')+
-    '</div><div class="sml mut" style="margin-top:8px">Tipp: Vor dem Senden prüfen, ob der Termin wirklich frei ist — die Vorlage geht davon aus.</div>');
+    (i.email?'<button class="btn" onclick="adminSendMail(\''+esc(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+(i.customer_id||i.id||'')+'\',closeModal)">Direkt senden</button>':'')+
+    '<button class="btn g" onclick="copyReply()">Text kopieren</button>'+
+    (i.email?'<button class="btn g" onclick="mailReply(\''+esc(i.email)+'\')">Im Mail-Programm öffnen</button>':'')+
+    '</div><div class="sml mut" style="margin-top:8px">Tipp: Vor dem Senden prüfen, ob der Termin wirklich frei ist – die Vorlage geht davon aus.</div>');
 }
 function adminSendMail(to,subject,body,custId,cb){
   fetch('api.php/sendmail',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
     body:JSON.stringify({to:to,subject:subject,body:body,customer_id:custId&&custId.length>30?custId:null})})
     .then(function(r){return r.json()}).then(function(j){
       if(j.mailed){toast('E-Mail versendet ✓ (in der Timeline protokolliert)');if(cb)cb()}
-      else toast(j.error||'Direktversand fehlgeschlagen — Firmen-E-Mail in den Einstellungen prüfen oder „Im Mail-Programm öffnen" nutzen.',1);
+      else toast(j.error||'Direktversand fehlgeschlagen – Firmen-E-Mail in den Einstellungen prüfen oder „Im Mail-Programm öffnen" nutzen.',1);
     }).catch(function(e){toast(e.message,1)});
 }
 function copyReply(){
   var txt='Betreff: '+v('rSubject')+'\n\n'+document.getElementById('rBody').value;
-  navigator.clipboard.writeText(txt).then(function(){toast('Kopiert ✓ — jetzt ins Mail-Programm einfügen.')})
-    .catch(function(){toast('Kopieren nicht möglich — Text bitte manuell markieren.',1)});
+  navigator.clipboard.writeText(txt).then(function(){toast('Kopiert ✓ – jetzt ins Mail-Programm einfügen.')})
+    .catch(function(){toast('Kopieren nicht möglich – Text bitte manuell markieren.',1)});
 }
 function mailReply(email){
   location.href='mailto:'+email+'?subject='+encodeURIComponent(v('rSubject'))+'&body='+encodeURIComponent(document.getElementById('rBody').value);

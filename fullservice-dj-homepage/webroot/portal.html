@@ -9,6 +9,8 @@
 <link href="fonts.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+.ic{width:17px;height:17px;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block}
+
 :root{--bg:#0f1012;--card:#1a1c21;--card2:#212429;--line:#282b32;--acc:#ff6f5b;--acc2:#ff8d7c;
 --txt:#f2f0ec;--mut:#a3a29b;--mut2:#6f6e68;--grn:#5aa05a}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
@@ -105,7 +107,7 @@ function loadOffer(){
     }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
 }
 function renderPlzGate(){
-  app('<div class="card"><div class="kicker">Euer Angebot</div><h1>Kurz einloggen</h1>'+
+  app('<div class="card"><div class="kicker">Euer Angebot</div><h1>Kurze Sicherheitsfrage</h1>'+
     '<p class="sub">Zum Schutz eurer Daten: Gebt bitte die Postleitzahl eurer Rechnungsadresse ein.</p>'+
     '<div class="msg err" id="gateMsg" style="display:'+(PLZ?'block':'none')+'">Die Postleitzahl passt leider nicht – bitte erneut versuchen.</div>'+
     '<label>Postleitzahl</label><input id="plzIn" inputmode="numeric" maxlength="10" placeholder="z. B. 58675">'+
@@ -155,23 +157,23 @@ function renderOffer(){
     totals+='<tr class="totals"><td colspan="3" class="num"><b>Gesamt</b></td><td class="num grand">'+euro(d.total_gross)+'</td></tr>';
   }
   var decided=['angenommen','abgelehnt','bezahlt','storniert'].indexOf(d.status)>=0;
-  var statusLine=d.status==='angenommen'?'<span class="status-b">✓ Angenommen — danke euch!</span>':
+  var statusLine=d.status==='angenommen'?'<span class="status-b">✓ Angenommen – danke euch!</span>':
     (d.status==='abgelehnt'?'<span class="status-b" style="border-color:var(--mut2);color:var(--mut)">Abgelehnt</span>':'');
   app(
     '<div class="card"><div class="kicker">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
     '<div><h1>Hallo '+esc(DOC.customer)+'!</h1>'+
     '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until?' · gültig bis '+dt(d.valid_until):'')+'</p></div>'+
-    '<button class="btn g" onclick="downloadPdf()">📄 Als PDF speichern</button></div>'+
+    '<button class="btn g" onclick="downloadPdf()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Als PDF speichern</button></div>'+
     (statusLine?'<div style="margin-top:12px">'+statusLine+'</div>':'')+
     (d.intro_text?'<p style="margin-top:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
     '</div>'+
     '<div class="card"><table><thead><tr><th class="num">#</th><th>Leistung</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead>'+
     '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>'+
-    '<p class="hint">💡 Tippt auf eine Position mit dem <b style="color:var(--acc)">i</b> – dort erkläre ich, was genau dahintersteckt.</p></div>'+
+    '<p class="hint">Tipp: Tippt auf eine Position mit dem <b style="color:var(--acc)">i</b> – dort erkläre ich, was genau dahintersteckt.</p></div>'+
     ((DOC.upsells&&DOC.upsells.length&&!decided)?
-      '<div class="card"><h3 style="margin-bottom:4px">Noch eine Schippe drauf? ✨</h3>'+
-      '<p class="sub">Beliebte Extras, die aus einer guten Feier eine unvergessliche machen. Interesse? Ein Klick genügt – ich melde mich mit Details.</p>'+
+      '<div class="card"><h3 style="margin-bottom:4px">Noch eine Schippe drauf?</h3>'+
+      '<p class="sub">Falls ihr noch überlegt: Diese Extras werden oft dazugebucht. Klickt an, was euch interessiert – ich sage euch, was es für euren Termin kostet.</p>'+
       '<div class="ups">'+DOC.upsells.map(function(u){
         return '<div class="up" id="up-'+u.id+'"><h4>'+esc(u.title)+'</h4><p>'+esc(u.description||'')+'</p>'+
         '<div class="upp">+ '+euro(u.price_net)+' <small style="font-weight:400;color:var(--mut2)">zzgl. USt.</small></div>'+
@@ -181,7 +183,7 @@ function renderOffer(){
     (function(){
       var rv=DOC.reviews||{};if(!rv.google_url)return '';
       return '<div class="card" style="padding:16px 24px;font-size:13px;color:var(--mut)">'+
-        (rv.tagline?'<b style="color:var(--txt)">'+esc(rv.tagline)+'</b> — ':'')+
+        (rv.tagline?'<b style="color:var(--txt)">'+esc(rv.tagline)+'</b> – ':'')+
         'Ihr wollt wissen, wie andere ihre Feier mit mir erlebt haben? '+
         '<a href="'+esc(rv.google_url)+'" target="_blank" rel="noopener">★ Google-Bewertungen ↗</a></div>';
     })()+
@@ -190,18 +192,18 @@ function renderOffer(){
       '<p class="sub">'+(d.status==='angenommen'?'Ich melde mich zeitnah bei euch mit den nächsten Schritten. Wenn euch noch etwas einfällt, schreibt mir hier:':'Ihr habt Fragen oder wollt doch nochmal sprechen? Schreibt mir gerne:')+'</p>'+
       '<div class="msg" id="aMsg"></div>'+
       '<label>Nachricht</label><textarea id="cmt"></textarea>'+
-      '<div class="actions" style="margin-top:12px"><button class="btn g" onclick="act(\'comment\')">💬 Nachricht senden</button></div>'
+      '<div class="actions" style="margin-top:12px"><button class="btn g" onclick="act(\'comment\')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Nachricht senden</button></div>'
       :
       '<h3 style="margin-bottom:6px">Wie möchtet ihr weitermachen?</h3>'+
       '<p class="sub">Alles unverbindlich bis zur Annahme – und Fragen kosten nichts.</p>'+
       '<div class="msg" id="aMsg"></div>'+
       '<div class="actions" style="margin-top:16px">'+
       '<button class="btn green" onclick="confirmAccept()">✓ Angebot annehmen</button>'+
-      '<button class="btn g" onclick="toggle(\'cmtBox\')">💬 Frage / Anmerkung</button>'+
-      '<button class="btn g" onclick="toggle(\'cbBox\')">📞 Rückruf wünschen</button>'+
+      '<button class="btn g" onclick="toggle(\'cmtBox\')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Frage / Anmerkung</button>'+
+      '<button class="btn g" onclick="toggle(\'cbBox\')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Rückruf wünschen</button>'+
       '<button class="btn g" onclick="toggle(\'declBox\')">Eher nicht …</button></div>'+
       '<div id="accBox" class="hidden"><h3 style="font-size:16px;margin:8px 0 4px">Verbindlich beauftragen</h3>'+
-      '<p class="sub" style="font-size:13px">Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an — danach ist euer Termin fest reserviert und ihr bekommt eine Bestätigung.</p>'+
+      '<p class="sub" style="font-size:13px">Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an – danach ist euer Termin fest reserviert und ihr bekommt eine Bestätigung.</p>'+
       '<label>Vor- und Nachname</label><input id="accName" autocomplete="name">'+
       '<label>Unterschrift (mit Finger oder Maus)</label>'+
       '<canvas id="accSig" style="width:100%;height:150px;background:#fff;border-radius:10px;touch-action:none;cursor:crosshair"></canvas>'+
@@ -212,8 +214,8 @@ function renderOffer(){
       '<div id="cbBox" class="hidden"><label>Telefonnummer & wann ihr gut erreichbar seid</label><input id="cbPhone" placeholder="z. B. 0171 1234567, abends ab 18 Uhr">'+
       '<div style="margin-top:10px"><button class="btn" onclick="act(\'callback\')">Rückruf anfordern</button></div></div>'+
       '<div id="declBox" class="hidden">'+
-      '<label>Magst du kurz sagen, woran es liegt? (optional)</label><textarea id="declMsg" placeholder="z. B. Budget, anderer Stil, Termin geändert …" style="min-height:70px"></textarea>'+
-      '<div class="chk"><input type="checkbox" id="bandeOpt" checked><span><b style="color:var(--txt)">Trotzdem einen richtig guten DJ finden – kostenlos.</b> Ich wähle persönlich bis zu fünf handverlesene Kollegen aus meinem Partner-Netzwerk aus, die zu eurer Feier und eurem Budget passen – die Vorschläge bekommt ihr direkt von mir. Mit dem Haken willigt ihr ein, dass ich eure Eckdaten dafür an meine Partner-Agentur (DJ Bande, Münster) weitergebe.</span></div>'+
+      '<label>Mögt ihr kurz sagen, woran es liegt? (optional)</label><textarea id="declMsg" placeholder="z. B. Budget, anderer Stil, Termin geändert …" style="min-height:70px"></textarea>'+
+      '<div class="chk"><input type="checkbox" id="bandeOpt"><span><b style="color:var(--txt)">Trotzdem einen richtig guten DJ finden – kostenlos.</b> Ich wähle persönlich bis zu fünf passende Kollegen aus meinem Partner-Netzwerk aus, die zu eurer Feier und eurem Budget passen – die Vorschläge bekommt ihr direkt von mir. Mit dem Haken willigt ihr ein, dass ich eure Eckdaten dafür an meine Partner-Agentur (DJ Bande, Münster) weitergebe.</span></div>'+
       '<div style="margin-top:10px"><button class="btn" onclick="decline()">Absagen'+' &amp; ggf. Vorschläge erhalten</button></div></div>'
     )+'</div>');
 }
@@ -344,7 +346,7 @@ function loadForm(){
     });
 }
 function renderForm(){
-  if(FDEF.done){app('<div class="card"><h1>Danke euch! 🙌</h1><p class="sub" style="margin-top:8px">Dieser Fragebogen wurde bereits beantwortet – ich melde mich zeitnah bei euch.</p></div>');return}
+  if(FDEF.done){app('<div class="card"><h1>Danke euch!</h1><p class="sub" style="margin-top:8px">Dieser Fragebogen wurde bereits beantwortet – ich melde mich zeitnah bei euch.</p></div>');return}
   var fields=(FDEF.fields||[]).map(function(f,i){
     var t=f.type||'text';
     if(t==='textarea')return '<label>'+esc(f.label)+'</label><textarea data-i="'+i+'"></textarea>';
@@ -367,7 +369,7 @@ function submitForm(){
   document.getElementById('fSend').disabled=true;
   fetch(API+'/portal/form/'+FORM,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers:answers})})
     .then(function(r){if(!r.ok)throw new Error();
-      app('<div class="card"><h1>Danke euch! 🙌</h1><p class="sub" style="margin-top:8px">Eure Antworten sind angekommen. Ich melde mich in der Regel innerhalb von 24 Stunden mit den nächsten Schritten.</p></div>');
+      app('<div class="card"><h1>Danke euch!</h1><p class="sub" style="margin-top:8px">Eure Antworten sind angekommen. Ich melde mich in der Regel innerhalb von 24 Stunden mit den nächsten Schritten.</p></div>');
     }).catch(function(){document.getElementById('fSend').disabled=false;showMsg('fMsg','err','Senden fehlgeschlagen – bitte erneut versuchen.')});
 }
 
@@ -383,7 +385,7 @@ function loadRental(){
     }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
 }
 function renderMvGate(){
-  app('<div class="card"><div class="kicker">Euer Mietvertrag</div><h1>Kurz einloggen</h1>'+
+  app('<div class="card"><div class="kicker">Euer Mietvertrag</div><h1>Kurze Sicherheitsfrage</h1>'+
     '<p class="sub">Zum Schutz eurer Daten: Gebt bitte die Postleitzahl eurer Rechnungsadresse ein.</p>'+
     '<div class="msg err" id="gateMsg" style="display:'+(PLZ?'block':'none')+'">Die Postleitzahl passt leider nicht – bitte erneut versuchen.</div>'+
     '<label>Postleitzahl</label><input id="plzIn" inputmode="numeric" maxlength="10" placeholder="z. B. 58675">'+
@@ -399,7 +401,7 @@ function submitMvPlz(){
 function renderRental(){
   var d=MVDATA,b=d.booking,total=d.items.reduce(function(s,it){return s+it.price},0);
   if(d.status==='unterschrieben'){
-    app('<div class="card"><h1>Vielen Dank! ✅</h1><p class="sub" style="margin-top:8px">Der Mietvertrag wurde am '+
+    app('<div class="card"><h1>Vielen Dank!</h1><p class="sub" style="margin-top:8px">Der Mietvertrag wurde am '+
       dt(d.signed_at)+' digital unterschrieben von <b>'+esc(d.signed_name)+'</b>. Ihr müsst nichts weiter tun – bis bald bei der Übergabe!</p></div>');
     return;
   }
@@ -431,7 +433,7 @@ function renderRental(){
     '<input type="checkbox" id="mvConsent" style="width:auto;margin-top:3px">'+
     '<span>Ich willige ein, dass die Ausweiskopie zur Absicherung dieses Mietvertrags gespeichert wird. Sie wird nach vollständiger, unbeschädigter Rückgabe der Mietsachen gelöscht. Mit meiner Unterschrift schließe ich den oben stehenden Mietvertrag verbindlich ab.</span></label>'+
     '<div class="msg err" id="mvMsg" style="display:none"></div>'+
-    '<div style="margin-top:16px"><button class="btn" id="mvSend" onclick="submitRental()">Vertrag verbindlich abschließen ✍</button></div></div>');
+    '<div style="margin-top:16px"><button class="btn" id="mvSend" onclick="submitRental()">Vertrag verbindlich abschließen</button></div></div>');
   sigInit();
 }
 function mvPhoto(inp,side){
@@ -481,7 +483,7 @@ function submitRental(){
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
       if(res.s>=400)throw new Error(res.j.error||'Senden fehlgeschlagen.');
-      app('<div class="card"><h1>Vertrag abgeschlossen ✅</h1><p class="sub" style="margin-top:8px">Danke, '+esc(name)+'! Der Mietvertrag ist digital unterschrieben, die Ausweiskopie ist sicher gespeichert und wird nach der Rückgabe gelöscht. Bis bald bei der Übergabe!</p></div>');
+      app('<div class="card"><h1>Vertrag abgeschlossen</h1><p class="sub" style="margin-top:8px">Danke, '+esc(name)+'! Der Mietvertrag ist digital unterschrieben, die Ausweiskopie ist sicher gespeichert und wird nach der Rückgabe gelöscht. Bis bald bei der Übergabe!</p></div>');
     }).catch(function(e){document.getElementById('mvSend').disabled=false;err(e.message)});
 }
 
@@ -490,7 +492,7 @@ var CTOK=localStorage.getItem('cust_tok')||'',ME=null;
 function cfetch(p,opt){opt=opt||{};opt.headers=Object.assign({},opt.headers||{},{Authorization:'Bearer '+CTOK});return fetch(API+'/'+p,opt)}
 function renderSetPw(){
   app('<div class="card"><div class="kicker">Dein Kunden-Backoffice</div><h1>Passwort festlegen</h1>'+
-    '<p class="sub">Einmal ein Passwort setzen — danach kommst du jederzeit mit E-Mail und Passwort an alle Unterlagen.</p>'+
+    '<p class="sub">Einmal ein Passwort setzen – danach kommst du jederzeit mit E-Mail und Passwort an alle Unterlagen.</p>'+
     '<div class="msg err" id="spMsg" style="display:none"></div>'+
     '<label>Passwort (min. 8 Zeichen)</label><input type="password" id="spPw1">'+
     '<label>Passwort wiederholen</label><input type="password" id="spPw2">'+
@@ -513,7 +515,7 @@ function doSetPw(){
 }
 function renderLogin(msg){
   app('<div class="card"><div class="kicker">Dein Kunden-Backoffice</div><h1>Anmelden</h1>'+
-    '<p class="sub">Alle Unterlagen an einem Ort: Angebote, Rechnungen, Verträge — plus Programmablauf, Musikwünsche und Fotos eurer Location.</p>'+
+    '<p class="sub">Alle Unterlagen an einem Ort: Angebote, Rechnungen, Verträge – plus Programmablauf, Musikwünsche und Fotos eurer Location.</p>'+
     '<div class="msg err" id="liMsg" style="display:'+(msg?'block':'none')+'">'+esc(msg||'')+'</div>'+
     '<label>E-Mail</label><input type="email" id="liMail" autocomplete="email">'+
     '<label>Passwort</label><input type="password" id="liPw" autocomplete="current-password">'+
@@ -547,7 +549,7 @@ function loadAccount(){
   }).then(function(me){
     if(!me)return;
     ME=me;renderAccount();
-  }).catch(function(){renderLogin('Verbindungsfehler — bitte später erneut versuchen.')});
+  }).catch(function(){renderLogin('Verbindungsfehler – bitte später erneut versuchen.')});
 }
 function renderAccount(){
   var me=ME;
@@ -562,7 +564,7 @@ function renderAccount(){
   var books=me.bookings.map(function(b,i){
     var n=b.notes||{};
     return '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">'+esc(b.title||'Termin')+' <span style="color:var(--mut);font-size:13px;font-weight:400">· '+dt(b.event_date)+'</span></h2>'+
-    '<p class="sub" style="font-size:13px;margin:6px 0 4px">Hier könnt ihr alles pflegen, was ich für euren Termin wissen soll — ich sehe Änderungen sofort.</p>'+
+    '<p class="sub" style="font-size:13px;margin:6px 0 4px">Hier könnt ihr alles pflegen, was ich für euren Termin wissen soll – ich sehe Änderungen sofort.</p>'+
     '<label>Programmablauf (Zeiten, Reden, Programmpunkte)</label><textarea id="nS'+i+'" style="min-height:80px" placeholder="z. B. 18:00 Empfang · 19:00 Essen · 20:30 Rede Chef · 21:00 Party …">'+esc(n.schedule||'')+'</textarea>'+
     '<label>Musikwünsche &amp; No-Gos</label><textarea id="nM'+i+'" style="min-height:80px" placeholder="Wünsche, Lieblingslieder, was auf keinen Fall laufen darf …">'+esc(n.music||'')+'</textarea>'+
     '<label>Vereinbarungen &amp; Sonstiges</label><textarea id="nA'+i+'" style="min-height:60px" placeholder="Was wir besprochen haben, Ansprechpartner vor Ort, Besonderheiten …">'+esc(n.agreements||'')+'</textarea>'+
@@ -570,15 +572,15 @@ function renderAccount(){
   }).join('');
   var files=(me.files||[]).map(function(f){
     return '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)">'+
-    '<div>'+(f.kind==='foto'?'🖼':'📄')+' '+esc(f.name)+' <span style="color:var(--mut);font-size:12px">('+Math.max(1,Math.round(f.size/1024))+' KB)</span></div>'+
+    '<div>'+(f.kind==='foto'?'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>')+' '+esc(f.name)+' <span style="color:var(--mut);font-size:12px">('+Math.max(1,Math.round(f.size/1024))+' KB)</span></div>'+
     '<div><a onclick="openFile(\''+f.id+'\')" style="cursor:pointer">Öffnen</a> &nbsp;<a onclick="delFile(\''+f.id+'\')" style="cursor:pointer;color:#e0a0a0">Löschen</a></div></div>';
-  }).join('')||'<p class="sub" style="font-size:13px">Noch keine Dateien — ladet gern Fotos eurer Location oder Dokumente hoch.</p>';
+  }).join('')||'<p class="sub" style="font-size:13px">Noch keine Dateien – ladet gern Fotos eurer Location oder Dokumente hoch.</p>';
   app('<div class="card"><div class="kicker">Dein Kunden-Backoffice</div><h1>Hallo, '+esc(me.customer.name)+'!</h1>'+
-    '<p class="sub">Hier findest du alle Unterlagen und kannst alles für eure Termine pflegen. <a onclick="logout()" style="cursor:pointer">Abmelden</a></p></div>'+
-    '<div class="card"><h2>📁 Meine Unterlagen</h2>'+docs+rentals+'</div>'+
+    '<p class="sub">Hier findet ihr alle Unterlagen und könnt alles für eure Termine pflegen. <a onclick="logout()" style="cursor:pointer">Abmelden</a></p></div>'+
+    '<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Meine Unterlagen</h2>'+docs+rentals+'</div>'+
     books+
-    '<div class="card"><h2>📷 Fotos &amp; Dokumente</h2>'+
-    '<p class="sub" style="font-size:13px">Locationfotos helfen mir enorm bei der Planung — Raum, Bühne, Stromanschlüsse, Parkplatz. Auch Dokumente (z. B. Ablaufpläne als PDF) sind willkommen.</p>'+
+    '<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Fotos &amp; Dokumente</h2>'+
+    '<p class="sub" style="font-size:13px">Locationfotos helfen mir enorm bei der Planung – Raum, Bühne, Stromanschlüsse, Parkplatz. Auch Dokumente (z. B. Ablaufpläne als PDF) sind willkommen.</p>'+
     '<div id="fileList">'+files+'</div>'+
     '<div style="margin-top:12px"><input type="file" id="fUp" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" onchange="uploadFiles(this)">'+
     '<div class="msg" id="fUpMsg" style="display:none;margin-top:8px"></div></div></div>');
@@ -589,7 +591,7 @@ function saveNotes(i){
     body:JSON.stringify({schedule:document.getElementById('nS'+i).value,music:document.getElementById('nM'+i).value,agreements:document.getElementById('nA'+i).value})})
     .then(function(r){if(!r.ok)throw new Error();
       var ok=document.getElementById('nOk'+i);ok.style.display='';setTimeout(function(){ok.style.display='none'},2500);
-    }).catch(function(){alert('Speichern fehlgeschlagen — bitte erneut versuchen.')});
+    }).catch(function(){alert('Speichern fehlgeschlagen – bitte erneut versuchen.')});
 }
 function uploadFiles(inp){
   var files=Array.from(inp.files||[]);inp.value='';
