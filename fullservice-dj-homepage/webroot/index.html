@@ -6,7 +6,7 @@
 <title>DJ Lauschgift – Hochzeits-DJ & Event-DJ | Deutschlandweit</title>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"LocalBusiness","name":"DJ Lauschgift",
-"description":"DJ für Hochzeiten, Geburtstage und Firmenfeiern – volle Tanzfläche ohne Schnickschnack. Über 20 Jahre Erfahrung, deutschlandweit im Einsatz.",
+"description":"DJ für Hochzeiten, Geburtstage und Firmenfeiern – volle Tanzfläche ohne Schnickschnack. 23 Jahre Erfahrung, deutschlandweit im Einsatz.",
 "address":{"@type":"PostalAddress","streetAddress":"Büttmecker Weg 35c","postalCode":"58675","addressLocality":"Hemer","addressCountry":"DE"},
 "telephone":"+4915236439373","url":"https://lauschgift.net","priceRange":"ab 1.200 €",
 "areaServed":"Deutschland","founder":{"@type":"Person","name":"Markus Jankowski"}}
@@ -586,6 +586,10 @@ sfetch('friends?select=*&public=eq.true&order=sort').then(function(r){
   }).join('');
   document.getElementById('freunde').style.display='';
 }).catch(function(){});
+
+/* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */
+try{var _tp=JSON.stringify({p:location.pathname.split('/').pop()||'index.html',r:document.referrer||''});
+navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 
 /* ===== Anfrage-Formular ===== */
 document.getElementById('inqForm').addEventListener('submit',function(ev){

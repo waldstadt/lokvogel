@@ -106,7 +106,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <div class="pt">
         <h3>🧟 Nach dem Kinderprogramm kippt nichts</h3>
         <p class="prob">„Bis 20 Uhr Familien, danach sollte Party sein — aber der Übergang hat nie gezündet."</p>
-        <p class="sol">Ich fahre den Abend in Stufen: früh Familien-Grusel, dann Stimmung aufbauen, ab der Geisterstunde volle Tanzfläche. Das ist mein Handwerk seit über 20 Jahren.</p>
+        <p class="sol">Ich fahre den Abend in Stufen: früh Familien-Grusel, dann Stimmung aufbauen, ab der Geisterstunde volle Tanzfläche. Das ist mein Handwerk seit 23 Jahren.</p>
       </div>
     </div>
   </div>
@@ -165,6 +165,9 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 
 <script>
 var API='api.php';
+/* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */
+try{var _tp=JSON.stringify({p:'halloween.html',r:document.referrer||''});
+navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 document.getElementById('inqForm').addEventListener('submit',function(ev){
   ev.preventDefault();
   var f=ev.target,msg=document.getElementById('formMsg'),btn=document.getElementById('sendBtn');

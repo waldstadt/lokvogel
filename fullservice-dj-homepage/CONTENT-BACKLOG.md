@@ -179,3 +179,27 @@ Gilt unabhängig davon, ob Markus am Wunschtermin Zeit hat. Konsequenzen im Syst
   („bezahlt wird erst, wenn du wirklich einen Platz hast").
 - Maßstab für alle künftigen Texte/Features: Würde sich ein unsicherer
   Interessent damit gut behandelt fühlen? Wenn nein → umformulieren.
+
+## Statistik & Newsletter (umgesetzt 2026-08-27)
+
+- ✅ Anonyme Besucher-Statistik, komplett self-hosted: gezählt werden nur
+  Tag + Seitenname + Referrer-Domain (keine IPs, keine Cookies, keine IDs)
+  → kein Cookie-Banner nötig. Auswertung im Backoffice unter Statistik:
+  Aufrufe pro Tag, meistbesuchte Seiten, Referrer, Anfragen-Quote.
+- ✅ Workshop-Newsletter mit Double-Opt-in: Anmeldebox in der
+  Workshop-Sektion der Technik-Seite, Bestätigungs-Mail, Ein-Klick-
+  Abmeldelink in jeder Mail. Versand + Abonnentenliste im Backoffice
+  (Technik-Seite). Bewusst NUR dort platziert: Auf der DJ-Startseite
+  bleibt die Anfrage der einzige Call-to-Action (Conversion-Regel!).
+- Entscheidung: KEIN allgemeiner Party-Newsletter für Feier-Kunden —
+  die buchen einmalig; Pflegeaufwand und Ablenkung vom Anfrage-Formular
+  stünden in keinem Verhältnis. Newsletter nur für die Workshop-/
+  Technik-Zielgruppe (kommt wieder, plant längerfristig).
+
+## Prüfen (rechtlich/inhaltlich, offen)
+
+- Mietpark zeigt „Alle Preise netto pro Miettag" — sobald sich das
+  Angebot (auch) an Privatkunden richtet, verlangt die Preisangaben-
+  verordnung Bruttopreise (inkl. USt). Vor Livegang klären: entweder
+  brutto ausweisen oder Vermietung klar auf Gewerbe/Vereine begrenzen.
+  → gehört mit in die anwaltliche Prüfung.

@@ -101,7 +101,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <div class="pt">
         <h3>💃 Die Tanzfläche bleibt leer</h3>
         <p class="prob">„Von der Auszubildenden bis zum Senior-Chef – irgendeine Playlist läuft, aber keiner steht auf."</p>
-        <p class="sol">Ich lese den Raum seit über 20 Jahren: erst Dinner-Begleitung, dann Stimmung aufbauen, dann volle Tanzfläche quer durch alle Jahrgänge. Ohne Schnickschnack, ohne Animation.</p>
+        <p class="sol">Ich lese den Raum seit 23 Jahren: erst Dinner-Begleitung, dann Stimmung aufbauen, dann volle Tanzfläche quer durch alle Jahrgänge. Ohne Schnickschnack, ohne Animation.</p>
       </div>
       <div class="pt">
         <h3>🏢 Die Location gibt nichts her</h3>
@@ -165,6 +165,9 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 
 <script>
 var API='api.php';
+/* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */
+try{var _tp=JSON.stringify({p:'weihnachtsfeier.html',r:document.referrer||''});
+navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 document.getElementById('inqForm').addEventListener('submit',function(ev){
   ev.preventDefault();
   var f=ev.target,msg=document.getElementById('formMsg'),btn=document.getElementById('sendBtn');

@@ -106,7 +106,14 @@ Branch `live` und ein Fine-grained GitHub-Token (nur dieses Repo, nur
   Bankverbindung. Aus einer Buchung werden Angebot/Rechnung inklusive
   DJ-Gage und zugeordneter Technik automatisch vorbefüllt.
 - **Statistik:** Umsatz pro Monat/Jahr, Angebots-Annahmequote,
-  Ø-Rechnungswert, Aufträge nach Anlass, Anfrage-Quellen.
+  Ø-Rechnungswert, Aufträge nach Anlass, Anfrage-Quellen — plus
+  **Website-Besucher** (anonym self-hosted gezählt: nur Tag, Seite und
+  Referrer-Domain; keine Cookies, keine IPs → kein Cookie-Banner nötig)
+  mit Tages-Chart, Top-Seiten, Referrern und Anfragen-Quote.
+- **Workshop-Newsletter:** Anmeldebox in der Workshop-Sektion,
+  Double-Opt-in per Bestätigungs-Mail, Ein-Klick-Abmeldelink in jeder
+  Mail; Abonnentenliste und Versand (inkl. Testmail an die eigene
+  Adresse) im Backoffice unter Technik.
 - **Website-CMS:** Alle Texte, Fotos (Upload auf den eigenen Server),
   Leistungspakete, FAQ, Verleih-Artikel, Kontaktdaten, SEO und
   Farbschema (Presets + freie Farbwahl) — Änderungen sind sofort live.

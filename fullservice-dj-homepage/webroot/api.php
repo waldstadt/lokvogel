@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 23;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 24;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -49,7 +49,7 @@ const BOOL_COLS = [
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
-  'workshop_events','workshop_signups','doc_audit','customer_files'];
+  'workshop_events','workshop_signups','doc_audit','customer_files','newsletter'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -207,6 +207,7 @@ function upgrade(PDO $p): void {
         ->execute([json_encode($fields, JSON_UNESCAPED_UNICODE), $row['id']]);
     }
   } catch (PDOException $e) {}
+  if ($v < 24) foreach (statsNewsletterDdl() as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   if ($v < 23) try {
     $st = $p->query("select id, fields from form_templates where name like 'DJ-Vorauswahl%' limit 1");
     if ($row = $st->fetch()) {
@@ -221,6 +222,16 @@ function upgrade(PDO $p): void {
     }
   } catch (PDOException $e) {}
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
+}
+
+/* Anonyme Reichweiten-Statistik (nur Tag/Seite/Referrer-Domain, keine IPs) + Newsletter mit Double-Opt-in */
+function statsNewsletterDdl(): array {
+  return [
+    "create table if not exists stats_daily (day text not null, page text not null,
+      ref text not null default '', views integer not null default 0, primary key (day, page, ref))",
+    "create table if not exists newsletter (id text primary key, email text unique not null, name text,
+      token text unique, source text, confirmed_at text, unsubscribed_at text, created_at text)",
+  ];
 }
 
 /* Vermittlungs-Mail „Termin belegt" — eine Quelle für Seed und Migration */
@@ -492,6 +503,7 @@ SQL);
   foreach (workshopsDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
   foreach (portalAccountDdl() as $sql) $p->exec($sql);
+  foreach (statsNewsletterDdl() as $sql) $p->exec($sql);
   seed($p);
   seedExtraTemplates($p);
   seedServiceProducts($p);
@@ -1675,6 +1687,64 @@ function handlePortal(string $path, string $method, $body): never {
     $used = (int)$st->fetchColumn();
     out(['total' => (int)$total, 'available' => max(0, (int)$total - $used)]);
   }
+  /* Newsletter: Anmeldung mit Double-Opt-in, Bestätigung und Ein-Klick-Abmeldung */
+  if ($path === 'portal/newsletter' && $method === 'POST') {
+    $email = mb_substr(trim((string)($body['email'] ?? '')), 0, 160);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) fail('Bitte eine gültige E-Mail-Adresse angeben.');
+    $name = mb_substr(trim((string)($body['name'] ?? '')), 0, 120);
+    $source = mb_substr(trim((string)($body['source'] ?? 'workshops')), 0, 60);
+    $st = $p->prepare('select * from newsletter where email = ?');
+    $st->execute([$email]);
+    $row = $st->fetch();
+    if ($row && $row['confirmed_at'] && !$row['unsubscribed_at'])
+      out(['ok' => true, 'already' => true]);
+    $token = bin2hex(random_bytes(16));
+    if ($row) {
+      $p->prepare('update newsletter set token=?, name=coalesce(nullif(?,\'\'), name), source=?, unsubscribed_at=null where id=?')
+        ->execute([$token, $name, $source, $row['id']]);
+    } else {
+      $p->prepare('insert into newsletter (id, email, name, token, source, created_at) values (?,?,?,?,?,?)')
+        ->execute([uuid(), $email, $name, $token, $source, now()]);
+    }
+    $vn = $name !== '' ? (preg_split('/\s+/', $name, 2)[0] ?? $name) : 'du';
+    $link = baseUrl() . '/api.php/portal/newsletter/confirm/' . $token;
+    $mailed = sendMailSafe($email, 'Nur noch ein Klick — dann bist du dabei',
+      ($vn === 'du' ? "Hallo,\n\n" : "Hallo $vn,\n\n") .
+      "schön, dass du bei neuen Workshop-Terminen als Erstes Bescheid wissen willst! " .
+      "Bestätige kurz deine Anmeldung, damit ich sicher weiß, dass die Adresse dir gehört:\n\n$link\n\n" .
+      "Du bekommst danach nur Post, wenn es wirklich etwas gibt: neue Termine, neue Themen, freie Plätze. " .
+      "Abmelden geht jederzeit mit einem Klick.\n\n" .
+      "Falls du das nicht warst, ignoriere diese Mail einfach — dann passiert nichts.\n\nBis bald!\nMarkus");
+    out(['ok' => true, 'mailed' => $mailed], 201);
+  }
+  if (preg_match('#^portal/newsletter/(confirm|unsubscribe)/([a-f0-9]{32})$#', $path, $m) && $method === 'GET') {
+    $st = $p->prepare('select * from newsletter where token = ?');
+    $st->execute([$m[2]]);
+    $row = $st->fetch();
+    $ok = false; $title = 'Link ungültig'; $text = 'Dieser Link ist nicht mehr gültig. Melde dich einfach neu an — oder schreib mir kurz.';
+    if ($row && $m[1] === 'confirm') {
+      if (!$row['confirmed_at']) {
+        $p->prepare('update newsletter set confirmed_at=?, unsubscribed_at=null where id=?')->execute([now(), $row['id']]);
+        notifyOwner('📬 Neuer Newsletter-Abonnent', 'E-Mail: ' . $row['email'] . ($row['name'] ? "\nName: " . $row['name'] : '') . "\nQuelle: " . ($row['source'] ?: '–'));
+      }
+      $ok = true; $title = 'Das hat geklappt ✓';
+      $text = 'Du bist dabei! Sobald es neue Workshop-Termine oder Themen gibt, bekommst du als Erstes Bescheid.';
+    } elseif ($row && $m[1] === 'unsubscribe') {
+      $p->prepare('update newsletter set unsubscribed_at=? where id=?')->execute([now(), $row['id']]);
+      $ok = true; $title = 'Du bist abgemeldet';
+      $text = 'Alles klar — du bekommst keine weiteren Mails von mir. Danke, dass du dabei warst!';
+    }
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' .
+      '<title>' . htmlspecialchars($title) . '</title></head>' .
+      '<body style="font-family:system-ui,sans-serif;background:#0e1213;color:#eef2f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px">' .
+      '<div style="max-width:440px;background:#181e20;border:1px solid #26302f;border-radius:14px;padding:36px;text-align:center">' .
+      '<h1 style="font-size:22px;margin:0 0 12px">' . htmlspecialchars($title) . '</h1>' .
+      '<p style="color:#9aa8a3;line-height:1.6;margin:0 0 22px">' . htmlspecialchars($text) . '</p>' .
+      '<a href="technik.html#workshops" style="color:#3cc8b4;text-decoration:none;font-weight:600">' .
+      ($ok && $m[1] === 'confirm' ? 'Zu den Workshop-Terminen →' : 'Zur Technik-Seite →') . '</a></div></body></html>';
+    exit;
+  }
   fail('Unbekannter Portal-Endpunkt.', 404);
 }
 
@@ -1737,6 +1807,72 @@ try {
     out(['anfragen' => "$b/api.php/ical/$k/anfragen.ics",
       'buchungen' => "$b/api.php/ical/$k/buchungen.ics",
       'technik' => "$b/api.php/ical/$k/technik.ics"]);
+  }
+  /* Anonyme Reichweiten-Zählung: nur Tag, Seitenname und Referrer-Domain — keine IPs, keine Cookies.
+     sendBeacon schickt text/plain, daher wird der Body hier selbst gelesen. */
+  if ($path === 'track' && $method === 'POST') {
+    $b = json_decode(file_get_contents('php://input'), true) ?: [];
+    $page = strtolower((string)($b['p'] ?? ''));
+    if (!preg_match('/^[a-z0-9_.-]{1,60}$/', $page)) $page = 'index.html';
+    $ref = '';
+    $host = strtolower((string)(parse_url((string)($b['r'] ?? ''), PHP_URL_HOST) ?: ''));
+    $own = strtolower((string)(parse_url(baseUrl(), PHP_URL_HOST) ?: ''));
+    if ($host !== '' && $host !== $own && $host !== ($_SERVER['HTTP_HOST'] ?? ''))
+      $ref = mb_substr(preg_replace('/^www\./', '', $host), 0, 80);
+    $day = gmdate('Y-m-d');
+    $p = db();
+    $u = $p->prepare('update stats_daily set views = views + 1 where day=? and page=? and ref=?');
+    $u->execute([$day, $page, $ref]);
+    if (!$u->rowCount()) {
+      try { $p->prepare('insert into stats_daily (day, page, ref, views) values (?,?,?,1)')->execute([$day, $page, $ref]); }
+      catch (PDOException $e) { $u->execute([$day, $page, $ref]); }
+    }
+    out(['ok' => true]);
+  }
+  /* Statistik-Übersicht fürs Backoffice */
+  if ($path === 'stats/overview' && $method === 'GET') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $days = max(7, min(365, (int)($_GET['days'] ?? 30)));
+    $from = gmdate('Y-m-d', time() - $days * 86400);
+    $p = db();
+    $q = function (string $sql) use ($p, $from) { $st = $p->prepare($sql); $st->execute([$from]); return $st->fetchAll(); };
+    $daily = $q("select day, sum(views) as views from stats_daily where day >= ? group by day order by day");
+    $inqDaily = $q("select substr(created_at,1,10) as day, count(*) as n from inquiries where created_at >= ? group by 1 order by 1");
+    out([
+      'days' => $days,
+      'daily' => $daily,
+      'pages' => $q("select page, sum(views) as views from stats_daily where day >= ? group by page order by views desc limit 12"),
+      'refs' => $q("select ref, sum(views) as views from stats_daily where day >= ? and ref != '' group by ref order by views desc limit 12"),
+      'inq_daily' => $inqDaily,
+      'views_total' => array_sum(array_column($daily, 'views')),
+      'inquiries_total' => array_sum(array_column($inqDaily, 'n')),
+      'signups_total' => (int)$p->query("select count(*) from workshop_signups where created_at >= '$from'")->fetchColumn(),
+      'newsletter_total' => (int)$p->query("select count(*) from newsletter where confirmed_at is not null and unsubscribed_at is null")->fetchColumn(),
+    ]);
+  }
+  /* Newsletter-Versand an alle bestätigten Abonnenten (oder Testmail an die eigene Adresse) */
+  if ($path === 'newsletter/send' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $subject = trim((string)($body['subject'] ?? ''));
+    $text = (string)($body['body'] ?? '');
+    if ($subject === '' || trim($text) === '') fail('Betreff und Text erforderlich.');
+    $p = db();
+    if (!empty($body['test'])) {
+      $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+      $to = (string)($comp['email'] ?? '');
+      if ($to === '') fail('Für die Testmail muss in den Einstellungen eine Firmen-E-Mail hinterlegt sein.');
+      out(['mailed' => sendMailSafe($to, '[TEST] ' . $subject, $text . "\n\n—\nAbmelden: (Link wird beim echten Versand je Empfänger eingefügt)")]);
+    }
+    $subs = $p->query("select * from newsletter where confirmed_at is not null and unsubscribed_at is null")->fetchAll();
+    $sent = 0; $failed = 0;
+    foreach ($subs as $s) {
+      $unsub = baseUrl() . '/api.php/portal/newsletter/unsubscribe/' . $s['token'];
+      $personal = str_replace('{vorname}',
+        $s['name'] ? (preg_split('/\s+/', (string)$s['name'], 2)[0] ?? $s['name']) : 'Musikfreund', $text);
+      if (sendMailSafe((string)$s['email'], $subject, $personal . "\n\n—\nDu bekommst diese Mail, weil du dich für Workshop-News angemeldet hast.\nAbmelden mit einem Klick: $unsub"))
+        $sent++; else $failed++;
+    }
+    out(['sent' => $sent, 'failed' => $failed, 'total' => count($subs)]);
   }
   /* Direktversand aus dem Backoffice */
   if ($path === 'sendmail' && $method === 'POST') {

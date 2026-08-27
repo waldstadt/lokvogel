@@ -347,6 +347,14 @@ th.num{text-align:right}
       <div class="card"><h3>Aufträge nach Anlass</h3><div id="statTypes" class="sml"></div></div>
       <div class="card"><h3>Anfrage-Quellen</h3><div id="statSources" class="sml"></div></div>
     </div>
+    <div class="card"><h3>🌐 Website-Besucher <span class="mut sml" style="font-weight:400">(anonym gezählt — ohne Cookies, ohne IP-Speicherung)</span>
+      <select id="webDays" style="width:120px;float:right" onchange="loadWebStats()"><option value="30">30 Tage</option><option value="7">7 Tage</option><option value="90">90 Tage</option><option value="365">365 Tage</option></select></h3>
+      <div class="tiles" id="webTiles" style="margin-top:8px"></div>
+      <div id="webChart" style="margin-top:12px"></div></div>
+    <div class="grid2" style="gap:16px">
+      <div class="card"><h3>Meistbesuchte Seiten</h3><div id="webPages" class="sml mut">–</div></div>
+      <div class="card"><h3>Woher die Besucher kommen <span class="mut sml" style="font-weight:400">(Referrer-Domains, direkte Aufrufe zählen nicht mit)</span></h3><div id="webRefs" class="sml mut">–</div></div>
+    </div>
   </div>
 
   <!-- TECHNIK -->
@@ -355,8 +363,19 @@ th.num{text-align:right}
       <button class="btn" onclick="openEqModal()">+ Neuer Artikel</button></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Heute im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
     <div class="card"><h3>Miet-Partner (DJs, Bands, Musiker, Techniker) <span class="mut sml" style="font-weight:400">— registrieren sich über die Technik-Seite, du schaltest frei und teilst den Code mit</span></h3><div id="partnerList" class="sml"></div></div>
-    <div class="card"><h3>Workshop-Termine <span class="mut sml" style="font-weight:400">— buchbar auf der Technik-Seite, Bezahlung vor Ort oder per Rechnung</span> <button class="btn sm" style="float:right" onclick="openWsModal()">+ Termin</button></h3>
+    <div class="card"><h3>Workshop-Termine <span class="mut sml" style="font-weight:400">— buchbar auf der Technik-Seite, Rechnung geht automatisch per E-Mail raus</span> <button class="btn sm" style="float:right" onclick="openWsModal()">+ Termin</button></h3>
       <div id="wsAdminList" class="sml"></div></div>
+    <div class="card"><h3>📬 Workshop-Newsletter <span class="mut sml" style="font-weight:400">— Anmeldung über die Technik-Seite, Double-Opt-in</span></h3>
+      <div id="nlAdminList" class="sml mut">–</div>
+      <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px">
+        <label>Betreff</label><input id="nlSubject" placeholder="z. B. Neue Workshop-Termine im November">
+        <label>Text <span class="mut sml" style="text-transform:none;letter-spacing:0">— {vorname} wird je Empfänger ersetzt, Abmeldelink kommt automatisch ans Ende</span></label>
+        <textarea id="nlBody" style="min-height:120px" placeholder="Hallo {vorname},&#10;&#10;es gibt neue Termine …"></textarea>
+        <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn g sm" onclick="nlAdminSend(true)">✉️ Testmail an mich</button>
+          <button class="btn sm" id="nlSendBtn" onclick="nlAdminSend(false)">📤 An alle Abonnenten senden</button>
+        </div>
+      </div></div>
   </div>
 
   <!-- CMS -->
@@ -606,6 +625,8 @@ function showPage(id){
   document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('a')});
   document.getElementById('pg-'+id).classList.add('a');
   document.querySelectorAll('#nav a').forEach(function(a){a.classList.toggle('a',a.dataset.pg===id)});
+  if(id==='stats')loadWebStats();
+  if(id==='tech')loadNewsletter();
   window.scrollTo(0,0);
 }
 
@@ -2399,6 +2420,81 @@ function renderTechCheckPrint(t,comp,c,pr,scale,picUrls){
 }
 
 /* ===== Kalender-Abo + Packliste ===== */
+/* ===== Website-Statistik (anonyme Zählung aus stats_daily) ===== */
+function loadWebStats(){
+  var days=document.getElementById('webDays').value;
+  fetch('api.php/stats/overview?days='+days,{headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){return r.json()}).then(function(j){
+      if(!j||j.error)return;
+      var conv=j.views_total?((j.inquiries_total/j.views_total)*100).toFixed(1).replace('.',','):'–';
+      document.getElementById('webTiles').innerHTML=
+        tile(j.views_total,'Seitenaufrufe')+tile(j.inquiries_total,'Anfragen')+
+        tile(conv+' %','Anfragen je Aufruf')+tile(j.signups_total,'Workshop-Anmeldungen')+
+        tile(j.newsletter_total,'Newsletter-Abos');
+      /* Tagesbalken über den kompletten Zeitraum, fehlende Tage = 0 */
+      var byDay={};(j.daily||[]).forEach(function(d){byDay[d.day]=Number(d.views)});
+      var inqByDay={};(j.inq_daily||[]).forEach(function(d){inqByDay[d.day]=Number(d.n)});
+      var out=[],max=1,n=Math.min(Number(days),120);
+      for(var i=n-1;i>=0;i--){
+        var d=new Date(Date.now()-i*864e5).toISOString().slice(0,10);
+        var v=byDay[d]||0;if(v>max)max=v;
+        out.push({d:d,v:v,q:inqByDay[d]||0});
+      }
+      document.getElementById('webChart').innerHTML=
+        '<div style="display:flex;align-items:flex-end;gap:2px;height:70px">'+out.map(function(x){
+          var h=Math.max(2,Math.round(x.v/max*66));
+          var t=new Date(x.d).toLocaleDateString('de-DE',{day:'numeric',month:'short'})+': '+x.v+' Aufrufe'+(x.q?', '+x.q+' Anfrage(n)':'');
+          return '<div title="'+t+'" style="flex:1;height:'+h+'px;border-radius:2px 2px 0 0;background:'+(x.q?'var(--acc,#e8a33d)':'rgba(255,255,255,.22)')+'"></div>';
+        }).join('')+'</div>'+
+        '<div class="mut sml" style="margin-top:6px">Farbige Balken = Tage mit Anfragen. Gezählt wird je Seitenaufruf, komplett anonym.'+(j.views_total?'':' Noch keine Daten — die Zählung startet, sobald die Seiten live sind.')+'</div>';
+      document.getElementById('webPages').innerHTML=(j.pages||[]).map(function(pg){
+        return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(pg.page)+'<span style="float:right">'+pg.views+'</span></div>';
+      }).join('')||'Noch keine Daten.';
+      document.getElementById('webRefs').innerHTML=(j.refs||[]).map(function(rf){
+        return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(rf.ref)+'<span style="float:right">'+rf.views+'</span></div>';
+      }).join('')||'Noch keine Referrer erfasst — z. B. Google-Treffer oder Links von anderen Seiten tauchen hier auf.';
+    }).catch(function(){});
+}
+
+/* ===== Newsletter-Verwaltung ===== */
+function loadNewsletter(){
+  api('newsletter?select=*&order=created_at.desc').then(function(rows){
+    CACHE.newsletter=rows||[];
+    var conf=rows.filter(function(s){return s.confirmed_at&&!s.unsubscribed_at});
+    var pend=rows.filter(function(s){return !s.confirmed_at&&!s.unsubscribed_at});
+    var off=rows.filter(function(s){return s.unsubscribed_at});
+    document.getElementById('nlSendBtn').textContent='📤 An '+conf.length+' Abonnenten senden';
+    document.getElementById('nlAdminList').innerHTML=
+      '<div class="mut" style="margin-bottom:8px">'+conf.length+' bestätigt · '+pend.length+' unbestätigt · '+off.length+' abgemeldet</div>'+
+      (conf.map(function(s){
+        return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(s.email)+
+          (s.name?' <span class="mut">('+esc(s.name)+')</span>':'')+
+          ' <span class="mut sml">seit '+dt(s.confirmed_at&&s.confirmed_at.slice(0,10))+'</span>'+
+          '<a class="sml" style="float:right;cursor:pointer" onclick="nlAdminRemove(\''+s.id+'\')">✕ austragen</a></div>';
+      }).join('')||'<span class="mut">Noch keine bestätigten Abonnenten.</span>');
+  }).catch(function(){});
+}
+function nlAdminRemove(id){
+  if(!confirm('Abonnenten wirklich austragen? Er bekommt dann keine Mails mehr.'))return;
+  api('newsletter?id=eq.'+id,{method:'PATCH',body:{unsubscribed_at:new Date().toISOString()}})
+    .then(function(){toast('Ausgetragen ✓');loadNewsletter()}).catch(function(e){toast(e.message,1)});
+}
+function nlAdminSend(test){
+  var subject=document.getElementById('nlSubject').value.trim(),body=document.getElementById('nlBody').value;
+  if(!subject||!body.trim()){toast('Betreff und Text angeben',1);return}
+  var conf=(CACHE.newsletter||[]).filter(function(s){return s.confirmed_at&&!s.unsubscribed_at});
+  if(!test&&!conf.length){toast('Keine bestätigten Abonnenten',1);return}
+  if(!test&&!confirm('Newsletter jetzt an '+conf.length+' Abonnenten senden?'))return;
+  fetch('api.php/newsletter/send',{method:'POST',
+    headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
+    body:JSON.stringify({subject:subject,body:body,test:!!test})})
+    .then(function(r){return r.json()}).then(function(j){
+      if(j.error){toast(j.error,1);return}
+      toast(test?(j.mailed?'Testmail verschickt ✓':'Testmail fehlgeschlagen — Firmen-E-Mail in den Einstellungen prüfen'):
+        ('Versendet ✓ '+j.sent+' von '+j.total+(j.failed?' — '+j.failed+' fehlgeschlagen':'')),test&&!j.mailed?1:0);
+    }).catch(function(e){toast(e.message,1)});
+}
+
 function loadIcal(){
   fetch('api.php/ical/urls',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(j){
     if(!j||!j.buchungen)return;
