@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 26;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 27;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -229,6 +229,24 @@ function upgrade(PDO $p): void {
     /* Technik nicht mehr als "zweites Standbein"/"eigenes Gewerk" framen, sondern als Ergänzung */
     $p->prepare("update site_content set value=?, updated_at=? where key='tech_teaser'")
       ->execute(['{"title":"Lauschgift Veranstaltungstechnik","text":"Ton und Licht gehören für mich untrennbar zum DJ-Sein dazu – deshalb biete ich beides auch unabhängig voneinander an: Technik zum Mieten direkt aus meinem Lager in Hemer, oder mich als Techniker inklusive Equipment, ganz ohne Auflegen. Alle Details dazu auf der Technik-Seite."}', now()]);
+  } catch (PDOException $e) {}
+  if ($v < 27) try {
+    /* Erfundene Technik-/Ausstattungsdetails aus den Location-Texten entfernen (waren teils schlicht falsch,
+       z.B. "Holzdecke" bei Neuhaus oder Licht "am Wasser" bei Ufer 39, das 100m entfernt liegt) */
+    $safe = [
+      'Romantikhotel Neuhaus' => 'Vier-Sterne-Haus mit einem der schönsten Ballsäle der Region. Bis 150 Gäste, meist Hochzeiten und runde Geburtstage.',
+      'Ufer 39' => 'Restaurant direkt am Bodensee mit offener Seeterrasse. Bis 130 Gäste, vor allem Hochzeiten und Firmenfeiern.',
+      'Wirtshaus Krämer' => 'Rustikale Location mit viel Charakter. Bis 120 Gäste, Hochzeiten und Geburtstage.',
+      'Waldenburger Hafen am Biggesee' => 'Naturkulisse direkt am Biggesee, variabel indoor und outdoor. Vor allem Hochzeiten und Sommerfeste.',
+      'Gut Kump' => 'Historischer Gutshof mit drei unterschiedlichen Räumen: Festscheune, Saal und Gewölbekeller. Bis 150 Gäste, Hochzeiten und Geburtstage.',
+      'Danzturm' => 'Bekannte Eventlocation direkt in meiner Heimatstadt. Hochzeiten und Firmenfeiern.',
+      'Gut Bardenhagen' => 'Ehemaliges Trabergestüt mit hellem Arkadensaal für bis zu 200 Gäste und Außentrauungen auf weitläufigem Gelände. Vor allem Hochzeiten.',
+      'Stapelskotten' => 'Restaurant an der Aa mit gemütlichem Innenbereich und offener Wasserlage draußen. Hochzeiten, Geburtstage und Firmenfeiern.',
+      'Remise by Haus Delecke' => 'Modernisierte Remise, samstags exklusiv für eine Feier buchbar. Hochzeiten und Firmenfeiern.',
+      'Speisekammer' => 'Gemütliche Location mit warmer Atmosphäre, Platz für bis zu 80 Gäste. Hochzeiten, Geburtstage und Familienfeiern.',
+    ];
+    $upd = $p->prepare("update locations set description=? where name=?");
+    foreach ($safe as $name => $desc) $upd->execute([$desc, $name]);
   } catch (PDOException $e) {}
   if ($v < 23) try {
     $st = $p->query("select id, fields from form_templates where name like 'DJ-Vorauswahl%' limit 1");
@@ -604,28 +622,28 @@ function seed(PDO $p): void {
   foreach ($reviews as [$s,$author,$type,$text,$date])
     $ins('reviews', ['sort'=>$s,'author'=>$author,'event_type'=>$type,'text'=>$text,'rating'=>5,'source'=>'direkt','review_date'=>$date,'public'=>1]);
 
-  /* Lieblingslocations (Fakten aus der bisherigen Website, Texte neu formuliert) */
+  /* Lieblingslocations (nur Fakten, die sicher stimmen – keine erfundenen Technik-/Ausstattungsdetails) */
   $locs = [
     [1,'Romantikhotel Neuhaus','Iserlohn','Sauerland / NRW',
-      'Vier-Sterne-Haus mit einem der schönsten Ballsäle der Region – Holzdecke, warme Materialien, angeschlossener Skulpturengarten für die freie Trauung. Ich stimme die Anlage präzise auf den Saal ab und arbeite im Garten mit akkubetriebenem Licht, ganz ohne Kabel über die historischen Wege. Bis 150 Gäste, meist Hochzeiten und runde Geburtstage.', 'https://www.hotel-neuhaus.de'],
+      'Vier-Sterne-Haus mit einem der schönsten Ballsäle der Region. Bis 150 Gäste, meist Hochzeiten und runde Geburtstage.', 'https://www.hotel-neuhaus.de'],
     [2,'Ufer 39','Konstanz','Bodensee / Baden-Württemberg',
-      'Restaurant direkt am Bodensee mit offener Seeterrasse und zwei unterschiedlichen Räumen. Meine PA bespielt Terrasse und Innenraum gleichwertig, ohne die ruhige Seeatmosphäre zu überfordern, dazu mobiles Akku-Licht für warme Stimmung am Wasser. Bis 130 Gäste, vor allem Hochzeiten und Firmenfeiern.', 'https://ufer39.de'],
+      'Restaurant direkt am Bodensee mit offener Seeterrasse. Bis 130 Gäste, vor allem Hochzeiten und Firmenfeiern.', 'https://ufer39.de'],
     [3,'Wirtshaus Krämer','Dortmund','Ruhrgebiet / NRW',
-      'Rustikale Location mit Holzbalken und viel Charakter – die Stimmung entsteht hier fast von allein. Ich setze auf ein kompaktes, präzise abgestimmtes Setup statt einer überdimensionierten PA und akzentuiere mit Licht gezielt Holz und Struktur des Raums. Bis 120 Gäste, Hochzeiten und Geburtstage.', ''],
+      'Rustikale Location mit viel Charakter. Bis 120 Gäste, Hochzeiten und Geburtstage.', ''],
     [4,'Waldenburger Hafen am Biggesee','Attendorn','Sauerland / NRW',
-      'Naturkulisse direkt am Biggesee – Wasser, Bäume und Abendhimmel brauchen keine Inszenierung. Meine Seeburg-PA liefert auch im Freien vollen Sound, und die Akku-Leuchten kommen ganz ohne Kabeltrommeln aus. Variabel indoor und outdoor, vor allem Hochzeiten und Sommerfeste.', ''],
+      'Naturkulisse direkt am Biggesee, variabel indoor und outdoor. Vor allem Hochzeiten und Sommerfeste.', ''],
     [5,'Gut Kump','Hamm','Westfalen / NRW',
-      'Historischer Gutshof von 1298 mit drei völlig unterschiedlichen Räumen: Festscheune, Saal und Gewölbekeller. Ich stimme Boxenposition, Pegel und Licht für jeden Raum einzeln ab – im Gewölbekeller setzen meine Akku-Leuchten die historische Tiefe gezielt in Szene. Bis 150 Gäste, Hochzeiten und Geburtstage.', 'https://www.gut-kump.de'],
+      'Historischer Gutshof mit drei unterschiedlichen Räumen: Festscheune, Saal und Gewölbekeller. Bis 150 Gäste, Hochzeiten und Geburtstage.', 'https://www.gut-kump.de'],
     [6,'Danzturm','Iserlohn','Sauerland / NRW',
-      'Bekannte Eventlocation direkt in meiner Heimatstadt – industrieller Charakter, hohe Decken, klare Architektur. Ich kenne den Raum gut, dadurch entfällt das Einarbeiten vor Ort: präzise abgestimmter Sound plus Moving Heads und LED-Tubes, die die Optik betonen statt zu überdecken. Hochzeiten und Firmenfeiern.', ''],
+      'Bekannte Eventlocation direkt in meiner Heimatstadt. Hochzeiten und Firmenfeiern.', ''],
     [7,'Gut Bardenhagen','Bienenbüttel','Lüneburger Heide / Niedersachsen',
-      'Ehemaliges Trabergestüt auf 7,5 Hektar mit hellem Arkadensaal für bis zu 200 Gäste und Außentrauungen auf weitläufigem Gelände. Für diese Größe arbeite ich mit mehreren Beschallungspunkten und eigenem Sub-Setup, bei Außentrauungen mit akkubetriebenem Licht ohne Kabelwege über das Gelände. Vor allem Hochzeiten.', 'https://www.gut-bardenhagen.de'],
+      'Ehemaliges Trabergestüt mit hellem Arkadensaal für bis zu 200 Gäste und Außentrauungen auf weitläufigem Gelände. Vor allem Hochzeiten.', 'https://www.gut-bardenhagen.de'],
     [8,'Stapelskotten','Münster','Münsterland / NRW',
-      'Restaurant an der Aa mit gemütlichem Innenbereich und offener Wasserlage draußen. Ich stimme Innen- und Außenbeschallung aufeinander ab, damit der Wechsel zwischen beiden Bereichen nahtlos bleibt, und setze draußen auf kabelloses Akku-Licht. Hochzeiten, Geburtstage und Firmenfeiern.', 'https://www.stapelskotten.de'],
+      'Restaurant an der Aa mit gemütlichem Innenbereich und offener Wasserlage draußen. Hochzeiten, Geburtstage und Firmenfeiern.', 'https://www.stapelskotten.de'],
     [9,'Remise by Haus Delecke','Möhnesee','Sauerland / NRW',
-      'Modernisierte Remise aus Naturstein, Glas und Holz, samstags exklusiv für eine Feier buchbar. Mehrere kompakte Beschallungspunkte sorgen für gleichmäßigen Klang im ganzen Raum, mein kabelloses Licht setzt Naturstein und Holz gezielt in Szene. Hochzeiten und Firmenfeiern.', 'https://www.haus-delecke.de/remise/'],
+      'Modernisierte Remise, samstags exklusiv für eine Feier buchbar. Hochzeiten und Firmenfeiern.', 'https://www.haus-delecke.de/remise/'],
     [10,'Speisekammer','Dortmund','Ruhrgebiet / NRW',
-      'Farmhaus-Stil mit unbehandelten Oberflächen und sofort warmer Atmosphäre, Platz für bis zu 80 Gäste. Ich halte die Technik bewusst kompakt, damit sie sich in den Raum einfügt statt ihn zu erschlagen, und setze mit warmem Akzentlicht Holz und Struktur in Szene. Hochzeiten, Geburtstage und Familienfeiern.', 'https://www.speisekammer-dortmund.com'],
+      'Gemütliche Location mit warmer Atmosphäre, Platz für bis zu 80 Gäste. Hochzeiten, Geburtstage und Familienfeiern.', 'https://www.speisekammer-dortmund.com'],
   ];
   foreach ($locs as [$s,$name,$city,$region,$desc,$url])
     $ins('locations', ['sort'=>$s,'name'=>$name,'city'=>$city,'region'=>$region,'description'=>$desc,'website'=>$url,'public'=>1]);
