@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 33;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 34;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -41,7 +41,7 @@ const BOOL_COLS = [
   'workshop_events' => ['public'],
   'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
   'bookings' => ['review_requested','open_ended'],
-  'equipment' => ['public','rentable'],
+  'equipment' => ['public','rentable','own_rig'],
   'equipment_sets' => ['public'],
   'booking_equipment' => ['out_done','back_done'],
   'communications' => ['followup_done'],
@@ -280,6 +280,10 @@ function upgrade(PDO $p): void {
       on conflict(key) do update set value=excluded.value")
       ->execute([json_encode($defs, JSON_UNESCAPED_UNICODE)]);
   } catch (PDOException $e) {}
+  if ($v < 34) foreach ([
+    "alter table equipment add column thomann_url text",
+    "alter table equipment add column own_rig integer default 0",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -548,7 +552,8 @@ create table equipment (id text primary key, sort integer default 0, name text n
   day_rate real default 0, followup_pct integer default 50,
   tier_week_pct real, tier_2week_pct real, tier_month_pct real,
   qty_total integer default 1, rentable integer default 1, public integer default 1,
-  status text default 'aktiv', notes text, partner_rate real, addon_id text, created_at text);
+  status text default 'aktiv', notes text, partner_rate real, addon_id text,
+  thomann_url text, own_rig integer default 0, created_at text);
 create table equipment_sets (id text primary key, sort integer default 0,
   name text not null, description text, image_url text, image_focal text default '50% 50%',
   discount_pct real default 5, fixed_price real, public integer default 1, created_at text);
