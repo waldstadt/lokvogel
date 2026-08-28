@@ -8,7 +8,7 @@
 {"@context":"https://schema.org","@type":"LocalBusiness","name":"DJ Lauschgift",
 "description":"DJ für Hochzeiten, Geburtstage und Firmenfeiern – volle Tanzfläche ohne Schnickschnack. 23 Jahre Erfahrung, deutschlandweit im Einsatz.",
 "address":{"@type":"PostalAddress","streetAddress":"Büttmecker Weg 35c","postalCode":"58675","addressLocality":"Hemer","addressCountry":"DE"},
-"telephone":"+4915236439373","url":"https://lauschgift.net","priceRange":"ab 1.200 €",
+"telephone":"+4915236439373","url":"https://lauschgift.net",
 "areaServed":"Deutschland","founder":{"@type":"Person","name":"Markus Jankowski"}}
 </script>
 <meta name="description" content="DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer.">
@@ -195,7 +195,6 @@ footer a:hover{color:var(--acc)}
       <a href="#leistungen">Leistungen</a>
       <a href="#ablauf">So läuft's</a>
       <a href="#ueber">Über mich</a>
-      <a href="#preise">Preise</a>
       <a href="#faq">FAQ</a>
       <a href="technik.html" class="switch"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg> Veranstaltungstechnik</a>
       <a href="#anfrage" class="btn small">Anfragen</a>
@@ -217,7 +216,7 @@ footer a:hover{color:var(--acc)}
     <div class="badges">
       <div class="badge"><b>23</b><span>Jahre hinter den Decks</span></div>
       <div class="badge"><b>Plan B</b><span>immer inklusive</span></div>
-      <div class="badge"><b>DE-weit</b><span>unterwegs</span></div>
+      <div class="badge"><b>Seeburg</b><span>Premium-Sound</span></div>
     </div>
   </div>
 </header>
@@ -286,32 +285,13 @@ footer a:hover{color:var(--acc)}
   </div>
 </section>
 
-<section id="preise">
-  <div class="wrap">
-    <div class="reveal">
-      <div class="kicker">Preise</div>
-      <h2 id="priceTitle">Was kostet das?</h2>
-    </div>
-    <div class="price-strip reveal">
-      <div>
-        <h3>Eine Feier mit mir beginnt bei <span style="color:var(--acc)" id="priceFrom">1.200&nbsp;€</span></h3>
-        <p id="priceText">Ob Hochzeit, Geburtstag oder Firmenfeier, spielt für den Preis keine Rolle – bei mir zahlt niemand einen „Hochzeitsaufschlag“. Ich rechne nach Termin (Haupt- oder Nebensaison), Arbeitsstunden und Technikaufwand. Ihr bekommt ein individuelles Angebot mit klaren Posten, zugeschnitten auf eure Feier.</p>
-        <p id="priceNote" style="margin-top:12px;font-size:14px;color:var(--txt)"><span style="color:var(--acc);font-weight:600">Gut zu wissen:</span> Das gilt für klassische Abendveranstaltungen am Wochenende in der Hauptsaison. Tagsüber, montags bis donnerstags oder im November, Januar, Februar und März kalkuliere ich deutlich günstiger. Fragt einfach mit eurem Termin an.</p>
-      </div>
-      <a href="#anfrage" class="btn">Angebot anfragen</a>
-    </div>
-    <div class="ex-grid" id="exGrid"></div>
-    <p class="ex-note reveal">Wichtig: Das sind <b style="color:var(--txt)">Preisbeispiele aus echten Feiern</b>, damit ihr vorab einschätzen könnt, in welchem Bereich ihr unterwegs seid – keine festen Pakete. Euer Angebot wird immer individuell nach Stunden und Technikaufwand kalkuliert.</p>
-  </div>
-</section>
-
 <section id="garantie">
   <div class="wrap">
     <div class="price-strip reveal" style="background:linear-gradient(120deg,rgba(255,111,91,.06),transparent 55%),var(--card)">
       <div>
         <div class="kicker" style="margin-bottom:10px">Die Lauschgift-Garantie</div>
         <h3 id="gTitle">Schon ausgebucht? Ihr steht trotzdem nicht ohne DJ da.</h3>
-        <p id="gText">Wenn ich an eurem Termin keine Zeit habe – oder merke, dass ich nicht der richtige DJ für eure Feier bin – wähle ich persönlich bis zu fünf Kollegen aus meinem Partner-Netzwerk aus, die wirklich zu euch passen. Keine anonyme Liste: Ich kenne die Kollegen und ihre Stärken, und ihr bekommt die Vorschläge direkt von mir. Wichtig: Die Preise auf dieser Seite gelten nur für mich selbst – empfohlene Kollegen kalkulieren eigenständig. Und Transparenz gehört dazu: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision (Details in den AGB).</p>
+        <p id="gText">Wenn ich an eurem Termin keine Zeit habe – oder merke, dass ich nicht der richtige DJ für eure Feier bin – wähle ich persönlich bis zu fünf Kollegen aus meinem Partner-Netzwerk aus, die wirklich zu euch passen. Keine anonyme Liste: Ich kenne die Kollegen und ihre Stärken, und ihr bekommt die Vorschläge direkt von mir – auch günstigere Optionen sind dabei, falls euer Budget das erfordert. Und Transparenz gehört dazu: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision (Details in den AGB).</p>
       </div>
     </div>
   </div>
@@ -454,17 +434,6 @@ var FALLBACK={
   ]
 };
 var LEGAL={};
-var EXAMPLES=[
-  {title:'Hochzeit',scope:'Sektempfang bis offenes Ende, Ton für die freie Trauung, dezentes Licht',price:'ca. 1.550 €'},
-  {title:'Geburtstag',scope:'Abendparty ca. 6 Stunden, kompakte Ton- und Lichttechnik',price:'ca. 1.000 €'},
-  {title:'Firmenfeier',scope:'Empfang, Reden-Ton und Party bis Mitternacht',price:'ca. 1.350 €'}
-];
-function renderExamples(list){
-  document.getElementById('exGrid').innerHTML=list.map(function(e){
-    return '<div class="ex reveal vis"><div class="xk">Preisbeispiel</div><h4>'+esc(e.title)+'</h4><p>'+esc(e.scope||'')+'</p><div class="xp">'+esc(e.price)+' <small>je nach Umfang</small></div></div>';
-  }).join('');
-}
-renderExamples(EXAMPLES);
 
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
@@ -519,12 +488,6 @@ function applyContent(rows){
   if(c.services){
     if(c.services.title)document.getElementById('servTitle').textContent=c.services.title;
     if(c.services.text)document.getElementById('servText').textContent=c.services.text;
-  }
-  if(c.prices){
-    if(c.prices.from)document.getElementById('priceFrom').textContent=euro(c.prices.from);
-    if(c.prices.text)document.getElementById('priceText').textContent=c.prices.text;
-    if(c.prices.examples&&c.prices.examples.length)renderExamples(c.prices.examples);
-    if(c.prices.note)document.getElementById('priceNote').innerHTML='<span style="color:var(--acc);font-weight:600">Gut zu wissen:</span> '+esc(c.prices.note);
   }
   if(c.tech_teaser){
     if(c.tech_teaser.title)document.getElementById('rentTitle').textContent=c.tech_teaser.title;

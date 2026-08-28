@@ -415,14 +415,6 @@ th.num{text-align:right}
           <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">Hochladen</button></div>
           <label>Technik-Marken <span class="mut sml" style="text-transform:none;letter-spacing:0">(kommagetrennt, erscheinen als Text-Leiste unter „Über mich")</span></label><input id="cAboutGear" placeholder="z. B. Seeburg Acoustic Line, Sennheiser, Rane">
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('about')">Speichern</button></div></div>
-        <div class="card"><h3>Preise-Text</h3>
-          <label>„ab“-Preis (€)</label><input type="number" id="cPriceFrom">
-          <label>Text</label><textarea id="cPriceText"></textarea>
-          <label>Preisbeispiele (eine Zeile je Beispiel: Titel | Umfang | Preis)</label>
-          <textarea id="cPriceEx" style="min-height:70px" placeholder="Hochzeit | Sektempfang bis offenes Ende … | ca. 1.550 €"></textarea>
-          <label>„Gut zu wissen“-Hinweis (Sonderkonditionen tagsüber / unter der Woche)</label>
-          <textarea id="cPriceSp" style="min-height:60px"></textarea>
-          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('prices')">Speichern</button></div></div>
         <div class="card"><h3>Garantie / DJ-Vermittlung</h3>
           <label>Überschrift</label><input id="cGTitle">
           <label>Text</label><textarea id="cGText" style="min-height:90px"></textarea>
@@ -2086,10 +2078,6 @@ function renderCms(){
   document.getElementById('cAboutText').value=g('about','text');
   document.getElementById('cAboutImg').value=g('about','image');
   document.getElementById('cAboutGear').value=(g('about','gear')||[]).join(', ');
-  document.getElementById('cPriceFrom').value=g('prices','from');
-  document.getElementById('cPriceText').value=g('prices','text');
-  document.getElementById('cPriceEx').value=(g('prices','examples')||[]).map(function(e){return e.title+' | '+(e.scope||'')+' | '+e.price}).join('\n');
-  document.getElementById('cPriceSp').value=g('prices','note');
   document.getElementById('cCtPhone').value=g('contact','phone');
   document.getElementById('cCtMail').value=g('contact','email');
   document.getElementById('cCtAddr').value=g('contact','address');
@@ -2141,12 +2129,6 @@ function saveContent(key){
   if(key==='hero')val={title:'DJ Lauschgift',subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg')};
   if(key==='about')val={title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg'),
     gear:v('cAboutGear').split(',').map(function(s){return s.trim()}).filter(Boolean)};
-  if(key==='prices')val={title:'Preise',from:Number(v('cPriceFrom'))||null,text:v('cPriceText'),
-    examples:document.getElementById('cPriceEx').value.split('\n').map(function(l){
-      var p=l.split('|').map(function(s){return s.trim()});
-      return p[0]?{title:p[0],scope:p[1]||'',price:p[2]||''}:null;
-    }).filter(Boolean),
-    note:document.getElementById('cPriceSp').value.trim()};
   if(key==='contact')val={title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
   if(key==='seo')val={title:v('cSeoTitle'),description:v('cSeoDesc')};
   if(key==='guarantee')val={title:v('cGTitle'),text:v('cGText')};
