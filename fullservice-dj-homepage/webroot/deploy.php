@@ -24,7 +24,7 @@
 declare(strict_types=1);
 const DP_DATA = __DIR__ . '/data';
 const DP_CONF = DP_DATA . '/deploy.json';
-const DP_KEEP = ['data', 'uploads'];   // wird beim Update nie angefasst
+const DP_KEEP = ['data', 'uploads', 'img'];   // wird beim Update nie angefasst
 
 header('Content-Type: application/json; charset=utf-8');
 function dp_out(array $j, int $code = 200): never {

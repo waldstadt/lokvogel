@@ -132,6 +132,8 @@ nav.scrolled{border-bottom-color:var(--line)}
 /* RENTAL */
 #technik{background:var(--bg2)}
 .rent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:18px;margin-top:44px}
+.gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.gal-grid img{aspect-ratio:4/3;object-fit:cover;border-radius:14px;border:1px solid var(--line)}
 .rent{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;transition:border-color .25s}
 .rent:hover{border-color:rgba(255,111,91,.5)}
 .rent .ri{aspect-ratio:4/3;background:var(--bg) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--mut2);font-size:32px}
@@ -258,6 +260,16 @@ footer a:hover{color:var(--acc)}
         <div id="aboutGear" style="display:flex;flex-wrap:wrap;gap:10px"></div>
       </div>
     </div>
+  </div>
+</section>
+
+<section id="galerie" style="display:none">
+  <div class="wrap">
+    <div class="reveal vis">
+      <div class="kicker">Eindrücke</div>
+      <h2 id="galTitle">So sieht's bei mir aus</h2>
+    </div>
+    <div class="gal-grid" id="galGrid" style="margin-top:44px"></div>
   </div>
 </section>
 
@@ -550,6 +562,13 @@ function applyContent(rows){
     if(c.reviews.djbande_url)links+='<a href="'+esc(c.reviews.djbande_url)+'" target="_blank" rel="noopener">★ Bewertungen bei meiner Partner-Agentur ↗</a>';
     document.getElementById('revLinks').innerHTML=links;
     if(links)document.getElementById('bewertungen').style.display='';
+  }
+  if(c.gallery&&c.gallery.images&&c.gallery.images.length){
+    if(c.gallery.title)document.getElementById('galTitle').textContent=c.gallery.title;
+    document.getElementById('galGrid').innerHTML=c.gallery.images.map(function(src){
+      return '<img src="'+esc(src)+'" alt="" loading="lazy" onerror="this.closest(\'.gal-grid\').removeChild(this)">';
+    }).join('');
+    document.getElementById('galerie').style.display='';
   }
   if(c.seo){
     if(c.seo.title)document.title=c.seo.title;

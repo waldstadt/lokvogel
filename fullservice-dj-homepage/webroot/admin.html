@@ -455,6 +455,12 @@ th.num{text-align:right}
           <div style="margin:10px 0"><button class="btn sm" onclick="saveContent('reviews')">Links speichern</button></div>
           <div id="revAdminList" class="sml"></div>
           <div class="mut sml" style="margin-top:8px">Tipp: Bewertungen wörtlich mit Name nur übernehmen, wenn der Kunde zugestimmt hat – sonst kürzen/anonymisieren (z. B. „Lisa H.“).</div></div>
+        <div class="card"><h3>Foto-Galerie <span class="mut sml" style="font-weight:400">— erscheint auf der Startseite unter „Über mich"</span></h3>
+          <label>Überschrift</label><input id="cGalTitle">
+          <label>Bildpfade <span class="mut sml" style="text-transform:none;letter-spacing:0">(eine Datei pro Zeile, z. B. img/foto1.jpg oder uploads/foto1.jpg)</span></label>
+          <textarea id="cGalImgs" style="min-height:110px" placeholder="img/IMG_4061.png
+img/spiegelkugel mittig.jpg"></textarea>
+          <div style="margin-top:10px"><button class="btn sm" onclick="saveGallery()">Galerie speichern</button></div></div>
         <div class="card"><h3>SEO</h3>
           <label>Seitentitel</label><input id="cSeoTitle">
           <label>Beschreibung</label><textarea id="cSeoDesc" style="min-height:46px"></textarea>
@@ -2100,6 +2106,8 @@ function renderCms(){
   document.getElementById('cRevGoogle').value=g('reviews','google_url');
   document.getElementById('cRevBande').value=g('reviews','djbande_url');
   document.getElementById('cRevTagline').value=g('reviews','tagline');
+  document.getElementById('cGalTitle').value=g('gallery','title')||"So sieht's bei mir aus";
+  document.getElementById('cGalImgs').value=(g('gallery','images')||[]).join('\n');
   renderRevAdmin();
   document.getElementById('cLegImp').value=g('legal','impressum');
   document.getElementById('cLegDs').value=g('legal','datenschutz');
@@ -2119,6 +2127,10 @@ function pickTheme(name){
   document.getElementById('thBg').value=t.bg;
   CACHE.content.theme=CACHE.content.theme||{};CACHE.content.theme.preset=name;
   document.querySelectorAll('.theme-sw').forEach(function(el){el.classList.toggle('sel',el.title===name)});
+}
+function saveGallery(){
+  var imgs=v('cGalImgs').split('\n').map(function(s){return s.trim()}).filter(Boolean);
+  upsertContent('gallery',{title:v('cGalTitle'),images:imgs});
 }
 function saveTheme(){
   var val={preset:(CACHE.content.theme&&CACHE.content.theme.preset)||'custom',primary:v('thPrimary'),bg:v('thBg'),font:v('thFont')};
