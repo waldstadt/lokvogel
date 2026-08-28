@@ -23,6 +23,21 @@ mit übernehmen.
   ausreichende Größen und Zeilenabstand; Zierschriften höchstens für
   Überschriften und dann als wählbarer Stil.
 
+## Lesbarkeit & Kontrast
+
+- Jede Seite muss WCAG-AA-Kontrast einhalten: Fließtext/Buttons mind.
+  **4,5:1**, große/fette Schrift (≥ 18px bzw. ≥ 14px fett) mind. **3:1**
+  gegen ihren Hintergrund. Bei neuen Farben/Themes und vor jedem
+  größeren Release die Kontrastwerte der zentralen Farbpaare rechnerisch
+  prüfen (relative Luminanz, nicht nur nach Augenmaß), nicht nur einzelne
+  Stellen — CSS-Spezifitäts-Konflikte (z. B. eine allgemeinere Regel wie
+  `.nav-links a` schlägt eine speziellere wie `.btn`) haben schon einmal
+  einen ganzen Button unlesbar gemacht, ohne dass es im Code offensichtlich
+  war.
+- Schwache/graue Sekundärfarben (Zeitangaben, Fußzeile, Hinweistexte)
+  trotzdem auf 4,5:1 gegen ihren jeweiligen Hintergrund prüfen — „bewusst
+  gedämpft" ist kein Freibrief für zu wenig Kontrast.
+
 ## Texte
 
 - Ton: persönlich, locker, professionell — Prüffrage: „Würde Markus das
