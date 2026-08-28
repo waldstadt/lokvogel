@@ -253,6 +253,10 @@ footer a:hover{color:var(--acc)}
       <div class="kicker">Über mich</div>
       <h2 id="aboutTitle">Musik ist mein Ding. Der Mittelpunkt gehört euch.</h2>
       <p class="lead" id="aboutText">Nach 23 Jahren hinter den Decks ist jede Feier immer noch anders – und genau das macht es aus. Ich bin kein DJ, der sich selbst inszeniert: Ich lese den Raum, spiele den richtigen Song zur richtigen Zeit und bleibe den ganzen Abend ansprechbar für euch und eure Gäste. Und weil ich ein echter Technik-Mensch bin, stehen Ton und Licht bei mir auf einem Niveau, das man sonst von deutlich größeren Produktionen kennt.</p>
+      <div id="aboutGearWrap" style="display:none;margin-top:26px">
+        <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut2);margin-bottom:10px;font-weight:600">Meine Technik</div>
+        <div id="aboutGear" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+      </div>
     </div>
   </div>
 </section>
@@ -492,6 +496,12 @@ function applyContent(rows){
     if(c.about.text)document.getElementById('aboutText').textContent=c.about.text;
     if(c.about.image){document.getElementById('aboutImg').style.backgroundImage='url("'+c.about.image+'")';
       document.getElementById('aboutPh').style.display='none'}
+    if(c.about.gear&&c.about.gear.length){
+      document.getElementById('aboutGear').innerHTML=c.about.gear.map(function(g){
+        return '<span style="font-size:13px;border:1px solid var(--line);border-radius:20px;padding:6px 14px;color:var(--mut)">'+esc(g)+'</span>';
+      }).join('');
+      document.getElementById('aboutGearWrap').style.display='';
+    }
   }
   if(c.services){
     if(c.services.title)document.getElementById('servTitle').textContent=c.services.title;

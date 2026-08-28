@@ -413,6 +413,7 @@ th.num{text-align:right}
           <label>Überschrift</label><input id="cAboutTitle">
           <label>Text</label><textarea id="cAboutText" style="min-height:110px"></textarea>
           <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">Hochladen</button></div>
+          <label>Technik-Marken <span class="mut sml" style="text-transform:none;letter-spacing:0">(kommagetrennt, erscheinen als Text-Leiste unter „Über mich")</span></label><input id="cAboutGear" placeholder="z. B. Seeburg Acoustic Line, Sennheiser, Rane">
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('about')">Speichern</button></div></div>
         <div class="card"><h3>Preise-Text</h3>
           <label>„ab“-Preis (€)</label><input type="number" id="cPriceFrom">
@@ -2078,6 +2079,7 @@ function renderCms(){
   document.getElementById('cAboutTitle').value=g('about','title');
   document.getElementById('cAboutText').value=g('about','text');
   document.getElementById('cAboutImg').value=g('about','image');
+  document.getElementById('cAboutGear').value=(g('about','gear')||[]).join(', ');
   document.getElementById('cPriceFrom').value=g('prices','from');
   document.getElementById('cPriceText').value=g('prices','text');
   document.getElementById('cPriceEx').value=(g('prices','examples')||[]).map(function(e){return e.title+' | '+(e.scope||'')+' | '+e.price}).join('\n');
@@ -2125,7 +2127,8 @@ function saveTheme(){
 function saveContent(key){
   var val;
   if(key==='hero')val={title:'DJ Lauschgift',subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg')};
-  if(key==='about')val={title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg')};
+  if(key==='about')val={title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg'),
+    gear:v('cAboutGear').split(',').map(function(s){return s.trim()}).filter(Boolean)};
   if(key==='prices')val={title:'Preise',from:Number(v('cPriceFrom'))||null,text:v('cPriceText'),
     examples:document.getElementById('cPriceEx').value.split('\n').map(function(l){
       var p=l.split('|').map(function(s){return s.trim()});
