@@ -1088,12 +1088,23 @@ function renderBe(){
     }).join('')+'</tbody></table>'):'Keine Technik zugeordnet.';
 }
 function rentDays(b){
+  if(b.billable_days)return Math.max(1,Number(b.billable_days));
   if(!b.end_date||b.end_date<=b.event_date)return 1;
   return Math.round((new Date(b.end_date)-new Date(b.event_date))/86400000)+1;
 }
 function rentPrice(eq,b){
-  var days=rentDays(b),base=Number(eq.day_rate)||0;
-  return base+(days-1)*base*(Number(eq.followup_pct||50)/100);
+  var days=rentDays(b),base=Number(eq.day_rate)||0,defs=(S.defaults||{});
+  var followupPct=Number(eq.followup_pct!=null?eq.followup_pct:50);
+  var weekPct=Number(eq.tier_week_pct!=null?eq.tier_week_pct:(defs.tier_week_pct!=null?defs.tier_week_pct:30));
+  var twoWeekPct=Number(eq.tier_2week_pct!=null?eq.tier_2week_pct:(defs.tier_2week_pct!=null?defs.tier_2week_pct:20));
+  var monthPct=Number(eq.tier_month_pct!=null?eq.tier_month_pct:(defs.tier_month_pct!=null?defs.tier_month_pct:12));
+  if(days<=1)return base;
+  var total=base;
+  total+=(Math.min(days,7)-1)*base*followupPct/100;
+  if(days>=8)total+=(Math.min(days,14)-7)*base*weekPct/100;
+  if(days>=15)total+=(Math.min(days,30)-14)*base*twoWeekPct/100;
+  if(days>=31)total+=(days-30)*base*monthPct/100;
+  return total;
 }
 function eqAvailable(eqId,b,excludeBeId){
   var eq=CACHE.equipment.find(function(e){return e.id===eqId});if(!eq)return 0;
@@ -1148,6 +1159,8 @@ function openBookModal(b,presetCust){
     '<div><label>Ende (Verleih)</label><input type="date" id="bEnd" value="'+(b.end_date||'')+'"></div>'+
     '<div><label>Beginn</label><input type="time" id="bStart" value="'+(b.start_time||'')+'"></div>'+
     '<div><label>Ende</label><input type="time" id="bTend" value="'+(b.end_time||'')+'"></div></div>'+
+    '<div class="grid2"><div><label>Miettage (Abrechnung)</label><input type="number" min="1" id="bBillDays" value="'+(b.billable_days||'')+'" placeholder="leer = automatisch aus Abholung/Rückgabe"></div>'+
+    '<div class="mut sml" style="align-self:end;padding-bottom:10px">Abholung/Rückgabe sind der Verleihzeitraum für die Verfügbarkeit – wenn ihr abweichend davon nur weniger Tage berechnet (z. B. Freund holt Freitag ab, bringt erst Mittwoch zurück, 1 Miettag berechnet), hier eintragen.</div></div>'+
     '<div class="grid3"><div><label>Location</label><input id="bVenue" value="'+esc(b.venue_name||'')+'"></div>'+
     '<div><label>Adresse</label><input id="bAddr" value="'+esc(b.venue_address||'')+'"></div>'+
     '<div><label>Gäste</label><input type="number" id="bGuests" value="'+(b.guests||'')+'"></div></div>'+
@@ -1163,7 +1176,8 @@ function saveBook(id){
   var body={customer_id:v('bCust'),status:v('bStatus'),kind:v('bKind'),event_type:v('bType'),title:v('bTitle'),
     event_date:v('bDate'),end_date:v('bEnd')||null,start_time:v('bStart')||null,end_time:v('bTend')||null,
     venue_name:v('bVenue'),venue_address:v('bAddr'),guests:v('bGuests')?Number(v('bGuests')):null,
-    fee_net:v('bFee')?Number(v('bFee')):null,notes:v('bNotes')};
+    fee_net:v('bFee')?Number(v('bFee')):null,notes:v('bNotes'),
+    billable_days:v('bBillDays')?Number(v('bBillDays')):null};
   (id?api('bookings?id=eq.'+id,{method:'PATCH',body:body}):api('bookings',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');loadAll();if(id)setTimeout(function(){openBookDetail(id)},400)})
     .catch(function(e){toast(e.message,1)});

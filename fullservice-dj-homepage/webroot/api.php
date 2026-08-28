@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 30;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 31;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -278,6 +278,9 @@ function upgrade(PDO $p): void {
     $p->prepare("insert into settings (key,value) values ('defaults',?)
       on conflict(key) do update set value=excluded.value")
       ->execute([json_encode($defs, JSON_UNESCAPED_UNICODE)]);
+  } catch (PDOException $e) {}
+  if ($v < 31) try {
+    $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
   if ($v < 23) try {
     $st = $p->query("select id, fields from form_templates where name like 'DJ-Vorauswahl%' limit 1");
@@ -533,7 +536,7 @@ create table bookings (id text primary key,
   status text default 'anfrage', kind text default 'dj', event_type text, title text,
   event_date text not null, end_date text, start_time text, end_time text,
   venue_name text, venue_address text, guests integer, fee_net real, notes text, rider text, customer_notes text,
-  review_requested integer default 0, created_at text, updated_at text);
+  billable_days integer, review_requested integer default 0, created_at text, updated_at text);
 create table booking_equipment (id text primary key,
   booking_id text not null references bookings(id) on delete cascade,
   equipment_id text not null references equipment(id) on delete restrict,
@@ -1119,7 +1122,11 @@ function portalRental(string $token, string $plz): array {
   }
   return $r;
 }
+/* Abholung/Rückgabe (event_date/end_date) sind der Verleihzeitraum für die Verfügbarkeitsprüfung -
+   das sind nicht zwangsläufig die abgerechneten Miettage (z.B. Freund holt Freitag ab, bringt erst
+   Mittwoch zurück, berechnet wird trotzdem nur ein Miettag). billable_days überschreibt das, wenn gesetzt. */
 function rentalDays(array $b): int {
+  if (!empty($b['billable_days'])) return max(1, (int)$b['billable_days']);
   if (empty($b['end_date']) || $b['end_date'] <= $b['event_date']) return 1;
   return (int)round((strtotime($b['end_date']) - strtotime($b['event_date'])) / 86400) + 1;
 }
