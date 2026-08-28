@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 29;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 30;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -265,6 +265,20 @@ function upgrade(PDO $p): void {
     /* Bestehende Locations ohne Foto haben nichts zu verstecken - erst neu gesetzte externe Fotos brauchen die Freigabe */
     $p->exec("update locations set image_source='eigen' where image_source is null");
   } catch (PDOException $e) {}
+  if ($v < 30) foreach ([
+    "alter table equipment add column tier_week_pct real",
+    "alter table equipment add column tier_2week_pct real",
+    "alter table equipment add column tier_month_pct real",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
+  if ($v < 30) try {
+    /* Globale Rabattstaffel-Standardwerte in die bestehenden Einstellungen einmischen, ohne Vorhandenes zu überschreiben */
+    $st = $p->query("select value from settings where key='defaults'");
+    $defs = json_decode((string)$st->fetchColumn() ?: '{}', true) ?: [];
+    $defs += ['tier_week_pct' => 30, 'tier_2week_pct' => 20, 'tier_month_pct' => 12];
+    $p->prepare("insert into settings (key,value) values ('defaults',?)
+      on conflict(key) do update set value=excluded.value")
+      ->execute([json_encode($defs, JSON_UNESCAPED_UNICODE)]);
+  } catch (PDOException $e) {}
   if ($v < 23) try {
     $st = $p->query("select id, fields from form_templates where name like 'DJ-Vorauswahl%' limit 1");
     if ($row = $st->fetch()) {
@@ -495,6 +509,7 @@ create table faq (id text primary key, sort integer default 0, question text not
   answer text not null, public integer default 1);
 create table equipment (id text primary key, sort integer default 0, name text not null, slug text,
   category text, description text, image_url text, day_rate real default 0, followup_pct integer default 50,
+  tier_week_pct real, tier_2week_pct real, tier_month_pct real,
   qty_total integer default 1, rentable integer default 1, public integer default 1,
   status text default 'aktiv', notes text, partner_rate real, addon_id text, created_at text);
 create table locations (id text primary key, sort integer default 0, name text not null,
@@ -1108,16 +1123,53 @@ function rentalDays(array $b): int {
   if (empty($b['end_date']) || $b['end_date'] <= $b['event_date']) return 1;
   return (int)round((strtotime($b['end_date']) - strtotime($b['event_date'])) / 86400) + 1;
 }
+/* Gestaffelter Mietpreis: Tag 1 voll, Tag 2-7 zu $followupPct, Tag 8-14 zu $weekPct,
+   Tag 15-30 zu $twoWeekPct, ab Tag 31 zu $monthPct (jeweils % vom Tagespreis $rate). */
+function rentalPrice(float $rate, int $days, float $followupPct, float $weekPct, float $twoWeekPct, float $monthPct): float {
+  if ($days <= 1) return $rate;
+  $total = $rate;
+  $total += (min($days, 7) - 1) * $rate * $followupPct / 100;
+  if ($days >= 8)  $total += (min($days, 14) - 7)  * $rate * $weekPct / 100;
+  if ($days >= 15) $total += (min($days, 30) - 14) * $rate * $twoWeekPct / 100;
+  if ($days >= 31) $total += ($days - 30) * $rate * $monthPct / 100;
+  return $total;
+}
+/* Verfügbarkeit eines Artikels im Zeitraum (gegen alle nicht stornierten Buchungen). null = Artikel nicht gefunden/nicht mietbar. */
+function equipmentAvailability(PDO $p, string $eq, string $from, string $to): ?array {
+  $st = $p->prepare("select qty_total from equipment where id=? and public=1 and status='aktiv'");
+  $st->execute([$eq]);
+  $total = $st->fetchColumn();
+  if ($total === false) return null;
+  $st = $p->prepare("select coalesce(sum(be.qty),0) from booking_equipment be
+    join bookings b on b.id = be.booking_id
+    where be.equipment_id = ? and b.status != 'storniert'
+      and b.event_date <= ? and coalesce(b.end_date, b.event_date) >= ?");
+  $st->execute([$eq, $to, $from]);
+  $used = (int)$st->fetchColumn();
+  return ['total' => (int)$total, 'available' => max(0, (int)$total - $used)];
+}
+function rentalTierDefaults(PDO $p): array {
+  $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
+  return [
+    'week' => (float)($defs['tier_week_pct'] ?? 30),
+    'twoweek' => (float)($defs['tier_2week_pct'] ?? 20),
+    'month' => (float)($defs['tier_month_pct'] ?? 12),
+  ];
+}
 function rentalItems(PDO $p, array $b): array {
   $days = rentalDays($b);
-  $st = $p->prepare('select be.qty, be.price_override, e.name, e.day_rate, e.followup_pct
+  $tiers = rentalTierDefaults($p);
+  $st = $p->prepare('select be.qty, be.price_override, e.name, e.day_rate, e.followup_pct,
+      e.tier_week_pct, e.tier_2week_pct, e.tier_month_pct
     from booking_equipment be join equipment e on e.id = be.equipment_id where be.booking_id = ?');
   $st->execute([$b['booking_id']]);
   $items = [];
   foreach ($st->fetchAll() as $x) {
     $base = (float)($x['day_rate'] ?? 0);
     $price = $x['price_override'] !== null ? (float)$x['price_override']
-      : ($base + ($days - 1) * $base * ((float)($x['followup_pct'] ?? 50) / 100)) * (int)$x['qty'];
+      : rentalPrice($base, $days, (float)($x['followup_pct'] ?? 50),
+          (float)($x['tier_week_pct'] ?? $tiers['week']), (float)($x['tier_2week_pct'] ?? $tiers['twoweek']), (float)($x['tier_month_pct'] ?? $tiers['month'])
+        ) * (int)$x['qty'];
     $items[] = ['name' => $x['name'], 'qty' => (int)$x['qty'], 'price' => round($price, 2)];
   }
   return $items;
@@ -1433,6 +1485,40 @@ function handlePortal(string $path, string $method, $body): never {
     $c = $st->fetch();
     if (!$c || !password_verify($pass, (string)$c['portal_hash'])) { usleep(500000); fail('E-Mail oder Passwort falsch.', 401); }
     out(['token' => custToken($p, $c['id']), 'name' => trim(($c['company'] ?: trim($c['first_name'] . ' ' . $c['last_name'])))]);
+  }
+  /* Selbstregistrierung für den Mietpark-Warenkorb – Konto ist sofort nutzbar,
+     eine Partner-Anmeldung (optional) durchläuft weiter die manuelle Freischaltung. */
+  if ($path === 'portal/account/register' && $method === 'POST') {
+    $name = trim((string)($body['name'] ?? ''));
+    $email = strtolower(trim((string)($body['email'] ?? '')));
+    $pass = (string)($body['password'] ?? '');
+    if ($name === '' || $email === '') fail('Name und E-Mail erforderlich.');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) fail('Bitte eine gültige E-Mail-Adresse angeben.');
+    if (strlen($pass) < 8) fail('Passwort bitte mit mindestens 8 Zeichen.');
+    $st = $p->prepare('select id, portal_hash from customers where lower(email) = ?');
+    $st->execute([$email]);
+    $existing = $st->fetch();
+    if ($existing && $existing['portal_hash'] !== null) fail('Für diese E-Mail existiert bereits ein Konto – bitte einloggen.', 409);
+    $parts = preg_split('/\s+/', $name, 2);
+    $first = $parts[0]; $last = $parts[1] ?? '';
+    $phone = mb_substr(trim((string)($body['phone'] ?? '')), 0, 60);
+    $hash = password_hash($pass, PASSWORD_DEFAULT);
+    if ($existing) {
+      $custId = $existing['id'];
+      $p->prepare('update customers set first_name=?, last_name=?, phone=?, portal_hash=?, updated_at=? where id=?')
+        ->execute([$first, $last, $phone, $hash, now(), $custId]);
+    } else {
+      $custId = uuid();
+      $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, phone, portal_hash, source, created_at, updated_at)
+        values (?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([$custId, 'privat', 'kunde', $first, $last, mb_substr($email,0,160), $phone, $hash, 'mietpark', now(), now()]);
+    }
+    if (!empty($body['partner_interest'])) {
+      $kind = in_array($body['partner_kind'] ?? '', ['dj','band','musiker']) ? $body['partner_kind'] : 'dj';
+      $p->prepare('insert into partners (id,name,company,kind,email,phone,status,created_at) values (?,?,?,?,?,?,?,?)')
+        ->execute([uuid(), mb_substr($name,0,120), '', $kind, mb_substr($email,0,160), $phone, 'beantragt', now()]);
+    }
+    out(['token' => custToken($p, $custId), 'name' => $name], 201);
   }
   if ($path === 'portal/account/set_password' && $method === 'POST') {
     $inv = (string)($body['invite'] ?? '');
@@ -1767,17 +1853,59 @@ function handlePortal(string $path, string $method, $body): never {
     $eq = (string)($_GET['eq'] ?? ''); $from = (string)($_GET['from'] ?? ''); $to = (string)($_GET['to'] ?? '');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) fail('Zeitraum fehlt.');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) $to = $from;
-    $st = $p->prepare("select qty_total from equipment where id=? and public=1 and status='aktiv'");
-    $st->execute([$eq]);
-    $total = $st->fetchColumn();
-    if ($total === false) fail('Artikel nicht gefunden.', 404);
-    $st = $p->prepare("select coalesce(sum(be.qty),0) from booking_equipment be
-      join bookings b on b.id = be.booking_id
-      where be.equipment_id = ? and b.status != 'storniert'
-        and b.event_date <= ? and coalesce(b.end_date, b.event_date) >= ?");
-    $st->execute([$eq, $to, $from]);
-    $used = (int)$st->fetchColumn();
-    out(['total' => (int)$total, 'available' => max(0, (int)$total - $used)]);
+    $av = equipmentAvailability($p, $eq, $from, $to);
+    if ($av === null) fail('Artikel nicht gefunden.', 404);
+    out($av);
+  }
+  /* Warenkorb: eingeloggter Kunde bucht mehrere Artikel für einen Zeitraum als Miet-Anfrage.
+     Legt eine normale bookings-Zeile (kind='miete') + booking_equipment-Zeilen an, damit sie
+     in der bestehenden Buchungs-Ansicht in admin.html ohne neue Oberfläche auftaucht. */
+  if ($path === 'portal/cart/submit' && $method === 'POST') {
+    $me = custAuth();
+    if (!$me) fail('Bitte zuerst einloggen oder registrieren.', 401);
+    $from = (string)($body['from'] ?? ''); $to = (string)($body['to'] ?? '');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) fail('Zeitraum fehlt.');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) $to = $from;
+    $cart = is_array($body['items'] ?? null) ? $body['items'] : [];
+    if (!$cart) fail('Der Warenkorb ist leer.');
+    /* Partnerpreis gilt nur für freigeschaltete DJ-/Band-/Musiker-Partner, nicht für Techniker-Partner */
+    $st = $p->prepare("select 1 from partners where lower(email)=lower(?) and status='freigeschaltet' and kind in ('dj','band','musiker') limit 1");
+    $st->execute([(string)$me['email']]);
+    $isPartner = (bool)$st->fetchColumn();
+    $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
+    $partnerPct = (float)($defs['partner_discount_pct'] ?? 20);
+    $tiers = rentalTierDefaults($p);
+    $days = rentalDays(['event_date' => $from, 'end_date' => $to]);
+    $lines = []; $total = 0.0;
+    foreach ($cart as $it) {
+      $eqId = (string)($it['equipment_id'] ?? ''); $qty = max(1, (int)($it['qty'] ?? 1));
+      $st = $p->prepare("select * from equipment where id=? and public=1 and status='aktiv'");
+      $st->execute([$eqId]);
+      $eq = $st->fetch();
+      if (!$eq) fail('Ein Artikel im Warenkorb ist nicht mehr verfügbar.', 404);
+      $av = equipmentAvailability($p, $eqId, $from, $to);
+      if ($av === null || $av['available'] < $qty) fail('„' . $eq['name'] . '" ist im gewünschten Zeitraum nicht in ausreichender Stückzahl verfügbar.', 409);
+      $rate = $isPartner ? (float)($eq['partner_rate'] ?? ((float)$eq['day_rate'] * (1 - $partnerPct / 100))) : (float)$eq['day_rate'];
+      $price = rentalPrice($rate, $days, (float)($eq['followup_pct'] ?? 50),
+        (float)($eq['tier_week_pct'] ?? $tiers['week']), (float)($eq['tier_2week_pct'] ?? $tiers['twoweek']), (float)($eq['tier_month_pct'] ?? $tiers['month'])
+      ) * $qty;
+      $price = round($price, 2);
+      $total += $price;
+      $lines[] = ['equipment_id' => $eqId, 'name' => $eq['name'], 'qty' => $qty, 'price' => $price];
+    }
+    $bookingId = uuid();
+    $p->prepare("insert into bookings (id, customer_id, status, kind, event_type, title, event_date, end_date, notes, created_at, updated_at)
+      values (?,?,?,?,?,?,?,?,?,?,?)")
+      ->execute([$bookingId, $me['id'], 'anfrage', 'technik', 'Technik-Miete', null, $from, $to,
+        mb_substr(trim((string)($body['notes'] ?? '')), 0, 2000), now(), now()]);
+    $insLine = $p->prepare('insert into booking_equipment (id, booking_id, equipment_id, qty, price_override) values (?,?,?,?,?)');
+    foreach ($lines as $l) $insLine->execute([uuid(), $bookingId, $l['equipment_id'], $l['qty'], $l['price']]);
+    $custName = trim(($me['company'] ?: trim($me['first_name'] . ' ' . $me['last_name'])));
+    notifyOwner('Neue Miet-Anfrage: ' . $custName,
+      "Zeitraum: $from" . ($to !== $from ? " bis $to" : '') . "\n\n" .
+      implode("\n", array_map(fn($l) => '- ' . $l['name'] . ' × ' . $l['qty'] . ' = ' . number_format($l['price'], 2, ',', '.') . ' €', $lines)) .
+      "\n\nGesamt (netto): " . number_format($total, 2, ',', '.') . " €" . ($isPartner ? "\n(Partnerpreis angewendet)" : ''));
+    out(['ok' => true, 'booking_id' => $bookingId, 'items' => $lines, 'total' => round($total, 2), 'partner' => $isPartner], 201);
   }
   /* Newsletter: Anmeldung mit Double-Opt-in, Bestätigung und Ein-Klick-Abmeldung */
   if ($path === 'portal/newsletter' && $method === 'POST') {

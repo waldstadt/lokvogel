@@ -234,7 +234,18 @@ footer a:hover{color:var(--acc)}
       <span class="sub" id="partnerBadge"></span>
     </div>
     <div class="rent-grid" id="rentGrid"></div>
-    <p class="rent-note">Alle Preise netto pro Miettag. Zeitraum oben eingeben und die Verfügbarkeit direkt prüfen – oder einfach kurz anfragen.</p>
+    <p class="rent-note">Alle Preise netto. Ab 1 Woche, 2 Wochen und 1 Monat gelten automatisch günstigere Tagessätze – die Staffel-Gesamtsumme seht ihr live im Warenkorb.</p>
+
+    <div id="cartBox" style="display:none;margin-top:36px;background:var(--card);border:1px solid var(--acc);border-radius:14px;padding:26px 24px;max-width:560px">
+      <h3 style="font-size:19px;margin-bottom:14px">Warenkorb</h3>
+      <div id="cartItems"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:15px">
+        <span>Gesamt (netto, für den gewählten Zeitraum)</span><b id="cartTotal" style="font-size:19px"></b>
+      </div>
+      <div id="cartAuth" style="margin-top:18px"></div>
+      <div class="msg" id="cartMsg" style="display:none;margin-top:14px"></div>
+      <div style="margin-top:14px"><button class="btn" id="cartSubmitBtn" onclick="submitCart()">Anfrage abschicken</button></div>
+    </div>
   </div>
 </section>
 
@@ -339,27 +350,14 @@ footer a:hover{color:var(--acc)}
     <div class="reveal">
       <div class="kicker">Für Kollegen</div>
       <h2>DJs, Bands &amp; Musiker mieten günstiger</h2>
-      <p class="lead">Du stehst selbst auf der Bühne oder hinter den Decks? Dann registriere dich einmalig als Miet-Partner – nach der Freischaltung bekommst du einen Partner-Code und siehst hier deine vergünstigten Preise.</p>
+      <p class="lead">Du stehst selbst auf der Bühne oder hinter den Decks? Als Miet-Partner bekommst du vergünstigte Preise im Mietpark. Die Partner-Registrierung läuft künftig direkt über die Buchung – hast du schon einen Partner-Code, gib ihn hier ein.</p>
     </div>
-    <div class="duo">
-      <div class="card reveal">
-        <h3>Partner werden</h3>
-        <div class="msg" id="pMsg"></div>
-        <label>Name *</label><input id="pName">
-        <label>Ich bin …</label><select id="pKind"><option value="dj">DJ</option><option value="band">Band</option><option value="musiker">Musiker:in</option><option value="techniker">Techniker:in</option></select>
-        <label>Firma / Künstlername</label><input id="pCompany">
-        <label>E-Mail *</label><input id="pEmail" type="email">
-        <label>Telefon</label><input id="pPhone">
-        <div style="margin-top:14px"><button class="btn" id="pBtn" onclick="registerPartner()">Registrierung absenden</button></div>
-        <p style="font-size:12px;color:var(--mut2);margin-top:10px">Ich prüfe jede Anfrage persönlich und melde mich mit deinem Partner-Code.</p>
-      </div>
-      <div class="card reveal">
-        <h3>Schon Partner? Code eingeben</h3>
-        <div class="msg" id="cMsg"></div>
-        <label>Partner-Code</label><input id="pCode" placeholder="z. B. 4F9A2B77" style="text-transform:uppercase">
-        <div style="margin-top:14px"><button class="btn g" onclick="checkPartner()">Partnerpreise anzeigen</button></div>
-        <p style="font-size:12px;color:var(--mut2);margin-top:10px">Mit gültigem Code werden oben im Mietpark automatisch deine vergünstigten Partnerpreise angezeigt.</p>
-      </div>
+    <div class="card reveal" style="max-width:460px">
+      <h3>Partner-Code eingeben</h3>
+      <div class="msg" id="cMsg"></div>
+      <label>Partner-Code</label><input id="pCode" placeholder="z. B. 4F9A2B77" style="text-transform:uppercase">
+      <div style="margin-top:14px"><button class="btn g" onclick="checkPartner()">Partnerpreise anzeigen</button></div>
+      <p style="font-size:12px;color:var(--mut2);margin-top:10px">Mit gültigem Code werden oben im Mietpark automatisch deine vergünstigten Partnerpreise angezeigt.</p>
     </div>
   </div>
 </section>
@@ -539,10 +537,26 @@ var LEGAL={};
 var EQ=[{name:'Nebelmaschine klein',category:'Effekt',description:'Kompakte Nebelmaschine inkl. Fluid – ideal für kleine Räume.',day_rate:25}];
 var PARTNER=JSON.parse(sessionStorage.getItem('lg_partner')||'null');
 var AVAIL={};
+var CART=JSON.parse(localStorage.getItem('lg_cart')||'[]');
+var CUST=JSON.parse(localStorage.getItem('lg_cust')||'null');
 function partnerPrice(e){
   if(!PARTNER)return null;
   if(e.partner_rate!=null)return Number(e.partner_rate);
   return Math.round(Number(e.day_rate||0)*(100-PARTNER.discount_pct))/100;
+}
+/* Spiegelt die Rabattstaffel aus api.php (rentalPrice()) für die Live-Vorschau; der Server rechnet beim Absenden verbindlich nach. */
+function rentalDaysClient(from,to){
+  if(!to||to<=from)return 1;
+  return Math.round((new Date(to)-new Date(from))/86400000)+1;
+}
+function rentalPriceClient(rate,days,followupPct,weekPct,twoWeekPct,monthPct){
+  if(days<=1)return rate;
+  var total=rate;
+  total+=(Math.min(days,7)-1)*rate*followupPct/100;
+  if(days>=8)total+=(Math.min(days,14)-7)*rate*weekPct/100;
+  if(days>=15)total+=(Math.min(days,30)-14)*rate*twoWeekPct/100;
+  if(days>=31)total+=(days-30)*rate*monthPct/100;
+  return total;
 }
 function renderRent(){
   document.getElementById('partnerBadge').innerHTML=PARTNER?('Partnerpreise aktiv für <b style="color:var(--txt)">'+esc(PARTNER.name)+'</b>'):'';
@@ -561,11 +575,16 @@ function renderRent(){
       var a=EQ.find(function(x){return x.id===e.addon_id});
       if(a)addon='<div class="addon">Passt dazu: <b>'+esc(a.name)+'</b> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag) – einfach mit anfragen.</div>';
     }
+    var inCart=e.id&&CART.some(function(c){return c.id===e.id});
+    var cartCtrl=e.id?('<div style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
+      '<input type="number" min="1" value="1" id="qty-'+e.id+'" style="margin:0;width:60px;padding:8px">'+
+      '<button class="btn small'+(inCart?' ghost':'')+'" onclick="addToCart(\''+e.id+'\')">'+(inCart?'Im Warenkorb ✓':'In den Warenkorb')+'</button></div>'):'';
     return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
       (e.category?'<div class="rc">'+esc(e.category)+'</div>':'')+
       '<h4>'+esc(e.name)+'</h4><p>'+esc(e.description||'')+'</p>'+
-      '<div class="rp">'+price+'</div>'+av+addon+'</div></div>';
+      '<div class="rp">'+price+'</div>'+av+addon+cartCtrl+'</div></div>';
   }).join('');
+  renderCart();
 }
 renderRent();
 
@@ -582,18 +601,106 @@ function checkAvail(){
       .then(function(r){return r.json()}).then(function(j){AVAIL[e.id]=j}).catch(function(){});
   })).then(renderRent);
 }
-function registerPartner(){
-  var name=document.getElementById('pName').value.trim(),email=document.getElementById('pEmail').value.trim();
-  var m=document.getElementById('pMsg');
-  if(!name||!email){m.className='msg err';m.textContent='Bitte Name und E-Mail angeben.';return}
-  document.getElementById('pBtn').disabled=true;
-  fetch(API+'/portal/partner',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name:name,email:email,kind:document.getElementById('pKind').value,
-      company:document.getElementById('pCompany').value.trim(),phone:document.getElementById('pPhone').value.trim()})})
-    .then(function(r){if(!r.ok)throw new Error();
-      m.className='msg ok';m.textContent='Danke! Deine Registrierung ist eingegangen – du bekommst deinen Partner-Code, sobald ich sie geprüft habe.';
-    }).catch(function(){m.className='msg err';m.textContent='Senden fehlgeschlagen – bitte später erneut versuchen.';
-      document.getElementById('pBtn').disabled=false});
+
+/* ---- Warenkorb ---- */
+function saveCart(){localStorage.setItem('lg_cart',JSON.stringify(CART))}
+function addToCart(id){
+  var e=EQ.find(function(x){return x.id===id});if(!e)return;
+  var qty=Math.max(1,Number(document.getElementById('qty-'+id).value)||1);
+  var existing=CART.find(function(c){return c.id===id});
+  if(existing)existing.qty=qty;else CART.push({id:id,qty:qty});
+  saveCart();renderRent();
+  document.getElementById('cartBox').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function removeFromCart(id){CART=CART.filter(function(c){return c.id!==id});saveCart();renderRent()}
+function renderCart(){
+  var box=document.getElementById('cartBox');
+  if(!CART.length){box.style.display='none';return}
+  box.style.display='block';
+  var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
+  var days=from?rentalDaysClient(from,to):1;
+  var total=0;
+  document.getElementById('cartItems').innerHTML=CART.map(function(c){
+    var e=EQ.find(function(x){return x.id===c.id});if(!e)return'';
+    var rate=partnerPrice(e)!=null?partnerPrice(e):Number(e.day_rate||0);
+    var line=rentalPriceClient(rate,days,Number(e.followup_pct!=null?e.followup_pct:50),
+      Number(e.tier_week_pct!=null?e.tier_week_pct:30),Number(e.tier_2week_pct!=null?e.tier_2week_pct:20),Number(e.tier_month_pct!=null?e.tier_month_pct:12))*c.qty;
+    total+=line;
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:14px">'+
+      '<span>'+esc(e.name)+' × '+c.qty+'</span><span>'+euro(line)+' <a onclick="removeFromCart(\''+c.id+'\')" style="color:var(--mut2);margin-left:8px" title="Entfernen">✕</a></span></div>';
+  }).join('');
+  document.getElementById('cartTotal').textContent=euro(total)+(from&&days>1?' · '+days+' Tage':'');
+  renderCartAuth();
+}
+function renderCartAuth(){
+  var el=document.getElementById('cartAuth');
+  if(CUST){el.innerHTML='<div class="sml" style="color:var(--mut)">Eingeloggt als <b style="color:var(--txt)">'+esc(CUST.name)+'</b> · <a onclick="custLogout()">abmelden</a></div>';return}
+  if(el.dataset.mode)return; // Formular schon offen, nicht überschreiben während der Eingabe
+  el.dataset.mode='login';
+  renderAuthForm();
+}
+function toggleAuthMode(){
+  var el=document.getElementById('cartAuth');
+  el.dataset.mode=el.dataset.mode==='login'?'register':'login';
+  renderAuthForm();
+}
+function renderAuthForm(){
+  var el=document.getElementById('cartAuth');
+  var reg=el.dataset.mode==='register';
+  el.innerHTML='<div style="font-size:13px;color:var(--mut);margin-bottom:10px">'+(reg?'Neu hier? Kurz registrieren, dann geht die Anfrage direkt raus.':'Schon Kunde? Einloggen und Anfrage abschicken.')+'</div>'+
+    (reg?'<label>Name *</label><input id="authName">':'')+
+    '<label>E-Mail *</label><input id="authEmail" type="email">'+
+    '<label>Passwort *</label><input id="authPass" type="password">'+
+    (reg?('<label style="margin-top:8px"><input type="checkbox" id="authPartner" style="width:auto;margin-right:6px" onchange="document.getElementById(\'authPartnerKind\').style.display=this.checked?\'block\':\'none\'">Ich bin DJ/Band/Musiker:in und möchte Partner-Konditionen</label>'+
+      '<select id="authPartnerKind" style="display:none;margin-top:8px"><option value="dj">DJ</option><option value="band">Band</option><option value="musiker">Musiker:in</option></select>'):'')+
+    '<div class="sml" style="margin-top:6px"><a onclick="toggleAuthMode()">'+(reg?'Schon ein Konto? Einloggen':'Noch kein Konto? Registrieren')+'</a></div>';
+}
+function custLogout(){CUST=null;localStorage.removeItem('lg_cust');localStorage.removeItem('lg_cust_token');document.getElementById('cartAuth').removeAttribute('data-mode');renderCart()}
+function authAndSubmit(){
+  var mode=(document.getElementById('cartAuth').dataset.mode)||'login';
+  var email=v_('authEmail'),pass=v_('authPass');
+  var m=document.getElementById('cartMsg');
+  if(!email||!pass){m.className='msg err';m.textContent='Bitte E-Mail und Passwort angeben.';return Promise.reject()}
+  var body,path;
+  if(mode==='register'){
+    var name=v_('authName');
+    if(!name){m.className='msg err';m.textContent='Bitte auch den Namen angeben.';return Promise.reject()}
+    body={name:name,email:email,password:pass,
+      partner_interest:document.getElementById('authPartner')&&document.getElementById('authPartner').checked,
+      partner_kind:document.getElementById('authPartnerKind')?document.getElementById('authPartnerKind').value:'dj'};
+    path='portal/account/register';
+  } else { body={email:email,password:pass}; path='portal/account/login'; }
+  return fetch(API+'/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s>=400){m.className='msg err';m.textContent=res.j.error||'Anmeldung fehlgeschlagen.';return Promise.reject()}
+      CUST={name:res.j.name};localStorage.setItem('lg_cust',JSON.stringify(CUST));
+      localStorage.setItem('lg_cust_token',res.j.token);
+      document.getElementById('cartAuth').removeAttribute('data-mode');
+      renderCart();
+    });
+}
+function v_(id){var el=document.getElementById(id);return el?el.value.trim():''}
+function submitCart(){
+  var m=document.getElementById('cartMsg');
+  var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
+  if(!from){m.className='msg err';m.style.display='block';m.textContent='Bitte Zeitraum (von/bis) oben angeben.';return}
+  if(!CART.length){m.className='msg err';m.style.display='block';m.textContent='Der Warenkorb ist leer.';return}
+  var go=CUST?Promise.resolve():authAndSubmit();
+  go.then(function(){
+    document.getElementById('cartSubmitBtn').disabled=true;
+    return fetch(API+'/portal/cart/submit',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('lg_cust_token')},
+      body:JSON.stringify({items:CART.map(function(c){return{equipment_id:c.id,qty:c.qty}}),from:from,to:to})})
+      .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+      .then(function(res){
+        document.getElementById('cartSubmitBtn').disabled=false;
+        m.style.display='block';
+        if(res.s>=400){m.className='msg err';m.textContent=res.j.error||'Anfrage fehlgeschlagen – bitte später erneut versuchen.';return}
+        m.className='msg ok';m.textContent='Danke! Eure Anfrage ist eingegangen – ihr bekommt in der Regel innerhalb von 24 Stunden eine Antwort mit Verfügbarkeit und Preis.';
+        CART=[];saveCart();renderRent();
+      });
+  }).catch(function(){document.getElementById('cartSubmitBtn').disabled=false});
 }
 function checkPartner(){
   var code=document.getElementById('pCode').value.trim().toUpperCase(),m=document.getElementById('cMsg');

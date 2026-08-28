@@ -525,6 +525,12 @@ img/spiegelkugel mittig.jpg"></textarea>
             <div><label>Reisekosten (€ / km, einfache Strecke ×2)</label><input type="number" step="0.01" id="sKmRate"></div>
             <div><label>Freikilometer (einfach, ohne Berechnung)</label><input type="number" id="sKmFree"></div>
           </div>
+          <label class="mut sml" style="margin-top:10px;display:block">Mietpreis-Rabattstaffel (Standard für alle Artikel, pro Artikel überschreibbar) – Tag 1 immer voller Preis, Tag 2-7 nutzt den „Folgetage %“-Wert je Artikel</label>
+          <div class="grid3">
+            <div><label>% ab 1 Woche (Tag 8+)</label><input type="number" id="sTierWeek"></div>
+            <div><label>% ab 2 Wochen (Tag 15+)</label><input type="number" id="sTier2Week"></div>
+            <div><label>% ab 1 Monat (Tag 31+)</label><input type="number" id="sTierMonth"></div>
+          </div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveNumbering()">Speichern</button></div>
         </div>
         <div class="card"><h3>Mietvertrag – Vertragsbedingungen</h3>
@@ -2041,6 +2047,10 @@ function openEqModal(id){
     '<div class="grid2"><div><label>Partner-Preis €/Tag (leer = Rabatt % aus Einstellungen)</label><input type="number" step="0.01" id="ePartner" value="'+(e.partner_rate!=null?e.partner_rate:'')+'"></div>'+
     '<div><label>Zubehör-Empfehlung („passt dazu“)</label><select id="eAddon"><option value="">–</option>'+
     (CACHE.equipment||[]).filter(function(x){return x.id!==e.id}).map(function(x){return '<option value="'+x.id+'"'+(e.addon_id===x.id?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select></div></div>'+
+    '<label class="mut sml" style="margin-top:10px;display:block">Rabattstaffel für längere Mietzeiträume (leer = globaler Standard aus den Einstellungen)</label>'+
+    '<div class="grid3"><div><label>% ab 1 Woche</label><input type="number" id="eTierWeek" value="'+(e.tier_week_pct!=null?e.tier_week_pct:'')+'"></div>'+
+    '<div><label>% ab 2 Wochen</label><input type="number" id="eTier2Week" value="'+(e.tier_2week_pct!=null?e.tier_2week_pct:'')+'"></div>'+
+    '<div><label>% ab 1 Monat</label><input type="number" id="eTierMonth" value="'+(e.tier_month_pct!=null?e.tier_month_pct:'')+'"></div></div>'+
     '<label>Bild</label><div style="display:flex;gap:8px"><input id="eImg" value="'+esc(e.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upEq" onchange="uploadImg(this,\'eImg\')"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">Hochladen</button></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="ePub" style="width:auto;margin-right:6px" '+(e.public!==false?'checked':'')+'>Auf Homepage anzeigen (mietbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveEq(\''+(id||'')+'\')">Speichern</button>'+
@@ -2051,7 +2061,11 @@ function saveEq(id){
   if(!v('eName')){toast('Name fehlt.',1);return}
   var body={name:v('eName'),category:v('eCat'),description:v('eDesc'),day_rate:Number(v('eRate'))||0,
     partner_rate:v('ePartner')!==''?Number(v('ePartner')):null,addon_id:v('eAddon')||null,
-    followup_pct:Number(v('ePct'))||50,qty_total:Number(v('eQty'))||1,status:v('eStatus'),
+    followup_pct:Number(v('ePct'))||50,
+    tier_week_pct:v('eTierWeek')!==''?Number(v('eTierWeek')):null,
+    tier_2week_pct:v('eTier2Week')!==''?Number(v('eTier2Week')):null,
+    tier_month_pct:v('eTierMonth')!==''?Number(v('eTierMonth')):null,
+    qty_total:Number(v('eQty'))||1,status:v('eStatus'),
     image_url:v('eImg'),public:document.getElementById('ePub').checked,rentable:document.getElementById('ePub').checked,
     slug:v('eName').toLowerCase().replace(/[^a-z0-9äöüß]+/g,'-').replace(/^-|-$/g,'')};
   (id?api('equipment?id=eq.'+id,{method:'PATCH',body:body}):api('equipment',{method:'POST',body:body}))
@@ -2695,6 +2709,9 @@ function renderSet(){
   document.getElementById('sSmall').checked=!!c.small_business;
   document.getElementById('sTaxRate').value=d.tax_rate!=null?d.tax_rate:19;
   document.getElementById('sPartnerPct').value=d.partner_discount_pct!=null?d.partner_discount_pct:20;
+  document.getElementById('sTierWeek').value=d.tier_week_pct!=null?d.tier_week_pct:30;
+  document.getElementById('sTier2Week').value=d.tier_2week_pct!=null?d.tier_2week_pct:20;
+  document.getElementById('sTierMonth').value=d.tier_month_pct!=null?d.tier_month_pct:12;
   document.getElementById('sKmRate').value=d.travel_rate_km!=null?d.travel_rate_km:0.70;
   document.getElementById('sKmFree').value=d.travel_free_km!=null?d.travel_free_km:30;
   document.getElementById('sBank').value=c.bank||'';
@@ -2724,6 +2741,7 @@ function saveNumbering(){
   var n={angebot:{prefix:v('sQPre'),next:Number(v('sQNext'))||1},rechnung:{prefix:v('sIPre'),next:Number(v('sINext'))||1},year_in_number:true};
   var d=S.defaults||{};d.payment_days=Number(v('sPayDays'))||14;d.quote_valid_days=Number(v('sValidDays'))||30;
   d.tax_rate=Number(v('sTaxRate'))||19;d.partner_discount_pct=Number(v('sPartnerPct'))||20;
+  d.tier_week_pct=Number(v('sTierWeek'))||0;d.tier_2week_pct=Number(v('sTier2Week'))||0;d.tier_month_pct=Number(v('sTierMonth'))||0;
   d.travel_rate_km=Number(v('sKmRate'))||0;d.travel_free_km=Number(v('sKmFree'))||0;
   Promise.all([
     api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'numbering',value:n}}),
