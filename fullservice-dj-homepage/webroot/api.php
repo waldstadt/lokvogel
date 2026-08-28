@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 31;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 32;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -282,6 +282,10 @@ function upgrade(PDO $p): void {
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
+  if ($v < 32) foreach ([
+    "alter table equipment add column image_focal text default '50% 50%'",
+    "alter table locations add column image_focal text default '50% 50%'",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
   if ($v < 23) try {
     $st = $p->query("select id, fields from form_templates where name like 'DJ-Vorauswahl%' limit 1");
     if ($row = $st->fetch()) {
@@ -511,12 +515,14 @@ create table packages (id text primary key, sort integer default 0, title text n
 create table faq (id text primary key, sort integer default 0, question text not null,
   answer text not null, public integer default 1);
 create table equipment (id text primary key, sort integer default 0, name text not null, slug text,
-  category text, description text, image_url text, day_rate real default 0, followup_pct integer default 50,
+  category text, description text, image_url text, image_focal text default '50% 50%',
+  day_rate real default 0, followup_pct integer default 50,
   tier_week_pct real, tier_2week_pct real, tier_month_pct real,
   qty_total integer default 1, rentable integer default 1, public integer default 1,
   status text default 'aktiv', notes text, partner_rate real, addon_id text, created_at text);
 create table locations (id text primary key, sort integer default 0, name text not null,
-  city text, region text, address text, phone text, description text, image_url text, website text,
+  city text, region text, address text, phone text, description text, image_url text,
+  image_focal text default '50% 50%', website text,
   image_source text default 'eigen', image_approved integer default 0,
   public integer default 1, created_at text);
 create table inquiries (id text primary key, name text not null, email text, phone text,
@@ -1615,6 +1621,7 @@ function handlePortal(string $path, string $method, $body): never {
       if (!$isImg && !in_array($ext, $allowedDocs)) fail('Erlaubt: Bilder sowie PDF/Office/Text-Dateien.');
       if (!$isImg && $ext === 'pdf' && !str_starts_with($raw, '%PDF')) fail('Keine gültige PDF-Datei.');
       $kind = $isImg ? 'foto' : 'dokument';
+      if ($isImg) $raw = processImage($raw);
       $bookingId = (string)($_GET['booking'] ?? '');
       if ($bookingId !== '') {
         $chk = $p->prepare('select count(*) from bookings where id = ? and customer_id = ?');
@@ -1757,8 +1764,8 @@ function handlePortal(string $path, string $method, $body): never {
     if (!is_dir($dir)) mkdir($dir, 0755, true);
     $ff = $r['id'] . '-front.' . $front['ext'];
     $fb = $r['id'] . '-back.' . $back['ext'];
-    file_put_contents("$dir/$ff", $front['bin']);
-    file_put_contents("$dir/$fb", $back['bin']);
+    file_put_contents("$dir/$ff", processImage($front['bin'], 1600, 82));
+    file_put_contents("$dir/$fb", processImage($back['bin'], 1600, 82));
     $terms = json_decode($p->query("select value from settings where key='rental_contract'")->fetchColumn() ?: '{}', true);
     $snapshot = json_encode(['items' => rentalItems($p, $r), 'days' => rentalDays($r),
       'event_date' => $r['event_date'], 'end_date' => $r['end_date'],
@@ -1976,6 +1983,44 @@ function handlePortal(string $path, string $method, $body): never {
 }
 
 /* ---------- Upload ---------- */
+/* Große Fotos automatisch auf eine vernünftige Webgröße verkleinern und neu komprimieren
+   (ein 10-MB-Handyfoto soll nie 1:1 auf dem Server landen). GIF (Animation) und AVIF (Server-
+   Unterstützung uneinheitlich) bleiben unangetastet. Bei JPEG wird die EXIF-Drehung fest ins
+   Bild gerechnet, damit die Ausrichtung stimmt, auch wenn die Metadaten beim Speichern wegfallen. */
+function processImage(string $raw, int $maxDim = 2000, int $quality = 85): string {
+  if (!extension_loaded('gd')) return $raw;
+  $info = @getimagesizefromstring($raw);
+  if (!$info) return $raw;
+  $mime = $info['mime'] ?? '';
+  if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'])) return $raw;
+  $img = @imagecreatefromstring($raw);
+  if (!$img) return $raw;
+  if ($mime === 'image/jpeg' && function_exists('exif_read_data')) {
+    $exif = @exif_read_data('data://image/jpeg;base64,' . base64_encode($raw));
+    switch ($exif['Orientation'] ?? 1) {
+      case 3: $img = imagerotate($img, 180, 0); break;
+      case 6: $img = imagerotate($img, 270, 0); break;
+      case 8: $img = imagerotate($img, 90, 0); break;
+    }
+  }
+  $w = imagesx($img); $h = imagesy($img);
+  $scale = min(1, $maxDim / max($w, $h));
+  if ($scale < 1) {
+    $nw = max(1, (int)round($w * $scale)); $nh = max(1, (int)round($h * $scale));
+    $resized = imagecreatetruecolor($nw, $nh);
+    if ($mime === 'image/png') { imagealphablending($resized, false); imagesavealpha($resized, true); }
+    imagecopyresampled($resized, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    imagedestroy($img);
+    $img = $resized;
+  }
+  ob_start();
+  if ($mime === 'image/png') imagepng($img, null, 6);
+  elseif ($mime === 'image/webp') imagewebp($img, null, $quality);
+  else imagejpeg($img, null, $quality);
+  $out = ob_get_clean();
+  imagedestroy($img);
+  return ($out !== false && strlen($out) > 0) ? $out : $raw;
+}
 function handleUpload(string $name): never {
   if (!currentUser()) fail('Nicht angemeldet.', 401);
   if (!is_dir(UPLOAD_DIR)) mkdir(UPLOAD_DIR, 0755, true);
@@ -1986,6 +2031,7 @@ function handleUpload(string $name): never {
   if (!in_array($ext, ['jpg','jpeg','png','webp','gif','avif'])) fail('Nur Bilddateien erlaubt.');
   $info = @getimagesizefromstring($raw);
   if ($info === false) fail('Keine gültige Bilddatei.');
+  $raw = processImage($raw);
   file_put_contents(UPLOAD_DIR . '/' . $name, $raw);
   out(['url' => 'uploads/' . $name], 201);
 }

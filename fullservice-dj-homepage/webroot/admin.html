@@ -407,12 +407,14 @@ th.num{text-align:right}
           <label>Unterzeile (Kicker)</label><input id="cHeroSub">
           <label>Text</label><textarea id="cHeroText"></textarea>
           <label>Button-Text</label><input id="cHeroCta">
-          <label>Hintergrundbild</label><div style="display:flex;gap:8px"><input id="cHeroImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upHero" onchange="uploadImg(this,'cHeroImg')"><button class="btn g sm" onclick="document.getElementById('upHero').click()">Hochladen</button></div>
+          <label>Hintergrundbild</label><div style="display:flex;gap:8px"><input id="cHeroImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upHero" onchange="uploadImg(this,'cHeroImg','cHeroFocal')"><button class="btn g sm" onclick="document.getElementById('upHero').click()">Hochladen</button></div>
+          <div id="cHeroFocalWrap"></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('hero')">Speichern</button></div></div>
         <div class="card"><h3>Über mich</h3>
           <label>Überschrift</label><input id="cAboutTitle">
           <label>Text</label><textarea id="cAboutText" style="min-height:110px"></textarea>
-          <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">Hochladen</button></div>
+          <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg','cAboutFocal')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">Hochladen</button></div>
+          <div id="cAboutFocalWrap"></div>
           <label>Technik-Marken <span class="mut sml" style="text-transform:none;letter-spacing:0">(kommagetrennt, erscheinen als Text-Leiste unter „Über mich")</span></label><input id="cAboutGear" placeholder="z. B. Seeburg Acoustic Line, Sennheiser, Rane">
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('about')">Speichern</button></div></div>
         <div class="card"><h3>Garantie / DJ-Vermittlung</h3>
@@ -2065,7 +2067,8 @@ function openEqModal(id){
     '<div class="grid3"><div><label>% ab 1 Woche</label><input type="number" id="eTierWeek" value="'+(e.tier_week_pct!=null?e.tier_week_pct:'')+'"></div>'+
     '<div><label>% ab 2 Wochen</label><input type="number" id="eTier2Week" value="'+(e.tier_2week_pct!=null?e.tier_2week_pct:'')+'"></div>'+
     '<div><label>% ab 1 Monat</label><input type="number" id="eTierMonth" value="'+(e.tier_month_pct!=null?e.tier_month_pct:'')+'"></div></div>'+
-    '<label>Bild</label><div style="display:flex;gap:8px"><input id="eImg" value="'+esc(e.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upEq" onchange="uploadImg(this,\'eImg\')"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">Hochladen</button></div>'+
+    '<label>Bild</label><div style="display:flex;gap:8px"><input id="eImg" value="'+esc(e.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upEq" onchange="uploadImg(this,\'eImg\',\'eFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">Hochladen</button></div>'+
+    focalWidget(e.image_url,e.image_focal,'eFocal','4/3')+
     '<label style="margin-top:12px"><input type="checkbox" id="ePub" style="width:auto;margin-right:6px" '+(e.public!==false?'checked':'')+'>Auf Homepage anzeigen (mietbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveEq(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delEq(\''+id+'\')">Löschen</button>':'')+'</div>');
@@ -2080,7 +2083,7 @@ function saveEq(id){
     tier_2week_pct:v('eTier2Week')!==''?Number(v('eTier2Week')):null,
     tier_month_pct:v('eTierMonth')!==''?Number(v('eTierMonth')):null,
     qty_total:Number(v('eQty'))||1,status:v('eStatus'),
-    image_url:v('eImg'),public:document.getElementById('ePub').checked,rentable:document.getElementById('ePub').checked,
+    image_url:v('eImg'),image_focal:v('eFocal'),public:document.getElementById('ePub').checked,rentable:document.getElementById('ePub').checked,
     slug:v('eName').toLowerCase().replace(/[^a-z0-9äöüß]+/g,'-').replace(/^-|-$/g,'')};
   (id?api('equipment?id=eq.'+id,{method:'PATCH',body:body}):api('equipment',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');
@@ -2107,9 +2110,11 @@ function renderCms(){
   document.getElementById('cHeroText').value=g('hero','text');
   document.getElementById('cHeroCta').value=g('hero','cta');
   document.getElementById('cHeroImg').value=g('hero','image');
+  document.getElementById('cHeroFocalWrap').innerHTML=focalWidget(g('hero','image'),g('hero','image_focal'),'cHeroFocal','21/9');
   document.getElementById('cAboutTitle').value=g('about','title');
   document.getElementById('cAboutText').value=g('about','text');
   document.getElementById('cAboutImg').value=g('about','image');
+  document.getElementById('cAboutFocalWrap').innerHTML=focalWidget(g('about','image'),g('about','image_focal'),'cAboutFocal','4/5');
   document.getElementById('cAboutGear').value=(g('about','gear')||[]).join(', ');
   document.getElementById('cCtPhone').value=g('contact','phone');
   document.getElementById('cCtMail').value=g('contact','email');
@@ -2161,8 +2166,8 @@ function saveTheme(){
 }
 function saveContent(key){
   var val;
-  if(key==='hero')val={title:'DJ Lauschgift',subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg')};
-  if(key==='about')val={title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg'),
+  if(key==='hero')val={title:'DJ Lauschgift',subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal')};
+  if(key==='about')val={title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg'),image_focal:v('cAboutFocal'),
     gear:v('cAboutGear').split(',').map(function(s){return s.trim()}).filter(Boolean)};
   if(key==='contact')val={title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
   if(key==='seo')val={title:v('cSeoTitle'),description:v('cSeoDesc')};
@@ -2183,7 +2188,7 @@ function upsertContent(key,val){
     .then(function(){CACHE.content[key]=val;toast('„'+key+'“ gespeichert ✓ – Homepage ist aktualisiert.')})
     .catch(function(e){toast(e.message,1)});
 }
-function uploadImg(inp,targetId){
+function uploadImg(inp,targetId,previewId){
   var f=inp.files[0];if(!f)return;
   var name=Date.now()+'-'+f.name.toLowerCase().replace(/[^a-z0-9.]+/g,'-');
   fetch(API+'/storage/'+encodeURIComponent(name),{
@@ -2193,9 +2198,34 @@ function uploadImg(inp,targetId){
     return r.json();
   }).then(function(j){
     document.getElementById(targetId).value=j.url;
-    toast('Bild hochgeladen ✓ – jetzt Speichern klicken.');
+    if(previewId){
+      var box=document.getElementById(previewId+'-box');
+      if(box)box.style.backgroundImage="url('"+j.url+"')";
+    }
+    toast('Bild hochgeladen ✓ – Server verkleinert große Fotos automatisch. Jetzt Speichern klicken.');
   }).catch(function(e){toast(e.message,1)});
   inp.value='';
+}
+/* Fokuspunkt-Widget: Klick aufs Vorschaubild legt fest, welcher Bereich beim Zuschneiden (object-fit:cover)
+   sichtbar bleibt, statt stur die Mitte zu nehmen. focalId = versteckte Werte-Input-ID, ratio = CSS aspect-ratio
+   des Vorschaukastens (z.B. "4/5"). */
+function focalWidget(imgUrl,focal,focalId,ratio){
+  focal=focal||'50% 50%';
+  var parts=focal.split(' '),fx=parseFloat(parts[0])||50,fy=parseFloat(parts[1])||50;
+  return '<label style="margin-top:10px">Bildausschnitt <span class="mut sml" style="text-transform:none;letter-spacing:0">(aufs Vorschaubild klicken, um z. B. ein Gesicht im Ausschnitt zu halten)</span></label>'+
+    '<div id="'+focalId+'-box" onclick="setFocal(event,\''+focalId+'\')" style="position:relative;width:180px;aspect-ratio:'+ratio+';border-radius:8px;overflow:hidden;border:1px solid var(--line);cursor:crosshair;background-color:var(--card);background-size:cover;background-repeat:no-repeat;background-position:'+fx+'% '+fy+'%;'+(imgUrl?"background-image:url('"+esc(imgUrl)+"')":'')+'">'+
+    '<div id="'+focalId+'-marker" style="position:absolute;left:'+fx+'%;top:'+fy+'%;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.5);pointer-events:none"></div></div>'+
+    '<input type="hidden" id="'+focalId+'" value="'+esc(focal)+'">';
+}
+function setFocal(ev,focalId){
+  var box=document.getElementById(focalId+'-box');
+  var r=box.getBoundingClientRect();
+  var x=Math.max(0,Math.min(100,Math.round((ev.clientX-r.left)/r.width*100)));
+  var y=Math.max(0,Math.min(100,Math.round((ev.clientY-r.top)/r.height*100)));
+  document.getElementById(focalId).value=x+'% '+y+'%';
+  box.style.backgroundPosition=x+'% '+y+'%';
+  var m=document.getElementById(focalId+'-marker');
+  m.style.left=x+'%';m.style.top=y+'%';
 }
 function renderPackAdmin(){
   document.getElementById('packList').innerHTML=CACHE.packages.map(function(p){
@@ -2290,8 +2320,9 @@ function openLocModal(id){
       '<label style="margin:0"><input type="checkbox" id="lImgApprove" style="width:auto;margin-right:6px" '+(l.image_approved?'checked':'')+'>Rechte geprüft – Bild freigeben</label>'+
       '</div>'
       :'')+
-    '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">Hochladen</button></div>'+
+    '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\',\'lFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">Hochladen</button></div>'+
     (webPending?'<div class="mut sml" style="margin-top:4px">Hier ein eigenes Foto einfügen ersetzt den Internet-Vorschlag ohne weitere Prüfung.</div>':'')+
+    focalWidget(l.image_url,l.image_focal,'lFocal','4/3')+
     '<label style="margin-top:12px"><input type="checkbox" id="lPub" style="width:auto;margin-right:6px" '+(l.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
     '<div class="mut sml" style="margin-top:6px">Die Reihenfolge stellst du in der Liste per Ziehen am ⠿-Griff ein.</div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveLoc(\''+(id||'')+'\')">Speichern</button>'+
@@ -2307,7 +2338,7 @@ function saveLoc(id){
     imageApproved=!!(document.getElementById('lImgApprove')&&document.getElementById('lImgApprove').checked);
   }
   var body={name:v('lName'),city:v('lCity'),region:v('lRegion'),address:v('lAddr'),phone:v('lPhone'),
-    description:v('lDesc'),website:v('lWeb'),image_url:imgVal,
+    description:v('lDesc'),website:v('lWeb'),image_url:imgVal,image_focal:v('lFocal'),
     image_source:imageSource,image_approved:imageApproved,
     public:document.getElementById('lPub').checked};
   if(!id)body.sort=(CACHE.locations||[]).length;

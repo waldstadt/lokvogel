@@ -561,7 +561,7 @@ function rentalPriceClient(rate,days,followupPct,weekPct,twoWeekPct,monthPct){
 function renderRent(){
   document.getElementById('partnerBadge').innerHTML=PARTNER?('Partnerpreise aktiv für <b style="color:var(--txt)">'+esc(PARTNER.name)+'</b>'):'';
   document.getElementById('rentGrid').innerHTML=EQ.map(function(e){
-    var img=e.image_url?' style="background-image:url(\''+esc(e.image_url)+'\')"':'';
+    var img=e.image_url?' style="background-image:url(\''+esc(e.image_url)+'\');background-position:'+esc(e.image_focal||'50% 50%')+'"':'';
     var icon=e.image_url?'':'♪';
     var pp=partnerPrice(e);
     var price=pp!=null?'<span class="old">'+euro(e.day_rate||0)+'</span>'+euro(pp)+' <small>/ Miettag · Partnerpreis</small>':euro(e.day_rate||0)+' <small>/ Miettag</small>';
