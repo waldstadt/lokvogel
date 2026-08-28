@@ -328,7 +328,8 @@ th.num{text-align:right}
       <div class="grid4">
         <div><label>Rabatt aufs Gesamtdokument</label><input type="number" step="0.01" id="docDiscVal" value="0"></div>
         <div><label>Rabatt-Art</label><select id="docDiscType"><option value="pct">%</option><option value="eur">€ (netto)</option></select></div>
-        <div></div><div></div>
+        <div><label>Pauschal-Gesamtpreis (brutto €) <span class="mut sml" style="text-transform:none;letter-spacing:0">– überschreibt die Positionssumme</span></label><input type="number" step="0.01" id="docTotalOverride" placeholder="leer = aus Positionen berechnet"></div>
+        <div></div>
       </div>
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
     </div>
@@ -365,6 +366,8 @@ th.num{text-align:right}
     <div class="phead"><div><div class="pt">Technik</div><div class="ps">Bestand, Verleihpreise &amp; Homepage-Anzeige</div></div>
       <button class="btn" onclick="openEqModal()">+ Neuer Artikel</button></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Heute im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
+    <div class="card"><h3>Sets <span class="mut sml" style="font-weight:400">– mehrere Artikel als ein buchbares Paket (z. B. Lautsprecher + Kabel + Endstufe)</span> <button class="btn sm" style="float:right" onclick="openSetModal()">+ Set</button></h3>
+      <div id="setAdminList" class="sml"></div></div>
     <div class="card"><h3>Miet-Partner (DJs, Bands, Musiker, Techniker) <span class="mut sml" style="font-weight:400">– registrieren sich über die Technik-Seite, du schaltest frei und teilst den Code mit</span></h3><div id="partnerList" class="sml"></div></div>
     <div class="card"><h3>Workshop-Termine <span class="mut sml" style="font-weight:400">– buchbar auf der Technik-Seite, Rechnung geht automatisch per E-Mail raus</span> <button class="btn sm" style="float:right" onclick="openWsModal()">+ Termin</button></h3>
       <div id="wsAdminList" class="sml"></div></div>
@@ -523,11 +526,23 @@ img/spiegelkugel mittig.jpg"></textarea>
             <div><label>USt.-Satz Standard (%)</label><input type="number" step="0.1" id="sTaxRate"></div>
             <div><label>Partner-Rabatt Technik-Miete (%)</label><input type="number" id="sPartnerPct"></div>
           </div>
-          <div class="grid2">
-            <div><label>Reisekosten (€ / km, einfache Strecke ×2)</label><input type="number" step="0.01" id="sKmRate"></div>
-            <div><label>Freikilometer (einfach, ohne Berechnung)</label><input type="number" id="sKmFree"></div>
+          <div class="grid3">
+            <div><label>Reisekosten (€ / km)</label><input type="number" step="0.01" id="sKmRate"></div>
+            <div><label>Freikilometer (einfache Strecke)</label><input type="number" id="sKmFree"></div>
+            <div><label>Freikilometer-Regel</label><select id="sKmFreeMode">
+              <option value="schwelle">Bis Freigrenze 0 € – darüber volle Strecke</option>
+              <option value="abzug">Freikilometer werden abgezogen</option>
+            </select></div>
           </div>
-          <label class="mut sml" style="margin-top:10px;display:block">Mietpreis-Rabattstaffel (Standard für alle Artikel, pro Artikel überschreibbar) – Tag 1 immer voller Preis, Tag 2-7 nutzt den „Folgetage %“-Wert je Artikel</label>
+          <label style="margin-top:6px"><input type="checkbox" id="sKmRoundtrip" style="width:auto;margin-right:6px">Hin- und Rückfahrt berechnen (aus = nur einfache Strecke)</label>
+          <label class="mut sml" style="margin-top:14px;display:block">Automatische Übernachtung</label>
+          <label><input type="checkbox" id="sOnEnabled" style="width:auto;margin-right:6px">Automatische Übernachtung bei langer Fahrt anbieten</label>
+          <div class="grid3">
+            <div><label>Preis pro Übernachtung (€)</label><input type="number" step="0.01" id="sOnPrice"></div>
+            <div><label>Schwelle bezieht sich auf</label><select id="sOnType"><option value="zeit">Fahrzeit (Minuten)</option><option value="strecke">Fahrtstrecke (km)</option></select></div>
+            <div><label>Schwellenwert</label><input type="number" id="sOnValue"></div>
+          </div>
+          <label class="mut sml" style="margin-top:14px;display:block">Mietpreis-Rabattstaffel (Standard für alle Artikel, pro Artikel überschreibbar) – Tag 1 immer voller Preis, Tag 2-7 nutzt den „Folgetage %“-Wert je Artikel</label>
           <div class="grid3">
             <div><label>% ab 1 Woche (Tag 8+)</label><input type="number" id="sTierWeek"></div>
             <div><label>% ab 2 Wochen (Tag 15+)</label><input type="number" id="sTier2Week"></div>
@@ -677,7 +692,9 @@ function loadAll(){
     api('products?select=*&order=sort'),
     api('partners?select=*&order=created_at.desc'),
     api('workshop_events?select=*&order=event_date'),
-    api('workshop_signups?select=*&order=created_at.desc')
+    api('workshop_signups?select=*&order=created_at.desc'),
+    api('equipment_sets?select=*&order=sort'),
+    api('equipment_set_items?select=*')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -687,6 +704,7 @@ function loadAll(){
     CACHE.docEvents=r[12]||[];CACHE.forms=r[13]||[];CACHE.formTpls=r[14]||[];CACHE.upsells=r[15]||[];
     CACHE.reviews=r[16]||[];CACHE.products=r[17]||[];CACHE.partners=r[18]||[];
     CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
+    CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];
     applyBrand();
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
@@ -700,7 +718,7 @@ function applyBrand(){
 }
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
-  renderEq();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
+  renderEq();renderSetsAdmin();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
   renderProducts();renderPartners();renderWsAdmin();
 }
 /* ===== Workshop-Termine & Anmeldungen ===== */
@@ -1163,6 +1181,7 @@ function openBookModal(b,presetCust){
     '<div><label>Ende</label><input type="time" id="bTend" value="'+(b.end_time||'')+'"></div></div>'+
     '<div class="grid2"><div><label>Miettage (Abrechnung)</label><input type="number" min="1" id="bBillDays" value="'+(b.billable_days||'')+'" placeholder="leer = automatisch aus Abholung/Rückgabe"></div>'+
     '<div class="mut sml" style="align-self:end;padding-bottom:10px">Abholung/Rückgabe sind der Verleihzeitraum für die Verfügbarkeit – wenn ihr abweichend davon nur weniger Tage berechnet (z. B. Freund holt Freitag ab, bringt erst Mittwoch zurück, 1 Miettag berechnet), hier eintragen.</div></div>'+
+    '<label><input type="checkbox" id="bOpenEnded" style="width:auto;margin-right:6px" '+(b.open_ended?'checked':'')+'>Dauerhaft verbaut / unbefristet (z. B. Festinstallation) – blockt die Verfügbarkeit der zugeordneten Technik ab dem Datum ohne Enddatum</label>'+
     '<div class="grid3"><div><label>Location</label><input id="bVenue" value="'+esc(b.venue_name||'')+'"></div>'+
     '<div><label>Adresse</label><input id="bAddr" value="'+esc(b.venue_address||'')+'"></div>'+
     '<div><label>Gäste</label><input type="number" id="bGuests" value="'+(b.guests||'')+'"></div></div>'+
@@ -1179,7 +1198,8 @@ function saveBook(id){
     event_date:v('bDate'),end_date:v('bEnd')||null,start_time:v('bStart')||null,end_time:v('bTend')||null,
     venue_name:v('bVenue'),venue_address:v('bAddr'),guests:v('bGuests')?Number(v('bGuests')):null,
     fee_net:v('bFee')?Number(v('bFee')):null,notes:v('bNotes'),
-    billable_days:v('bBillDays')?Number(v('bBillDays')):null};
+    billable_days:v('bBillDays')?Number(v('bBillDays')):null,
+    open_ended:document.getElementById('bOpenEnded').checked};
   (id?api('bookings?id=eq.'+id,{method:'PATCH',body:body}):api('bookings',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');loadAll();if(id)setTimeout(function(){openBookDetail(id)},400)})
     .catch(function(e){toast(e.message,1)});
@@ -1189,11 +1209,23 @@ function delBook(id){if(!confirm('Buchung löschen?'))return;
 
 /* ===== Rider / Einsatzblatt ===== */
 function riderOf(b){return (b&&b.rider&&typeof b.rider==='object')?b.rider:{}}
-function travelRate(){var d=S.defaults||{};return d.travel_rate_km!=null?Number(d.travel_rate_km):0.70}
+function travelRate(){var d=S.defaults||{};return d.travel_rate_km!=null?Number(d.travel_rate_km):0.50}
 function travelFree(){var d=S.defaults||{};return d.travel_free_km!=null?Number(d.travel_free_km):30}
+function travelFreeMode(){var d=S.defaults||{};return d.travel_free_mode||'schwelle'}
+function travelRoundtrip(){var d=S.defaults||{};return d.travel_roundtrip!==false}
+function overnightEnabled(){var d=S.defaults||{};return d.overnight_enabled!==false}
+function overnightPrice(){var d=S.defaults||{};return d.overnight_price!=null?Number(d.overnight_price):0}
+function overnightThresholdType(){var d=S.defaults||{};return d.overnight_threshold_type||'zeit'}
+function overnightThresholdValue(){var d=S.defaults||{};return d.overnight_threshold_value!=null?Number(d.overnight_threshold_value):60}
+/* Fahrtkosten: "schwelle" = bis travelFree() komplett kostenlos, darüber die volle Strecke;
+   "abzug" = travelFree() wird von der Strecke abgezogen, nur der Rest wird berechnet.
+   travelRoundtrip() steuert, ob Hin- und Rückfahrt (×2) oder nur die einfache Strecke berechnet wird. */
 function travelCost(km){
-  var chg=Math.max(0,(Number(km)||0)-travelFree());
-  return Math.round(chg*2*travelRate()*100)/100;
+  var k=Number(km)||0,free=travelFree(),billableKm;
+  if(travelFreeMode()==='abzug')billableKm=Math.max(0,k-free);
+  else billableKm=k>free?k:0;
+  var mult=travelRoundtrip()?2:1;
+  return Math.round(billableKm*mult*travelRate()*100)/100;
 }
 function renderRider(){
   var r=riderOf(curBook),el=document.getElementById('bdRider');
@@ -1207,6 +1239,7 @@ function renderRider(){
     row('Strom',r.power)+row('Parken / Anlieferung',r.parking)+row('Aufbauort / Bühne',r.stage)+
     row('Musikwünsche',r.music)+row('No-Gos',r.nogos)+
     row('Entfernung (einfach)',r.distance_km?r.distance_km+' km':'')+
+    row('Fahrzeit (einfach)',r.travel_minutes?r.travel_minutes+' Min.':'')+
     row('Reisekosten',tc?euro(tc)+' netto (wird als Position „Anfahrt“ übernommen)':'')+
     '</div>'+(r.notes?'<div style="margin-top:6px">'+row('Sonstiges / Ablauf',r.notes)+'</div>':'');
 }
@@ -1216,6 +1249,7 @@ function openRiderModal(){
     '<div class="grid3"><div><label>Personen / Gäste</label><input type="number" id="rGuests" value="'+(r.guests!=null?r.guests:(b.guests||''))+'"></div>'+
     '<div><label>Aufbau ab</label><input type="time" id="rSetup" value="'+(r.setup_from||'')+'"></div>'+
     '<div><label>Entfernung einfach (km)</label><input type="number" id="rKm" value="'+(r.distance_km||'')+'" oninput="riderKmHint()"></div></div>'+
+    '<div class="grid2"><div><label>Fahrzeit einfach (Minuten)</label><input type="number" id="rMin" value="'+(r.travel_minutes||'')+'" oninput="riderKmHint()"></div><div></div></div>'+
     '<div class="sml mut" id="rKmHint" style="margin:2px 0 8px"></div>'+
     '<div class="grid2"><div><label>Location</label><input id="rVenue" value="'+esc(r.venue_name||b.venue_name||'')+'"></div>'+
     '<div><label>Adresse (Straße, PLZ Ort)</label><input id="rAddr" value="'+esc(r.venue_address||b.venue_address||'')+'"></div></div>'+
@@ -1231,13 +1265,15 @@ function openRiderModal(){
   riderKmHint();
 }
 function riderKmHint(){
-  var km=Number(v('rKm'))||0,rate=travelRate(),free=travelFree();
-  document.getElementById('rKmHint').innerHTML=km?
-    ('Reisekosten: <b style="color:var(--wh)">'+euro(travelCost(km))+'</b> netto – '+Math.max(0,km-free)+' km berechnet × 2 (hin &amp; zurück) × '+euro(rate)+'/km'+(free?' ('+free+' Freikilometer)':'')+'. Fließt automatisch als Position „Anfahrt“ in Angebot/Rechnung. Satz in den Einstellungen.'):'';
+  var km=Number(v('rKm'))||0,min=Number(v('rMin'))||0,rate=travelRate(),free=travelFree();
+  var hint=km?('Reisekosten: <b style="color:var(--wh)">'+euro(travelCost(km))+'</b> netto ('+(travelFreeMode()==='schwelle'?(km>free?'über':'bis zu')+' '+free+' km Freigrenze':(free+' Freikilometer abgezogen'))+', '+(travelRoundtrip()?'Hin- und Rückfahrt':'einfache Strecke')+' × '+euro(rate)+'/km). Fließt automatisch als Position „Anfahrt" in Angebot/Rechnung. Regeln in den Einstellungen.'):'';
+  var onEnabled=overnightEnabled(),thresh=overnightThresholdType()==='zeit'?min:km,thVal=overnightThresholdValue();
+  if(onEnabled&&thresh>=thVal&&thVal>0)hint+=(hint?'<br>':'')+'Ab '+thVal+(overnightThresholdType()==='zeit'?' Min. Fahrzeit':' km Fahrtstrecke')+': automatische Übernachtung ('+euro(overnightPrice())+') wird beim Rechnung/Angebot erstellen ergänzt.';
+  document.getElementById('rKmHint').innerHTML=hint;
 }
 function saveRider(){
   var r={guests:v('rGuests')?Number(v('rGuests')):null,setup_from:v('rSetup')||null,
-    distance_km:v('rKm')?Number(v('rKm')):null,
+    distance_km:v('rKm')?Number(v('rKm')):null,travel_minutes:v('rMin')?Number(v('rMin')):null,
     venue_name:v('rVenue'),venue_address:v('rAddr'),contact_name:v('rContact'),contact_phone:v('rPhone'),
     power:v('rPower'),parking:v('rParking'),stage:v('rStage'),music:v('rMusic'),nogos:v('rNogos'),notes:v('rNotes')};
   var sync={rider:r,venue_name:r.venue_name||curBook.venue_name,venue_address:r.venue_address||curBook.venue_address,
@@ -1373,6 +1409,7 @@ function fillDocForm(){
   document.getElementById('docDiscVal').value=d.discount_value||0;
   document.getElementById('docDiscType').value=d.discount_type||'pct';
   document.getElementById('docDep').value=d.deposit_deducted||0;
+  document.getElementById('docTotalOverride').value=d.total_override!=null?d.total_override:'';
   document.getElementById('docIntro').value=d.intro_text||'';
   document.getElementById('docOutro').value=d.outro_text||'';
   updateDocTypeUI(d.doc_type);
@@ -1385,7 +1422,7 @@ function showAcceptSig(){
 function docLockedJs(d){return !!(d&&d.id&&['angebot','lieferschein'].indexOf(d.doc_type)<0&&d.status!=='entwurf')}
 function applyDocLock(){
   var locked=docLockedJs(curDoc);
-  ['docType','docCust','docBook','docDate','docDate2','docTax','docMode','docDiscVal','docDiscType','docDep','docIntro','docOutro']
+  ['docType','docCust','docBook','docDate','docDate2','docTax','docMode','docDiscVal','docDiscType','docDep','docTotalOverride','docIntro','docOutro']
     .forEach(function(i){var el=document.getElementById(i);if(el)el.disabled=locked});
   document.querySelectorAll('#docItems input, #docItems select').forEach(function(el){el.disabled=locked});
   document.getElementById('docSaveBtn').style.display=locked?'none':'';
@@ -1535,14 +1572,20 @@ function docCalc(){
   var net=sub-disc;
   var rate=Number(document.getElementById('docTax').value)||0;
   var tax=net*rate/100,gross=net+tax;
+  var override=v('docTotalOverride')!==''?Number(v('docTotalOverride')):null;
+  if(override!=null){gross=override;net=gross/(1+rate/100);tax=gross-net;}
   var dep=Number(document.getElementById('docDep').value)||0;
-  return {sub:sub,disc:disc,discVal:dv,discType:dtp,net:net,tax:tax,gross:gross,rate:rate,dep:dep};
+  return {sub:sub,disc:disc,discVal:dv,discType:dtp,net:net,tax:tax,gross:gross,rate:rate,dep:dep,override:override};
 }
 function renderTotals(){
   var c=docCalc(),t=document.getElementById('docType').value;
   var html='';
-  if(c.disc)html+='Zwischensumme: '+euro(c.sub)+' &nbsp;·&nbsp; Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+': −'+euro(c.disc)+'<br>';
-  html+='Netto: '+euro(c.net)+' &nbsp;·&nbsp; USt. '+c.rate+' %: '+euro(c.tax)+' &nbsp;·&nbsp; Brutto: <b>'+euro(c.gross)+'</b>';
+  if(c.override!=null){
+    html+='Pauschal-Gesamtpreis: <b>'+euro(c.gross)+'</b> brutto (Positionssumme wäre '+euro(c.sub)+' netto) &nbsp;·&nbsp; enthaltene USt. '+c.rate+' %: '+euro(c.tax)+'<br>';
+  } else {
+    if(c.disc)html+='Zwischensumme: '+euro(c.sub)+' &nbsp;·&nbsp; Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+': −'+euro(c.disc)+'<br>';
+    html+='Netto: '+euro(c.net)+' &nbsp;·&nbsp; USt. '+c.rate+' %: '+euro(c.tax)+' &nbsp;·&nbsp; Brutto: <b>'+euro(c.gross)+'</b>';
+  }
   if(v('docMode')==='brutto')html+='<br><span class="mut sml">Kundenansicht: Preise werden brutto (inkl. USt.) angezeigt</span>';
   if(t==='schluss'&&c.dep)html+='<br>abzgl. Abschläge: −'+euro(c.dep)+' &nbsp;·&nbsp; <b style="color:var(--wh)">Restbetrag: '+euro(c.gross-c.dep)+'</b>';
   document.getElementById('docTotals').innerHTML=html;
@@ -1551,6 +1594,7 @@ document.getElementById('docTax').addEventListener('input',renderTotals);
 document.getElementById('docDep').addEventListener('input',renderTotals);
 document.getElementById('docDiscVal').addEventListener('input',renderTotals);
 document.getElementById('docDiscType').addEventListener('change',renderTotals);
+document.getElementById('docTotalOverride').addEventListener('input',renderTotals);
 document.getElementById('docMode').addEventListener('change',renderTotals);
 
 function saveDoc(){
@@ -1561,7 +1605,7 @@ function saveDoc(){
     tax_rate:c.rate,is_small_business:c.rate===0&&!!(S.company&&S.company.small_business),
     intro_text:v('docIntro'),outro_text:v('docOutro'),
     price_mode:v('docMode'),discount_value:c.discVal,discount_type:c.discType,parent_id:curDoc.parent_id||null,
-    total_net:c.net,total_tax:c.tax,total_gross:c.gross,deposit_deducted:type==='schluss'?c.dep:0};
+    total_net:c.net,total_tax:c.tax,total_gross:c.gross,total_override:c.override,deposit_deducted:type==='schluss'?c.dep:0};
   body[type==='angebot'?'valid_until':'due_date']=v('docDate2')||null;
   var p;
   if(curDoc.id){p=api('documents?id=eq.'+curDoc.id,{method:'PATCH',prefer:'return=representation',body:body})}
@@ -1616,8 +1660,13 @@ function createDocFromBooking(type){
     });
     var rd=riderOf(b),tc=rd.distance_km?travelCost(rd.distance_km):0;
     if(tc>0)curItems.push({pos:curItems.length+1,description:'Anfahrt ('+rd.distance_km+' km einfache Strecke)',
-      note:'Hin- und Rückweg, '+travelFree()+' Freikilometer bereits abgezogen.',
+      note:(travelFreeMode()==='schwelle'?'Ab '+travelFree()+' km Freigrenze wird die volle Strecke berechnet.':travelFree()+' Freikilometer bereits abgezogen.')+(travelRoundtrip()?' Hin- und Rückweg.':' Einfache Strecke.'),
       qty:1,unit:'pausch.',unit_price:tc});
+    var onThresh=overnightThresholdType()==='zeit'?rd.travel_minutes:rd.distance_km;
+    if(overnightEnabled()&&onThresh&&onThresh>=overnightThresholdValue())
+      curItems.push({pos:curItems.length+1,description:'Übernachtung',
+        note:'Automatisch ergänzt ab '+overnightThresholdValue()+(overnightThresholdType()==='zeit'?' Min. Fahrzeit':' km Fahrtstrecke')+' – bei Bedarf entfernen oder eine zweite Übernachtung ergänzen.',
+        qty:1,unit:'pausch.',unit_price:overnightPrice()});
     if(!curItems.length)curItems=[{pos:1,description:label,qty:1,unit:'pausch.',unit_price:0}];
     renderItems();
     if(type==='abschlag'){
@@ -2053,8 +2102,9 @@ function renderEq(){
 function openEqModal(id){
   var e=id?CACHE.equipment.find(function(x){return x.id===id}):{};e=e||{};
   openModal(id?'Artikel bearbeiten':'Neuer Artikel',
-    '<div class="grid2"><div><label>Name *</label><input id="eName" value="'+esc(e.name||'')+'"></div>'+
-    '<div><label>Kategorie</label><input id="eCat" value="'+esc(e.category||'')+'" placeholder="PA, Licht, Effekt …"></div></div>'+
+    '<div class="grid3"><div><label>Name *</label><input id="eName" value="'+esc(e.name||'')+'"></div>'+
+    '<div><label>Kategorie</label><input id="eCat" value="'+esc(e.category||'')+'" placeholder="PA, Licht, Effekt …"></div>'+
+    '<div><label>Artikelnummer</label><input id="eSku" value="'+esc(e.sku||'')+'"></div></div>'+
     '<label>Beschreibung (Homepage)</label><textarea id="eDesc">'+esc(e.description||'')+'</textarea>'+
     '<div class="grid4"><div><label>€ / Miettag</label><input type="number" step="0.01" id="eRate" value="'+(e.day_rate||0)+'"></div>'+
     '<div><label>Folgetage %</label><input type="number" id="ePct" value="'+(e.followup_pct!=null?e.followup_pct:50)+'"></div>'+
@@ -2076,7 +2126,7 @@ function openEqModal(id){
 }
 function saveEq(id){
   if(!v('eName')){toast('Name fehlt.',1);return}
-  var body={name:v('eName'),category:v('eCat'),description:v('eDesc'),day_rate:Number(v('eRate'))||0,
+  var body={name:v('eName'),category:v('eCat'),sku:v('eSku')||null,description:v('eDesc'),day_rate:Number(v('eRate'))||0,
     partner_rate:v('ePartner')!==''?Number(v('ePartner')):null,addon_id:v('eAddon')||null,
     followup_pct:Number(v('ePct'))||50,
     tier_week_pct:v('eTierWeek')!==''?Number(v('eTierWeek')):null,
@@ -2095,6 +2145,73 @@ function delEq(id){
   api('equipment?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();
     api('equipment?select=*&order=sort').then(function(r){CACHE.equipment=r||[];renderEq()})})
     .catch(function(){toast('Nicht möglich – Artikel ist Buchungen zugeordnet.',1)});
+}
+
+/* ===== Technik-Sets ===== */
+var curSetItems=[];
+function renderSetsAdmin(){
+  var el=document.getElementById('setAdminList');if(!el)return;
+  el.innerHTML=(CACHE.equipmentSets||[]).map(function(s){
+    var n=(CACHE.setItems||[]).filter(function(x){return x.set_id===s.id}).length;
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openSetModal(\''+s.id+'\')">'+esc(s.name)+'</a> '+
+      '<span class="mut">'+n+' Artikel</span> '+
+      (s.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</div>';
+  }).join('')||'<span class="mut">Noch keine Sets.</span>';
+}
+function renderSetItemRows(){
+  document.getElementById('sItemRows').innerHTML=curSetItems.map(function(it,i){
+    return '<div class="grid3" style="margin-bottom:6px"><div style="grid-column:span 2"><select onchange="curSetItems['+i+'].equipment_id=this.value">'+
+      (CACHE.equipment||[]).map(function(e){return '<option value="'+e.id+'"'+(it.equipment_id===e.id?' selected':'')+'>'+esc(e.name)+' ('+euro(e.day_rate||0)+'/Tag)</option>'}).join('')+
+      '</select></div><div style="display:flex;gap:6px"><input type="number" min="1" value="'+(it.qty||1)+'" onchange="curSetItems['+i+'].qty=Number(this.value)||1" style="margin:0"><button class="btn r sm" onclick="curSetItems.splice('+i+',1);renderSetItemRows()">✕</button></div></div>';
+  }).join('')||'<span class="mut sml">Noch keine Artikel im Set.</span>';
+}
+function addSetItemRow(){
+  var first=(CACHE.equipment||[])[0];if(!first){toast('Erst Technik-Artikel anlegen.',1);return}
+  curSetItems.push({equipment_id:first.id,qty:1});renderSetItemRows();
+}
+function openSetModal(id){
+  var s=id?(CACHE.equipmentSets||[]).find(function(x){return x.id===id}):{};s=s||{};
+  curSetItems=id?(CACHE.setItems||[]).filter(function(x){return x.set_id===id}).map(function(x){return {equipment_id:x.equipment_id,qty:x.qty}}):[];
+  openModal(id?'Set bearbeiten':'Neues Set',
+    '<label>Name *</label><input id="sName" value="'+esc(s.name||'')+'" placeholder="z. B. Gartenparty-Paket">'+
+    '<label>Beschreibung (Homepage)</label><textarea id="sDesc">'+esc(s.description||'')+'</textarea>'+
+    '<div class="grid2"><div><label>Rabatt auf die Summe der Einzelpreise (%)</label><input type="number" step="0.1" id="sDiscPct" value="'+(s.discount_pct!=null?s.discount_pct:5)+'"></div>'+
+    '<div><label>oder Festpreis €/Tag (überschreibt den Rabatt)</label><input type="number" step="0.01" id="sFixed" value="'+(s.fixed_price!=null?s.fixed_price:'')+'"></div></div>'+
+    '<label style="margin-top:10px">Enthaltene Artikel</label><div id="sItemRows"></div>'+
+    '<button class="btn g sm" style="margin-top:6px" onclick="addSetItemRow()">+ Artikel</button>'+
+    '<label style="margin-top:14px">Foto</label><div style="display:flex;gap:8px"><input id="sImg" value="'+esc(s.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upSet" onchange="uploadImg(this,\'sImg\',\'sFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upSet\').click()">Hochladen</button></div>'+
+    focalWidget(s.image_url,s.image_focal,'sFocal','4/3')+
+    '<label style="margin-top:12px"><input type="checkbox" id="sPub" style="width:auto;margin-right:6px" '+(s.public!==false?'checked':'')+'>Auf Homepage anzeigen (buchbar)</label>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveSet(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delSet(\''+id+'\')">Löschen</button>':'')+'</div>');
+  renderSetItemRows();
+}
+function saveSet(id){
+  if(!v('sName')){toast('Name fehlt.',1);return}
+  if(!curSetItems.length){toast('Bitte mindestens einen Artikel ins Set aufnehmen.',1);return}
+  var body={name:v('sName'),description:v('sDesc'),
+    discount_pct:Number(v('sDiscPct'))||0,fixed_price:v('sFixed')!==''?Number(v('sFixed')):null,
+    image_url:v('sImg'),image_focal:v('sFocal'),public:document.getElementById('sPub').checked};
+  if(!id)body.sort=(CACHE.equipmentSets||[]).length;
+  var items=curSetItems.slice();
+  (id?api('equipment_sets?id=eq.'+id,{method:'PATCH',body:body}):api('equipment_sets',{method:'POST',prefer:'return=representation',body:body}))
+    .then(function(rows){
+      var setId=id||(rows&&rows[0]&&rows[0].id);
+      return api('equipment_set_items?set_id=eq.'+setId,{method:'DELETE'}).catch(function(){}).then(function(){
+        return Promise.all(items.map(function(it){return api('equipment_set_items',{method:'POST',body:{set_id:setId,equipment_id:it.equipment_id,qty:it.qty}})}));
+      });
+    })
+    .then(function(){closeModal();toast('Gespeichert ✓');reloadSets()}).catch(function(e){toast(e.message,1)});
+}
+function delSet(id){
+  if(!confirm('Set löschen?'))return;
+  api('equipment_set_items?set_id=eq.'+id,{method:'DELETE'}).catch(function(){}).then(function(){
+    return api('equipment_sets?id=eq.'+id,{method:'DELETE'});
+  }).then(function(){closeModal();toast('Gelöscht ✓');reloadSets()}).catch(function(e){toast(e.message,1)});
+}
+function reloadSets(){
+  Promise.all([api('equipment_sets?select=*&order=sort'),api('equipment_set_items?select=*')])
+    .then(function(r){CACHE.equipmentSets=r[0]||[];CACHE.setItems=r[1]||[];renderSetsAdmin()});
 }
 
 /* ===== CMS ===== */
@@ -2757,8 +2874,14 @@ function renderSet(){
   document.getElementById('sTierWeek').value=d.tier_week_pct!=null?d.tier_week_pct:30;
   document.getElementById('sTier2Week').value=d.tier_2week_pct!=null?d.tier_2week_pct:20;
   document.getElementById('sTierMonth').value=d.tier_month_pct!=null?d.tier_month_pct:12;
-  document.getElementById('sKmRate').value=d.travel_rate_km!=null?d.travel_rate_km:0.70;
+  document.getElementById('sKmRate').value=d.travel_rate_km!=null?d.travel_rate_km:0.50;
   document.getElementById('sKmFree').value=d.travel_free_km!=null?d.travel_free_km:30;
+  document.getElementById('sKmFreeMode').value=d.travel_free_mode||'schwelle';
+  document.getElementById('sKmRoundtrip').checked=d.travel_roundtrip!==false;
+  document.getElementById('sOnEnabled').checked=d.overnight_enabled!==false;
+  document.getElementById('sOnPrice').value=d.overnight_price!=null?d.overnight_price:0;
+  document.getElementById('sOnType').value=d.overnight_threshold_type||'zeit';
+  document.getElementById('sOnValue').value=d.overnight_threshold_value!=null?d.overnight_threshold_value:60;
   document.getElementById('sBank').value=c.bank||'';
   document.getElementById('sIban').value=c.iban||'';
   document.getElementById('sBic').value=c.bic||'';
@@ -2788,6 +2911,9 @@ function saveNumbering(){
   d.tax_rate=Number(v('sTaxRate'))||19;d.partner_discount_pct=Number(v('sPartnerPct'))||20;
   d.tier_week_pct=Number(v('sTierWeek'))||0;d.tier_2week_pct=Number(v('sTier2Week'))||0;d.tier_month_pct=Number(v('sTierMonth'))||0;
   d.travel_rate_km=Number(v('sKmRate'))||0;d.travel_free_km=Number(v('sKmFree'))||0;
+  d.travel_free_mode=v('sKmFreeMode')||'schwelle';d.travel_roundtrip=document.getElementById('sKmRoundtrip').checked;
+  d.overnight_enabled=document.getElementById('sOnEnabled').checked;d.overnight_price=Number(v('sOnPrice'))||0;
+  d.overnight_threshold_type=v('sOnType')||'zeit';d.overnight_threshold_value=Number(v('sOnValue'))||60;
   Promise.all([
     api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'numbering',value:n}}),
     api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'defaults',value:d}})
@@ -2958,6 +3084,8 @@ function openProdModal(id){
     '<div><label>Preis netto (€) – bei Paketen leer = Summe der Bestandteile</label><input type="number" step="0.01" id="pPrice" value="'+(p.price_net!=null?p.price_net:'')+'"></div></div>'+
     '<label>Paket-Bestandteile (eine Zeile je Artikel: Artikelnummer | Menge) – leer = normaler Artikel</label>'+
     '<textarea id="pBundle" style="min-height:70px;font-size:11px" placeholder="DJ-100 | 1&#10;TON-200 | 1">'+esc(bundleLines)+'</textarea>'+
+    '<label>Passt dazu (Artikelnummer) <span class="mut sml" style="text-transform:none;letter-spacing:0">– wird automatisch mit ins Angebot/die Rechnung übernommen, wenn dieser Artikel eingefügt wird (z. B. Kabel zu Lautsprecher)</span></label>'+
+    '<input id="pAddonSku" value="'+esc(p.addon_sku||'')+'" placeholder="z. B. KABEL-10">'+
     '<label style="margin-top:12px"><input type="checkbox" id="pActive" style="width:auto;margin-right:6px" '+(p.active!==false?'checked':'')+'>Aktiv (im „+ Artikel“-Picker sichtbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveProd(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'products\',\''+id+'\',reloadProds)">Löschen</button>':'')+'</div>');
@@ -2972,6 +3100,7 @@ function saveProd(id){
   if(bad.length){toast('Unbekannte Artikelnummer im Paket: '+bad.map(function(b){return b.sku}).join(', '),1);return}
   var body={sku:v('pSku').toUpperCase(),name:v('pName'),category:v('pCat'),description:v('pDesc'),
     unit:v('pUnit')||'Stk.',price_net:v('pPrice')!==''?Number(v('pPrice')):null,
+    addon_sku:v('pAddonSku')?v('pAddonSku').toUpperCase():null,
     bundle:bundle,sort:Number(v('pSort'))||0,active:document.getElementById('pActive').checked};
   (id?api('products?id=eq.'+id,{method:'PATCH',body:body}):api('products',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');reloadProds()}).catch(function(e){toast('Fehler (Artikelnummer doppelt?): '+e.message,1)});
@@ -3012,7 +3141,16 @@ function insertProduct(id){
   }
   curItems.push({pos:curItems.length+1,description:(p.sku?p.sku+' – ':'')+p.name,note:note,
     qty:1,unit:p.unit||'Stk.',unit_price:prodPrice(p)});
-  closeModal();renderItems();toast('„'+p.name+'“ eingefügt ✓');
+  var msg='„'+p.name+'" eingefügt ✓';
+  if(p.addon_sku){
+    var addon=(CACHE.products||[]).find(function(x){return x.sku===p.addon_sku});
+    if(addon){
+      curItems.push({pos:curItems.length+1,description:(addon.sku?addon.sku+' – ':'')+addon.name,note:addon.description||'',
+        qty:1,unit:addon.unit||'Stk.',unit_price:prodPrice(addon)});
+      msg+=' (inkl. „'+addon.name+'" – passt automatisch dazu, bei Bedarf entfernen)';
+    }
+  }
+  closeModal();renderItems();toast(msg);
 }
 
 /* ===== Partner (Technik-Vermietung) ===== */

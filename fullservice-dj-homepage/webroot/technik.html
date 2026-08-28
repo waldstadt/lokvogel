@@ -233,6 +233,11 @@ footer a:hover{color:var(--acc)}
       <button class="btn g" onclick="checkAvail()">Verfügbarkeit prüfen</button>
       <span class="sub" id="partnerBadge"></span>
     </div>
+    <div id="setSection" style="display:none;margin-top:36px">
+      <h3 style="font-size:19px;margin-bottom:14px">Sets – gleich alles zusammen</h3>
+      <div class="rent-grid" id="setGrid"></div>
+    </div>
+    <h3 style="font-size:19px;margin-top:36px;margin-bottom:14px" id="singleItemsHead">Einzelne Artikel</h3>
     <div class="rent-grid" id="rentGrid"></div>
     <p class="rent-note">Alle Preise netto. Ab 1 Woche, 2 Wochen und 1 Monat gelten automatisch günstigere Tagessätze – die Staffel-Gesamtsumme seht ihr live im Warenkorb.</p>
 
@@ -535,6 +540,7 @@ function esc(s){var d=document.createElement('div');d.textContent=s==null?'':Str
 var LEGAL={};
 
 var EQ=[{name:'Nebelmaschine klein',category:'Effekt',description:'Kompakte Nebelmaschine inkl. Fluid – ideal für kleine Räume.',day_rate:25}];
+var SETS=[],SET_ITEMS=[],EQ_ALL={};
 var PARTNER=JSON.parse(sessionStorage.getItem('lg_partner')||'null');
 var AVAIL={};
 var CART=JSON.parse(localStorage.getItem('lg_cart')||'[]');
@@ -575,7 +581,7 @@ function renderRent(){
       var a=EQ.find(function(x){return x.id===e.addon_id});
       if(a)addon='<div class="addon">Passt dazu: <b>'+esc(a.name)+'</b> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag) – einfach mit anfragen.</div>';
     }
-    var inCart=e.id&&CART.some(function(c){return c.id===e.id});
+    var inCart=e.id&&CART.some(function(c){return c.type!=='set'&&c.id===e.id});
     var cartCtrl=e.id?('<div style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
       '<input type="number" min="1" value="1" id="qty-'+e.id+'" style="margin:0;width:60px;padding:8px">'+
       '<button class="btn small'+(inCart?' ghost':'')+'" onclick="addToCart(\''+e.id+'\')">'+(inCart?'Im Warenkorb ✓':'In den Warenkorb')+'</button></div>'):'';
@@ -592,6 +598,46 @@ function sfetch(path){
   return fetch(API+'/rest/'+path).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()});
 }
 sfetch('equipment?select=*&public=eq.true&rentable=eq.true&status=eq.aktiv&order=sort').then(function(r){if(r.length){EQ=r;renderRent()}}).catch(function(){});
+sfetch('equipment?select=*').then(function(r){r.forEach(function(e){EQ_ALL[e.id]=e})}).catch(function(){});
+
+/* ---- Sets: mehrere Artikel als ein buchbares Paket ---- */
+function setRawSum(s){
+  return SET_ITEMS.filter(function(x){return x.set_id===s.id}).reduce(function(sum,x){
+    var e=EQ_ALL[x.equipment_id];if(!e)return sum;
+    var rate=partnerPrice(e)!=null?partnerPrice(e):Number(e.day_rate||0);
+    return sum+rate*x.qty;
+  },0);
+}
+function setDayRate(s){
+  var raw=setRawSum(s);
+  return s.fixed_price!=null?Number(s.fixed_price):raw*(1-(Number(s.discount_pct)||0)/100);
+}
+function renderSets(){
+  var box=document.getElementById('setSection');
+  if(!SETS.length){box.style.display='none';return}
+  box.style.display='block';
+  document.getElementById('setGrid').innerHTML=SETS.map(function(s){
+    var img=s.image_url?' style="background-image:url(\''+esc(s.image_url)+'\');background-position:'+esc(s.image_focal||'50% 50%')+'"':'';
+    var icon=s.image_url?'':'♪';
+    var items=SET_ITEMS.filter(function(x){return x.set_id===s.id});
+    var contains=items.map(function(x){var e=EQ_ALL[x.equipment_id];return (x.qty>1?x.qty+'× ':'')+(e?e.name:'?')}).join(', ');
+    var price=euro(setDayRate(s))+' <small>/ Miettag</small>';
+    var inCart=CART.some(function(c){return c.type==='set'&&c.set_id===s.id});
+    return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
+      '<div class="rc">SET</div>'+
+      '<h4>'+esc(s.name)+'</h4><p>'+esc(s.description||'')+'</p>'+
+      (contains?'<div class="addon">Enthält: '+esc(contains)+'</div>':'')+
+      '<div class="rp">'+price+'</div>'+
+      '<div style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
+      '<input type="number" min="1" value="1" id="qty-set-'+s.id+'" style="margin:0;width:60px;padding:8px">'+
+      '<button class="btn small'+(inCart?' ghost':'')+'" onclick="addSetToCart(\''+s.id+'\')">'+(inCart?'Im Warenkorb ✓':'In den Warenkorb')+'</button></div>'+
+      '</div></div>';
+  }).join('');
+}
+Promise.all([
+  sfetch('equipment_sets?select=*&public=eq.true&order=sort'),
+  sfetch('equipment_set_items?select=*')
+]).then(function(r){SETS=r[0]||[];SET_ITEMS=r[1]||[];renderSets()}).catch(function(){});
 
 function checkAvail(){
   var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
@@ -607,12 +653,19 @@ function saveCart(){localStorage.setItem('lg_cart',JSON.stringify(CART))}
 function addToCart(id){
   var e=EQ.find(function(x){return x.id===id});if(!e)return;
   var qty=Math.max(1,Number(document.getElementById('qty-'+id).value)||1);
-  var existing=CART.find(function(c){return c.id===id});
-  if(existing)existing.qty=qty;else CART.push({id:id,qty:qty});
+  var existing=CART.find(function(c){return c.type!=='set'&&c.id===id});
+  if(existing)existing.qty=qty;else CART.push({type:'equipment',id:id,qty:qty});
   saveCart();renderRent();
   document.getElementById('cartBox').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
-function removeFromCart(id){CART=CART.filter(function(c){return c.id!==id});saveCart();renderRent()}
+function addSetToCart(setId){
+  var qty=Math.max(1,Number(document.getElementById('qty-set-'+setId).value)||1);
+  var existing=CART.find(function(c){return c.type==='set'&&c.set_id===setId});
+  if(existing)existing.qty=qty;else CART.push({type:'set',set_id:setId,qty:qty});
+  saveCart();renderSets();renderCart();
+  document.getElementById('cartBox').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function removeFromCart(idx){CART.splice(idx,1);saveCart();renderRent();renderSets()}
 function renderCart(){
   var box=document.getElementById('cartBox');
   if(!CART.length){box.style.display='none';return}
@@ -620,14 +673,21 @@ function renderCart(){
   var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
   var days=from?rentalDaysClient(from,to):1;
   var total=0;
-  document.getElementById('cartItems').innerHTML=CART.map(function(c){
-    var e=EQ.find(function(x){return x.id===c.id});if(!e)return'';
+  document.getElementById('cartItems').innerHTML=CART.map(function(c,idx){
+    if(c.type==='set'){
+      var s=SETS.find(function(x){return x.id===c.set_id});if(!s)return'';
+      var line=rentalPriceClient(setDayRate(s),days,50,30,20,12)*c.qty;
+      total+=line;
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:14px">'+
+        '<span>Set: '+esc(s.name)+' × '+c.qty+'</span><span>'+euro(line)+' <a onclick="removeFromCart('+idx+')" style="color:var(--mut2);margin-left:8px" title="Entfernen">✕</a></span></div>';
+    }
+    var e=EQ.find(function(x){return x.id===c.id})||EQ_ALL[c.id];if(!e)return'';
     var rate=partnerPrice(e)!=null?partnerPrice(e):Number(e.day_rate||0);
     var line=rentalPriceClient(rate,days,Number(e.followup_pct!=null?e.followup_pct:50),
       Number(e.tier_week_pct!=null?e.tier_week_pct:30),Number(e.tier_2week_pct!=null?e.tier_2week_pct:20),Number(e.tier_month_pct!=null?e.tier_month_pct:12))*c.qty;
     total+=line;
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:14px">'+
-      '<span>'+esc(e.name)+' × '+c.qty+'</span><span>'+euro(line)+' <a onclick="removeFromCart(\''+c.id+'\')" style="color:var(--mut2);margin-left:8px" title="Entfernen">✕</a></span></div>';
+      '<span>'+esc(e.name)+' × '+c.qty+'</span><span>'+euro(line)+' <a onclick="removeFromCart('+idx+')" style="color:var(--mut2);margin-left:8px" title="Entfernen">✕</a></span></div>';
   }).join('');
   document.getElementById('cartTotal').textContent=euro(total)+(from&&days>1?' · '+days+' Tage':'');
   renderCartAuth();
@@ -691,14 +751,14 @@ function submitCart(){
     document.getElementById('cartSubmitBtn').disabled=true;
     return fetch(API+'/portal/cart/submit',{method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('lg_cust_token')},
-      body:JSON.stringify({items:CART.map(function(c){return{equipment_id:c.id,qty:c.qty}}),from:from,to:to})})
+      body:JSON.stringify({items:CART.map(function(c){return c.type==='set'?{type:'set',set_id:c.set_id,qty:c.qty}:{type:'equipment',equipment_id:c.id,qty:c.qty}}),from:from,to:to})})
       .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
       .then(function(res){
         document.getElementById('cartSubmitBtn').disabled=false;
         m.style.display='block';
         if(res.s>=400){m.className='msg err';m.textContent=res.j.error||'Anfrage fehlgeschlagen – bitte später erneut versuchen.';return}
         m.className='msg ok';m.textContent='Danke! Eure Anfrage ist eingegangen – ihr bekommt in der Regel innerhalb von 24 Stunden eine Antwort mit Verfügbarkeit und Preis.';
-        CART=[];saveCart();renderRent();
+        CART=[];saveCart();renderRent();renderSets();
       });
   }).catch(function(){document.getElementById('cartSubmitBtn').disabled=false});
 }

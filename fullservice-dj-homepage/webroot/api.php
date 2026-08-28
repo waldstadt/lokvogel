@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 32;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 33;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -40,8 +40,9 @@ const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved'], 'friends' => ['public'],
   'workshop_events' => ['public'],
   'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
-  'bookings' => ['review_requested'],
+  'bookings' => ['review_requested','open_ended'],
   'equipment' => ['public','rentable'],
+  'equipment_sets' => ['public'],
   'booking_equipment' => ['out_done','back_done'],
   'communications' => ['followup_done'],
   'documents' => ['is_small_business'],
@@ -49,11 +50,11 @@ const BOOL_COLS = [
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
-  'workshop_events','workshop_signups','doc_audit','customer_files','newsletter'];
+  'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
-const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends'];
+const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items'];
 const INQUIRY_FIELDS = ['name','email','phone','event_type','event_date','location','guests','message'];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -286,6 +287,34 @@ function upgrade(PDO $p): void {
     "alter table equipment add column image_focal text default '50% 50%'",
     "alter table locations add column image_focal text default '50% 50%'",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
+  if ($v < 33) foreach ([
+    "alter table equipment add column sku text",
+    "alter table documents add column total_override real",
+    "alter table bookings add column open_ended integer default 0",
+    "alter table products add column addon_sku text",
+    "create table if not exists equipment_sets (id text primary key, sort integer default 0,
+      name text not null, description text, image_url text, image_focal text default '50% 50%',
+      discount_pct real default 5, fixed_price real, public integer default 1, created_at text)",
+    "create table if not exists equipment_set_items (id text primary key,
+      set_id text not null references equipment_sets(id) on delete cascade,
+      equipment_id text not null references equipment(id) on delete restrict, qty integer default 1)",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte/Tabelle existiert bereits */ } }
+  if ($v < 33) try {
+    /* Fahrtkosten/Übernachtung: Markus nutzt real 0,50 statt der bisherigen 0,70 sowie eine
+       harte Freigrenze (0 € bis 30 km, nicht abgezogen) - Standardwerte entsprechend gesetzt,
+       aber nur ergänzt, nicht bereits individuell gesetzte Werte überschrieben. */
+    $st = $p->query("select value from settings where key='defaults'");
+    $defs = json_decode((string)$st->fetchColumn() ?: '{}', true) ?: [];
+    $defs['travel_rate_km'] = 0.50;
+    $defs += [
+      'travel_free_mode' => 'schwelle', 'travel_roundtrip' => true,
+      'overnight_enabled' => true, 'overnight_price' => 0,
+      'overnight_threshold_type' => 'zeit', 'overnight_threshold_value' => 60,
+    ];
+    $p->prepare("insert into settings (key,value) values ('defaults',?)
+      on conflict(key) do update set value=excluded.value")
+      ->execute([json_encode($defs, JSON_UNESCAPED_UNICODE)]);
+  } catch (PDOException $e) {}
   if ($v < 23) try {
     $st = $p->query("select id, fields from form_templates where name like 'DJ-Vorauswahl%' limit 1");
     if ($row = $st->fetch()) {
@@ -514,12 +543,18 @@ create table packages (id text primary key, sort integer default 0, title text n
   public integer default 1, created_at text);
 create table faq (id text primary key, sort integer default 0, question text not null,
   answer text not null, public integer default 1);
-create table equipment (id text primary key, sort integer default 0, name text not null, slug text,
+create table equipment (id text primary key, sort integer default 0, name text not null, slug text, sku text,
   category text, description text, image_url text, image_focal text default '50% 50%',
   day_rate real default 0, followup_pct integer default 50,
   tier_week_pct real, tier_2week_pct real, tier_month_pct real,
   qty_total integer default 1, rentable integer default 1, public integer default 1,
   status text default 'aktiv', notes text, partner_rate real, addon_id text, created_at text);
+create table equipment_sets (id text primary key, sort integer default 0,
+  name text not null, description text, image_url text, image_focal text default '50% 50%',
+  discount_pct real default 5, fixed_price real, public integer default 1, created_at text);
+create table equipment_set_items (id text primary key,
+  set_id text not null references equipment_sets(id) on delete cascade,
+  equipment_id text not null references equipment(id) on delete restrict, qty integer default 1);
 create table locations (id text primary key, sort integer default 0, name text not null,
   city text, region text, address text, phone text, description text, image_url text,
   image_focal text default '50% 50%', website text,
@@ -542,7 +577,8 @@ create table bookings (id text primary key,
   status text default 'anfrage', kind text default 'dj', event_type text, title text,
   event_date text not null, end_date text, start_time text, end_time text,
   venue_name text, venue_address text, guests integer, fee_net real, notes text, rider text, customer_notes text,
-  billable_days integer, review_requested integer default 0, created_at text, updated_at text);
+  billable_days integer, open_ended integer default 0,
+  review_requested integer default 0, created_at text, updated_at text);
 create table booking_equipment (id text primary key,
   booking_id text not null references bookings(id) on delete cascade,
   equipment_id text not null references equipment(id) on delete restrict,
@@ -555,13 +591,13 @@ create table documents (id text primary key, share_token text, doc_type text not
   parent_id text, status text default 'entwurf', doc_date text, valid_until text, due_date text,
   tax_rate real default 19, is_small_business integer default 0, intro_text text, outro_text text,
   total_net real default 0, total_tax real default 0, total_gross real default 0,
-  deposit_deducted real default 0, sent_at text, paid_at text,
+  deposit_deducted real default 0, total_override real, sent_at text, paid_at text,
   accepted_name text, accept_signature text, created_at text, updated_at text);
 create table email_templates (id text primary key, sort integer default 0, name text not null,
   subject text, body text, created_at text);
 create table products (id text primary key, sku text unique, sort integer default 0,
   category text, name text not null, description text, unit text default 'Stk.',
-  price_net real, bundle text default '[]', active integer default 1, created_at text);
+  price_net real, bundle text default '[]', addon_sku text, active integer default 1, created_at text);
 create table partners (id text primary key, code text unique, name text not null, company text,
   kind text default 'dj', email text, phone text, status text default 'beantragt',
   notes text, created_at text);
@@ -1156,7 +1192,8 @@ function equipmentAvailability(PDO $p, string $eq, string $from, string $to): ?a
   $st = $p->prepare("select coalesce(sum(be.qty),0) from booking_equipment be
     join bookings b on b.id = be.booking_id
     where be.equipment_id = ? and b.status != 'storniert'
-      and b.event_date <= ? and coalesce(b.end_date, b.event_date) >= ?");
+      and b.event_date <= ?
+      and (b.open_ended = 1 or coalesce(b.end_date, b.event_date) >= ?)");
   $st->execute([$eq, $to, $from]);
   $used = (int)$st->fetchColumn();
   return ['total' => (int)$total, 'available' => max(0, (int)$total - $used)];
@@ -1892,7 +1929,40 @@ function handlePortal(string $path, string $method, $body): never {
     $days = rentalDays(['event_date' => $from, 'end_date' => $to]);
     $lines = []; $total = 0.0;
     foreach ($cart as $it) {
-      $eqId = (string)($it['equipment_id'] ?? ''); $qty = max(1, (int)($it['qty'] ?? 1));
+      $qty = max(1, (int)($it['qty'] ?? 1));
+      if (($it['type'] ?? 'equipment') === 'set') {
+        $setId = (string)($it['set_id'] ?? '');
+        $st = $p->prepare("select * from equipment_sets where id=? and public=1");
+        $st->execute([$setId]);
+        $set = $st->fetch();
+        if (!$set) fail('Ein Set im Warenkorb ist nicht mehr verfügbar.', 404);
+        $st = $p->prepare("select si.qty as set_qty, e.* from equipment_set_items si
+          join equipment e on e.id = si.equipment_id where si.set_id = ?");
+        $st->execute([$setId]);
+        $comps = $st->fetchAll();
+        if (!$comps) fail('Das Set „' . $set['name'] . '" enthält keine Artikel.', 500);
+        $rawSum = 0.0; $compRates = [];
+        foreach ($comps as $c) {
+          $compQty = (int)$c['set_qty'] * $qty;
+          $av = equipmentAvailability($p, $c['id'], $from, $to);
+          if ($av === null || $av['available'] < $compQty) fail('„' . $c['name'] . '" (Teil des Sets „' . $set['name'] . '") ist im gewünschten Zeitraum nicht in ausreichender Stückzahl verfügbar.', 409);
+          $rate = $isPartner ? (float)($c['partner_rate'] ?? ((float)$c['day_rate'] * (1 - $partnerPct / 100))) : (float)$c['day_rate'];
+          $rawSum += $rate * $compQty;
+          $compRates[] = ['equipment_id' => $c['id'], 'name' => $c['name'], 'qty' => $compQty, 'rate' => $rate];
+        }
+        $setDayRate = $set['fixed_price'] !== null ? (float)$set['fixed_price'] : $rawSum * (1 - (float)$set['discount_pct'] / 100);
+        $setTotal = round(rentalPrice($setDayRate, $days, 50, $tiers['week'], $tiers['twoweek'], $tiers['month']), 2);
+        $total += $setTotal;
+        $remaining = $setTotal;
+        foreach ($compRates as $i => $c) {
+          $share = $rawSum > 0 ? $c['rate'] * $c['qty'] / $rawSum : 1 / count($compRates);
+          $compPrice = $i === count($compRates) - 1 ? $remaining : round($setTotal * $share, 2);
+          $remaining -= $compPrice;
+          $lines[] = ['equipment_id' => $c['equipment_id'], 'name' => $set['name'] . ' – ' . $c['name'], 'qty' => $c['qty'], 'price' => $compPrice];
+        }
+        continue;
+      }
+      $eqId = (string)($it['equipment_id'] ?? '');
       $st = $p->prepare("select * from equipment where id=? and public=1 and status='aktiv'");
       $st->execute([$eqId]);
       $eq = $st->fetch();
