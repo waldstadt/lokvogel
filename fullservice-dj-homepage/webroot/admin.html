@@ -436,7 +436,12 @@ th.num{text-align:right}
       <div>
         <div class="card"><h3>Leistungspakete <button class="btn sm" style="float:right" onclick="openPackModal()">+ Paket</button></h3><div id="packList" class="sml"></div></div>
         <div class="card"><h3>FAQ <button class="btn sm" style="float:right" onclick="openFaqModal()">+ Frage</button></h3><div id="faqAdminList" class="sml"></div></div>
-        <div class="card"><h3>Location-Empfehlungen <button class="btn sm" style="float:right" onclick="openLocModal()">+ Location</button></h3><div id="locAdminList" class="sml"></div></div>
+        <div class="card"><h3>Location-Empfehlungen <button class="btn sm" style="float:right" onclick="openLocModal()">+ Location</button></h3>
+          <label>Überschrift der Sektion</label><input id="cLocTitle">
+          <label>Einleitungstext</label><textarea id="cLocText" style="min-height:60px"></textarea>
+          <div style="margin-top:6px;margin-bottom:14px"><button class="btn sm" onclick="saveContent('loc_section')">Überschrift speichern</button></div>
+          <div class="mut sml" style="margin-bottom:8px">Reihenfolge per Ziehen am ⠿-Griff ändern.</div>
+          <div id="locAdminList" class="sml"></div></div>
         <div class="card"><h3>Freunde &amp; Empfehlungen <button class="btn sm" style="float:right" onclick="openFriendModal()">+ Empfehlung</button></h3>
           <div class="mut sml" style="margin-bottom:8px">Fotografen, Musiker, Planer, Kollegen – erscheinen auf der DJ-Homepage. Gegenseitige Verlinkung hilft beim Google-Ranking.</div>
           <div id="friendAdminList" class="sml"></div></div>
@@ -2089,6 +2094,8 @@ function renderCms(){
   document.getElementById('cThRentText').value=g('rental','text');
   document.getElementById('cThTeaTitle').value=g('tech_teaser','title');
   document.getElementById('cThTeaText').value=g('tech_teaser','text');
+  document.getElementById('cLocTitle').value=g('loc_section','title')||'Orte, an denen ich besonders gerne auflege';
+  document.getElementById('cLocText').value=g('loc_section','text')||'Deutschlandweit gibt es Locations, mit denen die Zusammenarbeit einfach herausragend läuft – eingespielte Teams, gute Technik-Bedingungen, tolle Räume. Diese Häuser empfehle ich aus voller Überzeugung.';
   document.getElementById('cGTitle').value=g('guarantee','title');
   document.getElementById('cGText').value=g('guarantee','text');
   document.getElementById('cRevGoogle').value=g('reviews','google_url');
@@ -2132,6 +2139,7 @@ function saveContent(key){
   if(key==='contact')val={title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
   if(key==='seo')val={title:v('cSeoTitle'),description:v('cSeoDesc')};
   if(key==='guarantee')val={title:v('cGTitle'),text:v('cGText')};
+  if(key==='loc_section')val={title:v('cLocTitle'),text:v('cLocText')};
   if(key==='reviews')val={google_url:v('cRevGoogle'),djbande_url:v('cRevBande'),tagline:v('cRevTagline')};
   if(key==='tech'){
     upsertContent('tech_hero',{subtitle:v('cThSub'),text:v('cThText')});
@@ -2211,11 +2219,28 @@ function saveFaq(id){
 }
 function delRow(tbl,id,cb){api(tbl+'?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();cb()}).catch(function(e){toast(e.message,1)})}
 function renderLocAdmin(){
-  document.getElementById('locAdminList').innerHTML=(CACHE.locations||[]).map(function(l){
-    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openLocModal(\''+l.id+'\')">'+esc(l.name)+'</a> '+
+  document.getElementById('locAdminList').innerHTML=(CACHE.locations||[]).map(function(l,i){
+    return '<div draggable="true" ondragstart="locDragStart('+i+',event)" ondragover="locDragOver(event)" ondrop="locDrop('+i+',event)" '+
+    'style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+
+    '<span style="opacity:.55;user-select:none" title="Ziehen zum Umsortieren">⠿</span>'+
+    '<a onclick="openLocModal(\''+l.id+'\')" style="flex:1">'+esc(l.name)+'</a> '+
     (l.city?'<span class="mut">'+esc(l.city)+'</span> ':'')+
     (l.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</div>';
   }).join('')||'<span class="mut">Noch keine Locations.</span>';
+}
+var locDragIdx=null;
+function locDragStart(i,ev){locDragIdx=i;ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',String(i))}catch(e){}}
+function locDragOver(ev){if(locDragIdx!==null)ev.preventDefault()}
+function locDrop(i,ev){
+  ev.preventDefault();
+  if(locDragIdx===null||locDragIdx===i){locDragIdx=null;return}
+  var arr=CACHE.locations;
+  var m=arr.splice(locDragIdx,1)[0];
+  arr.splice(i,0,m);
+  locDragIdx=null;
+  renderLocAdmin();
+  Promise.all(arr.map(function(l,idx){l.sort=idx;return api('locations?id=eq.'+l.id,{method:'PATCH',body:{sort:idx}})}))
+    .then(function(){toast('Reihenfolge gespeichert ✓')}).catch(function(e){toast(e.message,1)});
 }
 function openLocModal(id){
   var l=id?(CACHE.locations||[]).find(function(x){return x.id===id}):{};l=l||{};
@@ -2224,17 +2249,18 @@ function openLocModal(id){
     '<div><label>Stadt</label><input id="lCity" value="'+esc(l.city||'')+'"></div>'+
     '<div><label>Region</label><input id="lRegion" value="'+esc(l.region||'')+'" placeholder="z. B. NRW, Bayern"></div></div>'+
     '<label>Warum empfehle ich sie? (kurz)</label><textarea id="lDesc">'+esc(l.description||'')+'</textarea>'+
-    '<div class="grid2"><div><label>Website der Location</label><input id="lWeb" value="'+esc(l.website||'')+'" placeholder="https://…"></div>'+
-    '<div><label>Sortierung</label><input type="number" id="lSort" value="'+(l.sort||0)+'"></div></div>'+
+    '<label>Website der Location</label><input id="lWeb" value="'+esc(l.website||'')+'" placeholder="https://…">'+
     '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">Hochladen</button></div>'+
-    '<label style="margin-top:12px"><input type="checkbox" id="lPub" style="width:auto;margin-right:6px" '+(l.public?'checked':'')+'>Auf Homepage anzeigen</label>'+
+    '<label style="margin-top:12px"><input type="checkbox" id="lPub" style="width:auto;margin-right:6px" '+(l.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
+    '<div class="mut sml" style="margin-top:6px">Die Reihenfolge stellst du in der Liste per Ziehen am ⠿-Griff ein.</div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveLoc(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'locations\',\''+id+'\',reloadLocs)">Löschen</button>':'')+'</div>');
 }
 function saveLoc(id){
   if(!v('lName')){toast('Name fehlt.',1);return}
   var body={name:v('lName'),city:v('lCity'),region:v('lRegion'),description:v('lDesc'),website:v('lWeb'),
-    sort:Number(v('lSort'))||0,image_url:v('lImg'),public:document.getElementById('lPub').checked};
+    image_url:v('lImg'),public:document.getElementById('lPub').checked};
+  if(!id)body.sort=(CACHE.locations||[]).length;
   (id?api('locations?id=eq.'+id,{method:'PATCH',body:body}):api('locations',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');reloadLocs()}).catch(function(e){toast(e.message,1)});
 }

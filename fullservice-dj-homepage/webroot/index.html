@@ -538,6 +538,10 @@ function applyContent(rows){
     if(c.seo.title)document.title=c.seo.title;
     if(c.seo.description){var m=document.querySelector('meta[name=description]');if(m)m.content=c.seo.description}
   }
+  if(c.loc_section){
+    if(c.loc_section.title)document.getElementById('locTitle').textContent=c.loc_section.title;
+    if(c.loc_section.text)document.getElementById('locText').textContent=c.loc_section.text;
+  }
 }
 /* Schriftstil aus dem CMS (alle Dateien liegen lokal unter fonts/) */
 var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif"};
