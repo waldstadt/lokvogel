@@ -2225,6 +2225,7 @@ function renderLocAdmin(){
     '<span style="opacity:.55;user-select:none" title="Ziehen zum Umsortieren">⠿</span>'+
     '<a onclick="openLocModal(\''+l.id+'\')" style="flex:1">'+esc(l.name)+'</a> '+
     (l.city?'<span class="mut">'+esc(l.city)+'</span> ':'')+
+    (l.image_source==='web'?(l.image_approved?'<span class="b" style="background:rgba(201,138,60,.15);color:#e0a851">Web-Foto freigegeben</span> ':'<span class="b" style="background:rgba(201,138,60,.15);color:#e0a851">Foto ungeprüft</span> '):'')+
     (l.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</div>';
   }).join('')||'<span class="mut">Noch keine Locations.</span>';
 }
@@ -2244,13 +2245,25 @@ function locDrop(i,ev){
 }
 function openLocModal(id){
   var l=id?(CACHE.locations||[]).find(function(x){return x.id===id}):{};l=l||{};
+  var webPending=l.image_source==='web';
   openModal(id?'Location bearbeiten':'Neue Location',
     '<div class="grid3"><div><label>Name *</label><input id="lName" value="'+esc(l.name||'')+'"></div>'+
     '<div><label>Stadt</label><input id="lCity" value="'+esc(l.city||'')+'"></div>'+
     '<div><label>Region</label><input id="lRegion" value="'+esc(l.region||'')+'" placeholder="z. B. NRW, Bayern"></div></div>'+
+    '<div class="grid2"><div><label>Adresse</label><input id="lAddr" value="'+esc(l.address||'')+'" placeholder="Straße, Hausnummer"></div>'+
+    '<div><label>Telefon</label><input id="lPhone" value="'+esc(l.phone||'')+'" placeholder="z. B. 02371 123456"></div></div>'+
     '<label>Warum empfehle ich sie? (kurz)</label><textarea id="lDesc">'+esc(l.description||'')+'</textarea>'+
     '<label>Website der Location</label><input id="lWeb" value="'+esc(l.website||'')+'" placeholder="https://…">'+
+    (webPending?
+      '<div style="margin:6px 0 14px;padding:12px 14px;border:1px solid #c98a3c;border-radius:9px;background:rgba(201,138,60,.08)">'+
+      '<div style="font-size:13px;font-weight:600;color:#e0a851;margin-bottom:6px">Bild aus dem Internet – noch nicht freigegeben</div>'+
+      '<div class="mut sml" style="margin-bottom:8px">Dieses Foto wurde als Vorschlag hinterlegt (z. B. von der Website der Location) und erscheint erst auf der Homepage, wenn du die Nutzungsrechte geprüft hast – am sichersten durch kurze Nachfrage bei der Location selbst – und es hier freigibst.</div>'+
+      (l.image_url?'<img src="'+esc(l.image_url)+'" style="max-width:220px;border-radius:8px;display:block;margin-bottom:8px">':'')+
+      '<label style="margin:0"><input type="checkbox" id="lImgApprove" style="width:auto;margin-right:6px" '+(l.image_approved?'checked':'')+'>Rechte geprüft – Bild freigeben</label>'+
+      '</div>'
+      :'')+
     '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">Hochladen</button></div>'+
+    (webPending?'<div class="mut sml" style="margin-top:4px">Hier ein eigenes Foto einfügen ersetzt den Internet-Vorschlag ohne weitere Prüfung.</div>':'')+
     '<label style="margin-top:12px"><input type="checkbox" id="lPub" style="width:auto;margin-right:6px" '+(l.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
     '<div class="mut sml" style="margin-top:6px">Die Reihenfolge stellst du in der Liste per Ziehen am ⠿-Griff ein.</div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveLoc(\''+(id||'')+'\')">Speichern</button>'+
@@ -2258,8 +2271,17 @@ function openLocModal(id){
 }
 function saveLoc(id){
   if(!v('lName')){toast('Name fehlt.',1);return}
-  var body={name:v('lName'),city:v('lCity'),region:v('lRegion'),description:v('lDesc'),website:v('lWeb'),
-    image_url:v('lImg'),public:document.getElementById('lPub').checked};
+  var orig=id?(CACHE.locations||[]).find(function(x){return x.id===id}):null;
+  var imgVal=v('lImg');
+  var imageSource='eigen',imageApproved=true;
+  if(orig&&orig.image_source==='web'&&imgVal===(orig.image_url||'')){
+    imageSource='web';
+    imageApproved=!!(document.getElementById('lImgApprove')&&document.getElementById('lImgApprove').checked);
+  }
+  var body={name:v('lName'),city:v('lCity'),region:v('lRegion'),address:v('lAddr'),phone:v('lPhone'),
+    description:v('lDesc'),website:v('lWeb'),image_url:imgVal,
+    image_source:imageSource,image_approved:imageApproved,
+    public:document.getElementById('lPub').checked};
   if(!id)body.sort=(CACHE.locations||[]).length;
   (id?api('locations?id=eq.'+id,{method:'PATCH',body:body}):api('locations',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');reloadLocs()}).catch(function(e){toast(e.message,1)});

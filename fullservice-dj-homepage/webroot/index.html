@@ -577,13 +577,17 @@ sfetch('reviews?select=*&public=eq.true&order=sort').then(function(r){
 sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
   if(!r.length)return;
   document.getElementById('locGrid').innerHTML=r.map(function(l){
-    var img=l.image_url?' style="background-image:url(\''+esc(l.image_url)+'\')"':'';
-    var icon=l.image_url?'':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
-    var meta=[l.city,l.region].filter(Boolean).join(' · ');
+    var showImg=l.image_url&&(l.image_source!=='web'||l.image_approved);
+    var img=showImg?' style="background-image:url(\''+esc(l.image_url)+'\')"':'';
+    var icon=showImg?'':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+    var meta=[l.address,l.city,l.region].filter(Boolean).join(' · ');
+    var links=[];
+    if(l.website)links.push('<a href="'+esc(l.website)+'" target="_blank" rel="noopener">Zur Location ↗</a>');
+    if(l.phone)links.push('<a href="tel:'+esc(l.phone.replace(/[^\d+]/g,''))+'">'+esc(l.phone)+'</a>');
     return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
       (meta?'<div class="rc">'+esc(meta)+'</div>':'')+
       '<h4>'+esc(l.name)+'</h4><p>'+esc(l.description||'')+'</p>'+
-      (l.website?'<a href="'+esc(l.website)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600">Zur Location ↗</a>':'')+
+      (links.length?'<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;font-weight:600">'+links.join('')+'</div>':'')+
       '</div></div>';
   }).join('');
   document.getElementById('locations').style.display='';

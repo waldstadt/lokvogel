@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 28;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 29;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -37,7 +37,7 @@ const JSON_COLS = [
   'customers' => ['tags', 'tech_check'],
 ];
 const BOOL_COLS = [
-  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public'], 'friends' => ['public'],
+  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved'], 'friends' => ['public'],
   'workshop_events' => ['public'],
   'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
   'bookings' => ['review_requested'],
@@ -254,6 +254,16 @@ function upgrade(PDO $p): void {
       $p->prepare("insert into site_content (key,value,updated_at) values ('loc_section',?,?)")
         ->execute(['{"title":"Orte, an denen ich besonders gerne auflege","text":"Deutschlandweit gibt es Locations, mit denen die Zusammenarbeit einfach herausragend läuft – eingespielte Teams, gute Technik-Bedingungen, tolle Räume. Diese Häuser empfehle ich aus voller Überzeugung."}', now()]);
     }
+  } catch (PDOException $e) {}
+  if ($v < 29) foreach ([
+    "alter table locations add column address text",
+    "alter table locations add column phone text",
+    "alter table locations add column image_source text default 'eigen'",
+    "alter table locations add column image_approved integer default 0",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
+  if ($v < 29) try {
+    /* Bestehende Locations ohne Foto haben nichts zu verstecken - erst neu gesetzte externe Fotos brauchen die Freigabe */
+    $p->exec("update locations set image_source='eigen' where image_source is null");
   } catch (PDOException $e) {}
   if ($v < 23) try {
     $st = $p->query("select id, fields from form_templates where name like 'DJ-Vorauswahl%' limit 1");
@@ -488,7 +498,8 @@ create table equipment (id text primary key, sort integer default 0, name text n
   qty_total integer default 1, rentable integer default 1, public integer default 1,
   status text default 'aktiv', notes text, partner_rate real, addon_id text, created_at text);
 create table locations (id text primary key, sort integer default 0, name text not null,
-  city text, region text, description text, image_url text, website text,
+  city text, region text, address text, phone text, description text, image_url text, website text,
+  image_source text default 'eigen', image_approved integer default 0,
   public integer default 1, created_at text);
 create table inquiries (id text primary key, name text not null, email text, phone text,
   event_type text, event_date text, location text, guests text, message text,
