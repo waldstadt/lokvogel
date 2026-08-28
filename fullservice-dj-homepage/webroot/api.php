@@ -541,24 +541,24 @@ function seed(PDO $p): void {
       implode(',', array_fill(0, count($cols), '?')) . ")")->execute(array_values($row));
   };
   foreach ([
-    ['company', '{"name":"DJ Lauschgift","owner":"Markus Jankowski","street":"Büttmecker Weg 35c","zip_city":"58675 Hemer","phone":"01523 6439373","email":"","website":"https://lauschgift.net","tax_id":"","vat_id":"","iban":"","bic":"","bank":"","small_business":false}'],
+    ['company', '{"name":"DJ Lauschgift","owner":"Markus Jankowski","street":"Büttmecker Weg 35c","zip_city":"58675 Hemer","phone":"01523 6439373","email":"lauschgiftmarkus@gmail.com","website":"https://lauschgift.net","tax_id":"","vat_id":"","iban":"","bic":"","bank":"","small_business":false}'],
     ['numbering', '{"angebot":{"prefix":"AN-","next":1},"rechnung":{"prefix":"RE-","next":1},"lieferschein":{"prefix":"LS-","next":1},"year_in_number":true}'],
     ['rental_contract', json_encode(['text' => rentalContractDefault()], JSON_UNESCAPED_UNICODE)],
     ['defaults', '{"tax_rate":19,"payment_days":14,"quote_valid_days":30,"quote_intro":"vielen Dank für Ihre Anfrage. Gerne biete ich Ihnen an:","invoice_outro":"Bitte überweisen Sie den Betrag unter Angabe der Rechnungsnummer auf das unten genannte Konto."}'],
   ] as [$k, $v]) $p->prepare('insert into settings (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
 
   foreach ([
-    ['hero', '{"title":"DJ Lauschgift","subtitle":"DJ für Hochzeiten, Geburtstage & Firmenfeiern","text":"Ich bin Markus – seit 23 Jahren DJ für Hochzeiten, Geburtstage und Firmenfeiern. Keine Show um meine Person, kein Programm von der Stange: Ich lese den Raum und spiele das, was eure Gäste auf die Tanzfläche bringt.","cta":"Unverbindlich anfragen","image":""}'],
-    ['about', '{"title":"Musik ist mein Ding. Der Mittelpunkt gehört euch.","text":"Nach 23 Jahren hinter den Decks ist jede Feier immer noch anders – und genau das macht es aus. Ich bin kein DJ, der sich selbst inszeniert: Ich lese den Raum, spiele den richtigen Song zur richtigen Zeit und bleibe den ganzen Abend ansprechbar für euch und eure Gäste. Und weil ich ein echter Technik-Mensch bin, stehen Ton und Licht bei mir auf einem Niveau, das man sonst von deutlich größeren Produktionen kennt.","image":""}'],
+    ['hero', '{"title":"DJ Lauschgift","subtitle":"DJ für Hochzeiten, Geburtstage & Firmenfeiern · deutschlandweit","text":"Ich bin Markus – seit 23 Jahren DJ, quer durch Deutschland unterwegs. Keine Show um meine Person, kein Programm von der Stange: Ich lese den Raum und spiele das, was eure Gäste auf die Tanzfläche bringt. Ihr müsst euch um nichts kümmern – dafür bin ich da.","cta":"Unverbindlich anfragen","image":""}'],
+    ['about', '{"title":"Einfach Markus. Und trotzdem kein Standard-DJ.","text":"Angefangen hat alles mit zwei Plattenspielern und einem alten Mischpult zum 18. Geburtstag. Ein Jahr lang habe ich in der heimischen Garage geübt, bis ich für bekannte DJs das Warm-up in angesagten Clubs übernehmen durfte. Den eigentlichen Wendepunkt gab es aber bei einer ganz anderen Feier: Als meine Tante mich zu ihrem runden Geburtstag fragte, ob ich auch gemischte Musik auflegen könnte, war ich skeptisch – bis Jung und Alt gemeinsam auf der Tanzfläche standen und weitersangen, als ich den Regler runterzog. Seitdem ist mir in 23 Jahren kein einziger Abend langweilig geworden.\\n\\nWas mich von vielen anderen unterscheidet: Ich bin ein echter Technik- und Menschenfreund. Ich nehme euch und eure Gäste bewusst wahr und setze auf Licht- und Tontechnik, die man sonst eher von deutlich größeren Produktionen kennt – weil auch eine Feier mit 40 Gästen großartige Technik verdient. Mein Sound kommt von Seeburg Acoustic Line, einem der deutschen Top-Hersteller für mobile PA-Systeme – das hört man sofort. Dazu passe ich mich flexibel an jede Location an, ob Scheune, Schloss, Industriehalle oder Gartenparty: Ich kenne mein Equipment in- und auswendig und weiß, wie ich jeden Raum klanglich und optisch in Szene setze.","image":""}'],
     ['services', '{"title":"Das bekommt ihr","text":"Vom Sektempfang bis zum letzten Song: Musik, Ton für die freie Trauung, dezentes Licht passend zur Location – und ein Plan B für alle Fälle. Ihr feiert, ich kümmere mich um den Rest.","image":""}'],
     ['prices', json_encode([
       'title' => 'Was kostet das?',
-      'text' => 'Ob Hochzeit, Geburtstag oder Firmenfeier, spielt für den Preis keine Rolle – bei mir zahlt niemand einen „Hochzeitsaufschlag“. Ich rechne nach Termin (Haupt- oder Nebensaison), Arbeitsstunden und Technikaufwand. Ihr bekommt ein individuelles Angebot mit klaren Posten, zugeschnitten auf eure Feier.',
+      'text' => 'Ob Hochzeit, Geburtstag oder Firmenfeier – der Anlass spielt für den Preis keine Rolle, bei mir zahlt niemand einen „Hochzeitsaufschlag“. Ich rechne nach Termin (Haupt- oder Nebensaison), Dauer und Technikaufwand und setze bewusst auf hochwertige Technik von Seeburg Acoustic Line. Ihr bekommt immer ein individuelles Angebot, zugeschnitten auf eure Feier.',
       'from' => 1200,
       'examples' => [
-        ['title' => 'Hochzeit', 'scope' => 'Sektempfang bis offenes Ende, Ton für die freie Trauung, dezentes Licht', 'price' => 'ca. 1.550 €'],
-        ['title' => 'Geburtstag', 'scope' => 'Abendparty ca. 6 Stunden, kompakte Ton- und Lichttechnik', 'price' => 'ca. 1.000 €'],
-        ['title' => 'Firmenfeier', 'scope' => 'Empfang, Reden-Ton und Party bis Mitternacht', 'price' => 'ca. 1.350 €'],
+        ['title' => 'Kleine Feier tagsüber', 'scope' => 'z. B. Geburtstag oder Ladenöffnung, bis ca. 7 Stunden, kompaktes Setup', 'price' => 'ab 1.200 €'],
+        ['title' => 'Mittelgroße Feier', 'scope' => 'z. B. Hochzeit oder runder Geburtstag, ca. 8 Stunden, 60–100 Gäste', 'price' => 'ab 1.500 €'],
+        ['title' => 'Große Feier', 'scope' => 'z. B. große Familienfeier oder Firmenevent, bis 200 Gäste, alles inklusive', 'price' => 'auf Anfrage'],
       ],
       'note' => 'Das gilt für klassische Abendveranstaltungen am Wochenende in der Hauptsaison. Tagsüber, montags bis donnerstags oder im November, Januar, Februar und März kalkuliere ich deutlich günstiger. Fragt einfach mit eurem Termin an.',
     ], JSON_UNESCAPED_UNICODE)],
@@ -566,7 +566,7 @@ function seed(PDO $p): void {
     ['rental', '{"title":"Technik mieten","text":"Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung."}'],
     ['tech_hero', '{"subtitle":"Lauschgift Veranstaltungstechnik · Hemer","text":"Große Bühnen mit viel Platz kann jeder beschallen. Die Kunst ist die kleine Location: niedrige Decke, harte Wände, Publikum direkt vor der Box. Genau darauf bin ich spezialisiert – Ton und Licht für Veranstaltungen von 30 bis 200 Gästen, mit hochwertiger Technik, die dafür gebaut ist."}'],
     ['tech_teaser', '{"title":"Lauschgift Veranstaltungstechnik","text":"Ihr braucht keinen DJ, sondern Technik? Ton und Licht für Veranstaltungen von 30 bis 200 Gästen – zum Mieten aus meinem Lager in Hemer oder mit mir als Techniker. Das ist ein eigenes Gewerk mit eigener Seite."}'],
-    ['contact', '{"title":"Kontakt","phone":"01523 6439373","email":"","address":"Büttmecker Weg 35c, 58675 Hemer","instagram":"","whatsapp":""}'],
+    ['contact', '{"title":"Kontakt","phone":"01523 6439373","email":"lauschgiftmarkus@gmail.com","address":"Büttmecker Weg 35c, 58675 Hemer","instagram":"https://www.instagram.com/dj_lauschgift/","whatsapp":""}'],
     ['theme', '{"preset":"koralle","primary":"#ff6f5b","bg":"#0f1012","font":"grotesk"}'],
     ['reviews', '{"google_url":"","djbande_url":"","tagline":""}'],
     ['seo', '{"title":"DJ Lauschgift – Hochzeits-DJ & Event-DJ | Deutschlandweit","description":"DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer."}'],
@@ -596,6 +596,44 @@ function seed(PDO $p): void {
 
   $ins('equipment', ['sort'=>1,'name'=>'Nebelmaschine klein','slug'=>'nebelmaschine-klein','category'=>'Effekt',
     'description'=>'Kompakte Nebelmaschine inkl. Fluid – ideal für Partykeller und kleine Räume.','day_rate'=>25,'qty_total'=>1]);
+
+  /* Echte Kundenstimmen (Original-Zitate von der bisherigen Website) */
+  $reviews = [
+    [1,'Bastian D.','Hochzeit','Für uns fühlte es sich am Ende so an, als würde ein guter Freund auflegen. Markus hat es geschafft, alle abzuholen – von Death Metal über Pop bis Hardstyle. Die Tanzfläche war nie leer. Was ihn wirklich besonders macht, ist seine ruhige, unaufgeregte Art. Er stellt sich nicht selbst in den Mittelpunkt, sondern liest den Raum und spielt genau den richtigen Song.','Juni 2025'],
+    [2,'Roman & Kathi D.','Hochzeit','Egal ob Rock, Schlager oder regionale Lieder – perfekte musikalische Begleitung. Du hast unseren Musikgeschmack sofort erkannt und jeden Wunsch mit tollem Gespür umgesetzt. Besonders die regionalen Songs haben uns begeistert und dem Abend eine ganz persönliche Note gegeben.','Mai 2025'],
+    [3,'Kerstin & Tiago R.','Hochzeit','From the first call until the end of the evening, everything went smoothly. We had an international crowd and it surely wasn\'t easy to please everyone. Markus did very well, got everyone dancing and we had an incredible evening. Thank you so much!','Juli 2024'],
+    [4,'Gesine F.','60. Geburtstag','Aus meinen umfangreichen Playlists eine schöne, abwechslungsreiche Auswahl – danke! Coole Übergänge, dezent im Hintergrund ohne nervige Ansprachen, genau so wie gewünscht. Ein ganz großartiger Abend.','September 2025'],
+    [5,'Jan G.-K.','Hochzeit & Hoffest','Bis 5 Uhr durchgetanzt – einfach top! Er hat die Leute perfekt dort abgeholt, wo wir nach einer schon sehr starken Liveband waren. Nahtloser Übergang und dann nochmal Vollgas bis zum Morgen.','Juni 2023'],
+    [6,'Nicole R.','Firmenfeier','Musik und Beleuchtung haben enorm zum Gelingen beigetragen. Alles hat super funktioniert, besonders die Beleuchtung unserer Produktionsstätten war ein echtes Highlight. Klare Weiterempfehlung!','November 2023'],
+  ];
+  foreach ($reviews as [$s,$author,$type,$text,$date])
+    $ins('reviews', ['sort'=>$s,'author'=>$author,'event_type'=>$type,'text'=>$text,'rating'=>5,'source'=>'direkt','review_date'=>$date,'public'=>1]);
+
+  /* Lieblingslocations (Fakten aus der bisherigen Website, Texte neu formuliert) */
+  $locs = [
+    [1,'Romantikhotel Neuhaus','Iserlohn','Sauerland / NRW',
+      'Vier-Sterne-Haus mit einem der schönsten Ballsäle der Region – Holzdecke, warme Materialien, angeschlossener Skulpturengarten für die freie Trauung. Ich stimme die Anlage präzise auf den Saal ab und arbeite im Garten mit akkubetriebenem Licht, ganz ohne Kabel über die historischen Wege. Bis 150 Gäste, meist Hochzeiten und runde Geburtstage.', 'https://www.hotel-neuhaus.de'],
+    [2,'Ufer 39','Konstanz','Bodensee / Baden-Württemberg',
+      'Restaurant direkt am Bodensee mit offener Seeterrasse und zwei unterschiedlichen Räumen. Meine PA bespielt Terrasse und Innenraum gleichwertig, ohne die ruhige Seeatmosphäre zu überfordern, dazu mobiles Akku-Licht für warme Stimmung am Wasser. Bis 130 Gäste, vor allem Hochzeiten und Firmenfeiern.', 'https://ufer39.de'],
+    [3,'Wirtshaus Krämer','Dortmund','Ruhrgebiet / NRW',
+      'Rustikale Location mit Holzbalken und viel Charakter – die Stimmung entsteht hier fast von allein. Ich setze auf ein kompaktes, präzise abgestimmtes Setup statt einer überdimensionierten PA und akzentuiere mit Licht gezielt Holz und Struktur des Raums. Bis 120 Gäste, Hochzeiten und Geburtstage.', ''],
+    [4,'Waldenburger Hafen am Biggesee','Attendorn','Sauerland / NRW',
+      'Naturkulisse direkt am Biggesee – Wasser, Bäume und Abendhimmel brauchen keine Inszenierung. Meine Seeburg-PA liefert auch im Freien vollen Sound, und die Akku-Leuchten kommen ganz ohne Kabeltrommeln aus. Variabel indoor und outdoor, vor allem Hochzeiten und Sommerfeste.', ''],
+    [5,'Gut Kump','Hamm','Westfalen / NRW',
+      'Historischer Gutshof von 1298 mit drei völlig unterschiedlichen Räumen: Festscheune, Saal und Gewölbekeller. Ich stimme Boxenposition, Pegel und Licht für jeden Raum einzeln ab – im Gewölbekeller setzen meine Akku-Leuchten die historische Tiefe gezielt in Szene. Bis 150 Gäste, Hochzeiten und Geburtstage.', 'https://www.gut-kump.de'],
+    [6,'Danzturm','Iserlohn','Sauerland / NRW',
+      'Bekannte Eventlocation direkt in meiner Heimatstadt – industrieller Charakter, hohe Decken, klare Architektur. Ich kenne den Raum gut, dadurch entfällt das Einarbeiten vor Ort: präzise abgestimmter Sound plus Moving Heads und LED-Tubes, die die Optik betonen statt zu überdecken. Hochzeiten und Firmenfeiern.', ''],
+    [7,'Gut Bardenhagen','Bienenbüttel','Lüneburger Heide / Niedersachsen',
+      'Ehemaliges Trabergestüt auf 7,5 Hektar mit hellem Arkadensaal für bis zu 200 Gäste und Außentrauungen auf weitläufigem Gelände. Für diese Größe arbeite ich mit mehreren Beschallungspunkten und eigenem Sub-Setup, bei Außentrauungen mit akkubetriebenem Licht ohne Kabelwege über das Gelände. Vor allem Hochzeiten.', 'https://www.gut-bardenhagen.de'],
+    [8,'Stapelskotten','Münster','Münsterland / NRW',
+      'Restaurant an der Aa mit gemütlichem Innenbereich und offener Wasserlage draußen. Ich stimme Innen- und Außenbeschallung aufeinander ab, damit der Wechsel zwischen beiden Bereichen nahtlos bleibt, und setze draußen auf kabelloses Akku-Licht. Hochzeiten, Geburtstage und Firmenfeiern.', 'https://www.stapelskotten.de'],
+    [9,'Remise by Haus Delecke','Möhnesee','Sauerland / NRW',
+      'Modernisierte Remise aus Naturstein, Glas und Holz, samstags exklusiv für eine Feier buchbar. Mehrere kompakte Beschallungspunkte sorgen für gleichmäßigen Klang im ganzen Raum, mein kabelloses Licht setzt Naturstein und Holz gezielt in Szene. Hochzeiten und Firmenfeiern.', 'https://www.haus-delecke.de/remise/'],
+    [10,'Speisekammer','Dortmund','Ruhrgebiet / NRW',
+      'Farmhaus-Stil mit unbehandelten Oberflächen und sofort warmer Atmosphäre, Platz für bis zu 80 Gäste. Ich halte die Technik bewusst kompakt, damit sie sich in den Raum einfügt statt ihn zu erschlagen, und setze mit warmem Akzentlicht Holz und Struktur in Szene. Hochzeiten, Geburtstage und Familienfeiern.', 'https://www.speisekammer-dortmund.com'],
+  ];
+  foreach ($locs as [$s,$name,$city,$region,$desc,$url])
+    $ins('locations', ['sort'=>$s,'name'=>$name,'city'=>$city,'region'=>$region,'description'=>$desc,'website'=>$url,'public'=>1]);
 
   /* E-Mail-Antwortvorlagen – Platzhalter: {vorname} {name} {datum} {anlass} {ort} */
   $tpls = [
