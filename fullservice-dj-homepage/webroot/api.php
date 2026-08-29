@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 35;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 36;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -285,6 +285,7 @@ function upgrade(PDO $p): void {
     "alter table equipment add column own_rig integer default 0",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
   if ($v < 35) seedServiceProducts($p);
+  if ($v < 36) try { $p->exec("alter table equipment add column day_rate_suggested real"); } catch (PDOException $e) {}
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -556,7 +557,7 @@ create table equipment (id text primary key, sort integer default 0, name text n
   tier_week_pct real, tier_2week_pct real, tier_month_pct real,
   qty_total integer default 1, rentable integer default 1, public integer default 1,
   status text default 'aktiv', notes text, partner_rate real, addon_id text,
-  thomann_url text, own_rig integer default 0, created_at text);
+  thomann_url text, own_rig integer default 0, day_rate_suggested real, created_at text);
 create table equipment_sets (id text primary key, sort integer default 0,
   name text not null, description text, image_url text, image_focal text default '50% 50%',
   discount_pct real default 5, fixed_price real, public integer default 1, created_at text);
