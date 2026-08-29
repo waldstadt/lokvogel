@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 44;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 45;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -35,7 +35,7 @@ const JSON_COLS = [
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
   'products' => ['bundle'], 'bookings' => ['rider', 'customer_notes'], 'rental_contracts' => ['snapshot'],
   'customers' => ['tags', 'tech_check'],
-  'equipment' => ['addon_ids', 'images'],
+  'equipment' => ['addon_ids', 'images', 'fits_ids'],
 ];
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'],
@@ -322,6 +322,11 @@ function upgrade(PDO $p): void {
       ->execute(['Seeburg Acoustic Line X2', 'MANUAL-SEEBURG-X2',
         'Kompaktes Koaxial-Topteil (passiv): 8" Tieftöner + 1" Hochtöner koaxial – gleichmäßige Abstrahlung auch außerhalb der Achse. Belastbarkeit 250 W AES / 750 W Peak, 8 Ω, max. SPL 124 dB. Frequenzbereich 70 Hz–20 kHz, Abstrahlwinkel 90°×60°. Multiplex-Gehäuse 375×250×250 mm, 8 kg, 35-mm-Stativflansch, flugfähig.',
         'https://www.thomann.de/de/seeburg_x_2.htm', 'MANUAL-SEEBURG-A2']); } catch (PDOException $e) {}
+  }
+  if ($v < 45) {
+    /* Umgekehrte Zubehör-Beziehung „passend für": z. B. ein Kabel/Stativ gibt an,
+       zu welchen Hauptartikeln es passt. Beide Richtungen werden im Frontend gespiegelt. */
+    try { $p->exec("alter table equipment add column fits_ids text"); } catch (PDOException $e) {}
   }
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
@@ -678,7 +683,7 @@ create table equipment (id text primary key, sort integer default 0, name text n
   day_rate real default 0, followup_pct integer default 50,
   tier_week_pct real, tier_2week_pct real, tier_month_pct real,
   qty_total integer default 1, rentable integer default 1, public integer default 1,
-  status text default 'aktiv', notes text, partner_rate real, addon_id text, addon_ids text, images text,
+  status text default 'aktiv', notes text, partner_rate real, addon_id text, addon_ids text, images text, fits_ids text,
   thomann_url text, own_rig integer default 0, day_rate_suggested real,
   invoice_file text, invoice_name text, on_request integer default 0, created_at text);
 create table equipment_sets (id text primary key, sort integer default 0,
@@ -1181,7 +1186,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       if (!$auth && $t === 'equipment') {
         $pubCols = ['id','sort','name','slug','category','description','image_url','image_focal',
           'day_rate','followup_pct','tier_week_pct','tier_2week_pct','tier_month_pct',
-          'qty_total','rentable','public','status','addon_id','addon_ids','images','on_request'];
+          'qty_total','rentable','public','status','addon_id','addon_ids','images','fits_ids','on_request'];
         foreach ($rows as &$r) $r = array_intersect_key($r, array_flip($pubCols));
         unset($r);
       }

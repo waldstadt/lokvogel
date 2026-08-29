@@ -2456,17 +2456,9 @@ function openEqModal(id){
     '<div><label>Status</label><select id="eStatus"><option>aktiv</option><option>wartung</option><option>inaktiv</option></select></div></div>'+
     '<div class="grid2"><div><label>Partner-Preis €/Tag (leer = Rabatt % aus Einstellungen)</label><input type="number" step="0.01" id="ePartner" value="'+(e.partner_rate!=null?e.partner_rate:'')+'"></div>'+
     '<div><label>Zubehör-Empfehlung („passt dazu“ – bis zu 5)</label>'+
-    (function(){
-      var ids=(e.addon_ids&&e.addon_ids.length?e.addon_ids:(e.addon_id?[e.addon_id]:[])).slice(0,5);
-      var opts=(CACHE.equipment||[]).filter(function(x){return x.id!==e.id});
-      var sels='';
-      for(var i=0;i<5;i++){
-        var cur=ids[i]||'';
-        sels+='<select id="eAddon'+i+'" style="margin-bottom:6px"><option value="">–</option>'+
-          opts.map(function(x){return '<option value="'+x.id+'"'+(cur===x.id?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select>';
-      }
-      return sels;
-    })()+'</div></div>'+
+    eqRelSelects('eAddon',(e.addon_ids&&e.addon_ids.length?e.addon_ids:(e.addon_id?[e.addon_id]:[])),e.id)+
+    '<label style="margin-top:10px">Passend für („passend für" – bis zu 5, z. B. Kabel/Stativ zu einem Gerät)</label>'+
+    eqRelSelects('eFits',e.fits_ids||[],e.id)+'</div></div>'+
     '<div class="grid2"><div><label>Produktlink (Hersteller/Händler – Nachbestellung, techn. Daten)</label><input id="eThomann" value="'+esc(e.thomann_url||'')+'" placeholder="https://…">'+
     (e.thomann_url?'<a href="'+esc(e.thomann_url)+'" target="_blank" rel="noopener" class="mut sml">Produktseite ansehen ↗</a>':'')+'</div>'+
     '<div style="display:flex;align-items:flex-end"><label style="margin:0"><input type="checkbox" id="eOnReq" style="width:auto;margin-right:6px" '+(e.on_request?'checked':'')+'>Nur auf Anfrage verfügbar – Kunde kann in den Tourcase legen, Bestätigung machst du manuell</label></div></div>'+
@@ -2493,13 +2485,29 @@ function openEqModal(id){
   EQ_IMAGES=eqImagesOf(e);EQ_FOCAL=e.image_focal||'50% 50%';renderEqImgGrid();renderEqFocal();
   if(e.status)document.getElementById('eStatus').value=e.status;
 }
+/* Fünf Auswahlfelder für eine Artikel-Beziehung („passt dazu" / „passend für"). */
+function eqRelSelects(prefix,ids,selfId){
+  ids=(ids||[]).slice(0,5);
+  var opts=(CACHE.equipment||[]).filter(function(x){return x.id!==selfId});
+  var sels='';
+  for(var i=0;i<5;i++){
+    var cur=ids[i]||'';
+    sels+='<select id="'+prefix+i+'" style="margin-bottom:6px"><option value="">–</option>'+
+      opts.map(function(x){return '<option value="'+x.id+'"'+(cur===x.id?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select>';
+  }
+  return sels;
+}
+function eqRelValues(prefix){
+  var out=[];
+  for(var i=0;i<5;i++){var s=document.getElementById(prefix+i);var val=s&&s.value;if(val&&out.indexOf(val)===-1)out.push(val)}
+  return out;
+}
 function saveEq(id){
   if(!v('eName')){toast('Name fehlt.',1);return}
   var eqImgs=EQ_IMAGES.filter(function(u){return u&&String(u).trim()});
-  var addonIds=[];
-  for(var ai=0;ai<5;ai++){var s=document.getElementById('eAddon'+ai);var val=s&&s.value;if(val&&addonIds.indexOf(val)===-1)addonIds.push(val)}
+  var addonIds=eqRelValues('eAddon'),fitsIds=eqRelValues('eFits');
   var body={name:v('eName'),category:v('eCat'),sku:v('eSku')||null,description:v('eDesc'),day_rate:Number(v('eRate'))||0,
-    partner_rate:v('ePartner')!==''?Number(v('ePartner')):null,addon_ids:addonIds,addon_id:addonIds[0]||null,
+    partner_rate:v('ePartner')!==''?Number(v('ePartner')):null,addon_ids:addonIds,addon_id:addonIds[0]||null,fits_ids:fitsIds,
     thomann_url:v('eThomann')||null,on_request:document.getElementById('eOnReq').checked,
     day_rate_suggested:v('eRateSuggested')!==''?Number(v('eRateSuggested')):null,
     followup_pct:Number(v('ePct'))||50,
