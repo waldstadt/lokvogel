@@ -414,7 +414,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
       <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('docIntro')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
     </div>
-    <div class="card"><h3>Positionen <span style="float:right" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()"> + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()"> + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button></span></h3>
+    <div class="card"><h3>Positionen <span style="float:right" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()"> + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()"> + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button> <span id="docTplBtns"></span></span></h3>
       <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel netto</div><div>Gesamt</div><div></div></div>
       <div id="docItems"></div>
       <div class="totals" id="docTotals"></div>
@@ -457,6 +457,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <span id="eqBatchCount" class="mut sml"></span>
       <button class="btn" onclick="eqBatchSave()">Änderungen speichern</button>
     </div>
+    <input type="text" id="eqSearch" placeholder="Suchen (Name, Kategorie) …" oninput="renderEq()" style="margin-bottom:12px">
     <div class="tbl-wrap card" id="eqViewWrap"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Nächstes Mal im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
     <div class="tbl-wrap card" id="eqBatchWrap" hidden><table class="batch"><thead><tr><th class="chk"><input type="checkbox" id="eqBatchAll" onclick="eqBatchToggleAll(this.checked)"></th><th>Name</th><th>Kategorie</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th class="num">Bestand</th><th>Status</th><th class="chk">Auf Anfrage</th><th class="chk">Sichtbar</th></tr></thead><tbody id="eqBatchRows"></tbody></table></div>
     <div class="card"><h3>Sets <span class="mut sml" style="font-weight:400">– mehrere Artikel als ein buchbares Paket (z. B. Lautsprecher + Kabel + Endstufe)</span> <button class="btn sm" style="float:right" onclick="openSetModal()">+ Set</button></h3>
@@ -929,7 +930,8 @@ function loadAll(){
     api('workshop_signups?select=*&order=created_at.desc'),
     api('equipment_sets?select=*&order=sort'),
     api('equipment_set_items?select=*'),
-    api('calendar_blocks?select=*&order=start_date')
+    api('calendar_blocks?select=*&order=start_date'),
+    api('quote_templates?select=*&order=sort')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -940,6 +942,7 @@ function loadAll(){
     CACHE.reviews=r[16]||[];CACHE.products=r[17]||[];CACHE.partners=r[18]||[];
     CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
     CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];CACHE.blocks=r[23]||[];
+    CACHE.quoteTpls=r[24]||[];
     applyBrand();
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
@@ -1705,6 +1708,8 @@ function updateDocTypeUI(t){
   document.getElementById('docDepWrap').style.display=t==='schluss'?'':'none';
   document.getElementById('docDateLbl2').textContent=t==='angebot'?'Gültig bis':'Fällig am';
   document.getElementById('docBack').setAttribute('onclick',"showPage('"+(t==='angebot'?'quotes':'inv')+"')");
+  document.getElementById('docTplBtns').innerHTML=t==='angebot'?
+    '<button class="btn sm" onclick="openTplPicker()">Vorlage laden</button> <button class="btn sm" onclick="saveAsTpl()">Als Vorlage speichern</button>':'';
 }
 function fillDocForm(){
   var d=curDoc;
@@ -2542,15 +2547,23 @@ function eqNextUseSortVal(e){
 }
 function renderEq(){
   if(eqBatch.on){renderEqBatch();return;}
-  document.getElementById('eqRows').innerHTML=applySort((CACHE.equipment||[]).slice(),'equipment').map(function(e){
+  var q=(v('eqSearch')||'').toLowerCase();
+  var list=(CACHE.equipment||[]).filter(function(e){
+    return !q||[e.name,e.category].join(' ').toLowerCase().indexOf(q)>=0;
+  });
+  document.getElementById('eqRows').innerHTML=applySort(list,'equipment').map(function(e){
     var nu=eqNextUse(e),lbl=eqNextUseLabel(e);
-    return '<tr class="click" onclick="openEqModal(\''+e.id+'\')"><td><b>'+esc(e.name)+'</b>'+(e.on_request?' <span class="b yel" title="Nur auf Anfrage – Bestätigung manuell">auf Anfrage</span>':'')+'</td><td>'+esc(e.category||'–')+'</td>'+
+    var noPrice=!e.day_rate;
+    var noPhoto=!e.image_url&&!(e.images&&e.images.length);
+    var flags=(noPrice?' <span class="b red" title="Kein Tagespreis hinterlegt">kein Preis</span>':'')+
+      (noPhoto?' <span class="b red" title="Kein Produktfoto hinterlegt">kein Foto</span>':'');
+    return '<tr class="click" onclick="openEqModal(\''+e.id+'\')"><td><b>'+esc(e.name)+'</b>'+(e.on_request?' <span class="b yel" title="Nur auf Anfrage – Bestätigung manuell">auf Anfrage</span>':'')+flags+'</td><td>'+esc(e.category||'–')+'</td>'+
     '<td class="num">'+e.qty_total+'</td><td class="num">'+euro(e.day_rate)+'</td>'+
     '<td class="num">'+(e.partner_rate!=null?euro(e.partner_rate):'<span class="mut">auto</span>')+'</td>'+
     '<td>'+(e.public&&e.rentable?'<span class="b green">sichtbar</span>':'<span class="b grey">verborgen</span>')+'</td>'+
     '<td><span class="b '+({aktiv:'green',wartung:'yel',inaktiv:'grey'}[e.status]||'grey')+'">'+e.status+'</span></td>'+
     '<td>'+(nu?'<span class="b blue">'+lbl+'</span>':'–')+'</td></tr>';
-  }).join('')||'<tr><td colspan="8" class="mut">Noch keine Artikel.</td></tr>';
+  }).join('')||'<tr><td colspan="8" class="mut">'+(q?'Nichts gefunden.':'Noch keine Artikel.')+'</td></tr>';
   updateSortIndicators('equipment');
 }
 /* ===== Technik: Stapel-Bearbeitung ===== */
@@ -3968,11 +3981,22 @@ function saveTpl(id){
 function reloadTpls(){api('email_templates?select=*&order=sort').then(function(r){CACHE.tpls=r||[];renderTpls()})}
 
 /* ===== Produktkatalog ===== */
+/* Sucht eine Artikelnummer/einen Namen sowohl im Rechnungskatalog (products) als auch
+   im Technikkatalog (equipment) – Grundlage für Sets, die Technikartikel enthalten. */
+function catalogFind(identifier){
+  identifier=(identifier||'').trim();if(!identifier)return null;
+  var idU=identifier.toUpperCase();
+  var prod=(CACHE.products||[]).find(function(x){return x.sku===idU});
+  if(prod)return{type:'product',item:prod,sku:prod.sku,name:prod.name,unit:prod.unit||'Stk.',price:prodPrice(prod)};
+  var eq=(CACHE.equipment||[]).find(function(x){return(x.sku&&x.sku.toUpperCase()===idU)||x.name.toLowerCase()===identifier.toLowerCase()});
+  if(eq)return{type:'equipment',item:eq,sku:eq.sku||eq.name,name:eq.name,unit:'Tag',price:Number(eq.day_rate)||0};
+  return null;
+}
 function prodPrice(p){
   if(p.price_net!=null)return Number(p.price_net);
   return (p.bundle||[]).reduce(function(s,c){
-    var it=(CACHE.products||[]).find(function(x){return x.sku===c.sku});
-    return s+(it&&it.price_net!=null?Number(it.price_net):0)*(Number(c.qty)||1);
+    var it=catalogFind(c.sku);
+    return s+(it?it.price:0)*(Number(c.qty)||1);
   },0);
 }
 function renderProducts(){
@@ -3986,7 +4010,7 @@ function renderProducts(){
     '<td>'+esc(p.name)+(p.description?'<br><span class="mut sml">'+esc(p.description.slice(0,80))+'…</span>':'')+'</td>'+
     '<td>'+esc(p.category||'–')+'</td><td>'+esc(p.unit||'Stk.')+'</td>'+
     '<td class="num">'+euro(prodPrice(p))+'</td>'+
-    '<td>'+(isBundle?'<span class="b gold">Paket ('+(p.bundle||[]).length+')</span>':'<span class="b grey">Artikel</span>')+'</td>'+
+    '<td>'+(isBundle?'<span class="b gold">Set ('+(p.bundle||[]).length+')</span>':(p.kind==='dienstleistung'?'<span class="b blue">Dienstleistung</span>':'<span class="b grey">Artikel</span>'))+'</td>'+
     '<td>'+(p.active?'<span class="b green">aktiv</span>':'<span class="b grey">aus</span>')+'</td></tr>';
   }).join('')||'<tr><td colspan="7" class="mut">Keine Artikel gefunden.</td></tr>';
 }
@@ -3998,10 +4022,11 @@ function openProdModal(id){
     '<div><label>Kategorie</label><input id="pCat" value="'+esc(p.category||'')+'" placeholder="DJ-Leistung, Ton, Licht …"></div>'+
     '<div><label>Sortierung</label><input type="number" id="pSort" value="'+(p.sort||0)+'"></div></div>'+
     '<label>Name *</label><input id="pName" value="'+esc(p.name||'')+'">'+
+    '<label>Art</label><select id="pKind"><option value="artikel"'+(p.kind!=='dienstleistung'?' selected':'')+'>Artikel</option><option value="dienstleistung"'+(p.kind==='dienstleistung'?' selected':'')+'>Dienstleistung</option></select>'+
     '<label>Beschreibung (erscheint als Erklärung im Kundenportal)</label><textarea id="pDesc">'+esc(p.description||'')+'</textarea>'+edBtn('pDesc')+
     '<div class="grid2"><div><label>Einheit</label><input id="pUnit" value="'+esc(p.unit||'Stk.')+'"></div>'+
-    '<div><label>Preis netto (€) – bei Paketen leer = Summe der Bestandteile</label><input type="number" step="0.01" id="pPrice" value="'+(p.price_net!=null?p.price_net:'')+'"></div></div>'+
-    '<label>Paket-Bestandteile (eine Zeile je Artikel: Artikelnummer | Menge) – leer = normaler Artikel</label>'+
+    '<div><label>Preis netto (€) – bei Sets leer = Summe der Bestandteile</label><input type="number" step="0.01" id="pPrice" value="'+(p.price_net!=null?p.price_net:'')+'"></div></div>'+
+    '<label>Set-Bestandteile (eine Zeile je Artikelnummer: Artikelnummer | Menge) – zieht auch aus dem Technikkatalog, leer = normaler Artikel</label>'+
     '<textarea id="pBundle" style="min-height:70px;font-size:11px" placeholder="DJ-100 | 1&#10;TON-200 | 1">'+esc(bundleLines)+'</textarea>'+
     '<label>Passt dazu (Artikelnummer) <span class="mut sml" style="text-transform:none;letter-spacing:0">– wird automatisch mit ins Angebot/die Rechnung übernommen, wenn dieser Artikel eingefügt wird (z. B. Kabel zu Lautsprecher)</span></label>'+
     '<input id="pAddonSku" value="'+esc(p.addon_sku||'')+'" placeholder="z. B. KABEL-10">'+
@@ -4015,45 +4040,63 @@ function saveProd(id){
     var parts=l.split('|').map(function(s){return s.trim()});
     return parts[0]?{sku:parts[0].toUpperCase(),qty:Number(parts[1])||1}:null;
   }).filter(Boolean);
-  var bad=bundle.filter(function(c){return !(CACHE.products||[]).some(function(x){return x.sku===c.sku})});
-  if(bad.length){toast('Unbekannte Artikelnummer im Paket: '+bad.map(function(b){return b.sku}).join(', '),1);return}
+  var bad=bundle.filter(function(c){return !catalogFind(c.sku)});
+  if(bad.length){toast('Unbekannte Artikelnummer im Set (weder Rechnungs- noch Technikkatalog): '+bad.map(function(b){return b.sku}).join(', '),1);return}
   var body={sku:v('pSku').toUpperCase(),name:v('pName'),category:v('pCat'),description:v('pDesc'),
     unit:v('pUnit')||'Stk.',price_net:v('pPrice')!==''?Number(v('pPrice')):null,
-    addon_sku:v('pAddonSku')?v('pAddonSku').toUpperCase():null,
+    addon_sku:v('pAddonSku')?v('pAddonSku').toUpperCase():null,kind:v('pKind')||'artikel',
     bundle:bundle,sort:Number(v('pSort'))||0,active:document.getElementById('pActive').checked};
   (id?api('products?id=eq.'+id,{method:'PATCH',body:body}):api('products',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');reloadProds()}).catch(function(e){toast('Fehler (Artikelnummer doppelt?): '+e.message,1)});
 }
 function reloadProds(){api('products?select=*&order=sort').then(function(r){CACHE.products=r||[];renderProducts()})}
 function openProductPicker(){
-  var list=(CACHE.products||[]).filter(function(p){return p.active});
-  if(!list.length){toast('Keine aktiven Artikel – unter Produkte anlegen.',1);return}
+  var hasProducts=(CACHE.products||[]).some(function(p){return p.active});
+  var hasEquipment=(CACHE.equipment||[]).some(function(e){return e.status==='aktiv'});
+  if(!hasProducts&&!hasEquipment){toast('Keine aktiven Artikel – unter Produkte oder Technik anlegen.',1);return}
   openModal('Artikel einfügen',
-    '<input type="text" id="ppSearch" placeholder="Suchen …" oninput="renderPicker()" style="margin-bottom:10px">'+
+    '<input type="text" id="ppSearch" placeholder="Suchen (auch im Technikkatalog) …" oninput="renderPicker()" style="margin-bottom:10px">'+
     '<div id="ppList" style="max-height:420px;overflow-y:auto"></div>');
   renderPicker();
   document.getElementById('ppSearch').focus();
 }
 function renderPicker(){
   var q=(v('ppSearch')||'').toLowerCase();
-  var list=(CACHE.products||[]).filter(function(p){
+  var prods=(CACHE.products||[]).filter(function(p){
     return p.active&&(!q||[p.sku,p.name,p.category].join(' ').toLowerCase().indexOf(q)>=0);
-  }).sort(byNameDe);
-  document.getElementById('ppList').innerHTML=list.map(function(p){
+  }).map(function(p){
     var isBundle=(p.bundle||[]).length>0;
+    return{key:'p:'+p.id,sku:p.sku,name:p.name,unit:p.unit||'Stk.',price:prodPrice(p),desc:p.description||'',
+      badge:isBundle?'<span class="b gold">Set</span>':(p.kind==='dienstleistung'?'<span class="b blue">Dienstleistung</span>':'')};
+  });
+  var eq=(CACHE.equipment||[]).filter(function(e){
+    return e.status==='aktiv'&&(!q||[e.sku,e.name,e.category].join(' ').toLowerCase().indexOf(q)>=0);
+  }).map(function(e){
+    return{key:'e:'+e.id,sku:e.sku||'–',name:e.name,unit:'Tag',price:Number(e.day_rate)||0,desc:e.description||'',
+      badge:'<span class="b grey">Technikkatalog</span>'};
+  });
+  var list=prods.concat(eq).sort(byNameDe);
+  document.getElementById('ppList').innerHTML=list.map(function(p){
     return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:10px;align-items:center">'+
-    '<div><b>'+esc(p.sku)+'</b> '+esc(p.name)+' <span class="mut">'+euro(prodPrice(p))+' / '+esc(p.unit||'Stk.')+'</span>'+
-    (isBundle?' <span class="b gold">Paket</span>':'')+
-    '<div class="mut sml">'+esc((p.description||'').slice(0,90))+'</div></div>'+
-    '<button class="btn sm" onclick="insertProduct(\''+p.id+'\')">Einfügen</button></div>';
+    '<div><b>'+esc(p.sku)+'</b> '+esc(p.name)+' <span class="mut">'+euro(p.price)+' / '+esc(p.unit)+'</span>'+
+    (p.badge?' '+p.badge:'')+
+    '<div class="mut sml">'+esc(p.desc.slice(0,90))+'</div></div>'+
+    '<button class="btn sm" onclick="insertProduct(\''+p.key+'\')">Einfügen</button></div>';
   }).join('')||'<span class="mut sml">Nichts gefunden.</span>';
 }
-function insertProduct(id){
-  var p=(CACHE.products||[]).find(function(x){return x.id===id});if(!p)return;
+function insertProduct(key){
+  if(key.indexOf('e:')===0){
+    var eq=(CACHE.equipment||[]).find(function(x){return x.id===key.slice(2)});if(!eq)return;
+    curItems.push({pos:curItems.length+1,description:(eq.sku?eq.sku+' – ':'')+eq.name,note:eq.description||'',
+      qty:1,unit:'Tag',unit_price:Number(eq.day_rate)||0});
+    closeModal();renderItems();toast('„'+eq.name+'" eingefügt ✓');
+    return;
+  }
+  var p=(CACHE.products||[]).find(function(x){return x.id===(key.indexOf('p:')===0?key.slice(2):key)});if(!p)return;
   var note=p.description||'';
   if((p.bundle||[]).length){
     var comps=p.bundle.map(function(c){
-      var it=(CACHE.products||[]).find(function(x){return x.sku===c.sku});
+      var it=catalogFind(c.sku);
       return (c.qty>1?c.qty+'× ':'')+(it?it.name:c.sku);
     }).join(', ');
     note=(note?note+' ':'')+'Enthalten: '+comps+'.';
@@ -4071,6 +4114,33 @@ function insertProduct(id){
   }
   closeModal();renderItems();toast(msg);
 }
+
+/* ===== Angebots-Vorlagen (Standardangebote zum schnellen Anpassen) ===== */
+function openTplPicker(){
+  if(!(CACHE.quoteTpls||[]).length){toast('Noch keine Vorlage gespeichert – erst ein Angebot zusammenstellen und mit „Als Vorlage speichern" ablegen.',1);return}
+  openModal('Vorlage laden',(CACHE.quoteTpls||[]).map(function(t){
+    return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:10px;align-items:center">'+
+    '<div><b>'+esc(t.name)+'</b> <span class="mut sml">'+(t.items||[]).length+' Position(en)</span></div>'+
+    '<span><button class="btn sm" onclick="applyTpl(\''+t.id+'\')">Laden</button> <button class="btn sm r" onclick="delRow(\'quote_templates\',\''+t.id+'\',reloadTpls)">Löschen</button></span></div>';
+  }).join(''));
+}
+function applyTpl(id){
+  var t=(CACHE.quoteTpls||[]).find(function(x){return x.id===id});if(!t)return;
+  curItems=(t.items||[]).map(function(it,i){return{pos:i+1,description:it.description,note:it.note||'',qty:it.qty,unit:it.unit,unit_price:it.unit_price}});
+  if(t.intro_text)document.getElementById('docIntro').value=t.intro_text;
+  if(t.outro_text)document.getElementById('docOutro').value=t.outro_text;
+  closeModal();renderItems();toast('Vorlage „'+t.name+'" geladen ✓ – jetzt für den Kunden anpassen');
+}
+function saveAsTpl(){
+  if(!curItems.length){toast('Keine Positionen zum Speichern.',1);return}
+  var name=prompt('Name der Vorlage (z. B. „Hochzeit Standard"):');
+  if(!name)return;
+  var body={name:name,intro_text:v('docIntro')||'',outro_text:v('docOutro')||'',
+    items:curItems.map(function(it,i){return{pos:i+1,description:it.description,note:it.note||'',qty:it.qty,unit:it.unit,unit_price:it.unit_price}}),
+    sort:(CACHE.quoteTpls||[]).length};
+  api('quote_templates',{method:'POST',body:body}).then(function(){toast('Vorlage „'+name+'" gespeichert ✓');reloadTpls()}).catch(function(e){toast(e.message,1)});
+}
+function reloadTpls(){api('quote_templates?select=*&order=sort').then(function(r){CACHE.quoteTpls=r||[]})}
 
 /* ===== Partner (Technik-Vermietung) ===== */
 function renderPartners(){

@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 52;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 54;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -133,7 +133,7 @@ const JSON_COLS = [
   'settings' => ['value'], 'site_content' => ['value'], 'content_versions' => ['value'],
   'packages' => ['features'],
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
-  'products' => ['bundle'], 'bookings' => ['rider', 'customer_notes'], 'rental_contracts' => ['snapshot'],
+  'products' => ['bundle'], 'quote_templates' => ['items'], 'bookings' => ['rider', 'customer_notes'], 'rental_contracts' => ['snapshot'],
   'customers' => ['tags', 'tech_check'],
   'equipment' => ['addon_ids', 'images', 'fits_ids'],
 ];
@@ -152,7 +152,7 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions'];
+  'calendar_blocks','content_versions','quote_templates'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -467,6 +467,11 @@ function upgrade(PDO $p): void {
   if ($v < 52) try {
     $p->exec("alter table customers add column partner_name text");
   } catch (PDOException $e) {}
+  if ($v < 53) {
+    try { $p->exec("alter table products add column kind text default 'artikel'"); } catch (PDOException $e) {}
+    try { $p->exec(quoteTemplatesDdl()); } catch (PDOException $e) {}
+  }
+  if ($v < 54) mergeOldCatalogPdf($p);
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -807,6 +812,93 @@ function workshopsDdl(): array {
   ];
 }
 
+function quoteTemplatesDdl(): string {
+  return "create table if not exists quote_templates (id text primary key, sort integer default 0,
+    name text not null, intro_text text, outro_text text, items text default '[]', created_at text)";
+}
+
+/* Einmaliger Daten-Merge: Positionen aus Markus' altem Angebot (PDF aus der Vorgänger-Software)
+   in den Produktkatalog übernehmen. Nichts wird gelöscht oder überschrieben - existiert schon ein
+   Produkt mit demselben Namen, wird es unangetastet gelassen; weicht dessen Preis vom PDF-Preis ab,
+   landet der Konflikt in settings.catalog_merge_conflicts zur manuellen Prüfung im Backoffice. */
+function mergeOldCatalogPdf(PDO $p): void {
+  $items = [
+    // sku, name, category, kind, unit, price_net, description
+    ['DJ-ZUSATZSTD', 'Zusatzstunde', 'DJ-Leistung', 'dienstleistung', 'Std.', 120.00, 'Abrechnung im 15-Minuten-Takt.'],
+    ['DJ-INKL-TECH', 'DJ inkl DJ-Technik', 'DJ-Leistung', 'dienstleistung', 'pauschal', 150.00, 'DJ-Controller und Laptop, Funkmikrofon. Mindestbuchungsdauer 8 Stunden.'],
+    ['DJ-TRAUUNG-TECH', 'Technik für freie Trauung', 'DJ-Leistung', 'dienstleistung', 'Stk.', 179.00, 'Für freie Trauung und Sektempfang: Tonanlage für Sprache und Gesang, Funkmikrofon, nutzbar von Musikern und Traurednern, lockere Hintergrundmusik zum Sektempfang. Zusätzlich müssen DJ- bzw. Technikerstunden gebucht werden.'],
+    ['DJ-UEBERNACHT', 'Übernachtungspauschale', 'DJ-Leistung', 'dienstleistung', 'pauschal', 130.00, 'Ab 1 Stunde Anfahrt eine Übernachtung, ab 3,5 Stunden Anfahrt zwei Übernachtungen.'],
+    ['DJ-AUFABBAU', 'Auf- und Abbau', 'DJ-Leistung', 'dienstleistung', 'pauschal', 99.00, 'Nur berechnet, wenn zusätzlich zur Location gefahren werden muss - Auf-/Abbau direkt vor bzw. nach dem Auflegen ist kostenlos.'],
+    ['LI-MAXIV2', 'Ape Labs Maxi V2 grey/creme', 'Licht', 'artikel', 'Stk.', 15.00, 'Lichtstarker, kompakter Akku-LED-Spot für hohe Wände/Objekte, auch als Tanzflächen-Unterstützung und im Außenbereich.'],
+    ['LI-NEONTUBE', 'Ape Labs Neon Tube', 'Licht', 'artikel', 'Stk.', 20.00, 'Hochwertiger Akku-LED-Effekt für schöne Lichtakzente.'],
+    ['LI-THEATERSPOT', 'RGB WW Theater Spot', 'Licht', 'artikel', 'Stk.', 45.00, 'Theater-Spot in klassischer Optik mit Torblenden und gleichmäßiger Ausleuchtung.'],
+    ['LI-MOVINGHEAD', 'Multi Moving Head', 'Licht', 'artikel', 'Stk.', 45.00, 'Vom scharfen Beam über Wash- bis Derby-Effekt.'],
+    ['LI-NEBEL-GROSS', 'Nebelmaschine groß', 'Licht', 'artikel', 'Stk.', 75.00, 'Große 1,6 kW starke Nebelmaschine mit viel Output.'],
+    ['LI-NEBEL-KLEIN', 'Nebelmaschine klein', 'Licht', 'artikel', 'Stk.', 25.00, 'Kompakte Nebelmaschine mit geringem Stromverbrauch.'],
+    ['LI-HAZER-ENTOUR', 'Tour Hazer Entour', 'Licht', 'artikel', 'Stk.', 35.00, 'Feiner Dunst statt dichtem Nebel, macht Strahleneffekte sichtbar.'],
+    ['LI-HAZER-NH20', 'Tour Hazer NH-20 im Case', 'Licht', 'artikel', 'Stk.', 50.00, 'Unauffälliger Hazer für kleine bis mittlere Veranstaltungen, Hochzeiten und Gala.'],
+    ['TO-SEEBURG-A3', 'Seeburg Acoustic Line A3', 'Ton', 'artikel', 'Stk.', 35.00, 'Weit tragender, glasklarer High/Mid-Lautsprecher, 2x8"/1".'],
+    ['TO-SEEBURG-X2', 'Seeburg Acoustic Line X2', 'Ton', 'artikel', 'Stk.', 35.00, 'Kompakter, fein auflösender Coax-Lautsprecher - Hauptlautsprecher, Monitor oder Delay-Line.'],
+    ['TO-SEEBURG-A6', 'Seeburg Acoustic Line A6', 'Ton', 'artikel', 'Stk.', 40.00, 'Ausgewogener, klangstarker Lautsprecher in klassischer Bauform mit Monitorschräge.'],
+    ['TO-EV-EVERSE8', 'EV Everse 8', 'Ton', 'artikel', 'Stk.', 69.00, 'Akkulautsprecher für Reden, freie Trauung, Singer/Songwriter und Hintergrundmusik.'],
+    ['TO-JBL-PARTYBOX110', 'JBL Partybox 110', 'Ton', 'artikel', 'Stk.', 30.00, 'Bluetooth-Akku-Lautsprecher für die kleine Feier im Garten oder in kleiner Location.'],
+    ['TO-SEEBURG-SUB1201DP', 'Seeburg Acoustic Line G Sub 1201dp++', 'Ton', 'artikel', 'Stk.', 60.00, 'Aktiver 12"-Subwoofer, steuert 2 kleine Topteile und einen weiteren 12" an.'],
+    ['TO-SEEBURG-SUB1201PASSIV', 'Seeburg Acoustic Line G Sub 1201 (passiv)', 'Ton', 'artikel', 'Stk.', 40.00, 'Passiver 12"-Subwoofer.'],
+    ['TO-PLAUDIO-B215', 'PL Audio B215 aktiver Subwoofer', 'Ton', 'artikel', 'Stk.', 100.00, 'Aktiver Doppel-15"-Subwoofer, steuert bis zu 2 Topteile an.'],
+    ['DE-SPIEGELKUGEL50', '50cm Spiegelkugel', 'Deko', 'artikel', 'Stk.', 100.00, 'Inkl. Motor, Distanzstange und Bodenplatte.'],
+    ['TO-ALLENHEATH-CQ20B', 'Allen & Heath CQ20B', 'Ton', 'artikel', 'Stk.', 45.00, 'Digitales 20-Kanal-Bühnenmischpult.'],
+    ['TO-BEHRINGER-FLOW8', 'Behringer Flow 8', 'Ton', 'artikel', 'Stk.', 20.00, 'Kleiner digitaler Bühnenmischer mit Bluetooth und App-Steuerung.'],
+    ['ZU-DEZIBELMESSER', 'Dezibel Messgerät', 'Zubehör', 'artikel', 'Stk.', 5.00, 'Messgerät zur Messung der Lautstärke in Echtzeit.'],
+    ['TO-SENNHEISER-EW835', 'Sennheiser EW 835 Funkstrecke', 'Ton', 'artikel', 'Stk.', 40.00, 'Hochwertige Funkstrecke mit großer Reichweite und sauberem Ton.'],
+    ['TO-SENNHEISER-E835S', 'Sennheiser E835S', 'Ton', 'artikel', 'Stk.', 10.00, 'Kabelgebundenes Mikrofon.'],
+    ['TO-SHURE-SM58', 'Shure SM58', 'Ton', 'artikel', 'Stk.', 10.00, 'Der Klassiker unter den Gesangsmikrofonen.'],
+    ['TO-SHURE-BETA57A', 'Shure Beta 57a', 'Ton', 'artikel', 'Stk.', 10.00, 'Mikrofon.'],
+    ['TO-SHURE-SM57', 'Shure SM57', 'Ton', 'artikel', 'Stk.', 10.00, 'Mikrofon.'],
+    ['ZU-BODENPLATTE60ECKIG', 'Bodenplatte 60cm eckig', 'Zubehör', 'artikel', 'Stk.', 7.50, 'Bodenplatte 14 kg, 60x60 cm, mit 3x M20-Gewinde.'],
+    ['ZU-BODENPLATTE-TOURING', 'Bodenplatte Touring, eckig', 'Zubehör', 'artikel', 'Stk.', 10.00, '60x60 cm Bodenplatte mit 3x M20-Gewinde sowie Bohrungen für Traversenaufnahme.'],
+    ['ZU-DISTANZ-KURZ', 'Distanzstange kurz', 'Zubehör', 'artikel', 'Stk.', 5.00, 'M20 auf 35mm.'],
+    ['ZU-DISTANZ-LANG', 'Distanzstange lang', 'Zubehör', 'artikel', 'Stk.', 5.00, 'M20 auf 35mm.'],
+    ['ZU-BODENPLATTE-RUND-GRAVITY', 'Bodenplatte rund Gravity', 'Zubehör', 'artikel', 'Stk.', 7.50, 'Schwere Rundplatte.'],
+    ['ZU-BODENPLATTE-RUND-KM', 'Bodenplatte rund K&M', 'Zubehör', 'artikel', 'Stk.', 7.50, 'Mittelschwere Bodenplatte rund.'],
+    ['ZU-SPEAKON-10M', 'Speakon Kabel 4-polig, 10m', 'Zubehör', 'artikel', 'Stk.', 5.00, 'Lautsprecherkabel mit Speakon-Stecker 4-polig, 2,5mm².'],
+    ['ZU-SPEAKON-3M', 'Speakon Kabel 4-polig, 3m', 'Zubehör', 'artikel', 'Stk.', 2.00, 'Lautsprecherkabel mit Speakon-Stecker 4-polig, 2,5mm².'],
+    ['LI-WOLFMIX-W1', 'Wolfmix W1', 'Licht', 'artikel', 'Stk.', 40.00, 'Lichtsteuerung.'],
+    ['DJ-BASISPAKET', 'DJ Basispaket', 'DJ-Leistung', 'dienstleistung', 'Stk.', 875.00, '7 Stunden DJ (18-1 Uhr), inkl. DJ-Pult (schwarz oder Holzoptik), DJ-Mischpult und Laptop. Nur in Verbindung mit Licht- und Tontechnik buchbar.'],
+    ['DJ-PULT-SCHWARZ', 'Optik DJ Pult schwarz', 'DJ-Zubehör', 'artikel', 'Stk.', 0.00, ''],
+    ['DJ-PULT-HOLZ', 'Optik DJ Pult Holz', 'DJ-Zubehör', 'artikel', 'Stk.', 0.00, ''],
+    ['LI-APELABS-CONNECT', 'Ape Labs Connect', 'Licht', 'artikel', 'Stk.', 15.00, ''],
+    ['TO-SENNHEISER-E609', 'Sennheiser e609', 'Ton', 'artikel', 'Stk.', 10.00, 'Mikrofon zur Abnahme von Gitarrenamps.'],
+    ['TO-AUDIX-D6', 'Audix D6', 'Ton', 'artikel', 'Stk.', 12.00, 'Kickdrum-Mikrofon.'],
+  ];
+  $conflicts = [];
+  foreach ($items as [$sku, $name, $category, $kind, $unit, $price, $desc]) {
+    $st = $p->prepare("select id, sku, price_net from products where lower(name)=lower(?) or sku=?");
+    $st->execute([$name, $sku]);
+    $existing = $st->fetch();
+    if ($existing) {
+      $exPrice = $existing['price_net'] !== null ? (float)$existing['price_net'] : null;
+      if ($exPrice !== null && abs($exPrice - $price) > 0.001) {
+        $conflicts[] = ['name' => $name, 'existing_price' => $exPrice, 'pdf_price' => $price, 'sku' => $existing['sku']];
+      }
+      continue;
+    }
+    $useSku = $sku; $n = 1;
+    while (true) {
+      $chk = $p->prepare("select 1 from products where sku=?"); $chk->execute([$useSku]);
+      if (!$chk->fetchColumn()) break;
+      $n++; $useSku = $sku . '-' . $n;
+    }
+    $p->prepare("insert into products (id,sku,sort,category,name,description,unit,kind,price_net,bundle,addon_sku,active,created_at)
+      values (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      ->execute([uuid(), $useSku, 0, $category, $name, $desc, $unit, $kind, $price, '[]', null, 1, now()]);
+  }
+  if ($conflicts) {
+    $p->prepare("insert into settings (key,value,updated_at) values ('catalog_merge_conflicts', ?, ?)
+        on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
+      ->execute([json_encode($conflicts, JSON_UNESCAPED_UNICODE), now()]);
+  }
+}
+
 function friendsDdl(): string {
   return "create table if not exists friends (id text primary key, sort integer default 0,
     name text not null, category text, description text, website text,
@@ -902,7 +994,10 @@ create table email_templates (id text primary key, sort integer default 0, name 
   subject text, body text, created_at text);
 create table products (id text primary key, sku text unique, sort integer default 0,
   category text, name text not null, description text, unit text default 'Stk.',
-  price_net real, bundle text default '[]', addon_sku text, active integer default 1, created_at text);
+  kind text default 'artikel', price_net real, bundle text default '[]', addon_sku text,
+  active integer default 1, created_at text);
+create table quote_templates (id text primary key, sort integer default 0, name text not null,
+  intro_text text, outro_text text, items text default '[]', created_at text);
 create table partners (id text primary key, code text unique, name text not null, company text,
   kind text default 'dj', email text, phone text, status text default 'beantragt',
   discount_pct real, notes text, created_at text);
@@ -935,6 +1030,7 @@ SQL);
   seed($p);
   seedExtraTemplates($p);
   seedServiceProducts($p);
+  mergeOldCatalogPdf($p);
   seedTechCheckForm($p);
   seedEquipmentCatalog($p);
   /* Frühere Lokvogel-Artikel (own_rig) sind jetzt „auf Anfrage verfügbar". */
