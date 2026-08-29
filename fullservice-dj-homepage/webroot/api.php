@@ -28,6 +28,17 @@ const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
 const SCHEMA_VERSION = 49;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
+/* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
+   Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
+   und laufen über denselben Chat-Completions-Codepfad. */
+const AI_PROVIDER_DEFAULTS = [
+  'claude'   => ['base_url' => 'https://api.anthropic.com/v1', 'model' => 'claude-opus-5'],
+  'openai'   => ['base_url' => 'https://api.openai.com/v1', 'model' => 'gpt-4o-mini'],
+  'gemini'   => ['base_url' => 'https://generativelanguage.googleapis.com/v1beta/openai', 'model' => 'gemini-2.5-flash'],
+  'mistral'  => ['base_url' => 'https://api.mistral.ai/v1', 'model' => 'mistral-small-latest'],
+  'deepseek' => ['base_url' => 'https://api.deepseek.com/v1', 'model' => 'deepseek-chat'],
+];
+
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
   'settings' => ['value'], 'site_content' => ['value'], 'content_versions' => ['value'],
@@ -2621,13 +2632,14 @@ try {
     $p = db();
     $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
     if ($method === 'POST') {
-      $provider = (string)($body['provider'] ?? '') === 'claude' ? 'claude' : 'openai';
+      $provider = in_array((string)($body['provider'] ?? ''), ['claude', 'gemini', 'mistral', 'deepseek'], true)
+        ? (string)$body['provider'] : 'openai';
       $cfg['provider'] = $provider;
-      $defaultBase = $provider === 'claude' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1';
-      $baseUrl = trim((string)($body['base_url'] ?? '')) ?: $defaultBase;
+      $defaults = AI_PROVIDER_DEFAULTS[$provider] ?? AI_PROVIDER_DEFAULTS['openai'];
+      $baseUrl = trim((string)($body['base_url'] ?? '')) ?: $defaults['base_url'];
       if (!preg_match('#^https?://#', $baseUrl)) fail('Bitte eine gültige Basis-URL angeben (https://…).', 400);
       $cfg['base_url'] = $baseUrl;
-      $cfg['model'] = trim((string)($body['model'] ?? '')) ?: ($provider === 'claude' ? 'claude-opus-5' : 'gpt-4o-mini');
+      $cfg['model'] = trim((string)($body['model'] ?? '')) ?: $defaults['model'];
       if (isset($body['style'])) $cfg['style'] = trim((string)$body['style']);
       if (!empty($body['api_key'])) $cfg['api_key'] = trim((string)$body['api_key']);
       $p->prepare("insert into settings (key, value, updated_at) values ('ai', ?, ?)
@@ -2651,9 +2663,10 @@ try {
     $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
     $apiKey = trim((string)($cfg['api_key'] ?? ''));
     if ($apiKey === '') fail('Kein KI-Zugang eingerichtet – bitte in den Einstellungen unter „KI-Textassistent" einen API-Schlüssel hinterlegen.', 400);
-    $provider = (string)($cfg['provider'] ?? 'openai') === 'claude' ? 'claude' : 'openai';
-    $baseUrl = rtrim((string)($cfg['base_url'] ?: ($provider === 'claude' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1')), '/');
-    $model = (string)($cfg['model'] ?: ($provider === 'claude' ? 'claude-opus-5' : 'gpt-4o-mini'));
+    $provider = (string)($cfg['provider'] ?? 'openai');
+    $defaults = AI_PROVIDER_DEFAULTS[$provider] ?? AI_PROVIDER_DEFAULTS['openai'];
+    $baseUrl = rtrim((string)($cfg['base_url'] ?: $defaults['base_url']), '/');
+    $model = (string)($cfg['model'] ?: $defaults['model']);
     $style = trim((string)($cfg['style'] ?? '')) ?: (
       'Du schreibst deutsche Texte im Ton von Markus, einem DJ und Verleiher für Veranstaltungstechnik: '
       . 'persönlich, locker, professionell – so, wie er es am Telefon sagen würde. Keine Emojis, keine '
@@ -2679,7 +2692,7 @@ try {
       ], JSON_UNESCAPED_UNICODE);
       $ctx = stream_context_create(['http' => [
         'method' => 'POST',
-        'header' => "x-api-key: $apiKey\r\nanthropic-version: 2023-06-01\r\nContent-Type: application/json\r\n",
+        'header' => "x-api-key: $apiKey\r\nanthropic-version: 2023-06-01\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\nAccept: application/json\r\n",
         'content' => $reqBody,
         'timeout' => 40,
         'ignore_errors' => true,
@@ -2689,7 +2702,13 @@ try {
       $j = json_decode($resp, true);
       if (!is_array($j) || isset($j['error']) || ($j['type'] ?? '') === 'error') {
         $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
-        fail('KI-Anfrage fehlgeschlagen: ' . ($msg !== '' ? $msg : 'unerwartete Antwort vom KI-Dienst.'), 502);
+        if ($msg === '') {
+          $status = '';
+          foreach ((array)($http_response_header ?? []) as $h) { if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $sm)) $status = $sm[1]; }
+          $msg = 'unerwartete Antwort vom KI-Dienst' . ($status !== '' ? " (HTTP $status)" : '')
+            . (trim((string)$resp) !== '' ? ': ' . mb_substr(trim(strip_tags((string)$resp)), 0, 200) : '.');
+        }
+        fail('KI-Anfrage fehlgeschlagen: ' . $msg, 502);
       }
       $generated = '';
       foreach ((array)($j['content'] ?? []) as $block) {
@@ -2708,7 +2727,7 @@ try {
       ], JSON_UNESCAPED_UNICODE);
       $ctx = stream_context_create(['http' => [
         'method' => 'POST',
-        'header' => "Authorization: Bearer $apiKey\r\nContent-Type: application/json\r\n",
+        'header' => "Authorization: Bearer $apiKey\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\nAccept: application/json\r\n",
         'content' => $reqBody,
         'timeout' => 40,
         'ignore_errors' => true,
@@ -2718,7 +2737,13 @@ try {
       $j = json_decode($resp, true);
       if (!is_array($j) || isset($j['error'])) {
         $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
-        fail('KI-Anfrage fehlgeschlagen: ' . ($msg !== '' ? $msg : 'unerwartete Antwort vom KI-Dienst.'), 502);
+        if ($msg === '') {
+          $status = '';
+          foreach ((array)($http_response_header ?? []) as $h) { if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $sm)) $status = $sm[1]; }
+          $msg = 'unerwartete Antwort vom KI-Dienst' . ($status !== '' ? " (HTTP $status)" : '')
+            . (trim((string)$resp) !== '' ? ': ' . mb_substr(trim(strip_tags((string)$resp)), 0, 200) : '.');
+        }
+        fail('KI-Anfrage fehlgeschlagen: ' . $msg, 502);
       }
       $generated = trim((string)($j['choices'][0]['message']['content'] ?? ''));
     }

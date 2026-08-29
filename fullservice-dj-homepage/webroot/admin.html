@@ -715,7 +715,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <label>Anbieter</label>
           <select id="aiProvider" onchange="aiProviderChanged()">
             <option value="claude">Claude (Anthropic)</option>
-            <option value="openai">OpenAI / OpenAI-kompatibel</option>
+            <option value="openai">ChatGPT (OpenAI)</option>
+            <option value="gemini">Gemini (Google)</option>
+            <option value="mistral">Mistral AI</option>
+            <option value="deepseek">DeepSeek</option>
           </select>
           <div class="grid3" style="margin-top:8px">
             <div><label>Basis-URL</label><input id="aiBaseUrl" placeholder="https://api.anthropic.com/v1"></div>
@@ -3491,13 +3494,21 @@ function renderCmsReload(){
 }
 
 /* ===== KI-Textassistent ===== */
-var AI_DEFAULTS={claude:{base_url:'https://api.anthropic.com/v1',model:'claude-opus-5'},openai:{base_url:'https://api.openai.com/v1',model:'gpt-4o-mini'}};
+var AI_DEFAULTS={
+  claude:{base_url:'https://api.anthropic.com/v1',model:'claude-opus-5'},
+  openai:{base_url:'https://api.openai.com/v1',model:'gpt-4o-mini'},
+  gemini:{base_url:'https://generativelanguage.googleapis.com/v1beta/openai',model:'gemini-2.5-flash'},
+  mistral:{base_url:'https://api.mistral.ai/v1',model:'mistral-small-latest'},
+  deepseek:{base_url:'https://api.deepseek.com/v1',model:'deepseek-chat'}
+};
+/* Wechselt der Anbieter, sollen Basis-URL/Modell sofort auf dessen Vorgabe springen –
+   sonst zeigt das Feld eine URL, die zum neu gewählten Anbieter gar nicht passt. */
 function aiProviderChanged(){
   var p=v('aiProvider'),d=AI_DEFAULTS[p]||AI_DEFAULTS.claude;
   document.getElementById('aiBaseUrl').placeholder=d.base_url;
   document.getElementById('aiModel').placeholder=d.model;
-  if(!v('aiBaseUrl'))document.getElementById('aiBaseUrl').value=d.base_url;
-  if(!v('aiModel'))document.getElementById('aiModel').value=d.model;
+  document.getElementById('aiBaseUrl').value=d.base_url;
+  document.getElementById('aiModel').value=d.model;
 }
 function loadAiConfig(){
   fetch('api.php/ai/config',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(c){
