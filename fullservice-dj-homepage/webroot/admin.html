@@ -725,6 +725,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
             <div><label>Modell</label><input id="aiModel" placeholder="claude-opus-5"></div>
             <div><label>API-Schlüssel <span class="mut" id="aiKeyState"></span></label><input id="aiKey" type="password" placeholder="nur zum Ändern ausfüllen"></div>
           </div>
+          <div id="aiWorkspaceRow" style="display:none;margin-top:8px">
+            <label>Workspace-ID <span class="mut sml" style="text-transform:none;letter-spacing:0">– nur nötig, wenn Claude „anthropic-workspace-id is required" meldet (bei „identity-linked" Schlüsseln aus der Console). Zu finden in console.anthropic.com unter Settings → Workspaces.</span></label>
+            <input id="aiWorkspaceId" placeholder="wrkspc_…">
+          </div>
           <label style="margin-top:8px">Textstil-Vorgabe <span class="mut sml" style="text-transform:none;letter-spacing:0">– leer lassen für die Standard-Vorgabe (persönlich, locker, professionell, kein Bindestrich statt Halbgeviertstrich, keine Floskeln)</span></label>
           <textarea id="aiStyle" style="min-height:90px" placeholder="Du schreibst deutsche Texte im Ton von …"></textarea>
           <button class="btn sm" onclick="saveAiConfig()">Speichern</button>
@@ -3517,6 +3521,7 @@ function aiProviderChanged(){
   document.getElementById('aiModel').placeholder=d.model;
   document.getElementById('aiBaseUrl').value=d.base_url;
   document.getElementById('aiModel').value=d.model;
+  document.getElementById('aiWorkspaceRow').style.display=(p==='claude')?'':'none';
 }
 function loadAiConfig(){
   fetch('api.php/ai/config',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(c){
@@ -3525,11 +3530,13 @@ function loadAiConfig(){
     document.getElementById('aiBaseUrl').value=c.base_url||'';
     document.getElementById('aiModel').value=c.model||'';
     document.getElementById('aiStyle').value=c.style||'';
+    document.getElementById('aiWorkspaceId').value=c.workspace_id||'';
+    document.getElementById('aiWorkspaceRow').style.display=(c.provider==='claude')?'':'none';
     document.getElementById('aiKeyState').textContent=c.has_key?'(hinterlegt ✓)':'(fehlt)';
   }).catch(function(){});
 }
 function saveAiConfig(){
-  var body={provider:v('aiProvider'),base_url:v('aiBaseUrl'),model:v('aiModel'),style:v('aiStyle')};
+  var body={provider:v('aiProvider'),base_url:v('aiBaseUrl'),model:v('aiModel'),style:v('aiStyle'),workspace_id:v('aiWorkspaceId')};
   if(v('aiKey'))body.api_key=v('aiKey');
   fetch('api.php/ai/config',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(function(r){return r.json()}).then(function(c){

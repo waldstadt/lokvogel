@@ -2641,13 +2641,14 @@ try {
       $cfg['base_url'] = $baseUrl;
       $cfg['model'] = trim((string)($body['model'] ?? '')) ?: $defaults['model'];
       if (isset($body['style'])) $cfg['style'] = trim((string)$body['style']);
+      if (isset($body['workspace_id'])) $cfg['workspace_id'] = trim((string)$body['workspace_id']);
       if (!empty($body['api_key'])) $cfg['api_key'] = trim((string)$body['api_key']);
       $p->prepare("insert into settings (key, value, updated_at) values ('ai', ?, ?)
           on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
         ->execute([json_encode($cfg, JSON_UNESCAPED_UNICODE), now()]);
     }
     out(['provider' => $cfg['provider'] ?? 'openai', 'base_url' => $cfg['base_url'] ?? '', 'model' => $cfg['model'] ?? '',
-      'style' => $cfg['style'] ?? '', 'has_key' => !empty($cfg['api_key'])]);
+      'style' => $cfg['style'] ?? '', 'workspace_id' => $cfg['workspace_id'] ?? '', 'has_key' => !empty($cfg['api_key'])]);
   }
   /* KI-Textassistent: aus Stichpunkten/schlechtem Text einen fertigen Artikeltext machen.
      Nur der angemeldete Admin darf das aufrufen, sonst könnte jeder Besucher am eigenen
@@ -2690,9 +2691,12 @@ try {
         'system' => $style,
         'messages' => [['role' => 'user', 'content' => $text]],
       ], JSON_UNESCAPED_UNICODE);
+      $workspaceId = trim((string)($cfg['workspace_id'] ?? ''));
+      $header = "x-api-key: $apiKey\r\nanthropic-version: 2023-06-01\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\nAccept: application/json\r\n";
+      if ($workspaceId !== '') $header .= "anthropic-workspace-id: $workspaceId\r\n";
       $ctx = stream_context_create(['http' => [
         'method' => 'POST',
-        'header' => "x-api-key: $apiKey\r\nanthropic-version: 2023-06-01\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\nAccept: application/json\r\n",
+        'header' => $header,
         'content' => $reqBody,
         'timeout' => 40,
         'ignore_errors' => true,
