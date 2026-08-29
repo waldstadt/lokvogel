@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 43;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 44;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -35,7 +35,7 @@ const JSON_COLS = [
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
   'products' => ['bundle'], 'bookings' => ['rider', 'customer_notes'], 'rental_contracts' => ['snapshot'],
   'customers' => ['tags', 'tech_check'],
-  'equipment' => ['addon_ids'],
+  'equipment' => ['addon_ids', 'images'],
 ];
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'],
@@ -315,6 +315,14 @@ function upgrade(PDO $p): void {
     try { $p->exec("update equipment set addon_ids = '[\"' || addon_id || '\"]'
       where addon_ids is null and addon_id is not null and addon_id != ''"); } catch (PDOException $e) {}
   }
+  if ($v < 44) {
+    /* Mehrere Bilder je Artikel (JSON-Liste), plus Seeburg A2 -> X2 mit neuen Specs. */
+    try { $p->exec("alter table equipment add column images text"); } catch (PDOException $e) {}
+    try { $p->prepare("update equipment set name = ?, sku = ?, description = ?, thomann_url = ? where sku = ?")
+      ->execute(['Seeburg Acoustic Line X2', 'MANUAL-SEEBURG-X2',
+        'Kompaktes Koaxial-Topteil (passiv): 8" Tieftöner + 1" Hochtöner koaxial – gleichmäßige Abstrahlung auch außerhalb der Achse. Belastbarkeit 250 W AES / 750 W Peak, 8 Ω, max. SPL 124 dB. Frequenzbereich 70 Hz–20 kHz, Abstrahlwinkel 90°×60°. Multiplex-Gehäuse 375×250×250 mm, 8 kg, 35-mm-Stativflansch, flugfähig.',
+        'https://www.thomann.de/de/seeburg_x_2.htm', 'MANUAL-SEEBURG-A2']); } catch (PDOException $e) {}
+  }
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -527,7 +535,7 @@ function seedEquipmentCatalog(PDO $p): void {
     ['MANUAL-PLAUDIO-B215', 'Lautsprecher', 'PL Audio B215 Aktiv', 'Aktiver 2×15"-Subwoofer (Bus) mit eingebauter 3-Kanal-Endstufe: 2.500 W im Bassbereich + 2×800 W für den Betrieb von Topteilen. Eingebauter DSP mit 80 Presets, Faital-Chassis, Pascal-Endstufen. Kombiniert Sub + Endstufe für die angeschlossenen Topteile in einem Gerät.', 60.0, 'https://pl-audio.de/en/products/speaker/subwoofer/b-215-sub/', 2, true],
     ['MANUAL-SEEBURG-A3', 'Lautsprecher', 'Seeburg Acoustic Line A3', 'Passives Mittelhochton-Topteil, 2×8" Neodym-Tieftöner + 1" Hochtontreiber. Belastbarkeit 500 W AES / 1500 W Peak, 4 Ω, max. SPL 132 dB. Frequenzbereich 80 Hz–20 kHz, Abstrahlwinkel 90°×60° (drehbar). Anschluss 2× Speakon NL4MP, 35-mm-Stativhalterung. Maße 59×25×25 cm, Gewicht 12,5 kg.', 35.0, 'https://www.thomann.de/de/seeburg_acoustic_line_a3.htm', 2, true],
     // Von Markus mündlich durchgegeben, ohne Rechnung (Bestand für die normale Vermietung)
-    ['MANUAL-SEEBURG-A2', 'Lautsprecher', 'Seeburg Acoustic Line A2', 'Kompaktes Mittelhochton-Topteil, 2×6,5" Tieftöner + 1" Horn-Treiber. Integrierte Digital-Endstufe mit DSP, 500/150 W AES. Für Festinstallation und Sprachbeschallung geeignet.', 30.0, 'https://www.thomann.de/de/seeburg_acoustic_line_a2.htm', 2],
+    ['MANUAL-SEEBURG-X2', 'Lautsprecher', 'Seeburg Acoustic Line X2', 'Kompaktes Koaxial-Topteil (passiv): 8" Tieftöner + 1" Hochtöner koaxial – gleichmäßige Abstrahlung auch außerhalb der Achse. Belastbarkeit 250 W AES / 750 W Peak, 8 Ω, max. SPL 124 dB. Frequenzbereich 70 Hz–20 kHz, Abstrahlwinkel 90°×60°. Multiplex-Gehäuse 375×250×250 mm, 8 kg, 35-mm-Stativflansch, flugfähig.', 30.0, 'https://www.thomann.de/de/seeburg_x_2.htm', 2],
     ['MANUAL-SEEBURG-A6', 'Lautsprecher', 'Seeburg Acoustic Line A6', 'Multifunktions-Topteil 12"+1", drehbares DCP-Horn mit konstant 90°×60° Abstrahlung. Auch als Monitor einsetzbar. Belastbarkeit 500 W AES / 1500 W Peak, 8 Ω.', 40.0, 'https://www.thomann.de/de/acoustic_line_a6.htm', 2],
     ['MANUAL-SEEBURG-GSUB1201DPPP', 'Lautsprecher', 'Seeburg G-Sub 1201 dp++', 'Aktiver 12"-Subwoofer, flache Bauform (Höhe nur 33 cm), 3-Kanal-DSP-Endstufe mit 2 Signaleingängen – die zusätzlichen Endstufenkanäle können ein HiMid-/Fullrange-System oder einen passiven Sub mitversorgen. 500 W AES (Single) / 1000 W AES (Dual Mode). Menge laut Markus noch unklar, vorerst mit 1 angelegt – bitte im Backoffice korrigieren.', 90.0, 'https://www.thomann.de/de/seeburg_acoustic_line_g_sub_1201dp_480776.htm'],
     ['MANUAL-SEEBURG-GSUB1201-PASSIV', 'Lautsprecher', 'Seeburg G-Sub 1201 passiv', 'Passiver 12"-Subwoofer, Bassreflex, Neodym-Chassis, 500 W AES / 1500 W Peak, 8 Ω. Menge laut Markus noch unklar, vorerst mit 1 angelegt – bitte im Backoffice korrigieren.', 45.0, 'https://www.thomann.de/de/seeburg_acoustic_line_g_sub_1201.htm'],
@@ -670,7 +678,7 @@ create table equipment (id text primary key, sort integer default 0, name text n
   day_rate real default 0, followup_pct integer default 50,
   tier_week_pct real, tier_2week_pct real, tier_month_pct real,
   qty_total integer default 1, rentable integer default 1, public integer default 1,
-  status text default 'aktiv', notes text, partner_rate real, addon_id text, addon_ids text,
+  status text default 'aktiv', notes text, partner_rate real, addon_id text, addon_ids text, images text,
   thomann_url text, own_rig integer default 0, day_rate_suggested real,
   invoice_file text, invoice_name text, on_request integer default 0, created_at text);
 create table equipment_sets (id text primary key, sort integer default 0,
@@ -1173,7 +1181,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       if (!$auth && $t === 'equipment') {
         $pubCols = ['id','sort','name','slug','category','description','image_url','image_focal',
           'day_rate','followup_pct','tier_week_pct','tier_2week_pct','tier_month_pct',
-          'qty_total','rentable','public','status','addon_id','addon_ids','on_request'];
+          'qty_total','rentable','public','status','addon_id','addon_ids','images','on_request'];
         foreach ($rows as &$r) $r = array_intersect_key($r, array_flip($pubCols));
         unset($r);
       }
