@@ -254,6 +254,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <div class="card"><h3>Portal-Aktivität <span class="mut sml" style="font-weight:400">(Kundenreaktionen auf Angebote)</span></h3><div id="dashPortal" class="sml mut">–</div></div>
       <div class="card"><h3>Beantwortete Fragebögen</h3><div id="dashForms" class="sml mut">–</div></div>
       <div class="card"><h3>Bewertung anfragen <span class="mut sml" style="font-weight:400">(Feiern ohne Bewertungs-Mail)</span></h3><div id="dashReviews" class="sml mut">–</div></div>
+      <div class="card"><h3>Fehlende / unbestätigte Angaben</h3><div id="dashMissing" class="sml mut">–</div></div>
     </div>
   </div>
 
@@ -479,20 +480,34 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <div class="pt">Website-Inhalte</div><div class="ps">Texte, Fotos, Pakete, FAQ &amp; Design der öffentlichen Homepage – zum Bearbeiten Abschnitt anklicken</div>
     <div class="sec-label">Design &amp; Schrift</div>
     <div class="card"><h3>Design / Farbschema</h3>
-      <div id="themeRow" style="margin-bottom:8px"></div>
-      <div class="grid3">
+      <label class="sml mut" style="text-transform:none;letter-spacing:0;font-weight:400">Farben DJ-Seite (index.html)</label>
+      <div id="themeRow" style="margin:6px 0 8px"></div>
+      <div class="grid2">
         <div><label>Akzentfarbe</label><input type="color" id="thPrimary" style="height:36px;padding:2px"></div>
         <div><label>Hintergrund</label><input type="color" id="thBg" style="height:36px;padding:2px"></div>
-        <div><label>Schriftstil <span class="mut sml" style="text-transform:none;letter-spacing:0">(Überschriften)</span></label>
-          <select id="thFont">
-            <option value="grotesk">Markant – Space Grotesk</option>
-            <option value="outfit">Freundlich – Outfit</option>
-            <option value="playfair">Elegant – Playfair Display</option>
-          </select></div>
       </div>
+      <label class="sml mut" style="text-transform:none;letter-spacing:0;font-weight:400;margin-top:16px">Farben Technik-Seite (technik.html &amp; Mietkatalog)</label>
+      <div id="themeRowTech" style="margin:6px 0 8px"></div>
+      <div class="grid2">
+        <div><label>Akzentfarbe</label><input type="color" id="thPrimaryTech" style="height:36px;padding:2px"></div>
+        <div><label>Hintergrund</label><input type="color" id="thBgTech" style="height:36px;padding:2px"></div>
+      </div>
+      <label style="margin-top:16px">Schriftstil <span class="mut sml" style="text-transform:none;letter-spacing:0">(Überschriften, gilt für alle Seiten)</span></label>
+      <select id="thFont">
+        <option value="grotesk">Markant – Space Grotesk</option>
+        <option value="outfit">Freundlich – Outfit</option>
+        <option value="playfair">Elegant – Playfair Display</option>
+        <option value="poppins">Geometrisch – Poppins</option>
+        <option value="montserrat">Modern – Montserrat</option>
+        <option value="bebas">Plakativ – Bebas Neue</option>
+        <option value="merriweather">Warm-seriös – Merriweather</option>
+        <option value="oswald">Kompakt-kräftig – Oswald</option>
+        <option value="caveat">Handschrift – Caveat</option>
+        <option value="anton">Extra-fett – Anton</option>
+      </select>
       <div style="margin-top:8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <button class="btn sm" onclick="saveTheme()">Design speichern</button>
-        <span class="mut sml">Alle Schriften liegen fest auf dem eigenen Server (kein Google Fonts). Die Farben gelten für die DJ-Seite; der Schriftstil gilt für alle Seiten. Technik-Seite (Petrol) und Halloween (Orange) behalten bewusst ihre eigene Farbwelt.</span>
+        <span class="mut sml">Alle Schriften liegen fest auf dem eigenen Server (kein Google Fonts). DJ-Seite und Technik-Seite haben getrennte Farbpaletten, Halloween (Orange) behält bewusst ihre eigene Farbwelt.</span>
       </div>
     </div>
     <div class="sec-label">Startseite (DJ)</div>
@@ -522,6 +537,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <div id="vb_guarantee"></div></div>
     <div class="sec-label">Technik-Seite</div>
         <div class="card"><h3>Technik-Seite (technik.html)</h3>
+          <label style="margin-bottom:12px"><input type="checkbox" id="cThEnabled" style="width:auto;margin-right:6px" checked><b>Technik-Seite online</b> – ausschalten zeigt Besuchern nur einen Hinweis „gerade nicht verfügbar" statt der Seite</label>
           <label>Hero-Unterzeile</label><input id="cThSub">
           <label>Hero-Text</label><textarea id="cThText"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cThText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
@@ -542,7 +558,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div class="card"><h3>Leistungspakete <button class="btn sm" style="float:right" onclick="openPackModal()">+ Paket</button></h3>
           <div class="mut sml" style="margin-bottom:8px">Reihenfolge per Ziehen am ⠿-Griff ändern – Klick aufs Badge schaltet live/aus.</div>
           <div id="packList" class="sml"></div></div>
-        <div class="card"><h3>FAQ <button class="btn sm" style="float:right" onclick="openFaqModal()">+ Frage</button></h3>
+        <div class="card"><h3>FAQ <span style="float:right;display:flex;gap:6px"><button class="btn g sm" id="faqAiBtn" onclick="suggestFaq()">KI-Vorschlag</button><button class="btn sm" onclick="openFaqModal()">+ Frage</button></span></h3>
           <div class="mut sml" style="margin-bottom:8px">Reihenfolge per Ziehen am ⠿-Griff ändern – Klick aufs Badge schaltet live/aus.</div>
           <div id="faqAdminList" class="sml"></div></div>
         <div class="card"><h3>Location-Empfehlungen <button class="btn sm" style="float:right" onclick="openLocModal()">+ Location</button></h3>
@@ -550,7 +566,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <label>Einleitungstext</label><textarea id="cLocText" style="min-height:60px"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cLocText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <div class="grid2"><div><label>Maximal angezeigte Locations (0 = alle)</label><input type="number" min="0" id="cLocMax"></div>
-          <div style="align-self:end"><label style="margin:0 0 12px;text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cLocRotate" style="width:auto;margin-right:6px">Rotierend wechseln (täglich)</label></div></div>
+          <div style="align-self:end"><label style="margin:0 0 12px;text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cLocRotate" style="width:auto;margin-right:6px">Rotierend wechseln (bei jedem Besuch)</label></div></div>
           <div style="margin-top:6px;margin-bottom:14px"><button class="btn sm" onclick="saveContent('loc_section')">Texte &amp; Anzeige speichern</button></div>
           <div class="mut sml" style="margin-bottom:8px">Reihenfolge per Ziehen am ⠿-Griff ändern – Klick aufs Badge schaltet live/aus. Stern = Highlight, wird immer angezeigt.</div>
           <div id="locAdminList" class="sml"></div>
@@ -578,6 +594,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
             <button class="btn g sm" onclick="galFromPool()">Aus Pool wählen</button>
           </div>
           <textarea id="cGalImgs" hidden></textarea>
+          <div class="grid2" style="margin-top:8px">
+            <div><label>Max. gleichzeitig gezeigte Bilder <span class="mut sml" style="text-transform:none;letter-spacing:0">(0 = alle)</span></label><input type="number" id="cGalMax" min="0" value="6"></div>
+            <div style="display:flex;align-items:flex-end;padding-bottom:8px"><label style="margin:0"><input type="checkbox" id="cGalRotate" style="width:auto;margin-right:6px">Bei jedem Besuch neu mischen</label></div>
+          </div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveGallery()">Galerie speichern</button></div>
           <div id="vb_gallery"></div></div>
         <div class="card"><h3>Instagram-Galerie</h3>
@@ -610,6 +630,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cLegDs')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>AGB (inkl. Vermittlungsklausel DJ Bande)</label><textarea id="cLegAgb" style="min-height:90px"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cLegAgb')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
+          <label style="margin-top:12px"><input type="checkbox" id="cLegReviewed" style="width:auto;margin-right:6px"><b>Rechtstexte anwaltlich/steuerlich geprüft</b> – ohne Haken erscheint ein Hinweis im Dashboard</label>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('legal')">Speichern</button></div>
           <div id="vb_legal"></div></div>
   </div>
@@ -1083,6 +1104,19 @@ function renderDash(){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(b.title||b.event_type||'Auftrag')+' <span class="mut">'+dt(b.event_date)+' · '+esc(custName(b.customers))+'</span> '+
     '<button class="btn sm" style="float:right" onclick="composeReviewMail(\''+b.id+'\')">Danke &amp; Bewertung</button></div>';
   }).join('')||'Alle vergangenen Feiern sind angeschrieben.';
+  document.getElementById('dashMissing').innerHTML=computeMissingInfo().map(function(m){
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="showPage(\''+m.pg+'\')">'+esc(m.text)+'</a></div>';
+  }).join('')||'Alles vollständig – nichts offen.';
+}
+/* Prüft Firmendaten & Rechtstexte auf fehlende/unbestätigte Angaben und liefert
+   Dashboard-Zeilen (Text + Ziel-Seite zum Draufklicken). Rein informativ, kein Blocker. */
+function computeMissingInfo(){
+  var issues=[],comp=S.company||{},legal=(CACHE.content&&CACHE.content.legal)||{};
+  if(!comp.email)issues.push({text:'Firmen-E-Mail fehlt (Einstellungen → Firmendaten)',pg:'set'});
+  if(!comp.tax_id&&!comp.vat_id)issues.push({text:'Steuernummer/USt-IdNr. fehlt (Einstellungen → Firmendaten)',pg:'set'});
+  if(!comp.iban)issues.push({text:'IBAN fehlt (Einstellungen → Bankverbindung)',pg:'set'});
+  if(!legal.reviewed)issues.push({text:'Rechtstexte (Impressum/Datenschutz/AGB) sind noch nicht als geprüft markiert',pg:'cms'});
+  return issues;
 }
 function openEventDoc(evId,docId){
   api('doc_events?id=eq.'+evId,{method:'PATCH',body:{seen:1}}).then(function(){
@@ -2747,7 +2781,10 @@ function reloadSets(){
 var THEMES=[
   {n:'koralle',p:'#ff6f5b',bg:'#0f1012'},{n:'bernstein',p:'#e8a13c',bg:'#100f0c'},
   {n:'petrol',p:'#3cc8b4',bg:'#0b1211'},{n:'violett',p:'#9b6dff',bg:'#0e0c14'},
-  {n:'blau',p:'#5a8dee',bg:'#0b0e14'},{n:'mono',p:'#e8e8e8',bg:'#0c0c0c'}
+  {n:'blau',p:'#5a8dee',bg:'#0b0e14'},{n:'mono',p:'#e8e8e8',bg:'#0c0c0c'},
+  {n:'smaragd',p:'#4cc98a',bg:'#0b120e'},{n:'rot',p:'#e0534f',bg:'#120b0b'},
+  {n:'pink',p:'#ec6fa8',bg:'#120a0f'},{n:'tuerkis',p:'#38c6d0',bg:'#0a1213'},
+  {n:'senf',p:'#d1b23c',bg:'#100e08'},{n:'indigo',p:'#7a8ce8',bg:'#0d0e18'}
 ];
 function renderCms(){
   var c=CACHE.content||{};
@@ -2769,6 +2806,7 @@ function renderCms(){
   document.getElementById('cSeoDesc').value=g('seo','description');
   document.getElementById('cThSub').value=g('tech_hero','subtitle');
   document.getElementById('cThText').value=g('tech_hero','text');
+  document.getElementById('cThEnabled').checked=(c.tech_hero&&c.tech_hero.enabled)!==false;
   document.getElementById('cThRentTitle').value=g('rental','title');
   document.getElementById('cThRentText').value=g('rental','text');
   document.getElementById('cThTeaTitle').value=g('tech_teaser','title');
@@ -2785,35 +2823,50 @@ function renderCms(){
   document.getElementById('cRevMax').value=Number(g('reviews','max_count'))||0;
   document.getElementById('cRevRotate').checked=!!g('reviews','rotate');
   document.getElementById('cGalTitle').value=g('gallery','title')||"So sieht's bei mir aus";
+  document.getElementById('cGalMax').value=(c.gallery&&c.gallery.max_count!=null)?c.gallery.max_count:6;
+  document.getElementById('cGalRotate').checked=!!g('gallery','rotate');
   GAL_IMAGES=(g('gallery','images')||[]).slice();
   renderGalGrid();
   renderRevAdmin();
   document.getElementById('cLegImp').value=g('legal','impressum');
   document.getElementById('cLegDs').value=g('legal','datenschutz');
   document.getElementById('cLegAgb').value=g('legal','agb');
+  document.getElementById('cLegReviewed').checked=!!g('legal','reviewed');
   var th=c.theme||{};
   document.getElementById('thPrimary').value=th.primary||'#c9a227';
   document.getElementById('thBg').value=th.bg||'#0d0d0f';
-  document.getElementById('thFont').value=['grotesk','outfit','playfair'].indexOf(th.font)>=0?th.font:'grotesk';
+  var FONT_IDS=['grotesk','outfit','playfair','poppins','montserrat','bebas','merriweather','oswald','caveat','anton'];
+  document.getElementById('thFont').value=FONT_IDS.indexOf(th.font)>=0?th.font:'grotesk';
   document.getElementById('themeRow').innerHTML=THEMES.map(function(t){
-    return '<span class="theme-sw'+(th.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+t.n+'" onclick="pickTheme(\''+t.n+'\')"></span>';
+    return '<span class="theme-sw'+(th.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+t.n+'" onclick="pickTheme(\'dj\',\''+t.n+'\')"></span>';
+  }).join('')+'<span class="sml mut" style="margin-left:8px">Preset wählen oder Farben frei einstellen</span>';
+  var tt=c.theme_technik||{};
+  document.getElementById('thPrimaryTech').value=tt.primary||'#3cc8b4';
+  document.getElementById('thBgTech').value=tt.bg||'#0e1213';
+  document.getElementById('themeRowTech').innerHTML=THEMES.map(function(t){
+    return '<span class="theme-sw'+(tt.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+t.n+'" onclick="pickTheme(\'technik\',\''+t.n+'\')"></span>';
   }).join('')+'<span class="sml mut" style="margin-left:8px">Preset wählen oder Farben frei einstellen</span>';
   renderPackAdmin();renderFaqAdmin();reloadLocs();reloadFriends();
   renderSectionsCard();renderInstagram();loadVersions();
 }
-function pickTheme(name){
+function pickTheme(target,name){
   var t=THEMES.find(function(x){return x.n===name});
-  document.getElementById('thPrimary').value=t.p;
-  document.getElementById('thBg').value=t.bg;
-  CACHE.content.theme=CACHE.content.theme||{};CACHE.content.theme.preset=name;
-  document.querySelectorAll('.theme-sw').forEach(function(el){el.classList.toggle('sel',el.title===name)});
+  var pId=target==='technik'?'thPrimaryTech':'thPrimary',bId=target==='technik'?'thBgTech':'thBg';
+  var rowSel='#'+(target==='technik'?'themeRowTech':'themeRow')+' .theme-sw';
+  document.getElementById(pId).value=t.p;
+  document.getElementById(bId).value=t.bg;
+  var key=target==='technik'?'theme_technik':'theme';
+  CACHE.content[key]=CACHE.content[key]||{};CACHE.content[key].preset=name;
+  document.querySelectorAll(rowSel).forEach(function(el){el.classList.toggle('sel',el.title===name)});
 }
 function saveGallery(){
   upsertContent('gallery',buildContentVal('gallery'));
 }
 function saveTheme(){
   var val={preset:(CACHE.content.theme&&CACHE.content.theme.preset)||'custom',primary:v('thPrimary'),bg:v('thBg'),font:v('thFont')};
+  var valTech={preset:(CACHE.content.theme_technik&&CACHE.content.theme_technik.preset)||'custom',primary:v('thPrimaryTech'),bg:v('thBgTech')};
   upsertContent('theme',val);
+  upsertContent('theme_technik',valTech);
 }
 /* Baut den Wert eines site_content-Keys aus dem aktuellen Formularstand –
    genutzt von saveContent (live speichern) UND von den Versionen (Entwurf sichern). */
@@ -2834,13 +2887,14 @@ function buildContentVal(key){
     return Object.assign({},oldR,{google_url:v('cRevGoogle'),djbande_url:v('cRevBande'),tagline:v('cRevTagline'),
       max_count:Number(v('cRevMax'))||0,rotate:document.getElementById('cRevRotate').checked});
   }
-  if(key==='gallery')return {title:v('cGalTitle'),images:GAL_IMAGES.slice()};
-  if(key==='legal')return {impressum:document.getElementById('cLegImp').value,datenschutz:document.getElementById('cLegDs').value,agb:document.getElementById('cLegAgb').value};
+  if(key==='gallery')return {title:v('cGalTitle'),images:GAL_IMAGES.slice(),
+    max_count:Number(v('cGalMax'))||0,rotate:document.getElementById('cGalRotate').checked};
+  if(key==='legal')return {impressum:document.getElementById('cLegImp').value,datenschutz:document.getElementById('cLegDs').value,agb:document.getElementById('cLegAgb').value,reviewed:document.getElementById('cLegReviewed').checked};
   return {};
 }
 function saveContent(key){
   if(key==='tech'){
-    upsertContent('tech_hero',{subtitle:v('cThSub'),text:v('cThText')});
+    upsertContent('tech_hero',{subtitle:v('cThSub'),text:v('cThText'),enabled:document.getElementById('cThEnabled').checked});
     upsertContent('rental',{title:v('cThRentTitle'),text:v('cThRentText')});
     upsertContent('tech_teaser',{title:v('cThTeaTitle'),text:v('cThTeaText')});
     return;
@@ -3070,9 +3124,9 @@ function renderFaqAdmin(){
     pubSwitch('faq',f.id,!!f.public)+'</div>';
   }).join('')||'<span class="mut">Keine FAQ.</span>';
 }
-function openFaqModal(id){
-  var f=id?CACHE.faq.find(function(x){return x.id===id}):{};f=f||{};
-  openModal(id?'FAQ bearbeiten':'Neue Frage',
+function openFaqModal(id,prefill){
+  var f=id?CACHE.faq.find(function(x){return x.id===id}):(prefill||{});f=f||{};
+  openModal(id?'FAQ bearbeiten':(prefill?'KI-Vorschlag – bitte prüfen':'Neue Frage'),
     '<label>Frage *</label><input id="fQ" value="'+esc(f.question||'')+'">'+
     '<label>Antwort *</label><textarea id="fA" style="min-height:100px">'+esc(f.answer||'')+'</textarea>'+
     edBtn('fA')+
@@ -3080,6 +3134,17 @@ function openFaqModal(id){
     SORT_HINT+
     '<div style="margin-top:14px"><button class="btn" onclick="saveFaq(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'faq\',\''+id+'\',renderCmsReload)">Löschen</button>':'')+'</div>');
+}
+function suggestFaq(){
+  var btn=document.getElementById('faqAiBtn');
+  btn.disabled=true;btn.textContent='Wird generiert …';
+  fetch('api.php/ai/suggest-faq',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'}})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
+    .then(function(res){
+      btn.disabled=false;btn.textContent='KI-Vorschlag';
+      if(!res.ok||res.j.error){toast((res.j&&res.j.error)||'KI-Anfrage fehlgeschlagen.',1);return}
+      openFaqModal(null,{question:res.j.question,answer:res.j.answer});
+    }).catch(function(e){btn.disabled=false;btn.textContent='KI-Vorschlag';toast(e.message,1)});
 }
 function saveFaq(id){
   var body={question:v('fQ'),answer:v('fA'),public:document.getElementById('fPub').checked};
@@ -3161,15 +3226,46 @@ function openFriendModal(id){
     '<div class="grid2"><div><label>Name *</label><input id="frName" value="'+esc(f.name||'')+'"></div>'+
     '<div><label>Kategorie</label><input id="frCat" value="'+esc(f.category||'')+'" placeholder="z. B. Fotografie, Sängerin, Hochzeitsplanung"></div></div>'+
     '<label>Warum empfehle ich sie/ihn? (kurz)</label><textarea id="frDesc">'+esc(f.description||'')+'</textarea>'+edBtn('frDesc')+
+    '<label>Foto <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional)</span></label>'+
+    '<input type="hidden" id="frImg" value="'+esc(f.image_url||'')+'">'+
+    '<div style="display:flex;gap:8px"><input type="file" accept="image/*" style="display:none" id="frImgUp" onchange="frImgUpload(this)">'+
+    '<button class="btn g sm" onclick="document.getElementById(\'frImgUp\').click()">Hochladen</button>'+
+    '<button class="btn g sm" onclick="frImgFromPool()">Aus Pool</button>'+
+    (f.image_url?'<button class="btn g sm" onclick="frImgRemove()">Entfernen</button>':'')+'</div>'+
+    '<div id="frImgFocalWrap">'+focalWidget(f.image_url,f.image_focal,'frFocal','1/1')+'</div>'+
     '<label>Website</label><input id="frWeb" value="'+esc(f.website||'')+'" placeholder="https://…">'+
     '<label style="margin-top:12px"><input type="checkbox" id="frPub" style="width:auto;margin-right:6px" '+(f.public!==false&&f.public!==0?'checked':'')+'>Auf Homepage anzeigen</label>'+
     SORT_HINT+
     '<div style="margin-top:14px"><button class="btn" onclick="saveFriend(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'friends\',\''+id+'\',reloadFriends)">Löschen</button>':'')+'</div>');
 }
+function frImgUpload(inp){
+  var f=inp.files[0];if(!f)return;
+  var name=Date.now()+'-'+f.name.toLowerCase().replace(/[^a-z0-9.]+/g,'-');
+  fetch(API+'/storage/'+encodeURIComponent(name),{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:f})
+    .then(function(r){if(!r.ok)throw new Error('Upload fehlgeschlagen ('+r.status+')');return r.json()})
+    .then(function(j){
+      document.getElementById('frImg').value=j.url;
+      document.getElementById('frImgFocalWrap').innerHTML=focalWidget(j.url,'50% 50%','frFocal','1/1');
+      toast('Foto hochgeladen ✓ – „Speichern" nicht vergessen.');
+    }).catch(function(e){toast(e.message,1)});
+  inp.value='';
+}
+function frImgFromPool(){
+  openMediaPicker(function(urls){
+    if(!urls||!urls[0])return;
+    document.getElementById('frImg').value=urls[0];
+    document.getElementById('frImgFocalWrap').innerHTML=focalWidget(urls[0],'50% 50%','frFocal','1/1');
+  });
+}
+function frImgRemove(){
+  document.getElementById('frImg').value='';
+  document.getElementById('frImgFocalWrap').innerHTML=focalWidget('','50% 50%','frFocal','1/1');
+}
 function saveFriend(id){
   if(!v('frName')){toast('Name fehlt.',1);return}
   var body={name:v('frName'),category:v('frCat'),description:v('frDesc'),website:v('frWeb'),
+    image_url:v('frImg'),image_focal:v('frFocal'),
     public:document.getElementById('frPub').checked};
   if(!id)body.sort=(CACHE.friends||[]).length;
   (id?api('friends?id=eq.'+id,{method:'PATCH',body:body}):api('friends',{method:'POST',body:body}))
@@ -4448,9 +4544,11 @@ function fillContent(key,val){
     set('cLocTitle',val.title);set('cLocText',val.text);set('cLocMax',Number(val.max_count)||0);
     document.getElementById('cLocRotate').checked=!!val.rotate;
   }
-  if(key==='gallery'){set('cGalTitle',val.title);GAL_IMAGES=(val.images||[]).slice();renderGalGrid()}
+  if(key==='gallery'){set('cGalTitle',val.title);GAL_IMAGES=(val.images||[]).slice();renderGalGrid();
+    document.getElementById('cGalMax').value=val.max_count!=null?val.max_count:6;
+    document.getElementById('cGalRotate').checked=!!val.rotate}
   if(key==='seo'){set('cSeoTitle',val.title);set('cSeoDesc',val.description)}
-  if(key==='legal'){set('cLegImp',val.impressum);set('cLegDs',val.datenschutz);set('cLegAgb',val.agb)}
+  if(key==='legal'){set('cLegImp',val.impressum);set('cLegDs',val.datenschutz);set('cLegAgb',val.agb);document.getElementById('cLegReviewed').checked=!!val.reviewed}
 }
 
 /* ===== Inhalte/Einstellungen: Karten zuklappbar machen (Standard: zu) ===== */

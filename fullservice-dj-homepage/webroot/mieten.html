@@ -864,9 +864,13 @@ sfetch('site_content?select=key,value').then(function(rows){
     if(c.rental.text)document.getElementById('rentText').textContent=c.rental.text;
   }
   if(c.legal)LEGAL=c.legal;
+  if(c.theme_technik&&c.theme_technik.primary){
+    document.documentElement.style.setProperty('--acc',c.theme_technik.primary);
+    if(c.theme_technik.bg)document.documentElement.style.setProperty('--bg',c.theme_technik.bg);
+  }
   if(c.theme)applyFont(c.theme.font);
 }).catch(function(){});
-var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif"};
+var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif",poppins:"'Poppins',sans-serif",montserrat:"'Montserrat',sans-serif",bebas:"'Bebas Neue',cursive",merriweather:"'Merriweather',serif",oswald:"'Oswald',sans-serif",caveat:"'Caveat',cursive",anton:"'Anton',sans-serif"};
 function applyFont(f){
   if(!FONT_HEADS[f]||f==='grotesk')return;
   var s=document.createElement('style');

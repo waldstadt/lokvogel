@@ -442,8 +442,11 @@ var LEGAL={};
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
-/* Tages-Seed: deterministisch pro Tag, damit die Seite nicht bei jedem Reload springt */
+/* Tages-Seed: deterministisch pro Tag, damit z. B. Bewertungen nicht bei jedem Reload springen */
 var DAY_SEED=Math.floor(Date.now()/864e5);
+/* Besuchs-Seed: einmal pro Seitenaufruf neu gewürfelt - für Inhalte, die bei jedem Besuch
+   neu mischen sollen (z. B. Locations), statt nur einmal am Tag zu wechseln */
+var VISIT_SEED=Math.floor(Math.random()*1e9);
 
 /* Vom CMS ausgeblendete Sektionen (site_content key "sections" → {hidden:[...]}) */
 var HIDDEN_SECTIONS=[];
@@ -464,7 +467,8 @@ function galCleanup(){
 
 /* Auswahl + Rotation: Highlights immer dabei (Position rotiert täglich),
    restliche Plätze aus den Nicht-Highlights – bei rotate täglich weiterrückend. */
-function pickRotate(list,maxCount,rotate){
+function pickRotate(list,maxCount,rotate,seed){
+  var sd=seed!=null?seed:DAY_SEED;
   var highs=[],rest=[];
   (list||[]).forEach(function(x){(x&&x.highlight?highs:rest).push(x)});
   var max=Number(maxCount)||0;
@@ -472,12 +476,12 @@ function pickRotate(list,maxCount,rotate){
   var chosen=[];
   if(slots>=rest.length){chosen=rest.slice()}
   else if(rotate){
-    var off=rest.length?DAY_SEED%rest.length:0;
+    var off=rest.length?sd%rest.length:0;
     for(var i=0;i<slots;i++)chosen.push(rest[(off+i)%rest.length]);
   }else{chosen=rest.slice(0,slots)}
   var out=chosen.slice();
   highs.forEach(function(h,idx){
-    out.splice((DAY_SEED+idx)%(out.length+1),0,h);
+    out.splice((sd+idx)%(out.length+1),0,h);
   });
   return out;
 }
@@ -526,6 +530,10 @@ function sfetch(path){
 function applyContent(rows){
   var c={};rows.forEach(function(r){c[r.key]=r.value});
   if(c.sections&&c.sections.hidden&&c.sections.hidden.length)HIDDEN_SECTIONS=c.sections.hidden;
+  if(c.tech_hero&&c.tech_hero.enabled===false){
+    if(HIDDEN_SECTIONS.indexOf('technik')<0)HIDDEN_SECTIONS.push('technik');
+    var navTech=document.querySelector('a.switch[href="technik.html"]');if(navTech)navTech.style.display='none';
+  }
   if(c.hero){
     if(c.hero.subtitle)document.getElementById('heroKick').textContent=c.hero.subtitle;
     if(c.hero.text)document.getElementById('heroText').innerHTML=mdRender(c.hero.text);
@@ -591,7 +599,16 @@ function applyContent(rows){
   }
   if(c.gallery&&c.gallery.images&&c.gallery.images.length){
     if(c.gallery.title)document.getElementById('galTitle').textContent=c.gallery.title;
-    document.getElementById('galGrid').innerHTML=c.gallery.images.map(function(src){
+    var galAll=c.gallery.images,galMax=c.gallery.max_count!=null?Number(c.gallery.max_count):6;
+    var galSel=galAll;
+    if(galMax>0&&galAll.length>galMax){
+      if(c.gallery.rotate){
+        var goff=VISIT_SEED%galAll.length,gs=[];
+        for(var gi=0;gi<galMax;gi++)gs.push(galAll[(goff+gi)%galAll.length]);
+        galSel=gs;
+      }else galSel=galAll.slice(0,galMax);
+    }
+    document.getElementById('galGrid').innerHTML=galSel.map(function(src){
       return '<img src="'+esc(src)+'" alt="" loading="lazy" onerror="this.remove();galCleanup()">';
     }).join('');
     showSection('galerie');
@@ -622,7 +639,7 @@ function applyContent(rows){
   });
 }
 /* Schriftstil aus dem CMS (alle Dateien liegen lokal unter fonts/) */
-var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif"};
+var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif",poppins:"'Poppins',sans-serif",montserrat:"'Montserrat',sans-serif",bebas:"'Bebas Neue',cursive",merriweather:"'Merriweather',serif",oswald:"'Oswald',sans-serif",caveat:"'Caveat',cursive",anton:"'Anton',sans-serif"};
 function applyFont(f){
   if(!FONT_HEADS[f]||f==='grotesk')return;
   var s=document.createElement('style');
@@ -658,7 +675,7 @@ function renderReviews(){
 }
 function renderLocations(){
   if(!LOC_DATA||!LOC_DATA.length)return;
-  var sel=pickRotate(LOC_DATA,LOC_CFG.max_count,LOC_CFG.rotate);
+  var sel=pickRotate(LOC_DATA,LOC_CFG.max_count,LOC_CFG.rotate,VISIT_SEED);
   document.getElementById('locGrid').innerHTML=sel.map(function(l){
     var showImg=l.image_url&&(l.image_source!=='web'||l.image_approved);
     var img=showImg?' style="background-image:url(\''+esc(l.image_url)+'\');background-position:'+esc(l.image_focal||'50% 50%')+'"':'';
@@ -684,7 +701,8 @@ sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
 sfetch('friends?select=*&public=eq.true&order=sort').then(function(r){
   if(!r.length)return;
   document.getElementById('friendGrid').innerHTML=r.map(function(f){
-    return '<div class="rent reveal vis"><div class="rb">'+
+    var img=f.image_url?' style="background-image:url(\''+esc(f.image_url)+'\');background-position:'+esc(f.image_focal||'50% 50%')+'"':'';
+    return '<div class="rent reveal vis">'+(f.image_url?'<div class="ri"'+img+'></div>':'')+'<div class="rb">'+
       (f.category?'<div class="rc">'+esc(f.category)+'</div>':'')+
       '<h4>'+esc(f.name)+'</h4><p>'+mdRender(f.description||'')+'</p>'+
       (f.website?'<a href="'+esc(f.website)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600">Zur Website ↗</a>':'')+

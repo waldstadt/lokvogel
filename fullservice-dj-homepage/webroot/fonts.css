@@ -1,6 +1,13 @@
-/* Lokal eingebettete Schriften (Variable Fonts, latin) — keine Verbindung zu Google.
+/* Lokal eingebettete Schriften — keine Verbindung zu Google beim Seitenaufruf.
    Quelle: Google Fonts (SIL Open Font License), heruntergeladen und self-hosted. */
 @font-face{font-family:'Inter';font-style:normal;font-weight:300 700;font-display:swap;src:url('fonts/inter.woff2') format('woff2')}
 @font-face{font-family:'Space Grotesk';font-style:normal;font-weight:300 700;font-display:swap;src:url('fonts/space-grotesk.woff2') format('woff2')}
 @font-face{font-family:'Playfair Display';font-style:normal;font-weight:400 900;font-display:swap;src:url('fonts/playfair.woff2') format('woff2')}
 @font-face{font-family:'Outfit';font-style:normal;font-weight:100 900;font-display:swap;src:url('fonts/outfit.woff2') format('woff2')}
+@font-face{font-family:'Poppins';font-style:normal;font-weight:700;font-display:swap;src:url('fonts/poppins.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-style:normal;font-weight:700;font-display:swap;src:url('fonts/montserrat.woff2') format('woff2')}
+@font-face{font-family:'Bebas Neue';font-style:normal;font-weight:400;font-display:swap;src:url('fonts/bebas-neue.woff2') format('woff2')}
+@font-face{font-family:'Merriweather';font-style:normal;font-weight:700;font-display:swap;src:url('fonts/merriweather.woff2') format('woff2')}
+@font-face{font-family:'Oswald';font-style:normal;font-weight:600;font-display:swap;src:url('fonts/oswald.woff2') format('woff2')}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:600;font-display:swap;src:url('fonts/caveat.woff2') format('woff2')}
+@font-face{font-family:'Anton';font-style:normal;font-weight:400;font-display:swap;src:url('fonts/anton.woff2') format('woff2')}

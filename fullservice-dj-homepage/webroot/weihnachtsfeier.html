@@ -168,7 +168,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 <script>
 var API='api.php';
 /* Schriftstil aus dem CMS übernehmen (Dateien liegen lokal unter fonts/) */
-var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif"};
+var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif",poppins:"'Poppins',sans-serif",montserrat:"'Montserrat',sans-serif",bebas:"'Bebas Neue',cursive",merriweather:"'Merriweather',serif",oswald:"'Oswald',sans-serif",caveat:"'Caveat',cursive",anton:"'Anton',sans-serif"};
 fetch(API+'/rest/site_content?select=key,value').then(function(r){return r.json()}).then(function(rows){
   rows.forEach(function(row){
     if(row.key==='theme'&&row.value&&FONT_HEADS[row.value.font]&&row.value.font!=='grotesk'){

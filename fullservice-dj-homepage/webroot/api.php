@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 49;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 50;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -38,6 +38,81 @@ const AI_PROVIDER_DEFAULTS = [
   'mistral'  => ['base_url' => 'https://api.mistral.ai/v1', 'model' => 'mistral-small-latest'],
   'deepseek' => ['base_url' => 'https://api.deepseek.com/v1', 'model' => 'deepseek-chat'],
 ];
+
+/* Gemeinsamer Aufruf-Code für den KI-Textassistenten UND die FAQ-Vorschläge: baut die
+   Anfrage je nach Anbieter (native Anthropic-Messages-API vs. OpenAI-kompatible
+   Chat-Completions) und liefert den reinen generierten Text zurück. Bricht bei Fehlern
+   über fail() mit einer möglichst konkreten Meldung ab (HTTP-Status + Antwort-Ausschnitt),
+   statt nur "unerwartete Antwort" zu zeigen. */
+function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $model,
+                    string $workspaceId, string $system, string $userText, int $maxTokens): string {
+  $baseUrl = rtrim($baseUrl, '/');
+  if ($provider === 'claude') {
+    $reqBody = json_encode([
+      'model' => $model, 'max_tokens' => $maxTokens, 'system' => $system,
+      'messages' => [['role' => 'user', 'content' => $userText]],
+    ], JSON_UNESCAPED_UNICODE);
+    $header = "x-api-key: $apiKey\r\nanthropic-version: 2023-06-01\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\nAccept: application/json\r\n";
+    if ($workspaceId !== '') $header .= "anthropic-workspace-id: $workspaceId\r\n";
+    $ctx = stream_context_create(['http' => ['method' => 'POST', 'header' => $header, 'content' => $reqBody, 'timeout' => 40, 'ignore_errors' => true]]);
+    $resp = @file_get_contents($baseUrl . '/messages', false, $ctx);
+    if ($resp === false) fail('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.', 502);
+    $j = json_decode($resp, true);
+    if (!is_array($j) || isset($j['error']) || ($j['type'] ?? '') === 'error') {
+      $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
+      if ($msg === '') {
+        $status = '';
+        foreach ((array)($http_response_header ?? []) as $h) { if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $sm)) $status = $sm[1]; }
+        $msg = 'unerwartete Antwort vom KI-Dienst' . ($status !== '' ? " (HTTP $status)" : '')
+          . (trim((string)$resp) !== '' ? ': ' . mb_substr(trim(strip_tags((string)$resp)), 0, 200) : '.');
+      }
+      fail('KI-Anfrage fehlgeschlagen: ' . $msg, 502);
+    }
+    $generated = '';
+    foreach ((array)($j['content'] ?? []) as $block) { if (($block['type'] ?? '') === 'text') $generated .= (string)($block['text'] ?? ''); }
+    return trim($generated);
+  }
+  $reqBody = json_encode([
+    'model' => $model,
+    'messages' => [['role' => 'system', 'content' => $system], ['role' => 'user', 'content' => $userText]],
+    'temperature' => 0.6, 'max_tokens' => $maxTokens,
+  ], JSON_UNESCAPED_UNICODE);
+  $ctx = stream_context_create(['http' => [
+    'method' => 'POST',
+    'header' => "Authorization: Bearer $apiKey\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\nAccept: application/json\r\n",
+    'content' => $reqBody, 'timeout' => 40, 'ignore_errors' => true,
+  ]]);
+  $resp = @file_get_contents($baseUrl . '/chat/completions', false, $ctx);
+  if ($resp === false) fail('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.', 502);
+  $j = json_decode($resp, true);
+  if (!is_array($j) || isset($j['error'])) {
+    $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
+    if ($msg === '') {
+      $status = '';
+      foreach ((array)($http_response_header ?? []) as $h) { if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $sm)) $status = $sm[1]; }
+      $msg = 'unerwartete Antwort vom KI-Dienst' . ($status !== '' ? " (HTTP $status)" : '')
+        . (trim((string)$resp) !== '' ? ': ' . mb_substr(trim(strip_tags((string)$resp)), 0, 200) : '.');
+    }
+    fail('KI-Anfrage fehlgeschlagen: ' . $msg, 502);
+  }
+  return trim((string)($j['choices'][0]['message']['content'] ?? ''));
+}
+/* Liefert {provider,apiKey,baseUrl,model,workspaceId} aus settings.ai oder bricht mit
+   verständlicher Meldung ab, wenn kein Zugang eingerichtet ist. */
+function aiConfigOrFail(): array {
+  $p = db();
+  $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
+  $apiKey = trim((string)($cfg['api_key'] ?? ''));
+  if ($apiKey === '') fail('Kein KI-Zugang eingerichtet – bitte in den Einstellungen unter „KI-Textassistent" einen API-Schlüssel hinterlegen.', 400);
+  $provider = (string)($cfg['provider'] ?? 'openai');
+  $defaults = AI_PROVIDER_DEFAULTS[$provider] ?? AI_PROVIDER_DEFAULTS['openai'];
+  return [
+    'provider' => $provider, 'apiKey' => $apiKey,
+    'baseUrl' => (string)($cfg['base_url'] ?: $defaults['base_url']),
+    'model' => (string)($cfg['model'] ?: $defaults['model']),
+    'workspaceId' => trim((string)($cfg['workspace_id'] ?? '')),
+  ];
+}
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -368,6 +443,33 @@ function upgrade(PDO $p): void {
       }
     } catch (PDOException $e) {}
   }
+  if ($v < 50) foreach ([
+    "alter table friends add column image_url text",
+    "alter table friends add column image_focal text default '50% 50%'",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
+  if ($v < 50) {
+    /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
+       einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
+    try {
+      $row = $p->query("select value from site_content where key='legal'")->fetchColumn();
+      $legal = $row ? json_decode($row, true) : null;
+      if (is_array($legal)) {
+        $legal['impressum'] = str_replace(
+          ['E-Mail: (bitte im Backoffice ergänzen)', "\n\nUmsatzsteuer: (Steuernummer / USt-IdNr. bitte im Backoffice ergänzen)"],
+          ['E-Mail: lauschgiftmarkus@gmail.com', ''],
+          (string)($legal['impressum'] ?? '')
+        );
+        foreach (['datenschutz', 'agb'] as $lk) {
+          if (isset($legal[$lk])) {
+            $legal[$lk] = str_replace('Stand: bitte nach juristischer Prüfung ergänzen.', 'Stand: August 2026.', $legal[$lk]);
+          }
+        }
+        if (!isset($legal['reviewed'])) $legal['reviewed'] = false;
+        $p->prepare("update site_content set value = ? where key = 'legal'")
+          ->execute([json_encode($legal, JSON_UNESCAPED_UNICODE)]);
+      }
+    } catch (PDOException $e) {}
+  }
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -688,6 +790,7 @@ function workshopsDdl(): array {
 function friendsDdl(): string {
   return "create table if not exists friends (id text primary key, sort integer default 0,
     name text not null, category text, description text, website text,
+    image_url text, image_focal text default '50% 50%',
     public integer default 1, created_at text)";
 }
 
@@ -705,7 +808,7 @@ function rentalContractDefault(): string {
 
 /* Datenschutzerklärung – eine Quelle für Seed und Migration (v25) */
 function datenschutzText(): string {
-  return "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer, Telefon 01523 6439373.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Cookies und lokale Speicherung\nDiese Website verwendet keine Cookies zu Werbe- oder Tracking-Zwecken und bindet keine Dienste ein, die solche Cookies setzen. Ein Cookie-Banner ist deshalb nicht erforderlich. Nur im Kundenportal und im Partner-Bereich wird nach eurer aktiven Anmeldung ein technisch notwendiges Sitzungsmerkmal im Browser gespeichert (Local/Session Storage), damit ihr angemeldet bleibt (§ 25 Abs. 2 TDDDG).\n\n4. Schriftarten\nAlle Schriftarten liegen lokal auf dem Server dieser Website. Beim Seitenaufruf wird keine Verbindung zu Google Fonts oder anderen Drittanbietern aufgebaut.\n\n5. Reichweitenmessung\nZur Verbesserung des Angebots wird anonym gezählt, wie oft die einzelnen Seiten aufgerufen werden (nur Datum, Seitenname und ggf. die Domain der verweisenden Website). Dabei werden weder IP-Adressen noch Cookies oder sonstige Kennungen gespeichert – ein Bezug zu einzelnen Personen ist nicht möglich (Art. 6 Abs. 1 lit. f DSGVO).\n\n6. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n7. Newsletter\nFür den Workshop-Newsletter speichere ich eure E-Mail-Adresse erst nach Bestätigung über den zugesandten Link (Double-Opt-in) auf Grundlage eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Jede Mail enthält einen Abmeldelink; nach der Abmeldung erhaltet ihr keine weiteren Mails. Es wird kein Versanddienstleister eingesetzt – der Versand erfolgt über den eigenen Server.\n\n8. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n9. Digitaler Mietvertrag und Ausweiskopie\nBei der Vermietung von Veranstaltungstechnik könnt ihr den Mietvertrag digital abschließen. Dabei werden eure Unterschrift sowie – mit eurer ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 20 PAuswG) – Fotos der Vorder- und Rückseite eures Personalausweises verarbeitet und in einem zugriffsgeschützten Bereich des eigenen Servers gespeichert. Nicht benötigte Angaben dürft ihr vor dem Fotografieren schwärzen. Die Ausweiskopien dienen ausschließlich der Absicherung des Mietverhältnisses und werden nach vollständiger Rückgabe der Mietsachen gelöscht.\n\n10. Kundenportal\nIm Kundenportal könnt ihr euch mit E-Mail-Adresse und Passwort anmelden, um eure Unterlagen einzusehen und Angaben zu eurer Feier zu pflegen. Das Passwort wird ausschließlich verschlüsselt (als Hash) gespeichert; alle Inhalte liegen auf dem eigenen Server dieser Website (Art. 6 Abs. 1 lit. b DSGVO).\n\n11. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: bitte nach juristischer Prüfung ergänzen.";
+  return "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer, Telefon 01523 6439373.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Cookies und lokale Speicherung\nDiese Website verwendet keine Cookies zu Werbe- oder Tracking-Zwecken und bindet keine Dienste ein, die solche Cookies setzen. Ein Cookie-Banner ist deshalb nicht erforderlich. Nur im Kundenportal und im Partner-Bereich wird nach eurer aktiven Anmeldung ein technisch notwendiges Sitzungsmerkmal im Browser gespeichert (Local/Session Storage), damit ihr angemeldet bleibt (§ 25 Abs. 2 TDDDG).\n\n4. Schriftarten\nAlle Schriftarten liegen lokal auf dem Server dieser Website. Beim Seitenaufruf wird keine Verbindung zu Google Fonts oder anderen Drittanbietern aufgebaut.\n\n5. Reichweitenmessung\nZur Verbesserung des Angebots wird anonym gezählt, wie oft die einzelnen Seiten aufgerufen werden (nur Datum, Seitenname und ggf. die Domain der verweisenden Website). Dabei werden weder IP-Adressen noch Cookies oder sonstige Kennungen gespeichert – ein Bezug zu einzelnen Personen ist nicht möglich (Art. 6 Abs. 1 lit. f DSGVO).\n\n6. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n7. Newsletter\nFür den Workshop-Newsletter speichere ich eure E-Mail-Adresse erst nach Bestätigung über den zugesandten Link (Double-Opt-in) auf Grundlage eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Jede Mail enthält einen Abmeldelink; nach der Abmeldung erhaltet ihr keine weiteren Mails. Es wird kein Versanddienstleister eingesetzt – der Versand erfolgt über den eigenen Server.\n\n8. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n9. Digitaler Mietvertrag und Ausweiskopie\nBei der Vermietung von Veranstaltungstechnik könnt ihr den Mietvertrag digital abschließen. Dabei werden eure Unterschrift sowie – mit eurer ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 20 PAuswG) – Fotos der Vorder- und Rückseite eures Personalausweises verarbeitet und in einem zugriffsgeschützten Bereich des eigenen Servers gespeichert. Nicht benötigte Angaben dürft ihr vor dem Fotografieren schwärzen. Die Ausweiskopien dienen ausschließlich der Absicherung des Mietverhältnisses und werden nach vollständiger Rückgabe der Mietsachen gelöscht.\n\n10. Kundenportal\nIm Kundenportal könnt ihr euch mit E-Mail-Adresse und Passwort anmelden, um eure Unterlagen einzusehen und Angaben zu eurer Feier zu pflegen. Das Passwort wird ausschließlich verschlüsselt (als Hash) gespeichert; alle Inhalte liegen auf dem eigenen Server dieser Website (Art. 6 Abs. 1 lit. b DSGVO).\n\n11. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: August 2026.";
 }
 
 function migrate(PDO $p): void {
@@ -850,9 +953,10 @@ function seed(PDO $p): void {
     ['gallery', '{"title":"So sieht\'s bei mir aus","images":["img/IMG_4061.png","img/IMG_4086.png","img/IMG_3296.png","img/IMG_9059.png","img/IMG_3591.png","img/spiegelkugel mittig.jpg","img/IMG_0850.png"]}'],
     ['seo', '{"title":"DJ Lauschgift – Hochzeits-DJ & Event-DJ | Deutschlandweit","description":"DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer."}'],
     ['legal', json_encode([
-      'impressum' => "Angaben gemäß § 5 DDG\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\n\nTelefon: 01523 6439373\nE-Mail: (bitte im Backoffice ergänzen)\n\nUmsatzsteuer: (Steuernummer / USt-IdNr. bitte im Backoffice ergänzen)\n\nVerantwortlich für den Inhalt: Markus Jankowski (Anschrift wie oben)",
+      'impressum' => "Angaben gemäß § 5 DDG\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\n\nTelefon: 01523 6439373\nE-Mail: lauschgiftmarkus@gmail.com\n\nVerantwortlich für den Inhalt: Markus Jankowski (Anschrift wie oben)",
       'datenschutz' => datenschutzText(),
-      'agb' => "Allgemeine Geschäftsbedingungen (AGB)\n\n1. Geltungsbereich\nDiese AGB gelten ausschließlich für Verträge über DJ-Leistungen und Technikvermietung, die unmittelbar mit Markus Jankowski (DJ Lauschgift), Büttmecker Weg 35c, 58675 Hemer, geschlossen werden.\n\nSie gelten nicht für Verträge, die der Auftraggeber mit anderen DJs schließt – etwa nach einer Empfehlung bzw. Vermittlung über die Partner-Agentur (vgl. Ziffer 6) oder direkt mit dem jeweiligen DJ. Für solche Verträge gelten allein die Bedingungen des jeweiligen DJs bzw. der Agentur; der Auftragnehmer ist an diesen Verträgen nicht beteiligt und übernimmt für deren Inhalt und Erfüllung keine Haftung.\n\n2. Angebot und Vertragsschluss\nAngebote sind freibleibend. Der Vertrag kommt mit schriftlicher Bestätigung (auch per E-Mail) zustande. Erst mit der Bestätigung ist der Termin verbindlich reserviert.\n\n3. Preise\nDie Vergütung richtet sich nach Auslastung, Arbeitsstunden und technischem Aufwand der jeweiligen Veranstaltung; eine Unterscheidung nach Anlass (z. B. Hochzeit, Geburtstag, Firmenfeier) findet nicht statt. Alle Posten werden im Angebot ausgewiesen.\n\n4. Ausfall des Auftragnehmers und Ersatz (Plan B)\nFällt der Auftragnehmer aus (z. B. durch Krankheit), verpflichtet er sich, sich im Rahmen seiner Möglichkeiten um einen geeigneten Ersatz-DJ aus seinem Kollegen-Netzwerk zu bemühen und diesen dem Auftraggeber unverzüglich vorzuschlagen.\n\nDer Vorschlag ist für den Auftraggeber unverbindlich: Er kann frei entscheiden, ob er den vorgeschlagenen Ersatz-DJ beauftragt oder vom Vertrag zurücktritt. Bei Rücktritt werden bereits geleistete Zahlungen vollständig erstattet; weitergehende Ansprüche bestehen nur bei Vorsatz oder grober Fahrlässigkeit.\n\nEntscheidet sich der Auftraggeber für den Ersatz-DJ, kommt der Vertrag über dessen Leistung direkt mit dem Ersatz-DJ zustande. Wichtig: Der Ersatz-DJ rechnet zu seinen eigenen Preisen ab – der Endpreis kann daher vom ursprünglich vereinbarten Preis abweichen. Auch der Leistungsumfang, insbesondere die mitgeführte Ton- und Lichttechnik, kann vom Angebot des Auftragnehmers abweichen. Bereits an den Auftragnehmer geleistete Zahlungen werden in diesem Fall erstattet bzw. verrechnet.\n\n5. Stornierung durch den Auftraggeber\nSagt der Auftraggeber die Veranstaltung ab, kann kurzfristig in der Regel kein Ersatzauftrag mehr angenommen werden – insbesondere innerhalb von sechs Wochen vor dem Termin ist eine Neubelegung praktisch ausgeschlossen. Daher gilt folgende pauschale Ausfallvergütung (jeweils bezogen auf die vereinbarte Nettovergütung):\n– Absage bis 6 Monate vor dem Termin: 20 %\n– Absage bis 3 Monate vor dem Termin: 40 %\n– Absage bis 6 Wochen vor dem Termin: 60 %\n– Absage weniger als 6 Wochen vor dem Termin: 80 %\n– Absage weniger als 7 Tage vor dem Termin oder Nichtabnahme: 90 %\nErsparte Aufwendungen (z. B. nicht anfallende Fahrtkosten sowie stornierbare Übernachtungskosten) werden angerechnet und von der Ausfallvergütung abgezogen. Dem Auftraggeber bleibt der Nachweis unbenommen, dass kein oder ein wesentlich geringerer Schaden entstanden ist. Gelingt es dem Auftragnehmer, für den Termin einen gleichwertigen Ersatzauftrag anzunehmen, entfällt die Ausfallvergütung bis auf bereits entstandene Kosten. Maßgeblich für die Staffel ist der Zugang der Absage in Textform.\n\nUmbuchung auf einen Ersatztermin: Einigen sich beide Seiten auf einen Ersatztermin, kann der Auftragnehmer anstelle der Ausfallvergütung eine reduzierte Umbuchungspauschale ansetzen; bereits entstandene Kosten (z. B. nicht stornierbare Auslagen) werden zusätzlich berechnet. Die Umbuchung ist eine reine Kulanzregelung des Auftragnehmers: Ein Anspruch auf einen Ersatztermin oder auf eine reduzierte Pauschale besteht nicht. Ob und zu welchen Konditionen umgebucht wird, entscheidet der Auftragnehmer frei im Einzelfall – insbesondere abhängig von seiner Verfügbarkeit am Wunschtermin, davon, ob der ursprüngliche Termin anderweitig belegt werden kann, und vom Buchungswert des Ersatztermins.\n\n6. DJ-Vermittlung über Partner-Agentur\nIst der Auftragnehmer am gewünschten Termin verhindert oder kommt eine Zusammenarbeit aus anderen Gründen nicht zustande, kann er dem Interessenten auf Wunsch bis zu fünf passende DJs vorschlagen. Diese Empfehlung ist eine reine Vermittlungsleistung des Auftragnehmers und für den Interessenten kostenlos – sie wird ihm nicht in Rechnung gestellt.\n\nDie Vermittlung erfolgt über die Partner-Agentur DJ Bande (Münster). Der Vertrag über die DJ-Leistung kommt ausschließlich zwischen dem Interessenten und dem vermittelten DJ bzw. der Agentur zustande; die Abrechnung der DJ-Leistung erfolgt nicht über den Auftragnehmer. Die Vermittlungsleistung finanziert sich dadurch, dass der Auftragnehmer für eine erfolgreich zustande gekommene Vermittlung eine Aufwandsentschädigung (Provision) von der Agentur bzw. dem vermittelten DJ erhält. Für den Interessenten entstehen dadurch keine zusätzlichen Kosten. Die auf dieser Website genannten Preise und Preisbeispiele gelten ausschließlich für Leistungen des Auftragnehmers selbst; vermittelte DJs kalkulieren ihre Vergütung eigenständig, deren Konditionen können abweichen.\n\n7. Widerrufsrecht\nBei der Buchung von DJ- und Veranstaltungstechnik-Leistungen für einen bestimmten Termin besteht kein Widerrufsrecht. Gemäß § 312g Abs. 2 Nr. 9 BGB ist das Widerrufsrecht ausgeschlossen bei Verträgen zur Erbringung von Dienstleistungen im Zusammenhang mit Freizeitbetätigungen, wenn der Vertrag für die Erbringung einen spezifischen Termin oder Zeitraum vorsieht. Jede Buchung ist daher rechtsverbindlich und verpflichtet zur Abnahme und Bezahlung der Leistung.\n\nSofern eine Buchung im Einzelfall nicht unter § 312g Abs. 2 Nr. 9 BGB fallen sollte, gilt für Verbraucher: Sie haben das Recht, binnen vierzehn Tagen ab Vertragsschluss diesen Vertrag ohne Angabe von Gründen zu widerrufen. Der Widerruf ist zu richten an: Markus Jankowski, Büttmecker Weg 35c, 58675 Hemer (oder per E-Mail an die im Impressum genannte Adresse).\n\n8. Technikvermietung\nMietpreise gelten pro Miettag (24 Stunden); jeder Folgetag wird mit 50 % des Grundpreises berechnet. Der Mieter haftet für Verlust und Beschädigung der Mietsachen ab Übergabe bis zur Rückgabe.\n\n9. Zahlungsbedingungen\nRechnungen sind, sofern nicht anders vereinbart, innerhalb von 14 Tagen ohne Abzug zahlbar. Bei Buchungen kann eine Abschlagszahlung vereinbart werden.\n\n10. Schlussbestimmungen\nEs gilt deutsches Recht. Sollten einzelne Bestimmungen unwirksam sein, bleibt der Vertrag im Übrigen wirksam.\n\nStand: bitte nach juristischer Prüfung ergänzen.",
+      'reviewed' => false,
+      'agb' => "Allgemeine Geschäftsbedingungen (AGB)\n\n1. Geltungsbereich\nDiese AGB gelten ausschließlich für Verträge über DJ-Leistungen und Technikvermietung, die unmittelbar mit Markus Jankowski (DJ Lauschgift), Büttmecker Weg 35c, 58675 Hemer, geschlossen werden.\n\nSie gelten nicht für Verträge, die der Auftraggeber mit anderen DJs schließt – etwa nach einer Empfehlung bzw. Vermittlung über die Partner-Agentur (vgl. Ziffer 6) oder direkt mit dem jeweiligen DJ. Für solche Verträge gelten allein die Bedingungen des jeweiligen DJs bzw. der Agentur; der Auftragnehmer ist an diesen Verträgen nicht beteiligt und übernimmt für deren Inhalt und Erfüllung keine Haftung.\n\n2. Angebot und Vertragsschluss\nAngebote sind freibleibend. Der Vertrag kommt mit schriftlicher Bestätigung (auch per E-Mail) zustande. Erst mit der Bestätigung ist der Termin verbindlich reserviert.\n\n3. Preise\nDie Vergütung richtet sich nach Auslastung, Arbeitsstunden und technischem Aufwand der jeweiligen Veranstaltung; eine Unterscheidung nach Anlass (z. B. Hochzeit, Geburtstag, Firmenfeier) findet nicht statt. Alle Posten werden im Angebot ausgewiesen.\n\n4. Ausfall des Auftragnehmers und Ersatz (Plan B)\nFällt der Auftragnehmer aus (z. B. durch Krankheit), verpflichtet er sich, sich im Rahmen seiner Möglichkeiten um einen geeigneten Ersatz-DJ aus seinem Kollegen-Netzwerk zu bemühen und diesen dem Auftraggeber unverzüglich vorzuschlagen.\n\nDer Vorschlag ist für den Auftraggeber unverbindlich: Er kann frei entscheiden, ob er den vorgeschlagenen Ersatz-DJ beauftragt oder vom Vertrag zurücktritt. Bei Rücktritt werden bereits geleistete Zahlungen vollständig erstattet; weitergehende Ansprüche bestehen nur bei Vorsatz oder grober Fahrlässigkeit.\n\nEntscheidet sich der Auftraggeber für den Ersatz-DJ, kommt der Vertrag über dessen Leistung direkt mit dem Ersatz-DJ zustande. Wichtig: Der Ersatz-DJ rechnet zu seinen eigenen Preisen ab – der Endpreis kann daher vom ursprünglich vereinbarten Preis abweichen. Auch der Leistungsumfang, insbesondere die mitgeführte Ton- und Lichttechnik, kann vom Angebot des Auftragnehmers abweichen. Bereits an den Auftragnehmer geleistete Zahlungen werden in diesem Fall erstattet bzw. verrechnet.\n\n5. Stornierung durch den Auftraggeber\nSagt der Auftraggeber die Veranstaltung ab, kann kurzfristig in der Regel kein Ersatzauftrag mehr angenommen werden – insbesondere innerhalb von sechs Wochen vor dem Termin ist eine Neubelegung praktisch ausgeschlossen. Daher gilt folgende pauschale Ausfallvergütung (jeweils bezogen auf die vereinbarte Nettovergütung):\n– Absage bis 6 Monate vor dem Termin: 20 %\n– Absage bis 3 Monate vor dem Termin: 40 %\n– Absage bis 6 Wochen vor dem Termin: 60 %\n– Absage weniger als 6 Wochen vor dem Termin: 80 %\n– Absage weniger als 7 Tage vor dem Termin oder Nichtabnahme: 90 %\nErsparte Aufwendungen (z. B. nicht anfallende Fahrtkosten sowie stornierbare Übernachtungskosten) werden angerechnet und von der Ausfallvergütung abgezogen. Dem Auftraggeber bleibt der Nachweis unbenommen, dass kein oder ein wesentlich geringerer Schaden entstanden ist. Gelingt es dem Auftragnehmer, für den Termin einen gleichwertigen Ersatzauftrag anzunehmen, entfällt die Ausfallvergütung bis auf bereits entstandene Kosten. Maßgeblich für die Staffel ist der Zugang der Absage in Textform.\n\nUmbuchung auf einen Ersatztermin: Einigen sich beide Seiten auf einen Ersatztermin, kann der Auftragnehmer anstelle der Ausfallvergütung eine reduzierte Umbuchungspauschale ansetzen; bereits entstandene Kosten (z. B. nicht stornierbare Auslagen) werden zusätzlich berechnet. Die Umbuchung ist eine reine Kulanzregelung des Auftragnehmers: Ein Anspruch auf einen Ersatztermin oder auf eine reduzierte Pauschale besteht nicht. Ob und zu welchen Konditionen umgebucht wird, entscheidet der Auftragnehmer frei im Einzelfall – insbesondere abhängig von seiner Verfügbarkeit am Wunschtermin, davon, ob der ursprüngliche Termin anderweitig belegt werden kann, und vom Buchungswert des Ersatztermins.\n\n6. DJ-Vermittlung über Partner-Agentur\nIst der Auftragnehmer am gewünschten Termin verhindert oder kommt eine Zusammenarbeit aus anderen Gründen nicht zustande, kann er dem Interessenten auf Wunsch bis zu fünf passende DJs vorschlagen. Diese Empfehlung ist eine reine Vermittlungsleistung des Auftragnehmers und für den Interessenten kostenlos – sie wird ihm nicht in Rechnung gestellt.\n\nDie Vermittlung erfolgt über die Partner-Agentur DJ Bande (Münster). Der Vertrag über die DJ-Leistung kommt ausschließlich zwischen dem Interessenten und dem vermittelten DJ bzw. der Agentur zustande; die Abrechnung der DJ-Leistung erfolgt nicht über den Auftragnehmer. Die Vermittlungsleistung finanziert sich dadurch, dass der Auftragnehmer für eine erfolgreich zustande gekommene Vermittlung eine Aufwandsentschädigung (Provision) von der Agentur bzw. dem vermittelten DJ erhält. Für den Interessenten entstehen dadurch keine zusätzlichen Kosten. Die auf dieser Website genannten Preise und Preisbeispiele gelten ausschließlich für Leistungen des Auftragnehmers selbst; vermittelte DJs kalkulieren ihre Vergütung eigenständig, deren Konditionen können abweichen.\n\n7. Widerrufsrecht\nBei der Buchung von DJ- und Veranstaltungstechnik-Leistungen für einen bestimmten Termin besteht kein Widerrufsrecht. Gemäß § 312g Abs. 2 Nr. 9 BGB ist das Widerrufsrecht ausgeschlossen bei Verträgen zur Erbringung von Dienstleistungen im Zusammenhang mit Freizeitbetätigungen, wenn der Vertrag für die Erbringung einen spezifischen Termin oder Zeitraum vorsieht. Jede Buchung ist daher rechtsverbindlich und verpflichtet zur Abnahme und Bezahlung der Leistung.\n\nSofern eine Buchung im Einzelfall nicht unter § 312g Abs. 2 Nr. 9 BGB fallen sollte, gilt für Verbraucher: Sie haben das Recht, binnen vierzehn Tagen ab Vertragsschluss diesen Vertrag ohne Angabe von Gründen zu widerrufen. Der Widerruf ist zu richten an: Markus Jankowski, Büttmecker Weg 35c, 58675 Hemer (oder per E-Mail an die im Impressum genannte Adresse).\n\n8. Technikvermietung\nMietpreise gelten pro Miettag (24 Stunden); jeder Folgetag wird mit 50 % des Grundpreises berechnet. Der Mieter haftet für Verlust und Beschädigung der Mietsachen ab Übergabe bis zur Rückgabe.\n\n9. Zahlungsbedingungen\nRechnungen sind, sofern nicht anders vereinbart, innerhalb von 14 Tagen ohne Abzug zahlbar. Bei Buchungen kann eine Abschlagszahlung vereinbart werden.\n\n10. Schlussbestimmungen\nEs gilt deutsches Recht. Sollten einzelne Bestimmungen unwirksam sein, bleibt der Vertrag im Übrigen wirksam.\n\nStand: August 2026.",
     ], JSON_UNESCAPED_UNICODE)],
   ] as [$k, $v]) $p->prepare('insert into site_content (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
 
@@ -2660,14 +2764,9 @@ try {
     if (mb_strlen($text) > 4000) fail('Text ist zu lang (max. 4000 Zeichen).', 400);
     $kind = (string)($body['kind'] ?? 'page');
     $category = trim((string)($body['category'] ?? ''));
+    $ai = aiConfigOrFail();
     $p = db();
     $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
-    $apiKey = trim((string)($cfg['api_key'] ?? ''));
-    if ($apiKey === '') fail('Kein KI-Zugang eingerichtet – bitte in den Einstellungen unter „KI-Textassistent" einen API-Schlüssel hinterlegen.', 400);
-    $provider = (string)($cfg['provider'] ?? 'openai');
-    $defaults = AI_PROVIDER_DEFAULTS[$provider] ?? AI_PROVIDER_DEFAULTS['openai'];
-    $baseUrl = rtrim((string)($cfg['base_url'] ?: $defaults['base_url']), '/');
-    $model = (string)($cfg['model'] ?: $defaults['model']);
     $style = trim((string)($cfg['style'] ?? '')) ?: (
       'Du schreibst deutsche Texte im Ton von Markus, einem DJ und Verleiher für Veranstaltungstechnik: '
       . 'persönlich, locker, professionell – so, wie er es am Telefon sagen würde. Keine Emojis, keine '
@@ -2689,75 +2788,45 @@ try {
       $style .= sprintf(' Ziel-Länge des Textes: etwa %d bis %d Zeichen (nicht strikt, aber orientiere dich daran).',
         (int)$targetLen[0], (int)$targetLen[1]);
     }
-    if ($provider === 'claude') {
-      $reqBody = json_encode([
-        'model' => $model,
-        'max_tokens' => 800,
-        'system' => $style,
-        'messages' => [['role' => 'user', 'content' => $text]],
-      ], JSON_UNESCAPED_UNICODE);
-      $workspaceId = trim((string)($cfg['workspace_id'] ?? ''));
-      $header = "x-api-key: $apiKey\r\nanthropic-version: 2023-06-01\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\nAccept: application/json\r\n";
-      if ($workspaceId !== '') $header .= "anthropic-workspace-id: $workspaceId\r\n";
-      $ctx = stream_context_create(['http' => [
-        'method' => 'POST',
-        'header' => $header,
-        'content' => $reqBody,
-        'timeout' => 40,
-        'ignore_errors' => true,
-      ]]);
-      $resp = @file_get_contents($baseUrl . '/messages', false, $ctx);
-      if ($resp === false) fail('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.', 502);
-      $j = json_decode($resp, true);
-      if (!is_array($j) || isset($j['error']) || ($j['type'] ?? '') === 'error') {
-        $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
-        if ($msg === '') {
-          $status = '';
-          foreach ((array)($http_response_header ?? []) as $h) { if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $sm)) $status = $sm[1]; }
-          $msg = 'unerwartete Antwort vom KI-Dienst' . ($status !== '' ? " (HTTP $status)" : '')
-            . (trim((string)$resp) !== '' ? ': ' . mb_substr(trim(strip_tags((string)$resp)), 0, 200) : '.');
-        }
-        fail('KI-Anfrage fehlgeschlagen: ' . $msg, 502);
-      }
-      $generated = '';
-      foreach ((array)($j['content'] ?? []) as $block) {
-        if (($block['type'] ?? '') === 'text') $generated .= (string)($block['text'] ?? '');
-      }
-      $generated = trim($generated);
-    } else {
-      $reqBody = json_encode([
-        'model' => $model,
-        'messages' => [
-          ['role' => 'system', 'content' => $style],
-          ['role' => 'user', 'content' => $text],
-        ],
-        'temperature' => 0.6,
-        'max_tokens' => 500,
-      ], JSON_UNESCAPED_UNICODE);
-      $ctx = stream_context_create(['http' => [
-        'method' => 'POST',
-        'header' => "Authorization: Bearer $apiKey\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\nAccept: application/json\r\n",
-        'content' => $reqBody,
-        'timeout' => 40,
-        'ignore_errors' => true,
-      ]]);
-      $resp = @file_get_contents($baseUrl . '/chat/completions', false, $ctx);
-      if ($resp === false) fail('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.', 502);
-      $j = json_decode($resp, true);
-      if (!is_array($j) || isset($j['error'])) {
-        $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
-        if ($msg === '') {
-          $status = '';
-          foreach ((array)($http_response_header ?? []) as $h) { if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $sm)) $status = $sm[1]; }
-          $msg = 'unerwartete Antwort vom KI-Dienst' . ($status !== '' ? " (HTTP $status)" : '')
-            . (trim((string)$resp) !== '' ? ': ' . mb_substr(trim(strip_tags((string)$resp)), 0, 200) : '.');
-        }
-        fail('KI-Anfrage fehlgeschlagen: ' . $msg, 502);
-      }
-      $generated = trim((string)($j['choices'][0]['message']['content'] ?? ''));
-    }
+    $generated = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $style, $text, 800);
     if ($generated === '') fail('KI-Anfrage fehlgeschlagen: keine Antwort erhalten.', 502);
     out(['text' => $generated]);
+  }
+  /* KI-Textassistent: FAQ-Vorschlag aus den Website-Inhalten generieren. Ein Klick = ein
+     Vorschlag (Frage+Antwort); der Admin sieht ihn im FAQ-Editor und kann ihn vor dem
+     Speichern noch anpassen. Bereits vorhandene Fragen werden mitgeschickt, damit die KI
+     keine Dopplung vorschlägt. */
+  if ($path === 'ai/suggest-faq' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $ai = aiConfigOrFail();
+    $p = db();
+    $existing = $p->query("select question from faq order by sort")->fetchAll(PDO::FETCH_COLUMN);
+    $contentRows = $p->query("select key, value from site_content where key in
+      ('hero','about','guarantee','tech_hero','rental','tech_teaser')")->fetchAll();
+    $siteText = '';
+    foreach ($contentRows as $r) {
+      $v = json_decode((string)$r['value'], true) ?: [];
+      foreach (['subtitle', 'title', 'text'] as $f) if (!empty($v[$f])) $siteText .= $v[$f] . "\n";
+    }
+    $packages = $p->query("select title, description from packages where public = 1")->fetchAll();
+    foreach ($packages as $pk) $siteText .= ($pk['title'] ?? '') . ': ' . ($pk['description'] ?? '') . "\n";
+    if (trim($siteText) === '') fail('Es sind noch zu wenig Website-Inhalte gepflegt, um einen FAQ-Vorschlag daraus zu machen.', 400);
+    $system = 'Du hilfst, die FAQ-Sektion einer DJ- und Veranstaltungstechnik-Verleih-Website zu ergänzen. '
+      . 'Du bekommst Auszüge aus den Website-Inhalten und eine Liste bereits vorhandener FAQ-Fragen. '
+      . 'Schlage GENAU EINE neue, sinnvolle Frage samt kurzer, passender Antwort vor, die zu den gegebenen '
+      . 'Inhalten passt und sich klar von den vorhandenen Fragen unterscheidet. Antworte AUSSCHLIESSLICH als '
+      . 'kompaktes JSON-Objekt ohne Markdown-Codeblock, exakt in der Form {"question":"...","answer":"..."}. '
+      . 'Die Antwort im JSON soll im Ton von Markus formuliert sein: persönlich, locker, professionell, '
+      . 'keine Floskeln, kein Bindestrich statt Halbgeviertstrich, ca. 1–3 Sätze.';
+    $userText = "Website-Inhalte:\n" . mb_substr($siteText, 0, 3000)
+      . "\n\nBereits vorhandene FAQ-Fragen (nicht wiederholen):\n" . ($existing ? implode("\n", $existing) : '(noch keine)');
+    $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 400);
+    $raw = trim(preg_replace('#^```(?:json)?|```$#m', '', $raw));
+    $j = json_decode($raw, true);
+    if (!is_array($j) || empty($j['question']) || empty($j['answer'])) {
+      fail('KI-Anfrage fehlgeschlagen: konnte keinen gültigen FAQ-Vorschlag erzeugen.', 502);
+    }
+    out(['question' => trim((string)$j['question']), 'answer' => trim((string)$j['answer'])]);
   }
   /* Technik-Check-Fotos: geschützt in data/checkpics, Zugriff nur angemeldet */
   if (preg_match('#^checkpic/([a-f0-9-]{30,40})$#', $path, $m) && $method === 'POST') {
