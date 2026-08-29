@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 54;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 55;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -472,6 +472,7 @@ function upgrade(PDO $p): void {
     try { $p->exec(quoteTemplatesDdl()); } catch (PDOException $e) {}
   }
   if ($v < 54) mergeOldCatalogPdf($p);
+  if ($v < 55) removePlaceholderProducts($p);
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -899,6 +900,14 @@ function mergeOldCatalogPdf(PDO $p): void {
   }
 }
 
+/* Die fünf Beispiel-Positionen (+ Beispiel-Set) aus der allerersten Katalog-Seed sind
+   inzwischen durch den echten Altkatalog (mergeOldCatalogPdf) ersetzt - werden entfernt. */
+function removePlaceholderProducts(PDO $p): void {
+  $skus = ['DJ-100', 'DJ-110', 'TON-200', 'LICHT-300', 'FAHRT-900', 'PAKET-500'];
+  $in = implode(',', array_fill(0, count($skus), '?'));
+  $p->prepare("delete from products where sku in ($in)")->execute($skus);
+}
+
 function friendsDdl(): string {
   return "create table if not exists friends (id text primary key, sort integer default 0,
     name text not null, category text, description text, website text,
@@ -1221,7 +1230,6 @@ Markus Jankowski – DJ Lauschgift"],
 
   seedFormTemplates($p);
   seedUpsells($p);
-  seedProducts($p);
 
   /* Beispiel-Location als Vorlage – erst nach Bearbeitung auf 'öffentlich' stellen */
   $ins('locations', ['sort'=>1,'name'=>'Beispiel-Location (bitte ersetzen)','city'=>'Musterstadt','region'=>'NRW',
