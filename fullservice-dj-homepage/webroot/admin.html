@@ -57,6 +57,16 @@ textarea{min-height:70px;resize:vertical}
 @media(max-width:640px){.grid2,.grid3,.grid4{grid-template-columns:1fr}.side{width:60px}.side .slogo,.side .grp,.sbot{display:none}.sn a{font-size:10px;padding:8px 6px;text-align:center}.cnt{margin-left:60px}}
 .card{background:var(--cd);border:1px solid var(--bdr);padding:18px;margin-bottom:16px}
 .card h3{border-bottom:1px solid var(--bdr);padding-bottom:8px;margin-bottom:12px;font-size:13px}
+/* Inhalte & Einstellungen: eine ruhige Spalte mit Gruppen-Überschriften und zuklappbaren Karten */
+#pg-cms,#pg-set{max-width:820px}
+.sec-label{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--gl);margin:26px 0 10px;border-bottom:1px solid var(--bdr);padding-bottom:6px;font-weight:600}
+.card.clps{margin-bottom:12px}
+.card.clps>h3{cursor:pointer;user-select:none;position:relative;padding-left:18px}
+.card.clps>h3::before{content:'▸';position:absolute;left:0;top:-1px;color:var(--gl);transition:transform .15s;display:inline-block}
+.card.clps.open>h3::before{transform:rotate(90deg)}
+.card.clps:not(.open){padding-bottom:10px}
+.card.clps:not(.open)>h3{border-bottom:none;padding-bottom:0;margin-bottom:0}
+.card.clps:not(.open)>*:not(h3){display:none!important}
 
 /* Tabellen */
 table{width:100%;border-collapse:collapse;font-size:12px}
@@ -402,7 +412,8 @@ th.num{text-align:right}
 
   <!-- CMS -->
   <div class="pg" id="pg-cms">
-    <div class="pt">Website-Inhalte</div><div class="ps">Texte, Fotos, Pakete, FAQ &amp; Design der öffentlichen Homepage</div>
+    <div class="pt">Website-Inhalte</div><div class="ps">Texte, Fotos, Pakete, FAQ &amp; Design der öffentlichen Homepage – zum Bearbeiten Abschnitt anklicken</div>
+    <div class="sec-label">Design &amp; Schrift</div>
     <div class="card"><h3>Design / Farbschema</h3>
       <div id="themeRow" style="margin-bottom:8px"></div>
       <div class="grid3">
@@ -420,8 +431,7 @@ th.num{text-align:right}
         <span class="mut sml">Alle Schriften liegen fest auf dem eigenen Server (kein Google Fonts). Die Farben gelten für die DJ-Seite; der Schriftstil gilt für alle Seiten. Technik-Seite (Petrol) und Halloween (Orange) behalten bewusst ihre eigene Farbwelt.</span>
       </div>
     </div>
-    <div class="grid2" style="gap:16px;align-items:start">
-      <div>
+    <div class="sec-label">Startseite (DJ)</div>
         <div class="card"><h3>Hero (Startbereich)</h3>
           <label>Unterzeile (Kicker)</label><input id="cHeroSub">
           <label>Text</label><textarea id="cHeroText"></textarea>
@@ -440,6 +450,7 @@ th.num{text-align:right}
           <label>Überschrift</label><input id="cGTitle">
           <label>Text</label><textarea id="cGText" style="min-height:90px"></textarea>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('guarantee')">Speichern</button></div></div>
+    <div class="sec-label">Technik-Seite</div>
         <div class="card"><h3>Technik-Seite (technik.html)</h3>
           <label>Hero-Unterzeile</label><input id="cThSub">
           <label>Hero-Text</label><textarea id="cThText"></textarea>
@@ -448,13 +459,13 @@ th.num{text-align:right}
           <label>Teaser auf der DJ-Seite (Titel)</label><input id="cThTeaTitle">
           <label>Teaser auf der DJ-Seite (Text)</label><textarea id="cThTeaText" style="min-height:46px"></textarea>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('tech')">Speichern</button></div></div>
+    <div class="sec-label">Kontakt</div>
         <div class="card"><h3>Kontaktdaten (öffentlich)</h3>
           <label>Telefon</label><input id="cCtPhone">
           <label>E-Mail</label><input id="cCtMail">
           <label>Adresse</label><input id="cCtAddr">
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('contact')">Speichern</button></div></div>
-      </div>
-      <div>
+    <div class="sec-label">Sammlungen &amp; Listen</div>
         <div class="card"><h3>Leistungspakete <button class="btn sm" style="float:right" onclick="openPackModal()">+ Paket</button></h3><div id="packList" class="sml"></div></div>
         <div class="card"><h3>FAQ <button class="btn sm" style="float:right" onclick="openFaqModal()">+ Frage</button></h3><div id="faqAdminList" class="sml"></div></div>
         <div class="card"><h3>Location-Empfehlungen <button class="btn sm" style="float:right" onclick="openLocModal()">+ Location</button></h3>
@@ -479,6 +490,7 @@ th.num{text-align:right}
           <textarea id="cGalImgs" style="min-height:110px" placeholder="img/IMG_4061.png
 img/spiegelkugel mittig.jpg"></textarea>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveGallery()">Galerie speichern</button></div></div>
+    <div class="sec-label">SEO &amp; Rechtliches</div>
         <div class="card"><h3>SEO</h3>
           <label>Seitentitel</label><input id="cSeoTitle">
           <label>Beschreibung</label><textarea id="cSeoDesc" style="min-height:46px"></textarea>
@@ -488,14 +500,12 @@ img/spiegelkugel mittig.jpg"></textarea>
           <label>Datenschutzerklärung</label><textarea id="cLegDs" style="min-height:90px"></textarea>
           <label>AGB (inkl. Vermittlungsklausel DJ Bande)</label><textarea id="cLegAgb" style="min-height:90px"></textarea>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('legal')">Speichern</button></div></div>
-      </div>
-    </div>
   </div>
 
   <!-- EINSTELLUNGEN -->
   <div class="pg" id="pg-set">
     <div class="pt">Einstellungen</div><div class="ps">Firmendaten, Nummernkreise &amp; Vorgaben für Dokumente</div>
-    <div class="grid2" style="gap:16px;align-items:start">
+    <div class="sec-label">Rechnungsstellung</div>
       <div class="card"><h3>Firmendaten (Briefkopf)</h3>
         <div class="grid2">
           <div><label>Firmierung</label><input id="sName"></div>
@@ -518,7 +528,6 @@ img/spiegelkugel mittig.jpg"></textarea>
         <label style="margin-top:12px"><input type="checkbox" id="sSmall" style="width:auto;margin-right:6px"><b>Umsatzsteuer AUS</b> – Kleinunternehmer nach §19 UStG: Dokumente werden ohne USt. erstellt, inkl. Pflichthinweis</label>
         <div style="margin-top:12px"><button class="btn sm" onclick="saveCompany()">Speichern</button></div>
       </div>
-      <div>
         <div class="card"><h3>Bankverbindung</h3>
           <label>Bank</label><input id="sBank">
           <label>IBAN</label><input id="sIban">
@@ -566,11 +575,13 @@ img/spiegelkugel mittig.jpg"></textarea>
           </div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveNumbering()">Speichern</button></div>
         </div>
+    <div class="sec-label">Verträge &amp; Vermietung</div>
         <div class="card"><h3>Mietvertrag – Vertragsbedingungen</h3>
           <textarea id="sRental" style="min-height:160px;font-size:11px"></textarea>
           <div class="mut sml" style="margin-top:6px">Erscheint auf jedem gedruckten Mietvertrag (Buchungs-Detail → „ Mietvertrag“). Vor Livegang anwaltlich prüfen lassen.</div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveRental()">Speichern</button></div>
         </div>
+    <div class="sec-label">Kalender &amp; Werkzeuge</div>
         <div class="card"><h3>Kalender-Abo (iCal) <span class="mut sml" style="font-weight:400">– Termine automatisch im Handy-/PC-Kalender</span></h3>
           <div class="sml mut" style="margin-bottom:8px">Diese URLs einmal als „Kalender abonnieren" ins Handy oder in Google/Apple/Outlook eintragen – drei Kalender in eigenen Farben, aktualisieren sich selbst. Nicht weitergeben (enthalten Kundendaten).</div>
           <label>Anfragen &amp; offene Angebote (vorläufig)</label><input id="icAnfragen"readonly onclick="this.select()" style="font-size:11px">
@@ -585,6 +596,7 @@ img/spiegelkugel mittig.jpg"></textarea>
           <div class="mut sml" style="margin:6px 0">Erscheint auf jeder Packliste (Buchungs-Detail → „ Packliste") zusätzlich zur zugeordneten Technik des Auftrags.</div>
           <button class="btn sm" onclick="savePacking()">Speichern</button>
         </div>
+    <div class="sec-label">System</div>
         <div class="card"><h3>Website-Updates <span class="mut sml" style="font-weight:400">– Änderungen aus der Entwicklung live stellen, ohne FTP</span></h3>
           <div class="sml mut" style="margin-bottom:8px">So funktioniert's: Neue Versionen landen auf dem GitHub-Branch <code>live</code>. Der Server holt sie sich selbst – automatisch per Cronjob oder hier per Klick. Deine Daten (Datenbank, Uploads) bleiben unberührt, vor jedem Update wird gesichert.</div>
           <div class="grid3">
@@ -608,8 +620,6 @@ img/spiegelkugel mittig.jpg"></textarea>
           <div class="sml mut" style="margin:8px 0 4px">Wichtig: Backups liegen auf demselben Server – lade dir regelmäßig eins per Klick herunter (externe Kopie).</div>
           <div id="bkList" class="sml mut">–</div>
         </div>
-      </div>
-    </div>
   </div>
 
   </div></div>
@@ -3405,6 +3415,17 @@ function openModal(title,html){
 function closeModal(){document.getElementById('modalBg').classList.remove('v')}
 document.getElementById('modalBg').addEventListener('click',function(e){if(e.target===this)closeModal()});
 function v(id){var el=document.getElementById(id);return el?el.value.trim():''}
+
+/* ===== Inhalte/Einstellungen: Karten zuklappbar machen (Standard: zu) ===== */
+document.querySelectorAll('#pg-cms .card, #pg-set .card').forEach(function(card){
+  card.classList.add('clps');
+  var h=card.querySelector('h3');
+  if(!h)return;
+  h.addEventListener('click',function(e){
+    if(e.target.closest('button,a,input,select,textarea'))return;
+    card.classList.toggle('open');
+  });
+});
 </script>
 </body>
 </html>
