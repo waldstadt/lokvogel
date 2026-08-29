@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 38;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 39;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -291,6 +291,7 @@ function upgrade(PDO $p): void {
     "alter table equipment add column invoice_name text",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
   if ($v < 38) seedEquipmentCatalog($p);
+  if ($v < 39) seedEquipmentCatalog($p);   // neue Artikel nachziehen (idempotent per SKU)
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -516,18 +517,23 @@ function seedEquipmentCatalog(PDO $p): void {
     ['MANUAL-EUROLITE-NH20', 'Effekt', 'Eurolite NH-20 Tour Fazer', 'DMX-Dunstnebelmaschine (Hazer) im Flightcase, Tank 1,7 l, Verbrauch ca. 2,2 ml/min, Aufheizzeit ca. 1,5 Min., Wurfweite ca. 2 m. Steuerung DMX, Stand-alone, QuickDMX/W-DMX/CRMX über USB. Menge vorerst mit 1 angelegt.', 35.0, 'https://www.thomann.de/de/eurolite_nh_20_tour_fazer.htm'],
     ['MANUAL-ADJ-ENTOURFAZE', 'Effekt', 'ADJ Entour Faze', 'Fazer/Hazer mit 450-W-Heizelement, Nebelausstoß ca. 113 m³/min, Verbrauch ca. 4,5 ml/min, Aufheizzeit ca. 45 Sek. Tank 3 l, verwendet normale Wasser-Nebelfluid. Steuerung über Menütasten/Bar-Display, Trigger-Schalter, optional DMX oder mitgeliefertes Kabel-Fernbedienung. Maße 414×202×303 mm, Gewicht 4,5 kg. Menge vorerst mit 1 angelegt.', 30.0, 'https://www.thomann.de/de/adj_entour_faze.htm'],
     ['MANUAL-APELABS-MARVELFLOOD', 'Licht', 'Ape Labs Marvel Flood', 'Akku-Flutlicht, 9 Pixel-LEDs à 18 W, Dual-Drive-Technologie (flimmerfrei), IP64. Akkulaufzeit ca. 2 Std. bei 100 % / ca. 8 Std. bei 75 % Helligkeit. Steuerung per App/Fernbedienung/Wireless-DMX (Reichweite ca. 1200 m, automatischer Signal-Repeater von Lampe zu Lampe) oder klassisch per DMX-Kabel im Dauerbetrieb. Maße 28,5×26,5×8,0 cm, Gewicht 3,7 kg.', 25.0, 'https://www.thomann.de/de/ape_labs_marvel_flood.htm', 2],
+    // Preis von Markus fest vorgegeben (Index 8 = day_rate), daher keine reine Empfehlung
+    ['MANUAL-JBL-PARTYBOX', 'Lautsprecher', 'JBL PartyBox 100 / 110', 'Mobiler Akku-Partylautsprecher mit Lichteffekten, 160 W, bis zu 12 Std. Akkulaufzeit, Bluetooth und AUX/USB, Mikrofon-/Gitarreneingang, spritzwassergeschützt (110er: IPX4). Maße ca. 29,5×57×30 cm, Gewicht ca. 11 kg. Bestand gemischt aus PartyBox 100 und 110 – praktisch baugleich in Klang und Bedienung.', 25.0, 'https://www.thomann.de/de/jbl_partybox_110.htm', 3, false, 25.0],
+    ['MANUAL-LEINWAND-80', 'Video', 'Mobile Beamer-Leinwand 80"', 'Mobile Leinwand für Beamer, 80 Zoll Bilddiagonale. Wird gerollt transportiert und passt so in jeden Kombi – schnell aufgebaut, für den Innenbereich.', 10.0, null],
+    ['MANUAL-LEINWAND-100', 'Video', 'Mobile Beamer-Leinwand 100"', 'Mobile Leinwand für Beamer, 100 Zoll Bilddiagonale. Wird gerollt transportiert und passt so in jeden Kombi – schnell aufgebaut, für den Innenbereich.', 15.0, null],
   ];
   foreach ($rows as $row) {
     [$sku, $cat, $n, $d, $suggested, $thomann] = $row;
     $qty = $row[6] ?? 1;
     $ownRig = $row[7] ?? false;
+    $rate = $row[8] ?? 0;   // fester Mietpreis, falls Markus ihn schon vorgegeben hat
     $c = $p->prepare('select count(*) from equipment where sku = ?');
     $c->execute([$sku]);
     if (!(int)$c->fetchColumn())
       $p->prepare('insert into equipment (id,sort,name,slug,sku,category,description,day_rate,day_rate_suggested,
-          followup_pct,qty_total,rentable,public,status,thomann_url,own_rig,created_at) values (?,?,?,?,?,?,?,0,?,50,?,1,1,?,?,?,?)')
+          followup_pct,qty_total,rentable,public,status,thomann_url,own_rig,created_at) values (?,?,?,?,?,?,?,?,?,50,?,1,1,?,?,?,?)')
         ->execute([uuid(), 0, $n,
-          strtolower(preg_replace('/[^a-z0-9äöüß]+/iu', '-', $n)), $sku, $cat, $d, $suggested, $qty, 'aktiv', $thomann, $ownRig ? 1 : 0, now()]);
+          strtolower(preg_replace('/[^a-z0-9äöüß]+/iu', '-', $n)), $sku, $cat, $d, $rate, $suggested, $qty, 'aktiv', $thomann, $ownRig ? 1 : 0, now()]);
   }
 }
 
