@@ -459,6 +459,9 @@ function seedEquipmentCatalog(PDO $p): void {
     ['363817', 'Mischpult', 'Behringer X AIR XR12',
      '12-Kanal-Digitalmischpult: 4 Mikrofon- (Midas-Preamps) + 8 Line-Eingänge (davon 2 Hi-Z), 2 symmetrische Aux-Ausgänge, Main L/R auf XLR, Kopfhörerausgang. Steuerung komplett per App über integriertes WLAN-Modul, USB für Stereo-WAV-Aufnahme. Maße 333×149×95 mm, Höhe 2 HE, Gewicht 2,4 kg.',
      45.0, 'https://www.thomann.de/de/behringer_x_air_xr12.htm'],
+    ['606393', 'DJ-Controller', 'Hercules DJ Control Mix Ultra',
+     'Mobiler DJ-Controller mit integriertem Akku (bis zu 10 Std. Laufzeit), drahtlose Anbindung ans Smartphone/Tablet per Bluetooth Low Energy (Android/iOS). 2 virtuelle Decks + Mixer, 2 berührungsgesteuerte Jogwheels, 8 Pads (Hot Cue/Loop/FX/Sampler), EQ/Tempo/Loop/Sample-Bedienelemente. Inkl. Staubschutz-Cover, Audio-Split-Kabel, USB-A/USB-C-Kabel. Maße (BxTxH) 315×174×40 mm, Gewicht 0,85 kg.',
+     20.0, 'https://www.thomann.de/de/hercules_dj_control_mix_ultra.htm'],
   ];
   foreach ($rows as [$sku, $cat, $n, $d, $suggested, $thomann]) {
     $c = $p->prepare('select count(*) from equipment where sku = ?');
