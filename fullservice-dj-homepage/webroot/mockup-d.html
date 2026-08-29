@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Entwurf D – Seitenleiste/Split</title>
+<link href="fonts.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#f4f2ee;--ink:#181818;--acc:#d9481c;--mut:#6a6660;--line:#181818}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.65}
+a{color:inherit}
+
+.frame{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+.rail{border-right:2px solid var(--line);padding:34px 30px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.rail .logo{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:26px;letter-spacing:-.02em;line-height:1.1}
+.rail .logo i{font-style:normal;color:var(--acc)}
+.rail .logo small{display:block;font-size:10px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:var(--mut);margin-top:6px}
+.rail nav{margin-top:60px;display:flex;flex-direction:column;gap:0;border-top:2px solid var(--line)}
+.rail nav a{text-decoration:none;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;padding:15px 2px;border-bottom:1px solid rgba(24,24,24,.2);display:flex;justify-content:space-between;align-items:baseline}
+.rail nav a small{font-family:ui-monospace,monospace;font-size:10px;color:var(--mut)}
+.rail nav a:hover{color:var(--acc)}
+.rail .foot{margin-top:auto;font-size:12.5px;color:var(--mut);line-height:1.8}
+.rail .foot b{color:var(--ink)}
+.rail .cta{display:block;text-align:center;background:var(--ink);color:var(--bg);text-decoration:none;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;padding:15px;margin-top:20px}
+.rail .cta:hover{background:var(--acc)}
+
+.main{overflow:hidden}
+.hero{padding:76px 56px 60px;border-bottom:2px solid var(--line)}
+.hero .over{font-family:ui-monospace,monospace;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);margin-bottom:22px}
+h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(44px,5.4vw,76px);line-height:.99;letter-spacing:-.035em}
+h1 .out{color:transparent;-webkit-text-stroke:2px var(--ink)}
+.hero p{max-width:520px;margin-top:28px;font-size:17px;color:var(--mut)}
+.hero .row{display:flex;gap:40px;margin-top:44px;align-items:center}
+.hero .row .fact{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px}
+.hero .row .fact small{display:block;font-family:ui-monospace,monospace;font-weight:400;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+
+.list{padding:56px}
+.list .lh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+h2{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:30px;letter-spacing:-.02em}
+.list .lh a{font-family:ui-monospace,monospace;font-size:12px;color:var(--acc);text-transform:uppercase;letter-spacing:.1em;text-decoration:none}
+.item{display:grid;grid-template-columns:70px 1fr auto;gap:26px;align-items:center;padding:26px 0;border-bottom:1px solid rgba(24,24,24,.25)}
+.item:first-of-type{border-top:2px solid var(--line)}
+.item .no{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;color:transparent;-webkit-text-stroke:1.5px var(--ink)}
+.item h3{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;letter-spacing:-.01em}
+.item .cat{font-family:ui-monospace,monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--acc)}
+.item p{font-size:14px;color:var(--mut);margin-top:4px;max-width:520px}
+.item .end{text-align:right}
+.item .price{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px}
+.item .price small{font-family:'Inter',sans-serif;font-weight:400;font-size:12px;color:var(--mut)}
+.item .add{display:inline-block;margin-top:8px;font-size:13px;text-decoration:none;border:1.5px solid var(--ink);padding:8px 16px;font-family:'Space Grotesk',sans-serif;font-weight:600}
+.item .add:hover{background:var(--ink);color:var(--bg)}
+</style>
+</head>
+<body>
+
+<div class="frame">
+  <aside class="rail">
+    <div class="logo">lausch<br>gift<i>.</i><small>Veranstaltungstechnik<br>Hemer / Sauerland</small></div>
+    <nav>
+      <a href="#">Mietpark <small>01</small></a>
+      <a href="#">Techniker <small>02</small></a>
+      <a href="#">Installation <small>03</small></a>
+      <a href="#">Workshops <small>04</small></a>
+      <a href="#">Konditionen <small>05</small></a>
+    </nav>
+    <div class="foot">
+      <b>Markus Jankowski</b><br>
+      Büttmecker Weg 35c<br>58675 Hemer<br>
+      01523 6439373
+      <a class="cta" href="#">Anfragen</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="hero">
+      <div class="over">Ton &amp; Licht · 30–200 Gäste</div>
+      <h1>Jedes Wort<br>verständlich.<br><span class="out">Auch in der</span><br><span class="out">schwierigsten Location.</span></h1>
+      <p>Große Bühnen kann jeder beschallen. Die Kunst ist die kleine Location: niedrige Decke, harte Wände, Publikum direkt vor der Box. Genau darauf bin ich spezialisiert.</p>
+      <div class="row">
+        <div class="fact">24 h<small>= 1 Miettag</small></div>
+        <div class="fact">−50 %<small>jeder Folgetag</small></div>
+        <div class="fact">Hemer<small>Lager &amp; Abholung</small></div>
+      </div>
+    </header>
+
+    <section class="list">
+      <div class="lh"><h2>Mietpark</h2><a href="#">Alle 37 Artikel →</a></div>
+      <div class="item">
+        <div class="no">01</div>
+        <div><div class="cat">Mischpult</div><h3>Allen &amp; Heath CQ20B</h3><p>Ultrakompakter Digitalmixer, 16 Preamps, Steuerung per App über das eigene WLAN.</p></div>
+        <div class="end"><div class="price">85 € <small>/ Tag</small></div><a class="add" href="#">In den Tourcase</a></div>
+      </div>
+      <div class="item">
+        <div class="no">02</div>
+        <div><div class="cat">Licht</div><h3>Ape Labs Neon Tube Set</h3><p>Sechs LED-Lichtröhren im Softbag, 15 Stunden Akku, App- und Funk-DMX-Steuerung.</p></div>
+        <div class="end"><div class="price">80 € <small>/ Tag</small></div><a class="add" href="#">In den Tourcase</a></div>
+      </div>
+      <div class="item">
+        <div class="no">03</div>
+        <div><div class="cat">Lautsprecher</div><h3>Seeburg Acoustic Line A6</h3><p>12"/1"-Topteil mit drehbarem Horn – erwachsener Klang, auch als Monitor.</p></div>
+        <div class="end"><div class="price">40 € <small>/ Tag</small></div><a class="add" href="#">In den Tourcase</a></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+</body>
+</html>

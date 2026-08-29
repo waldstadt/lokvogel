@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Entwurf F – Fachblatt/Zeitung</title>
+<link href="fonts.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--paper:#faf7f0;--ink:#191713;--blue:#1d3fbf;--mut:#6e685d;--rule:#191713}
+body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);font-size:16px;line-height:1.65}
+a{color:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:0 26px}
+
+.topline{border-bottom:1px solid var(--rule);font-family:ui-monospace,monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.topline-in{display:flex;justify-content:space-between;padding:10px 0}
+
+.mast{text-align:center;padding:36px 0 26px;border-bottom:3px double var(--rule)}
+.mast h1{font-family:'Playfair Display',serif;font-weight:900;font-size:clamp(46px,7.4vw,92px);letter-spacing:-.015em;line-height:.95}
+.mast h1 i{font-style:italic;color:var(--blue)}
+.mast .sub{margin-top:12px;font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--mut)}
+
+.navrow{border-bottom:1px solid var(--rule);text-align:center;padding:12px 0;font-family:'Inter',sans-serif;font-size:13.5px}
+.navrow a{text-decoration:none;margin:0 16px}
+.navrow a:hover{color:var(--blue);text-decoration:underline;text-underline-offset:4px}
+.navrow a.cta{color:var(--blue);font-weight:600}
+
+.lead{padding:54px 0 46px;border-bottom:1px solid var(--rule)}
+.lead-grid{display:grid;grid-template-columns:2fr 1fr;gap:54px}
+.lead .kicker{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--blue);margin-bottom:16px}
+.lead h2{font-family:'Playfair Display',serif;font-weight:900;font-size:clamp(32px,4.6vw,54px);line-height:1.08;letter-spacing:-.01em}
+.lead .standfirst{margin-top:22px;font-size:18px;line-height:1.6;color:var(--mut);font-style:italic;font-family:'Playfair Display',serif}
+.lead .body{margin-top:20px;font-size:15.5px;columns:2;column-gap:34px;column-rule:1px solid rgba(25,23,19,.2)}
+.lead .body p:first-child::first-letter{font-family:'Playfair Display',serif;font-weight:900;font-size:52px;float:left;line-height:.82;padding-right:9px;color:var(--blue)}
+.lead .cta-line{margin-top:28px}
+.lead .cta-line a{font-weight:600;color:var(--blue);text-decoration:underline;text-underline-offset:4px;font-size:16px}
+.sidebox{border:1px solid var(--rule);padding:24px 22px;align-self:start}
+.sidebox h4{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;border-bottom:1px solid var(--rule);padding-bottom:10px;margin-bottom:16px}
+.sidebox .r{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px dotted rgba(25,23,19,.35);font-size:14px}
+.sidebox .r:last-child{border-bottom:none}
+.sidebox .r b{font-family:'Playfair Display',serif;font-size:19px}
+
+.klein{padding:50px 0 70px}
+.klein .kh{display:flex;align-items:baseline;justify-content:space-between;border-bottom:3px double var(--rule);padding-bottom:10px;margin-bottom:0}
+.klein h3{font-family:'Playfair Display',serif;font-weight:900;font-size:32px}
+.klein .kh span{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut)}
+.ads{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+.ad{padding:24px 22px;border-bottom:1px solid rgba(25,23,19,.3);border-right:1px dotted rgba(25,23,19,.4)}
+.ad:nth-child(3n){border-right:none}
+.ad .cat{font-family:ui-monospace,monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--blue);margin-bottom:8px}
+.ad h5{font-family:'Playfair Display',serif;font-weight:900;font-size:20px;margin-bottom:6px}
+.ad p{font-size:13.5px;color:var(--mut)}
+.ad .foot{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px}
+.ad .price{font-family:'Playfair Display',serif;font-weight:900;font-size:19px}
+.ad .price small{font-family:'Inter',sans-serif;font-weight:400;font-size:11.5px;color:var(--mut)}
+.ad a{font-size:12.5px;color:var(--blue);text-decoration:underline;text-underline-offset:3px}
+</style>
+</head>
+<body>
+
+<div class="topline">
+  <div class="wrap topline-in">
+    <span>Hemer, Sauerland</span>
+    <span>Ton · Licht · Veranstaltungstechnik</span>
+    <span>Antwort binnen 24 Std.</span>
+  </div>
+</div>
+
+<header class="mast">
+  <h1>Lauschgift<i>.</i></h1>
+  <div class="sub">Veranstaltungstechnik seit dem ersten Takt</div>
+</header>
+
+<nav class="navrow">
+  <a href="#">Mietpark</a><a href="#">Techniker buchen</a><a href="#">Festinstallation</a><a href="#">Workshops</a><a href="#">Konditionen</a><a href="#" class="cta">Anfragen →</a>
+</nav>
+
+<section class="lead">
+  <div class="wrap lead-grid">
+    <article>
+      <div class="kicker">Beschallung für 30 bis 200 Gäste</div>
+      <h2>Jedes Wort verständlich – auch in der schwierigsten Location.</h2>
+      <p class="standfirst">Große Bühnen kann jeder beschallen. Die Kunst ist die kleine Location.</p>
+      <div class="body">
+        <p>Niedrige Decke, harte Wände, Publikum direkt vor der Box: In genau solchen Räumen entscheidet sich, ob ein Abend anstrengend wird oder gemütlich. Darauf habe ich mich spezialisiert – mit kompakter, hochwertiger Technik, die für enge Räume gebaut ist.</p>
+        <p>Ob Firmenfeier mit Reden, Singer-Songwriter im Wirtshaus oder die volle Kneipe am Samstagabend: Die Anlage passt in die Ecke und füllt trotzdem den Raum. Geliefert, aufgebaut, nachts wieder weg – oder zum Selbstabholen am Lager in Hemer, mit kurzer Einweisung.</p>
+      </div>
+      <div class="cta-line"><a href="#">Unverbindlich anfragen →</a></div>
+    </article>
+    <aside class="sidebox">
+      <h4>Konditionen auf einen Blick</h4>
+      <div class="r"><span>Ein Miettag</span><b>24 h</b></div>
+      <div class="r"><span>Jeder Folgetag</span><b>−50 %</b></div>
+      <div class="r"><span>Lager &amp; Abholung</span><b>Hemer</b></div>
+      <div class="r"><span>Artikel im Lager</span><b>37</b></div>
+    </aside>
+  </div>
+</section>
+
+<section class="klein">
+  <div class="wrap">
+    <div class="kh"><h3>Aus dem Mietpark</h3><span>Auszug · alle Preise netto / Miettag</span></div>
+    <div class="ads">
+      <div class="ad">
+        <div class="cat">Mischpult</div>
+        <h5>Allen &amp; Heath CQ20B</h5>
+        <p>Ultrakompakter Digitalmixer, 16 Preamps, Steuerung per App über das eigene WLAN.</p>
+        <div class="foot"><span class="price">85 € <small>/ Tag</small></span><a href="#">In den Tourcase</a></div>
+      </div>
+      <div class="ad">
+        <div class="cat">Licht</div>
+        <h5>Ape Labs Neon Tube Set</h5>
+        <p>Sechs LED-Lichtröhren im Softbag, 15 Stunden Akku, App- und Funk-DMX-Steuerung.</p>
+        <div class="foot"><span class="price">80 € <small>/ Tag</small></span><a href="#">In den Tourcase</a></div>
+      </div>
+      <div class="ad">
+        <div class="cat">Lautsprecher</div>
+        <h5>Seeburg Acoustic Line A6</h5>
+        <p>12"/1"-Topteil mit drehbarem Horn – erwachsener Klang, auch als Monitor.</p>
+        <div class="foot"><span class="price">40 € <small>/ Tag</small></span><a href="#">In den Tourcase</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
