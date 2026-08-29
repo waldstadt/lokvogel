@@ -114,8 +114,9 @@ footer a:hover{color:var(--acc)}
   .cats::-webkit-scrollbar{display:none}
   .cat-chip{flex-shrink:0;white-space:nowrap}
   .rent-grid{grid-template-columns:1fr;gap:12px}
-  .rent{display:grid;grid-template-columns:96px 1fr}
-  .rent .ri{aspect-ratio:auto;height:100%;min-height:96px}
+  .rent{display:grid;grid-template-columns:132px 1fr;align-items:start}
+  /* Artikelbilder bleiben auch mobil im Querformat (4:3) - Technik fotografiert man quer */
+  .rent .ri{width:112px;aspect-ratio:4/3;height:auto;margin:14px 0 14px 14px;border-radius:4px}
   .rent .ri svg{width:26px;height:26px}
   .rent .rb{padding:12px 14px}
   .rent h4{font-size:15px}
