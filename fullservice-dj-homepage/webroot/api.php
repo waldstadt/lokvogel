@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 37;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 38;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -290,6 +290,7 @@ function upgrade(PDO $p): void {
     "alter table equipment add column invoice_file text",
     "alter table equipment add column invoice_name text",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
+  if ($v < 38) seedEquipmentCatalog($p);
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -447,6 +448,26 @@ function seedServiceProducts(PDO $p): void {
       $p->prepare('insert into products (id,sku,sort,category,name,description,unit,price_net,bundle,active,created_at)
           values (?,?,?,?,?,?,?,?,?,1,?)')
         ->execute([uuid(), $sku, $s, $cat, $n, $d, $u, $pr, '[]', now()]);
+  }
+}
+
+/* Technik-Bestand, den Markus aus seinen Thomann-Rechnungen durchgibt – SKU = Thomann-Artikelnummer,
+   damit ein Artikel bei mehrfacher Migration nicht doppelt angelegt wird. day_rate bleibt 0, bis
+   Markus die Empfehlung (day_rate_suggested) im Backoffice bestätigt oder selbst einen Preis einträgt. */
+function seedEquipmentCatalog(PDO $p): void {
+  $rows = [
+    ['363817', 'Mischpult', 'Behringer X AIR XR12',
+     '12-Kanal-Digitalmischpult: 4 Mikrofon- (Midas-Preamps) + 8 Line-Eingänge (davon 2 Hi-Z), 2 symmetrische Aux-Ausgänge, Main L/R auf XLR, Kopfhörerausgang. Steuerung komplett per App über integriertes WLAN-Modul, USB für Stereo-WAV-Aufnahme. Maße 333×149×95 mm, Höhe 2 HE, Gewicht 2,4 kg.',
+     45.0, 'https://www.thomann.de/de/behringer_x_air_xr12.htm'],
+  ];
+  foreach ($rows as [$sku, $cat, $n, $d, $suggested, $thomann]) {
+    $c = $p->prepare('select count(*) from equipment where sku = ?');
+    $c->execute([$sku]);
+    if (!(int)$c->fetchColumn())
+      $p->prepare('insert into equipment (id,sort,name,slug,sku,category,description,day_rate,day_rate_suggested,
+          followup_pct,qty_total,rentable,public,status,thomann_url,created_at) values (?,?,?,?,?,?,?,0,?,50,1,1,1,?,?,?)')
+        ->execute([uuid(), 0, $n,
+          strtolower(preg_replace('/[^a-z0-9äöüß]+/i', '-', $n)), $sku, $cat, $d, $suggested, 'aktiv', $thomann, now()]);
   }
 }
 
@@ -645,6 +666,7 @@ SQL);
   seedExtraTemplates($p);
   seedServiceProducts($p);
   seedTechCheckForm($p);
+  seedEquipmentCatalog($p);
 }
 
 function seed(PDO $p): void {
