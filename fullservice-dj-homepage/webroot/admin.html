@@ -435,25 +435,32 @@ th.num{text-align:right}
         <div class="card"><h3>Hero (Startbereich)</h3>
           <label>Unterzeile (Kicker)</label><input id="cHeroSub">
           <label>Text</label><textarea id="cHeroText"></textarea>
+          <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cHeroText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Button-Text</label><input id="cHeroCta">
-          <label>Hintergrundbild</label><div style="display:flex;gap:8px"><input id="cHeroImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upHero" onchange="uploadImg(this,'cHeroImg','cHeroFocal')"><button class="btn g sm" onclick="document.getElementById('upHero').click()">Hochladen</button></div>
+          <label>Hintergrundbild</label><div style="display:flex;gap:8px"><input id="cHeroImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upHero" onchange="uploadImg(this,'cHeroImg','cHeroFocal')"><button class="btn g sm" onclick="document.getElementById('upHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cHeroImg','cHeroFocal')">Aus Pool</button></div>
           <div id="cHeroFocalWrap"></div>
-          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('hero')">Speichern</button></div></div>
+          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('hero')">Speichern</button></div>
+          <div id="vb_hero"></div></div>
         <div class="card"><h3>Über mich</h3>
           <label>Überschrift</label><input id="cAboutTitle">
           <label>Text</label><textarea id="cAboutText" style="min-height:110px"></textarea>
-          <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg','cAboutFocal')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">Hochladen</button></div>
+          <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cAboutText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
+          <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg','cAboutFocal')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cAboutImg','cAboutFocal')">Aus Pool</button></div>
           <div id="cAboutFocalWrap"></div>
           <label>Technik-Marken <span class="mut sml" style="text-transform:none;letter-spacing:0">(kommagetrennt, erscheinen als Text-Leiste unter „Über mich")</span></label><input id="cAboutGear" placeholder="z. B. Seeburg Acoustic Line, Sennheiser, Rane">
-          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('about')">Speichern</button></div></div>
+          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('about')">Speichern</button></div>
+          <div id="vb_about"></div></div>
         <div class="card"><h3>Garantie / DJ-Vermittlung</h3>
           <label>Überschrift</label><input id="cGTitle">
           <label>Text</label><textarea id="cGText" style="min-height:90px"></textarea>
-          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('guarantee')">Speichern</button></div></div>
+          <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cGText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
+          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('guarantee')">Speichern</button></div>
+          <div id="vb_guarantee"></div></div>
     <div class="sec-label">Technik-Seite</div>
         <div class="card"><h3>Technik-Seite (technik.html)</h3>
           <label>Hero-Unterzeile</label><input id="cThSub">
           <label>Hero-Text</label><textarea id="cThText"></textarea>
+          <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cThText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Mietpark-Titel</label><input id="cThRentTitle">
           <label>Mietpark-Text</label><textarea id="cThRentText" style="min-height:46px"></textarea>
           <label>Teaser auf der DJ-Seite (Titel)</label><input id="cThTeaTitle">
