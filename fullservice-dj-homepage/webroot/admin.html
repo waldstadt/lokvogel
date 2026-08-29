@@ -1203,7 +1203,8 @@ function inqToCust(id){
     var jobs=[api('inquiries?id=eq.'+id,{method:'PATCH',body:{status:'in_bearbeitung',customer_id:c.id}})];
     if(i.event_date)jobs.push(api('bookings',{method:'POST',body:{
       customer_id:c.id,status:'anfrage',event_type:i.event_type,event_date:i.event_date,
-      title:(i.event_type||'Anfrage')+' '+i.name,venue_name:i.location,kind:i.event_type==='Technik mieten'?'technik':'dj'}}));
+      title:(i.event_type||'Anfrage')+' '+i.name,venue_name:i.location,venue_address:i.location,
+      kind:i.event_type==='Technik mieten'?'technik':'dj'}}));
     jobs.push(api('communications',{method:'POST',body:{customer_id:c.id,channel:'note',direction:'in',
       subject:'Anfrage über Homepage',content:i.message||'',occurred_at:i.created_at}}));
     return Promise.all(jobs);
@@ -4124,7 +4125,7 @@ function renderPicker(){
 function insertProduct(key){
   if(key.indexOf('e:')===0){
     var eq=(CACHE.equipment||[]).find(function(x){return x.id===key.slice(2)});if(!eq)return;
-    curItems.push({pos:curItems.length+1,description:(eq.sku?eq.sku+' – ':'')+eq.name,note:eq.description||'',
+    curItems.push({pos:curItems.length+1,description:eq.name,note:eq.description||'',
       qty:1,unit:'Tag',unit_price:Number(eq.day_rate)||0});
     closeModal();renderItems();toast('„'+eq.name+'" eingefügt ✓');
     return;
