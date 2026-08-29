@@ -2628,12 +2628,14 @@ try {
       if (!preg_match('#^https?://#', $baseUrl)) fail('Bitte eine gültige Basis-URL angeben (https://…).', 400);
       $cfg['base_url'] = $baseUrl;
       $cfg['model'] = trim((string)($body['model'] ?? '')) ?: ($provider === 'claude' ? 'claude-opus-5' : 'gpt-4o-mini');
+      if (isset($body['style'])) $cfg['style'] = trim((string)$body['style']);
       if (!empty($body['api_key'])) $cfg['api_key'] = trim((string)$body['api_key']);
       $p->prepare("insert into settings (key, value, updated_at) values ('ai', ?, ?)
           on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
         ->execute([json_encode($cfg, JSON_UNESCAPED_UNICODE), now()]);
     }
-    out(['provider' => $cfg['provider'] ?? 'openai', 'base_url' => $cfg['base_url'] ?? '', 'model' => $cfg['model'] ?? '', 'has_key' => !empty($cfg['api_key'])]);
+    out(['provider' => $cfg['provider'] ?? 'openai', 'base_url' => $cfg['base_url'] ?? '', 'model' => $cfg['model'] ?? '',
+      'style' => $cfg['style'] ?? '', 'has_key' => !empty($cfg['api_key'])]);
   }
   /* KI-Textassistent: aus Stichpunkten/schlechtem Text einen fertigen Artikeltext machen.
      Nur der angemeldete Admin darf das aufrufen, sonst könnte jeder Besucher am eigenen
@@ -2652,11 +2654,13 @@ try {
     $provider = (string)($cfg['provider'] ?? 'openai') === 'claude' ? 'claude' : 'openai';
     $baseUrl = rtrim((string)($cfg['base_url'] ?: ($provider === 'claude' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1')), '/');
     $model = (string)($cfg['model'] ?: ($provider === 'claude' ? 'claude-opus-5' : 'gpt-4o-mini'));
-    $style = 'Du schreibst deutsche Texte im Ton von Markus, einem DJ und Verleiher für Veranstaltungstechnik: '
+    $style = trim((string)($cfg['style'] ?? '')) ?: (
+      'Du schreibst deutsche Texte im Ton von Markus, einem DJ und Verleiher für Veranstaltungstechnik: '
       . 'persönlich, locker, professionell – so, wie er es am Telefon sagen würde. Keine Emojis, keine '
       . 'Worthülsen oder Floskeln, keine Aufzählungen und keine Überschriften – nur zusammenhängender '
       . 'Fließtext. Ein Gedankenstrich wird als Halbgeviertstrich „–" geschrieben, nicht als Bindestrich. '
-      . 'Du darfst sparsam **fett** oder *kursiv* markieren (einfaches Markdown, kein HTML).';
+      . 'Du darfst sparsam **fett** oder *kursiv* markieren (einfaches Markdown, kein HTML).'
+    );
     if ($kind === 'equipment') {
       $style .= ' Schreibe aus den gegebenen Stichpunkten/technischen Daten einen kurzen, prägnanten '
         . 'Vermietungs-Artikeltext (ca. 2–4 Sätze) für die Produktseite eines DJ- und Veranstaltungstechnik-'
