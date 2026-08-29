@@ -571,28 +571,45 @@ function applyContent(rows){
   var lq=new URLSearchParams(location.search).get('legal');
   if(lq&&LEGAL_TITLES[lq])openLegal(lq);
   if(c.reviews){
+    REV_CFG=c.reviews;
     if(c.reviews.tagline)document.getElementById('revTagline').textContent=c.reviews.tagline;
     var links='';
     if(c.reviews.google_url)links+='<a href="'+esc(c.reviews.google_url)+'" target="_blank" rel="noopener">★ Alle Google-Bewertungen lesen ↗</a>';
     if(c.reviews.djbande_url)links+='<a href="'+esc(c.reviews.djbande_url)+'" target="_blank" rel="noopener">★ Bewertungen bei meiner Partner-Agentur ↗</a>';
     document.getElementById('revLinks').innerHTML=links;
-    if(links)document.getElementById('bewertungen').style.display='';
+    if(links)showSection('bewertungen');
   }
   if(c.gallery&&c.gallery.images&&c.gallery.images.length){
     if(c.gallery.title)document.getElementById('galTitle').textContent=c.gallery.title;
     document.getElementById('galGrid').innerHTML=c.gallery.images.map(function(src){
       return '<img src="'+esc(src)+'" alt="" loading="lazy" onerror="this.closest(\'.gal-grid\').removeChild(this)">';
     }).join('');
-    document.getElementById('galerie').style.display='';
+    showSection('galerie');
   }
   if(c.seo){
     if(c.seo.title)document.title=c.seo.title;
     if(c.seo.description){var m=document.querySelector('meta[name=description]');if(m)m.content=c.seo.description}
   }
   if(c.loc_section){
+    LOC_CFG=c.loc_section;
     if(c.loc_section.title)document.getElementById('locTitle').textContent=c.loc_section.title;
-    if(c.loc_section.text)document.getElementById('locText').textContent=c.loc_section.text;
+    if(c.loc_section.text)document.getElementById('locText').innerHTML=mdRender(c.loc_section.text);
   }
+  if(c.instagram_feed&&c.instagram_feed.images&&c.instagram_feed.images.length){
+    document.getElementById('igGrid').innerHTML=c.instagram_feed.images.map(function(im){
+      if(!im||!im.file)return '';
+      var img='<img src="'+esc(im.file)+'" alt="'+esc(im.caption||'Instagram-Beitrag')+'" loading="lazy" onerror="(this.closest(\'a\')||this).remove()">';
+      if(im.permalink&&/^https?:\/\//i.test(im.permalink))
+        return '<a href="'+esc(im.permalink)+'" target="_blank" rel="noopener">'+img+'</a>';
+      return img;
+    }).join('');
+    document.getElementById('igBlock').style.display='';
+    showSection('galerie');
+  }
+  renderLocations();renderReviews();
+  HIDDEN_SECTIONS.forEach(function(id){
+    var el=document.getElementById(id);if(el)el.style.display='none';
+  });
 }
 /* Schriftstil aus dem CMS (alle Dateien liegen lokal unter fonts/) */
 var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif"};
@@ -614,20 +631,25 @@ sfetch('site_content?select=key,value').then(applyContent).catch(function(){});
 sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderPacks(r)}).catch(function(){});
 sfetch('faq?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderFaq(r)}).catch(function(){});
 var SRC_NAME={google:'Google-Bewertung','dj-bande':'Bewertung über die Partner-Agentur',direkt:'Kundenstimme'};
-sfetch('reviews?select=*&public=eq.true&order=sort').then(function(r){
-  if(!r.length)return;
-  document.getElementById('revGrid').innerHTML=r.map(function(rv){
+/* Daten und CMS-Konfiguration können in beliebiger Reihenfolge eintreffen –
+   deshalb werden beide gemerkt und die Render-Funktionen aus beiden Callbacks aufgerufen. */
+var REV_DATA=null,REV_CFG={},LOC_DATA=null,LOC_CFG={};
+function renderReviews(){
+  if(!REV_DATA||!REV_DATA.length)return;
+  var sel=pickRotate(REV_DATA,REV_CFG.max_count,REV_CFG.rotate);
+  document.getElementById('revGrid').innerHTML=sel.map(function(rv){
     var stars='★★★★★'.slice(0,Math.max(1,Math.min(5,rv.rating||5)));
     return '<div class="rev reveal vis"><div class="stars">'+stars+'</div>'+
       '<p>„'+esc(rv.text)+'“</p>'+
       '<div class="who">'+esc(rv.author)+(rv.event_type?' · '+esc(rv.event_type):'')+'</div>'+
       '<div class="src">'+(SRC_NAME[rv.source]||esc(rv.source||''))+(rv.review_date?' · '+esc(rv.review_date):'')+'</div></div>';
   }).join('');
-  document.getElementById('bewertungen').style.display='';
-}).catch(function(){});
-sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
-  if(!r.length)return;
-  document.getElementById('locGrid').innerHTML=r.map(function(l){
+  showSection('bewertungen');
+}
+function renderLocations(){
+  if(!LOC_DATA||!LOC_DATA.length)return;
+  var sel=pickRotate(LOC_DATA,LOC_CFG.max_count,LOC_CFG.rotate);
+  document.getElementById('locGrid').innerHTML=sel.map(function(l){
     var showImg=l.image_url&&(l.image_source!=='web'||l.image_approved);
     var img=showImg?' style="background-image:url(\''+esc(l.image_url)+'\');background-position:'+esc(l.image_focal||'50% 50%')+'"':'';
     var icon=showImg?'':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
@@ -637,22 +659,28 @@ sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
     if(l.phone)links.push('<a href="tel:'+esc(l.phone.replace(/[^\d+]/g,''))+'">'+esc(l.phone)+'</a>');
     return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
       (meta?'<div class="rc">'+esc(meta)+'</div>':'')+
-      '<h4>'+esc(l.name)+'</h4><p>'+esc(l.description||'')+'</p>'+
+      '<h4>'+esc(l.name)+'</h4><p>'+mdRender(l.description||'')+'</p>'+
       (links.length?'<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;font-weight:600">'+links.join('')+'</div>':'')+
       '</div></div>';
   }).join('');
-  document.getElementById('locations').style.display='';
+  showSection('locations');
+}
+sfetch('reviews?select=*&public=eq.true&order=sort').then(function(r){
+  REV_DATA=r;renderReviews();
+}).catch(function(){});
+sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
+  LOC_DATA=r;renderLocations();
 }).catch(function(){});
 sfetch('friends?select=*&public=eq.true&order=sort').then(function(r){
   if(!r.length)return;
   document.getElementById('friendGrid').innerHTML=r.map(function(f){
     return '<div class="rent reveal vis"><div class="rb">'+
       (f.category?'<div class="rc">'+esc(f.category)+'</div>':'')+
-      '<h4>'+esc(f.name)+'</h4><p>'+esc(f.description||'')+'</p>'+
+      '<h4>'+esc(f.name)+'</h4><p>'+mdRender(f.description||'')+'</p>'+
       (f.website?'<a href="'+esc(f.website)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600">Zur Website ↗</a>':'')+
       '</div></div>';
   }).join('');
-  document.getElementById('freunde').style.display='';
+  showSection('freunde');
 }).catch(function(){});
 
 /* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */
