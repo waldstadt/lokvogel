@@ -2230,7 +2230,7 @@ function openEqModal(id){
     '<div class="grid3"><div><label>% ab 1 Woche</label><input type="number" id="eTierWeek" value="'+(e.tier_week_pct!=null?e.tier_week_pct:'')+'"></div>'+
     '<div><label>% ab 2 Wochen</label><input type="number" id="eTier2Week" value="'+(e.tier_2week_pct!=null?e.tier_2week_pct:'')+'"></div>'+
     '<div><label>% ab 1 Monat</label><input type="number" id="eTierMonth" value="'+(e.tier_month_pct!=null?e.tier_month_pct:'')+'"></div></div>'+
-    '<label>Bild</label><div style="display:flex;gap:8px"><input id="eImg" value="'+esc(e.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upEq" onchange="uploadImg(this,\'eImg\',\'eFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">Hochladen</button></div>'+
+    '<label>Bild</label><div style="display:flex;gap:8px"><input id="eImg" value="'+esc(e.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upEq" onchange="uploadImg(this,\'eImg\',\'eFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'eImg\',\'eFocal\')">Aus Pool</button></div>'+
     focalWidget(e.image_url,e.image_focal,'eFocal','4/3')+
     '<label style="margin-top:12px"><input type="checkbox" id="ePub" style="width:auto;margin-right:6px" '+(e.public!==false?'checked':'')+'>Auf Homepage anzeigen (mietbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveEq(\''+(id||'')+'\')">Speichern</button>'+
@@ -2294,7 +2294,7 @@ function openSetModal(id){
     '<div><label>oder Festpreis €/Tag (überschreibt den Rabatt)</label><input type="number" step="0.01" id="sFixed" value="'+(s.fixed_price!=null?s.fixed_price:'')+'"></div></div>'+
     '<label style="margin-top:10px">Enthaltene Artikel</label><div id="sItemRows"></div>'+
     '<button class="btn g sm" style="margin-top:6px" onclick="addSetItemRow()">+ Artikel</button>'+
-    '<label style="margin-top:14px">Foto</label><div style="display:flex;gap:8px"><input id="sImg" value="'+esc(s.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upSet" onchange="uploadImg(this,\'sImg\',\'sFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upSet\').click()">Hochladen</button></div>'+
+    '<label style="margin-top:14px">Foto</label><div style="display:flex;gap:8px"><input id="sImg" value="'+esc(s.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upSet" onchange="uploadImg(this,\'sImg\',\'sFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upSet\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'sImg\',\'sFocal\')">Aus Pool</button></div>'+
     focalWidget(s.image_url,s.image_focal,'sFocal','4/3')+
     '<label style="margin-top:12px"><input type="checkbox" id="sPub" style="width:auto;margin-right:6px" '+(s.public!==false?'checked':'')+'>Auf Homepage anzeigen (buchbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveSet(\''+(id||'')+'\')">Speichern</button>'+
@@ -2361,13 +2361,18 @@ function renderCms(){
   document.getElementById('cThTeaText').value=g('tech_teaser','text');
   document.getElementById('cLocTitle').value=g('loc_section','title')||'Orte, an denen ich besonders gerne auflege';
   document.getElementById('cLocText').value=g('loc_section','text')||'Deutschlandweit gibt es Locations, mit denen die Zusammenarbeit einfach herausragend läuft – eingespielte Teams, gute Technik-Bedingungen, tolle Räume. Diese Häuser empfehle ich aus voller Überzeugung.';
+  document.getElementById('cLocMax').value=Number(g('loc_section','max_count'))||0;
+  document.getElementById('cLocRotate').checked=!!g('loc_section','rotate');
   document.getElementById('cGTitle').value=g('guarantee','title');
   document.getElementById('cGText').value=g('guarantee','text');
   document.getElementById('cRevGoogle').value=g('reviews','google_url');
   document.getElementById('cRevBande').value=g('reviews','djbande_url');
   document.getElementById('cRevTagline').value=g('reviews','tagline');
+  document.getElementById('cRevMax').value=Number(g('reviews','max_count'))||0;
+  document.getElementById('cRevRotate').checked=!!g('reviews','rotate');
   document.getElementById('cGalTitle').value=g('gallery','title')||"So sieht's bei mir aus";
-  document.getElementById('cGalImgs').value=(g('gallery','images')||[]).join('\n');
+  GAL_IMAGES=(g('gallery','images')||[]).slice();
+  renderGalGrid();
   renderRevAdmin();
   document.getElementById('cLegImp').value=g('legal','impressum');
   document.getElementById('cLegDs').value=g('legal','datenschutz');
@@ -2380,6 +2385,7 @@ function renderCms(){
     return '<span class="theme-sw'+(th.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+t.n+'" onclick="pickTheme(\''+t.n+'\')"></span>';
   }).join('')+'<span class="sml mut" style="margin-left:8px">Preset wählen oder Farben frei einstellen</span>';
   renderPackAdmin();renderFaqAdmin();reloadLocs();reloadFriends();
+  renderSectionsCard();renderInstagram();loadVersions();
 }
 function pickTheme(name){
   var t=THEMES.find(function(x){return x.n===name});
@@ -2389,31 +2395,43 @@ function pickTheme(name){
   document.querySelectorAll('.theme-sw').forEach(function(el){el.classList.toggle('sel',el.title===name)});
 }
 function saveGallery(){
-  var imgs=v('cGalImgs').split('\n').map(function(s){return s.trim()}).filter(Boolean);
-  upsertContent('gallery',{title:v('cGalTitle'),images:imgs});
+  upsertContent('gallery',buildContentVal('gallery'));
 }
 function saveTheme(){
   var val={preset:(CACHE.content.theme&&CACHE.content.theme.preset)||'custom',primary:v('thPrimary'),bg:v('thBg'),font:v('thFont')};
   upsertContent('theme',val);
 }
-function saveContent(key){
-  var val;
-  if(key==='hero')val={title:'DJ Lauschgift',subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal')};
-  if(key==='about')val={title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg'),image_focal:v('cAboutFocal'),
+/* Baut den Wert eines site_content-Keys aus dem aktuellen Formularstand –
+   genutzt von saveContent (live speichern) UND von den Versionen (Entwurf sichern). */
+function buildContentVal(key){
+  if(key==='hero')return {title:'DJ Lauschgift',subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal')};
+  if(key==='about')return {title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg'),image_focal:v('cAboutFocal'),
     gear:v('cAboutGear').split(',').map(function(s){return s.trim()}).filter(Boolean)};
-  if(key==='contact')val={title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
-  if(key==='seo')val={title:v('cSeoTitle'),description:v('cSeoDesc')};
-  if(key==='guarantee')val={title:v('cGTitle'),text:v('cGText')};
-  if(key==='loc_section')val={title:v('cLocTitle'),text:v('cLocText')};
-  if(key==='reviews')val={google_url:v('cRevGoogle'),djbande_url:v('cRevBande'),tagline:v('cRevTagline')};
+  if(key==='contact')return {title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
+  if(key==='seo')return {title:v('cSeoTitle'),description:v('cSeoDesc')};
+  if(key==='guarantee')return {title:v('cGTitle'),text:v('cGText')};
+  if(key==='loc_section'){
+    var oldL=CACHE.content.loc_section||{};
+    return Object.assign({},oldL,{title:v('cLocTitle'),text:v('cLocText'),
+      max_count:Number(v('cLocMax'))||0,rotate:document.getElementById('cLocRotate').checked});
+  }
+  if(key==='reviews'){
+    var oldR=CACHE.content.reviews||{};
+    return Object.assign({},oldR,{google_url:v('cRevGoogle'),djbande_url:v('cRevBande'),tagline:v('cRevTagline'),
+      max_count:Number(v('cRevMax'))||0,rotate:document.getElementById('cRevRotate').checked});
+  }
+  if(key==='gallery')return {title:v('cGalTitle'),images:GAL_IMAGES.slice()};
+  if(key==='legal')return {impressum:document.getElementById('cLegImp').value,datenschutz:document.getElementById('cLegDs').value,agb:document.getElementById('cLegAgb').value};
+  return {};
+}
+function saveContent(key){
   if(key==='tech'){
     upsertContent('tech_hero',{subtitle:v('cThSub'),text:v('cThText')});
     upsertContent('rental',{title:v('cThRentTitle'),text:v('cThRentText')});
     upsertContent('tech_teaser',{title:v('cThTeaTitle'),text:v('cThTeaText')});
     return;
   }
-  if(key==='legal')val={impressum:document.getElementById('cLegImp').value,datenschutz:document.getElementById('cLegDs').value,agb:document.getElementById('cLegAgb').value};
-  upsertContent(key,val);
+  upsertContent(key,buildContentVal(key));
 }
 function upsertContent(key,val){
   api('site_content',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:key,value:val}})
@@ -2477,11 +2495,55 @@ function setFocal(ev,focalId){
   var m=document.getElementById(focalId+'-marker');
   m.style.left=x+'%';m.style.top=y+'%';
 }
+/* Schnell-Schalter: Klick aufs live/aus-Badge toggelt public sofort per PATCH */
+var DD_LISTS={
+  packages:{tbl:'packages',cache:'packages',render:function(){renderPackAdmin()}},
+  faq:{tbl:'faq',cache:'faq',render:function(){renderFaqAdmin()}},
+  locations:{tbl:'locations',cache:'locations',render:function(){renderLocAdmin()}},
+  friends:{tbl:'friends',cache:'friends',render:function(){renderFriendAdmin()}},
+  reviews:{tbl:'reviews',cache:'reviews',render:function(){renderRevAdmin()}}
+};
+function pubSwitch(name,id,isPub){
+  return '<span class="b '+(isPub?'green':'grey')+'" style="cursor:pointer" title="Klicken zum Ein-/Ausschalten" '+
+    'onclick="togglePub(event,\''+name+'\',\''+id+'\','+(isPub?'true':'false')+')">'+(isPub?'live':'aus')+'</span>';
+}
+function togglePub(ev,name,id,cur){
+  ev.stopPropagation();
+  var cfg=DD_LISTS[name];
+  api(cfg.tbl+'?id=eq.'+id,{method:'PATCH',body:{public:!cur}})
+    .then(function(){
+      var row=(CACHE[cfg.cache]||[]).find(function(x){return String(x.id)===String(id)});
+      if(row)row.public=!cur;
+      cfg.render();
+      toast(!cur?'Eingeschaltet ✓ – ist jetzt auf der Homepage.':'Ausgeschaltet ✓ – ist von der Homepage runter.');
+    }).catch(function(e){toast(e.message,1)});
+}
+/* Generisches Drag&Drop für alle sortierbaren Listen (⠿-Griff, PATCH sort je Zeile) */
+var ddListName=null,ddIdx=null;
+function ddAttrs(name,i){
+  return ' draggable="true" ondragstart="ddStart(\''+name+'\','+i+',event)" ondragover="ddOver(\''+name+'\',event)" ondrop="ddDrop(\''+name+'\','+i+',event)"';
+}
+function ddStart(name,i,ev){ddListName=name;ddIdx=i;ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',String(i))}catch(e){}}
+function ddOver(name,ev){if(ddListName===name&&ddIdx!==null)ev.preventDefault()}
+function ddDrop(name,i,ev){
+  ev.preventDefault();
+  if(ddListName!==name||ddIdx===null||ddIdx===i){ddListName=null;ddIdx=null;return}
+  var cfg=DD_LISTS[name],arr=CACHE[cfg.cache]||[];
+  var m=arr.splice(ddIdx,1)[0];
+  arr.splice(i,0,m);
+  ddListName=null;ddIdx=null;
+  cfg.render();
+  Promise.all(arr.map(function(row,idx){row.sort=idx;return api(cfg.tbl+'?id=eq.'+row.id,{method:'PATCH',body:{sort:idx}})}))
+    .then(function(){toast('Reihenfolge gespeichert ✓')}).catch(function(e){toast(e.message,1)});
+}
+var SORT_HINT='<div class="mut sml" style="margin-top:6px">Reihenfolge per Ziehen am ⠿-Griff in der Liste.</div>';
+function ddGrip(){return '<span style="opacity:.55;user-select:none" title="Ziehen zum Umsortieren">⠿</span>'}
 function renderPackAdmin(){
-  document.getElementById('packList').innerHTML=CACHE.packages.map(function(p){
-    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openPackModal(\''+p.id+'\')">'+esc(p.title)+'</a> '+
-    (p.price_from?('<span class="mut">'+esc(p.price_note||'ab')+' '+euro(p.price_from)+'</span> '):'')+
-    (p.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</div>';
+  document.getElementById('packList').innerHTML=(CACHE.packages||[]).map(function(p,i){
+    return '<div'+ddAttrs('packages',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
+    '<a onclick="openPackModal(\''+p.id+'\')" style="flex:1">'+esc(p.title)+'</a>'+
+    (p.price_from?('<span class="mut">'+esc(p.price_note||'ab')+' '+euro(p.price_from)+'</span>'):'')+
+    pubSwitch('packages',p.id,!!p.public)+'</div>';
   }).join('')||'<span class="mut">Keine Pakete.</span>';
 }
 function openPackModal(id){
@@ -2489,25 +2551,27 @@ function openPackModal(id){
   openModal(id?'Paket bearbeiten':'Neues Paket',
     '<div class="grid2"><div><label>Titel *</label><input id="pTitle" value="'+esc(p.title||'')+'"></div>'+
     '<div><label>Untertitel</label><input id="pSub" value="'+esc(p.subtitle||'')+'"></div></div>'+
-    '<div class="grid3"><div><label>Preis (€)</label><input type="number" id="pPrice" value="'+(p.price_from||'')+'"></div>'+
-    '<div><label>Zusatz (ab/pauschal)</label><input id="pNote" value="'+esc(p.price_note||'ab')+'"></div>'+
-    '<div><label>Sortierung</label><input type="number" id="pSort" value="'+(p.sort||0)+'"></div></div>'+
+    '<div class="grid2"><div><label>Preis (€)</label><input type="number" id="pPrice" value="'+(p.price_from||'')+'"></div>'+
+    '<div><label>Zusatz (ab/pauschal)</label><input id="pNote" value="'+esc(p.price_note||'ab')+'"></div></div>'+
     '<label>Leistungen (eine pro Zeile)</label><textarea id="pFeat" style="min-height:100px">'+esc((p.features||[]).join('\n'))+'</textarea>'+
     '<label style="margin-top:12px"><input type="checkbox" id="pPub" style="width:auto;margin-right:6px" '+(p.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
+    SORT_HINT+
     '<div style="margin-top:14px"><button class="btn" onclick="savePack(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'packages\',\''+id+'\',renderCmsReload)">Löschen</button>':'')+'</div>');
 }
 function savePack(id){
   var body={title:v('pTitle'),subtitle:v('pSub'),price_from:v('pPrice')?Number(v('pPrice')):null,price_note:v('pNote'),
-    sort:Number(v('pSort'))||0,features:v('pFeat').split('\n').map(function(s){return s.trim()}).filter(Boolean),
+    features:v('pFeat').split('\n').map(function(s){return s.trim()}).filter(Boolean),
     public:document.getElementById('pPub').checked};
+  if(!id)body.sort=(CACHE.packages||[]).length;
   (id?api('packages?id=eq.'+id,{method:'PATCH',body:body}):api('packages',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');renderCmsReload()}).catch(function(e){toast(e.message,1)});
 }
 function renderFaqAdmin(){
-  document.getElementById('faqAdminList').innerHTML=CACHE.faq.map(function(f){
-    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openFaqModal(\''+f.id+'\')">'+esc(f.question)+'</a> '+
-    (f.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</div>';
+  document.getElementById('faqAdminList').innerHTML=(CACHE.faq||[]).map(function(f,i){
+    return '<div'+ddAttrs('faq',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
+    '<a onclick="openFaqModal(\''+f.id+'\')" style="flex:1">'+esc(f.question)+'</a>'+
+    pubSwitch('faq',f.id,!!f.public)+'</div>';
   }).join('')||'<span class="mut">Keine FAQ.</span>';
 }
 function openFaqModal(id){
@@ -2515,41 +2579,28 @@ function openFaqModal(id){
   openModal(id?'FAQ bearbeiten':'Neue Frage',
     '<label>Frage *</label><input id="fQ" value="'+esc(f.question||'')+'">'+
     '<label>Antwort *</label><textarea id="fA" style="min-height:100px">'+esc(f.answer||'')+'</textarea>'+
-    '<div class="grid2"><div><label>Sortierung</label><input type="number" id="fSort" value="'+(f.sort||0)+'"></div>'+
-    '<div style="align-self:end"><label style="margin:0"><input type="checkbox" id="fPub" style="width:auto;margin-right:6px" '+(f.public!==false?'checked':'')+'>Auf Homepage anzeigen</label></div></div>'+
+    edBtn('fA')+
+    '<label style="margin-top:12px"><input type="checkbox" id="fPub" style="width:auto;margin-right:6px" '+(f.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
+    SORT_HINT+
     '<div style="margin-top:14px"><button class="btn" onclick="saveFaq(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'faq\',\''+id+'\',renderCmsReload)">Löschen</button>':'')+'</div>');
 }
 function saveFaq(id){
-  var body={question:v('fQ'),answer:v('fA'),sort:Number(v('fSort'))||0,public:document.getElementById('fPub').checked};
+  var body={question:v('fQ'),answer:v('fA'),public:document.getElementById('fPub').checked};
+  if(!id)body.sort=(CACHE.faq||[]).length;
   (id?api('faq?id=eq.'+id,{method:'PATCH',body:body}):api('faq',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');renderCmsReload()}).catch(function(e){toast(e.message,1)});
 }
 function delRow(tbl,id,cb){api(tbl+'?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();cb()}).catch(function(e){toast(e.message,1)})}
 function renderLocAdmin(){
   document.getElementById('locAdminList').innerHTML=(CACHE.locations||[]).map(function(l,i){
-    return '<div draggable="true" ondragstart="locDragStart('+i+',event)" ondragover="locDragOver(event)" ondrop="locDrop('+i+',event)" '+
-    'style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+
-    '<span style="opacity:.55;user-select:none" title="Ziehen zum Umsortieren">⠿</span>'+
+    return '<div'+ddAttrs('locations',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
+    (l.highlight?'<span style="color:var(--yel)" title="Highlight – wird immer angezeigt"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>':'')+
     '<a onclick="openLocModal(\''+l.id+'\')" style="flex:1">'+esc(l.name)+'</a> '+
     (l.city?'<span class="mut">'+esc(l.city)+'</span> ':'')+
     (l.image_source==='web'?(l.image_approved?'<span class="b" style="background:rgba(201,138,60,.15);color:#e0a851">Web-Foto freigegeben</span> ':'<span class="b" style="background:rgba(201,138,60,.15);color:#e0a851">Foto ungeprüft</span> '):'')+
-    (l.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</div>';
+    pubSwitch('locations',l.id,!!l.public)+'</div>';
   }).join('')||'<span class="mut">Noch keine Locations.</span>';
-}
-var locDragIdx=null;
-function locDragStart(i,ev){locDragIdx=i;ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',String(i))}catch(e){}}
-function locDragOver(ev){if(locDragIdx!==null)ev.preventDefault()}
-function locDrop(i,ev){
-  ev.preventDefault();
-  if(locDragIdx===null||locDragIdx===i){locDragIdx=null;return}
-  var arr=CACHE.locations;
-  var m=arr.splice(locDragIdx,1)[0];
-  arr.splice(i,0,m);
-  locDragIdx=null;
-  renderLocAdmin();
-  Promise.all(arr.map(function(l,idx){l.sort=idx;return api('locations?id=eq.'+l.id,{method:'PATCH',body:{sort:idx}})}))
-    .then(function(){toast('Reihenfolge gespeichert ✓')}).catch(function(e){toast(e.message,1)});
 }
 function openLocModal(id){
   var l=id?(CACHE.locations||[]).find(function(x){return x.id===id}):{};l=l||{};
@@ -2570,10 +2621,11 @@ function openLocModal(id){
       '<label style="margin:0"><input type="checkbox" id="lImgApprove" style="width:auto;margin-right:6px" '+(l.image_approved?'checked':'')+'>Rechte geprüft – Bild freigeben</label>'+
       '</div>'
       :'')+
-    '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\',\'lFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">Hochladen</button></div>'+
+    '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\',\'lFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'lImg\',\'lFocal\')">Aus Pool</button></div>'+
     (webPending?'<div class="mut sml" style="margin-top:4px">Hier ein eigenes Foto einfügen ersetzt den Internet-Vorschlag ohne weitere Prüfung.</div>':'')+
     focalWidget(l.image_url,l.image_focal,'lFocal','4/3')+
     '<label style="margin-top:12px"><input type="checkbox" id="lPub" style="width:auto;margin-right:6px" '+(l.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
+    '<label><input type="checkbox" id="lHl" style="width:auto;margin-right:6px" '+(l.highlight?'checked':'')+'>Highlight – wird immer angezeigt (an wechselnder Position)</label>'+
     '<div class="mut sml" style="margin-top:6px">Die Reihenfolge stellst du in der Liste per Ziehen am ⠿-Griff ein.</div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveLoc(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'locations\',\''+id+'\',reloadLocs)">Löschen</button>':'')+'</div>');
@@ -2590,6 +2642,7 @@ function saveLoc(id){
   var body={name:v('lName'),city:v('lCity'),region:v('lRegion'),address:v('lAddr'),phone:v('lPhone'),
     description:v('lDesc'),website:v('lWeb'),image_url:imgVal,image_focal:v('lFocal'),
     image_source:imageSource,image_approved:imageApproved,
+    highlight:document.getElementById('lHl').checked,
     public:document.getElementById('lPub').checked};
   if(!id)body.sort=(CACHE.locations||[]).length;
   (id?api('locations?id=eq.'+id,{method:'PATCH',body:body}):api('locations',{method:'POST',body:body}))
@@ -2597,10 +2650,11 @@ function saveLoc(id){
 }
 function reloadLocs(){api('locations?select=*&order=sort').then(function(r){CACHE.locations=r||[];renderLocAdmin()})}
 function renderFriendAdmin(){
-  document.getElementById('friendAdminList').innerHTML=(CACHE.friends||[]).map(function(f){
-    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openFriendModal(\''+f.id+'\')">'+esc(f.name)+'</a> '+
-    (f.category?'<span class="mut">'+esc(f.category)+'</span> ':'')+
-    (f.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</div>';
+  document.getElementById('friendAdminList').innerHTML=(CACHE.friends||[]).map(function(f,i){
+    return '<div'+ddAttrs('friends',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
+    '<a onclick="openFriendModal(\''+f.id+'\')" style="flex:1">'+esc(f.name)+'</a>'+
+    (f.category?'<span class="mut">'+esc(f.category)+'</span>':'')+
+    pubSwitch('friends',f.id,!!f.public)+'</div>';
   }).join('')||'<span class="mut">Noch keine Empfehlungen.</span>';
 }
 function openFriendModal(id){
@@ -2609,16 +2663,17 @@ function openFriendModal(id){
     '<div class="grid2"><div><label>Name *</label><input id="frName" value="'+esc(f.name||'')+'"></div>'+
     '<div><label>Kategorie</label><input id="frCat" value="'+esc(f.category||'')+'" placeholder="z. B. Fotografie, Sängerin, Hochzeitsplanung"></div></div>'+
     '<label>Warum empfehle ich sie/ihn? (kurz)</label><textarea id="frDesc">'+esc(f.description||'')+'</textarea>'+
-    '<div class="grid2"><div><label>Website</label><input id="frWeb" value="'+esc(f.website||'')+'" placeholder="https://…"></div>'+
-    '<div><label>Sortierung</label><input type="number" id="frSort" value="'+(f.sort||0)+'"></div></div>'+
+    '<label>Website</label><input id="frWeb" value="'+esc(f.website||'')+'" placeholder="https://…">'+
     '<label style="margin-top:12px"><input type="checkbox" id="frPub" style="width:auto;margin-right:6px" '+(f.public!==false&&f.public!==0?'checked':'')+'>Auf Homepage anzeigen</label>'+
+    SORT_HINT+
     '<div style="margin-top:14px"><button class="btn" onclick="saveFriend(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'friends\',\''+id+'\',reloadFriends)">Löschen</button>':'')+'</div>');
 }
 function saveFriend(id){
   if(!v('frName')){toast('Name fehlt.',1);return}
   var body={name:v('frName'),category:v('frCat'),description:v('frDesc'),website:v('frWeb'),
-    sort:Number(v('frSort'))||0,public:document.getElementById('frPub').checked};
+    public:document.getElementById('frPub').checked};
+  if(!id)body.sort=(CACHE.friends||[]).length;
   (id?api('friends?id=eq.'+id,{method:'PATCH',body:body}):api('friends',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');reloadFriends()}).catch(function(e){toast(e.message,1)});
 }
@@ -3308,9 +3363,10 @@ function reloadPartners(){api('partners?select=*&order=created_at.desc').then(fu
 
 /* ===== Bewertungen ===== */
 function renderRevAdmin(){
-  document.getElementById('revAdminList').innerHTML=(CACHE.reviews||[]).map(function(r){
-    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openRevModal(\''+r.id+'\')">'+esc(r.author)+'</a> <span style="color:#f5b942">'+'★★★★★'.slice(0,r.rating||5)+'</span> <span class="mut">'+esc(r.source||'')+'</span> '+
-    (r.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</div>';
+  document.getElementById('revAdminList').innerHTML=(CACHE.reviews||[]).map(function(r,i){
+    return '<div'+ddAttrs('reviews',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
+    '<a onclick="openRevModal(\''+r.id+'\')" style="flex:1">'+esc(r.author)+'</a><span style="color:#f5b942">'+'★★★★★'.slice(0,r.rating||5)+'</span> <span class="mut">'+esc(r.source||'')+'</span>'+
+    pubSwitch('reviews',r.id,!!r.public)+'</div>';
   }).join('')||'<span class="mut">Noch keine Bewertungen eingepflegt.</span>';
 }
 function openRevModal(id){
@@ -3320,10 +3376,10 @@ function openRevModal(id){
     '<div><label>Anlass</label><input id="rvType" value="'+esc(r.event_type||'')+'" placeholder="Hochzeit"></div>'+
     '<div><label>Sterne (1–5)</label><input type="number" min="1" max="5" id="rvRating" value="'+(r.rating||5)+'"></div></div>'+
     '<label>Text *</label><textarea id="rvText" style="min-height:90px">'+esc(r.text||'')+'</textarea>'+
-    '<div class="grid3"><div><label>Quelle</label><select id="rvSource"><option value="google">Google</option><option value="dj-bande">Partner-Agentur (DJ Bande)</option><option value="direkt">Direkt / E-Mail</option></select></div>'+
-    '<div><label>Datum (z. B. „Juli 2026“)</label><input id="rvDate" value="'+esc(r.review_date||'')+'"></div>'+
-    '<div><label>Sortierung</label><input type="number" id="rvSort" value="'+(r.sort||0)+'"></div></div>'+
+    '<div class="grid2"><div><label>Quelle</label><select id="rvSource"><option value="google">Google</option><option value="dj-bande">Partner-Agentur (DJ Bande)</option><option value="direkt">Direkt / E-Mail</option></select></div>'+
+    '<div><label>Datum (z. B. „Juli 2026“)</label><input id="rvDate" value="'+esc(r.review_date||'')+'"></div></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="rvPub" style="width:auto;margin-right:6px" '+(r.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
+    SORT_HINT+
     '<div style="margin-top:14px"><button class="btn" onclick="saveRev(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'reviews\',\''+id+'\',reloadRevs)">Löschen</button>':'')+'</div>');
   if(r.source)document.getElementById('rvSource').value=r.source;
@@ -3331,8 +3387,9 @@ function openRevModal(id){
 function saveRev(id){
   if(!v('rvAuthor')||!v('rvText')){toast('Name und Text fehlen.',1);return}
   var body={author:v('rvAuthor'),event_type:v('rvType'),rating:Math.max(1,Math.min(5,Number(v('rvRating'))||5)),
-    text:v('rvText'),source:v('rvSource'),review_date:v('rvDate'),sort:Number(v('rvSort'))||0,
+    text:v('rvText'),source:v('rvSource'),review_date:v('rvDate'),
     public:document.getElementById('rvPub').checked};
+  if(!id)body.sort=(CACHE.reviews||[]).length;
   (id?api('reviews?id=eq.'+id,{method:'PATCH',body:body}):api('reviews',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');reloadRevs()}).catch(function(e){toast(e.message,1)});
 }
@@ -3458,6 +3515,322 @@ function openModal(title,html){
 function closeModal(){document.getElementById('modalBg').classList.remove('v')}
 document.getElementById('modalBg').addEventListener('click',function(e){if(e.target===this)closeModal()});
 function v(id){var el=document.getElementById(id);return el?el.value.trim():''}
+
+/* ===== Zweites Overlay (liegt über offenen Modals – für Medien-Pool & Text-Editor) ===== */
+function openOvl2(title,html){
+  document.getElementById('ovl2Box').innerHTML='<h3>'+title+'<span class="x" onclick="closeOvl2()">✕</span></h3>'+html;
+  document.getElementById('ovl2Bg').classList.add('v');
+}
+function closeOvl2(){document.getElementById('ovl2Bg').classList.remove('v')}
+document.getElementById('ovl2Bg').addEventListener('click',function(e){if(e.target===this)closeOvl2()});
+
+/* ===== Batch-Upload: mehrere Dateien nacheinander über den /storage-Upload ===== */
+function uploadFilesSeq(files,each,done){
+  files=Array.prototype.slice.call(files||[]);
+  if(!files.length)return;
+  var i=0,urls=[];
+  function next(){
+    if(i>=files.length){if(done)done(urls);return}
+    var f=files[i];
+    var name=Date.now()+'-'+f.name.toLowerCase().replace(/[^a-z0-9.]+/g,'-');
+    toast('Lade hoch … '+(i+1)+' / '+files.length);
+    fetch(API+'/storage/'+encodeURIComponent(name),{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:f})
+      .then(function(r){if(!r.ok)throw new Error('Upload fehlgeschlagen ('+r.status+')');return r.json()})
+      .then(function(j){urls.push(j.url);if(each)each(j.url);i++;next()})
+      .catch(function(e){toast(e.message,1);i++;next()});
+  }
+  next();
+}
+
+/* ===== Medien-Pool ===== */
+var MEDIA_CB=null,MEDIA_MULTI=false,MEDIA_SEL=[],MEDIA_LIST=[];
+function openMediaPicker(cb,multi){
+  MEDIA_CB=cb;MEDIA_MULTI=!!multi;MEDIA_SEL=[];MEDIA_LIST=[];
+  openOvl2('Medien-Pool',
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">'+
+    '<input type="file" accept="image/*" multiple style="display:none" id="mpUp" onchange="mpUpload(this)">'+
+    '<button class="btn g sm" onclick="document.getElementById(\'mpUp\').click()">Hochladen</button>'+
+    (MEDIA_MULTI?'<button class="btn sm" onclick="mpApply()">Übernehmen (<span id="mpCnt">0</span>)</button>':'')+
+    '<span class="mut sml">'+(MEDIA_MULTI?'Bilder anklicken zum Auswählen, dann „Übernehmen".':'Bild anklicken zum Übernehmen.')+'</span></div>'+
+    '<div id="mpGrid" class="sml mut">Lade Bilder …</div>');
+  mpLoad();
+}
+function mpLoad(){
+  fetch(API+'/media/list',{headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){if(!r.ok)throw new Error('list');return r.json()})
+    .then(function(list){MEDIA_LIST=Array.isArray(list)?list:[];mpRenderGrid()})
+    .catch(function(){MEDIA_LIST=[];mpRenderGrid()});
+}
+function mpKb(n){n=Number(n)||0;return n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB'}
+function mpRenderGrid(){
+  var g=document.getElementById('mpGrid');if(!g)return;
+  if(!MEDIA_LIST.length){g.innerHTML='<span class="mut">Noch keine Bilder im Pool – über „Hochladen" landen die ersten hier.</span>';return}
+  g.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">'+
+    MEDIA_LIST.map(function(m,i){
+      var sel=MEDIA_SEL.indexOf(m.url)>=0;
+      return '<div onclick="mpPick('+i+')" style="cursor:pointer;position:relative">'+
+      '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:2px solid '+(sel?'var(--acc)':'var(--bdr)')+'">'+
+      (sel?'<span style="position:absolute;top:6px;right:6px;background:var(--acc);color:#141414;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:0;width:12px;height:12px"><polyline points="20 6 9 17 4 12"/></svg></span>':'')+
+      '<div class="mut" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
+      '<div class="mut" style="font-size:10px">'+mpKb(m.size)+(m.source==='instagram'?' · Instagram':'')+'</div></div>';
+    }).join('')+'</div>';
+}
+function mpPick(i){
+  var m=MEDIA_LIST[i];if(!m)return;
+  if(MEDIA_MULTI){
+    var ix=MEDIA_SEL.indexOf(m.url);
+    if(ix>=0)MEDIA_SEL.splice(ix,1);else MEDIA_SEL.push(m.url);
+    mpRenderGrid();
+    var c=document.getElementById('mpCnt');if(c)c.textContent=MEDIA_SEL.length;
+  }else{
+    var cb=MEDIA_CB;closeOvl2();
+    if(cb)cb(m.url);
+  }
+}
+function mpApply(){
+  var cb=MEDIA_CB,sel=MEDIA_SEL.slice();
+  closeOvl2();
+  if(cb)cb(sel);
+}
+function mpUpload(inp){
+  uploadFilesSeq(inp.files,null,function(urls){toast(urls.length+' Bild(er) hochgeladen ✓');mpLoad()});
+  inp.value='';
+}
+/* „Aus Pool"-Button neben Bildfeldern: setzt die URL und aktualisiert die Fokus-Vorschau */
+function poolPick(targetId,focalId){
+  openMediaPicker(function(url){
+    var el=document.getElementById(targetId);if(!el)return;
+    el.value=url;
+    if(focalId){
+      var box=document.getElementById(focalId+'-box');
+      if(box)box.style.backgroundImage="url('"+url+"')";
+    }
+  });
+}
+
+/* ===== Foto-Galerie: visuelle Bildübersicht ===== */
+var GAL_IMAGES=[];
+function renderGalGrid(){
+  var ta=document.getElementById('cGalImgs');if(ta)ta.value=GAL_IMAGES.join('\n');
+  var el=document.getElementById('galGrid');if(!el)return;
+  el.innerHTML=GAL_IMAGES.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">'+
+    GAL_IMAGES.map(function(u,i){
+      return '<div draggable="true" ondragstart="galDragStart('+i+',event)" ondragover="galDragOver(event)" ondrop="galDrop('+i+',event)" style="position:relative;cursor:grab">'+
+      '<img src="'+esc(u)+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:1px solid var(--bdr)">'+
+      '<a onclick="galRemove('+i+')" title="Bild entfernen" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.65);color:var(--wh);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:0;width:12px;height:12px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></a>'+
+      '<div class="mut" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(u)+'">'+esc(u.split('/').pop())+'</div></div>';
+    }).join('')+'</div>'
+    :'<span class="mut">Noch keine Bilder – über „Bilder hochladen" oder „Aus Pool wählen" hinzufügen.</span>';
+}
+function galRemove(i){GAL_IMAGES.splice(i,1);renderGalGrid();toast('Entfernt – „Galerie speichern" nicht vergessen.')}
+var galDragIdx=null;
+function galDragStart(i,ev){galDragIdx=i;ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',String(i))}catch(e){}}
+function galDragOver(ev){if(galDragIdx!==null)ev.preventDefault()}
+function galDrop(i,ev){
+  ev.preventDefault();
+  if(galDragIdx===null||galDragIdx===i){galDragIdx=null;return}
+  var m=GAL_IMAGES.splice(galDragIdx,1)[0];
+  GAL_IMAGES.splice(i,0,m);
+  galDragIdx=null;
+  renderGalGrid();
+  toast('Umsortiert – „Galerie speichern" nicht vergessen.');
+}
+function galUpload(inp){
+  uploadFilesSeq(inp.files,function(url){GAL_IMAGES.push(url);renderGalGrid()},
+    function(urls){toast(urls.length+' Bild(er) hochgeladen ✓ – „Galerie speichern" nicht vergessen.')});
+  inp.value='';
+}
+function galFromPool(){
+  openMediaPicker(function(urls){
+    (urls||[]).forEach(function(u){if(GAL_IMAGES.indexOf(u)<0)GAL_IMAGES.push(u)});
+    renderGalGrid();
+  },true);
+}
+
+/* ===== Instagram-Galerie ===== */
+function renderInstagram(){
+  var ig=S.instagram||{};
+  var tokEl=document.getElementById('igTokState');if(!tokEl)return;
+  tokEl.textContent=ig.token?'– Token ist gesetzt':'– noch kein Token gesetzt';
+  document.getElementById('igToken').value='';
+  document.getElementById('igEnabled').checked=!!ig.enabled;
+  document.getElementById('igMax').value=ig.max||12;
+  renderIgPreview();
+}
+function renderIgPreview(){
+  var el=document.getElementById('igPreview');if(!el)return;
+  var feed=CACHE.content.instagram_feed;
+  var imgs=Array.isArray(feed)?feed:((feed&&(feed.images||feed.items))||[]);
+  imgs=imgs.map(function(x){return typeof x==='string'?x:(x&&(x.url||x.image))}).filter(Boolean);
+  el.innerHTML=imgs.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px">'+
+    imgs.map(function(u){return '<img src="'+esc(u)+'" loading="lazy" style="width:100%;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--bdr)">'}).join('')+'</div>'
+    :'<span class="mut">Noch keine synchronisierten Bilder – Token speichern und „Jetzt synchronisieren" klicken.</span>';
+}
+function saveInstagram(){
+  var old=S.instagram||{};
+  var val={token:v('igToken')||old.token||'',enabled:document.getElementById('igEnabled').checked,max:Number(v('igMax'))||12};
+  api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'instagram',value:val}})
+    .then(function(){S.instagram=val;renderInstagram();toast('Instagram-Einstellungen gespeichert ✓')})
+    .catch(function(e){toast(e.message,1)});
+}
+function igSync(){
+  toast('Synchronisiere mit Instagram …');
+  fetch('api.php/instagram/sync',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){return r.json().catch(function(){throw new Error('Sync fehlgeschlagen ('+r.status+')')})})
+    .then(function(j){
+      if(j&&j.ok){
+        toast((j.count||0)+' Bilder synchronisiert ✓');
+        return api('site_content?key=eq.instagram_feed').then(function(r){
+          if(r&&r[0])CACHE.content.instagram_feed=r[0].value;
+          renderIgPreview();
+        });
+      }
+      throw new Error((j&&j.error)||'Sync fehlgeschlagen');
+    }).catch(function(e){toast(e.message,1)});
+}
+
+/* ===== Text-Editor („Groß bearbeiten") mit Mini-Markdown ===== */
+var ED_TARGET=null;
+function edBtn(id){
+  return '<div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor(\''+id+'\')">'+
+  '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>';
+}
+function openTextEditor(id){
+  var src=document.getElementById(id);if(!src)return;
+  ED_TARGET=id;
+  openOvl2('Text bearbeiten',
+    '<div style="display:flex;gap:6px;margin-bottom:8px">'+
+    '<button class="btn g sm" style="font-weight:700" title="Auswahl fett" onclick="edWrap(\'**\',\'**\')">B</button>'+
+    '<button class="btn g sm" style="font-style:italic" title="Auswahl kursiv" onclick="edWrap(\'*\',\'*\')">I</button>'+
+    '<button class="btn g sm" title="Auswahl verlinken" onclick="edLink()">Link</button></div>'+
+    '<textarea id="edArea" style="min-height:320px"></textarea>'+
+    '<div class="mut sml" style="margin-top:6px">**fett**, *kursiv*, [Text](https://…) – wird auf der Homepage formatiert angezeigt.</div>'+
+    '<div style="margin-top:12px"><button class="btn" onclick="edApply()">Übernehmen</button> <button class="btn g" onclick="closeOvl2()">Abbrechen</button></div>');
+  document.getElementById('edArea').value=src.value;
+}
+function edWrap(pre,post){
+  var t=document.getElementById('edArea');if(!t)return;
+  var s=t.selectionStart,e=t.selectionEnd;
+  var sel=t.value.slice(s,e)||'Text';
+  t.value=t.value.slice(0,s)+pre+sel+post+t.value.slice(e);
+  t.focus();
+  t.setSelectionRange(s+pre.length,s+pre.length+sel.length);
+}
+function edLink(){
+  var t=document.getElementById('edArea');if(!t)return;
+  var s=t.selectionStart,e=t.selectionEnd;
+  var url=prompt('Link-Adresse (https://…):','https://');
+  if(!url)return;
+  var sel=t.value.slice(s,e)||'Linktext';
+  var rep='['+sel+']('+url.trim()+')';
+  t.value=t.value.slice(0,s)+rep+t.value.slice(e);
+  t.focus();
+  t.setSelectionRange(s+1,s+1+sel.length);
+}
+function edApply(){
+  var src=document.getElementById(ED_TARGET);
+  if(src)src.value=document.getElementById('edArea').value;
+  closeOvl2();
+  toast('Übernommen – „Speichern" nicht vergessen.');
+}
+
+/* ===== Bereiche der Startseite (site_content sections {hidden:[…]}) ===== */
+var HOME_SECTIONS=[['ueber','Über mich'],['leistungen','Leistungen'],['ablauf','Ablauf'],['galerie','Galerie'],
+  ['bewertungen','Bewertungen'],['garantie','Garantie'],['technik','Technik-Teaser'],['locations','Locations'],
+  ['freunde','Freunde'],['faq','FAQ']];
+function renderSectionsCard(){
+  var el=document.getElementById('secList');if(!el)return;
+  var hidden=((CACHE.content.sections||{}).hidden)||[];
+  el.innerHTML=HOME_SECTIONS.map(function(s){
+    var on=hidden.indexOf(s[0])<0;
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+
+    '<span>'+s[1]+'</span><span class="b '+(on?'green':'grey')+'" style="cursor:pointer" title="Klicken zum Ein-/Ausschalten" onclick="toggleSection(\''+s[0]+'\')">'+(on?'an':'aus')+'</span></div>';
+  }).join('');
+}
+function toggleSection(id){
+  var hidden=(((CACHE.content.sections||{}).hidden)||[]).slice();
+  var ix=hidden.indexOf(id);
+  if(ix>=0)hidden.splice(ix,1);else hidden.push(id);
+  CACHE.content.sections={hidden:hidden};
+  renderSectionsCard();
+  upsertContent('sections',{hidden:hidden});
+}
+
+/* ===== Versionen: site_content = die EINE Live-Fassung, content_versions = Entwürfe/Archiv ===== */
+var VB_KEYS={hero:'Hero',about:'Über mich',guarantee:'Garantie',loc_section:'Location-Einleitung',gallery:'Galerie',seo:'SEO',legal:'Rechtstexte'};
+function loadVersions(){
+  api('content_versions?select=*&order=created_at.desc')
+    .then(function(r){CACHE.versions=r||[];renderVersionBars(false)})
+    .catch(function(){CACHE.versions=[];renderVersionBars(true)});
+}
+function renderVersionBars(unavailable){
+  Object.keys(VB_KEYS).forEach(function(key){
+    var el=document.getElementById('vb_'+key);if(!el)return;
+    var vs=(CACHE.versions||[]).filter(function(x){return x.key===key});
+    el.innerHTML='<div style="border-top:1px dashed var(--bdr);margin-top:14px;padding-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" class="sml">'+
+      '<button class="btn g sm" onclick="saveVersion(\''+key+'\')">Als Version sichern</button>'+
+      (vs.length?('<select id="vsel_'+key+'" style="width:auto;max-width:280px;padding:5px 8px;font-size:11px">'+
+        vs.map(function(x){return '<option value="'+esc(String(x.id))+'">'+esc(x.label||'ohne Namen')+' · '+dtt(x.created_at)+'</option>'}).join('')+'</select>'+
+        '<button class="btn g sm" onclick="loadVersion(\''+key+'\')">In Formular laden</button>'+
+        '<button class="btn g sm" onclick="delVersion(\''+key+'\')">Löschen</button>')
+        :'<span class="mut sml">'+(unavailable?'Versionen sind gleich verfügbar – das Server-Update läuft noch.':'Noch keine Versionen. „Als Version sichern" legt einen Entwurf an – live geht weiterhin nur „Speichern".')+'</span>')+
+      '</div>';
+  });
+}
+function saveVersion(key){
+  var label=prompt('Name für diese Version (z. B. „Sommer-Text"):');
+  if(!label)return;
+  var val=buildContentVal(key);
+  api('content_versions',{method:'POST',body:{key:key,label:label.trim(),value:val,created_at:new Date().toISOString()}})
+    .then(function(){return api('content_versions?select=*&order=created_at.desc')})
+    .then(function(r){
+      CACHE.versions=r||[];
+      var extra=CACHE.versions.filter(function(x){return x.key===key}).slice(5);
+      if(!extra.length)return null;
+      return Promise.all(extra.map(function(x){return api('content_versions?id=eq.'+x.id,{method:'DELETE'})}))
+        .then(function(){CACHE.versions=CACHE.versions.filter(function(x){return extra.indexOf(x)<0})});
+    })
+    .then(function(){renderVersionBars(false);toast('Version gesichert ✓ – die Live-Fassung bleibt unverändert.')})
+    .catch(function(e){toast('Version konnte nicht gesichert werden: '+e.message,1)});
+}
+function loadVersion(key){
+  var sel=document.getElementById('vsel_'+key);if(!sel||!sel.value)return;
+  var x=(CACHE.versions||[]).find(function(y){return String(y.id)===sel.value});
+  if(!x)return;
+  fillContent(key,x.value||{});
+  toast('Version geladen – noch nicht live. „Speichern" macht sie live.');
+}
+function delVersion(key){
+  var sel=document.getElementById('vsel_'+key);if(!sel||!sel.value)return;
+  if(!confirm('Diese Version löschen?'))return;
+  api('content_versions?id=eq.'+sel.value,{method:'DELETE'})
+    .then(function(){
+      CACHE.versions=(CACHE.versions||[]).filter(function(x){return String(x.id)!==sel.value});
+      renderVersionBars(false);toast('Version gelöscht ✓');
+    }).catch(function(e){toast(e.message,1)});
+}
+/* Füllt NUR die Formularfelder eines Keys (Sandbox – speichert nichts) */
+function fillContent(key,val){
+  val=val||{};
+  function set(id,x){var el=document.getElementById(id);if(el)el.value=x==null?'':x}
+  if(key==='hero'){
+    set('cHeroSub',val.subtitle);set('cHeroText',val.text);set('cHeroCta',val.cta);set('cHeroImg',val.image);
+    document.getElementById('cHeroFocalWrap').innerHTML=focalWidget(val.image,val.image_focal,'cHeroFocal','21/9');
+  }
+  if(key==='about'){
+    set('cAboutTitle',val.title);set('cAboutText',val.text);set('cAboutImg',val.image);
+    set('cAboutGear',(val.gear||[]).join(', '));
+    document.getElementById('cAboutFocalWrap').innerHTML=focalWidget(val.image,val.image_focal,'cAboutFocal','4/5');
+  }
+  if(key==='guarantee'){set('cGTitle',val.title);set('cGText',val.text)}
+  if(key==='loc_section'){
+    set('cLocTitle',val.title);set('cLocText',val.text);set('cLocMax',Number(val.max_count)||0);
+    document.getElementById('cLocRotate').checked=!!val.rotate;
+  }
+  if(key==='gallery'){set('cGalTitle',val.title);GAL_IMAGES=(val.images||[]).slice();renderGalGrid()}
+  if(key==='seo'){set('cSeoTitle',val.title);set('cSeoDesc',val.description)}
+  if(key==='legal'){set('cLegImp',val.impressum);set('cLegDs',val.datenschutz);set('cLegAgb',val.agb)}
+}
 
 /* ===== Inhalte/Einstellungen: Karten zuklappbar machen (Standard: zu) ===== */
 document.querySelectorAll('#pg-cms .card, #pg-set .card').forEach(function(card){
