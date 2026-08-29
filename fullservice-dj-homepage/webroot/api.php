@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 41;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 42;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -41,7 +41,7 @@ const BOOL_COLS = [
   'workshop_events' => ['public'],
   'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
   'bookings' => ['review_requested','open_ended'],
-  'equipment' => ['public','rentable','own_rig'],
+  'equipment' => ['public','rentable','own_rig','on_request'],
   'equipment_sets' => ['public'],
   'booking_equipment' => ['out_done','back_done'],
   'communications' => ['followup_done'],
@@ -300,6 +300,13 @@ function upgrade(PDO $p): void {
     "create table if not exists content_versions (id text primary key, key text not null,
       label text, value text not null default '{}', created_at text)",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
+  if ($v < 42) {
+    /* „Lokvogel"-Konzept wird zu „auf Anfrage verfügbar": solche Artikel dürfen in den Tourcase,
+       die Bestätigung erfolgt manuell - sie werden nicht durch die Verfügbarkeitsprüfung geblockt.
+       own_rig bleibt als interne Altdaten erhalten, wird aber nicht mehr für Anzeige/Logik genutzt. */
+    try { $p->exec("alter table equipment add column on_request integer default 0"); } catch (PDOException $e) { /* Spalte existiert bereits */ }
+    try { $p->exec("update equipment set on_request = 1 where own_rig = 1"); } catch (PDOException $e) {}
+  }
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -657,7 +664,7 @@ create table equipment (id text primary key, sort integer default 0, name text n
   qty_total integer default 1, rentable integer default 1, public integer default 1,
   status text default 'aktiv', notes text, partner_rate real, addon_id text,
   thomann_url text, own_rig integer default 0, day_rate_suggested real,
-  invoice_file text, invoice_name text, created_at text);
+  invoice_file text, invoice_name text, on_request integer default 0, created_at text);
 create table equipment_sets (id text primary key, sort integer default 0,
   name text not null, description text, image_url text, image_focal text default '50% 50%',
   discount_pct real default 5, fixed_price real, public integer default 1, created_at text);
@@ -1152,7 +1159,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       if (!$auth && $t === 'equipment') {
         $pubCols = ['id','sort','name','slug','category','description','image_url','image_focal',
           'day_rate','followup_pct','tier_week_pct','tier_2week_pct','tier_month_pct',
-          'qty_total','rentable','public','status','addon_id'];
+          'qty_total','rentable','public','status','addon_id','on_request'];
         foreach ($rows as &$r) $r = array_intersect_key($r, array_flip($pubCols));
         unset($r);
       }
@@ -1308,10 +1315,14 @@ function rentalPrice(float $rate, int $days, float $followupPct, float $weekPct,
 }
 /* Verfügbarkeit eines Artikels im Zeitraum (gegen alle nicht stornierten Buchungen). null = Artikel nicht gefunden/nicht mietbar. */
 function equipmentAvailability(PDO $p, string $eq, string $from, string $to): ?array {
-  $st = $p->prepare("select qty_total from equipment where id=? and public=1 and status='aktiv'");
+  $st = $p->prepare("select qty_total, on_request from equipment where id=? and public=1 and status='aktiv'");
   $st->execute([$eq]);
-  $total = $st->fetchColumn();
-  if ($total === false) return null;
+  $row = $st->fetch();
+  if (!$row) return null;
+  $total = (int)$row['qty_total'];
+  $onRequest = (int)$row['on_request'] === 1;
+  /* Anfrage-Artikel sind immer anfragbar (manuelle Bestätigung) - nicht als belegt melden. */
+  if ($onRequest) return ['total' => $total, 'available' => $total, 'on_request' => true];
   $st = $p->prepare("select coalesce(sum(be.qty),0) from booking_equipment be
     join bookings b on b.id = be.booking_id
     where be.equipment_id = ? and b.status != 'storniert'
@@ -1319,7 +1330,7 @@ function equipmentAvailability(PDO $p, string $eq, string $from, string $to): ?a
       and (b.open_ended = 1 or coalesce(b.end_date, b.event_date) >= ?)");
   $st->execute([$eq, $to, $from]);
   $used = (int)$st->fetchColumn();
-  return ['total' => (int)$total, 'available' => max(0, (int)$total - $used)];
+  return ['total' => $total, 'available' => max(0, $total - $used), 'on_request' => false];
 }
 function rentalTierDefaults(PDO $p): array {
   $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
@@ -2072,7 +2083,8 @@ function handlePortal(string $path, string $method, $body): never {
         foreach ($comps as $c) {
           $compQty = (int)$c['set_qty'] * $qty;
           $av = equipmentAvailability($p, $c['id'], $from, $to);
-          if ($av === null || $av['available'] < $compQty) fail('„' . $c['name'] . '" (Teil des Sets „' . $set['name'] . '") ist im gewünschten Zeitraum nicht in ausreichender Stückzahl verfügbar.', 409);
+          /* Anfrage-Artikel passieren die Schranke - Bestätigung erfolgt manuell. */
+          if ($av === null || (empty($av['on_request']) && $av['available'] < $compQty)) fail('„' . $c['name'] . '" (Teil des Sets „' . $set['name'] . '") ist im gewünschten Zeitraum nicht in ausreichender Stückzahl verfügbar.', 409);
           $rate = $isPartner ? (float)($c['partner_rate'] ?? ((float)$c['day_rate'] * (1 - $partnerPct / 100))) : (float)$c['day_rate'];
           $rawSum += $rate * $compQty;
           $compRates[] = ['equipment_id' => $c['id'], 'name' => $c['name'], 'qty' => $compQty, 'rate' => $rate];
@@ -2095,7 +2107,8 @@ function handlePortal(string $path, string $method, $body): never {
       $eq = $st->fetch();
       if (!$eq) fail('Ein Artikel im Warenkorb ist nicht mehr verfügbar.', 404);
       $av = equipmentAvailability($p, $eqId, $from, $to);
-      if ($av === null || $av['available'] < $qty) fail('„' . $eq['name'] . '" ist im gewünschten Zeitraum nicht in ausreichender Stückzahl verfügbar.', 409);
+      /* Anfrage-Artikel passieren die Schranke - Bestätigung erfolgt manuell. */
+      if ($av === null || (empty($av['on_request']) && $av['available'] < $qty)) fail('„' . $eq['name'] . '" ist im gewünschten Zeitraum nicht in ausreichender Stückzahl verfügbar.', 409);
       $rate = $isPartner ? (float)($eq['partner_rate'] ?? ((float)$eq['day_rate'] * (1 - $partnerPct / 100))) : (float)$eq['day_rate'];
       $price = rentalPrice($rate, $days, (float)($eq['followup_pct'] ?? 50),
         (float)($eq['tier_week_pct'] ?? $tiers['week']), (float)($eq['tier_2week_pct'] ?? $tiers['twoweek']), (float)($eq['tier_month_pct'] ?? $tiers['month'])
