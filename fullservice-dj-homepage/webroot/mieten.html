@@ -66,6 +66,14 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86
 .rent{background:var(--card);border:1px solid var(--line);border-radius:5px;overflow:hidden;transition:border-color .25s}
 .rent:hover{border-color:rgba(60,200,180,.5)}
 .rent .ri{aspect-ratio:4/3;background:var(--bg) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--mut2)}
+/* Set-Hauptbild ohne eigenes Foto: automatische Collage aus den Hauptbildern der enthaltenen Artikel */
+.rent .ri.set-collage{display:grid;gap:1px;background:var(--line);grid-auto-rows:1fr;align-items:stretch;justify-content:stretch}
+.rent .ri.set-collage>div{background:var(--bg) center/cover no-repeat;min-height:0;min-width:0}
+.rent .ri.set-collage.n1{grid-template-columns:1fr}
+.rent .ri.set-collage.n2{grid-template-columns:1fr 1fr}
+.rent .ri.set-collage.n3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.rent .ri.set-collage.n3>div:first-child{grid-row:span 2}
+.rent .ri.set-collage.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 .rent .ri svg{width:38px;height:38px;stroke-width:1.6}
 .rent .rb{padding:18px 20px}
 .rent h4{font-size:16px;font-weight:700;margin-bottom:4px}
@@ -572,19 +580,36 @@ function setDayRate(s){
   var raw=setRawSum(s);
   return s.fixed_price!=null?Number(s.fixed_price):raw*(1-(Number(s.discount_pct)||0)/100);
 }
+/* Hauptbilder der enthaltenen Artikel (eindeutig, in Set-Reihenfolge) - Grundlage für die
+   automatische Collage, wenn das Set kein eigenes Foto hat. */
+function setItemImages(s){
+  var imgs=[];
+  SET_ITEMS.filter(function(x){return x.set_id===s.id}).forEach(function(x){
+    var e=EQ_ALL[x.equipment_id];
+    if(e&&e.image_url&&imgs.indexOf(e.image_url)<0)imgs.push(e.image_url);
+  });
+  return imgs;
+}
+function setImageArea(s){
+  if(s.image_url)
+    return '<div class="ri" style="background-image:url(\''+esc(s.image_url)+'\');background-position:'+esc(s.image_focal||'50% 50%')+'"></div>';
+  var imgs=setItemImages(s).slice(0,4);
+  if(!imgs.length)return '<div class="ri">'+catIcon('')+'</div>';
+  return '<div class="ri set-collage n'+imgs.length+'">'+imgs.map(function(u){
+    return '<div style="background-image:url(\''+esc(u)+'\')"></div>';
+  }).join('')+'</div>';
+}
 function renderSets(){
   var box=document.getElementById('setSection');
   if(!SETS.length){box.style.display='none';return}
   box.style.display='block';
   document.getElementById('setGrid').innerHTML=SETS.map(function(s){
-    var img=s.image_url?' style="background-image:url(\''+esc(s.image_url)+'\');background-position:'+esc(s.image_focal||'50% 50%')+'"':'';
-    var icon=s.image_url?'':catIcon('');
     var items=SET_ITEMS.filter(function(x){return x.set_id===s.id});
     var contains=items.map(function(x){var e=EQ_ALL[x.equipment_id];return (x.qty>1?x.qty+'× ':'')+(e?e.name:'?')}).join(', ');
     var rate=setDayRate(s);
     var price=rate?euro(rate)+' <small>/ Miettag</small>':'Preis auf Anfrage';
     var inCart=CART.some(function(c){return c.type==='set'&&c.set_id===s.id});
-    return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
+    return '<div class="rent reveal vis">'+setImageArea(s)+'<div class="rb">'+
       '<div class="rc">SET</div>'+
       '<h4>'+esc(s.name)+'</h4><p>'+esc(s.description||'')+'</p>'+
       (contains?'<div class="addon">Enthält: '+esc(contains)+'</div>':'')+

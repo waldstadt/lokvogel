@@ -2570,7 +2570,8 @@ function openSetModal(id){
     '<div><label>oder Festpreis €/Tag (überschreibt den Rabatt)</label><input type="number" step="0.01" id="sFixed" value="'+(s.fixed_price!=null?s.fixed_price:'')+'"></div></div>'+
     '<label style="margin-top:10px">Enthaltene Artikel</label><div id="sItemRows"></div>'+
     '<button class="btn g sm" style="margin-top:6px" onclick="addSetItemRow()">+ Artikel</button>'+
-    '<label style="margin-top:14px">Foto</label><div style="display:flex;gap:8px"><input id="sImg" value="'+esc(s.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upSet" onchange="uploadImg(this,\'sImg\',\'sFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upSet\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'sImg\',\'sFocal\')">Aus Pool</button></div>'+
+    '<label style="margin-top:14px">Foto <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional – ohne eigenes Foto zeigt die Homepage automatisch eine Collage aus den Hauptbildern der enthaltenen Artikel)</span></label>'+
+    '<div style="display:flex;gap:8px"><input id="sImg" value="'+esc(s.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upSet" onchange="uploadImg(this,\'sImg\',\'sFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upSet\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'sImg\',\'sFocal\')">Aus Pool</button></div>'+
     focalWidget(s.image_url,s.image_focal,'sFocal','4/3')+
     '<label style="margin-top:12px"><input type="checkbox" id="sPub" style="width:auto;margin-right:6px" '+(s.public!==false?'checked':'')+'>Auf Homepage anzeigen (buchbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveSet(\''+(id||'')+'\')">Speichern</button>'+
