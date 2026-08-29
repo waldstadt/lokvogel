@@ -2482,15 +2482,20 @@ function openEqModal(id){
         '<div><label>% ab 2 Wochen</label><input type="number" id="eTier2Week" placeholder="'+g2+'" value="'+(e.tier_2week_pct!=null?e.tier_2week_pct:'')+'"></div>'+
         '<div><label>% ab 1 Monat</label><input type="number" id="eTierMonth" placeholder="'+gm+'" value="'+(e.tier_month_pct!=null?e.tier_month_pct:'')+'"></div></div>';
     })()+
-    '<label>Bild</label><div style="display:flex;gap:8px"><input id="eImg" value="'+esc(e.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upEq" onchange="uploadImg(this,\'eImg\',\'eFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'eImg\',\'eFocal\')">Aus Pool</button></div>'+
-    focalWidget(e.image_url,e.image_focal,'eFocal','4/3')+
+    '<label>Bilder</label>'+
+    '<div class="mut sml" style="margin-bottom:6px;text-transform:none;letter-spacing:0">Das erste Bild ist das Hauptbild – es steht in der Übersicht und als großes Foto oben. Reihenfolge per Ziehen ändern.</div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:8px"><input type="file" accept="image/*" multiple style="display:none" id="upEq" onchange="eqUpload(this)"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">Bilder hochladen</button><button class="btn g sm" onclick="eqFromPool()">Aus Pool wählen</button></div>'+
+    '<div id="eqImgGrid"></div>'+
+    '<div id="eqFocalWrap"></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="ePub" style="width:auto;margin-right:6px" '+(e.public!==false?'checked':'')+'>Auf Homepage anzeigen (mietbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveEq(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delEq(\''+id+'\')">Löschen</button>':'')+'</div>');
+  EQ_IMAGES=eqImagesOf(e);EQ_FOCAL=e.image_focal||'50% 50%';renderEqImgGrid();renderEqFocal();
   if(e.status)document.getElementById('eStatus').value=e.status;
 }
 function saveEq(id){
   if(!v('eName')){toast('Name fehlt.',1);return}
+  var eqImgs=EQ_IMAGES.filter(function(u){return u&&String(u).trim()});
   var addonIds=[];
   for(var ai=0;ai<5;ai++){var s=document.getElementById('eAddon'+ai);var val=s&&s.value;if(val&&addonIds.indexOf(val)===-1)addonIds.push(val)}
   var body={name:v('eName'),category:v('eCat'),sku:v('eSku')||null,description:v('eDesc'),day_rate:Number(v('eRate'))||0,
@@ -2502,7 +2507,7 @@ function saveEq(id){
     tier_2week_pct:v('eTier2Week')!==''?Number(v('eTier2Week')):null,
     tier_month_pct:v('eTierMonth')!==''?Number(v('eTierMonth')):null,
     qty_total:Number(v('eQty'))||1,status:v('eStatus'),
-    image_url:v('eImg'),image_focal:v('eFocal'),public:document.getElementById('ePub').checked,rentable:document.getElementById('ePub').checked,
+    images:eqImgs,image_url:eqImgs[0]||'',image_focal:v('eFocal'),public:document.getElementById('ePub').checked,rentable:document.getElementById('ePub').checked,
     slug:v('eName').toLowerCase().replace(/[^a-z0-9äöüß]+/g,'-').replace(/^-|-$/g,'')};
   (id?api('equipment?id=eq.'+id,{method:'PATCH',body:body}):api('equipment',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');
@@ -2753,6 +2758,57 @@ function setFocal(ev,focalId){
   var m=document.getElementById(focalId+'-marker');
   m.style.left=x+'%';m.style.top=y+'%';
 }
+/* ===== Equipment-Bilder: mehrere Fotos je Artikel, erstes = Hauptbild ===== */
+var EQ_IMAGES=[],EQ_FOCAL='50% 50%',eqDragIdx=null;
+/* Bildliste eines Artikels normalisieren: images-Array (ggf. als JSON-String) hat Vorrang,
+   sonst Fallback auf das einzelne image_url (Abwärtskompatibilität für Bestandsartikel). */
+function eqImagesOf(e){
+  var im=e&&e.images;
+  if(typeof im==='string'){try{im=JSON.parse(im)}catch(_){im=null}}
+  if(Array.isArray(im)){im=im.filter(Boolean);if(im.length)return im.slice()}
+  return e&&e.image_url?[e.image_url]:[];
+}
+function renderEqImgGrid(){
+  var el=document.getElementById('eqImgGrid');if(!el)return;
+  el.innerHTML=EQ_IMAGES.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">'+
+    EQ_IMAGES.map(function(u,i){
+      return '<div draggable="true" ondragstart="eqDragStart('+i+',event)" ondragover="eqDragOver(event)" ondrop="eqDrop('+i+',event)" style="position:relative;cursor:grab">'+
+      '<img src="'+esc(u)+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:'+(i===0?'2px solid var(--acc)':'1px solid var(--bdr)')+'">'+
+      (i===0?'<span style="position:absolute;top:4px;left:4px;background:var(--acc);color:#141414;font-size:10px;padding:1px 6px;border-radius:4px">Hauptbild</span>':'')+
+      '<a onclick="eqImgRemove('+i+')" title="Bild entfernen" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.65);color:var(--wh);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:0;width:12px;height:12px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></a>'+
+      '<div class="mut" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(u)+'">'+esc(u.split('/').pop())+'</div></div>';
+    }).join('')+'</div>'
+    :'<span class="mut">Noch keine Bilder – über „Bilder hochladen" oder „Aus Pool wählen" hinzufügen. Das erste Bild wird das Hauptbild.</span>';
+}
+/* Fokuspunkt gilt für das Hauptbild (= erstes Bild). Vor dem Neuzeichnen den aktuellen
+   Wert aus dem versteckten Input retten, damit Umsortieren/Entfernen ihn nicht verwirft. */
+function renderEqFocal(){
+  var wrap=document.getElementById('eqFocalWrap');if(!wrap)return;
+  var cur=document.getElementById('eFocal');if(cur)EQ_FOCAL=cur.value;
+  wrap.innerHTML=focalWidget(EQ_IMAGES[0]||'',EQ_FOCAL,'eFocal','4/3');
+}
+function eqImgRemove(i){EQ_IMAGES.splice(i,1);renderEqImgGrid();renderEqFocal()}
+function eqDragStart(i,ev){eqDragIdx=i;ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',String(i))}catch(e){}}
+function eqDragOver(ev){if(eqDragIdx!==null)ev.preventDefault()}
+function eqDrop(i,ev){
+  ev.preventDefault();
+  if(eqDragIdx===null||eqDragIdx===i){eqDragIdx=null;return}
+  var m=EQ_IMAGES.splice(eqDragIdx,1)[0];
+  EQ_IMAGES.splice(i,0,m);
+  eqDragIdx=null;renderEqImgGrid();renderEqFocal();
+}
+function eqUpload(inp){
+  uploadFilesSeq(inp.files,function(url){EQ_IMAGES.push(url);renderEqImgGrid();renderEqFocal()},
+    function(urls){toast(urls.length+' Bild(er) hochgeladen ✓ – „Speichern" nicht vergessen.')});
+  inp.value='';
+}
+function eqFromPool(){
+  openMediaPicker(function(urls){
+    (urls||[]).forEach(function(u){if(EQ_IMAGES.indexOf(u)<0)EQ_IMAGES.push(u)});
+    renderEqImgGrid();renderEqFocal();
+  },true);
+}
+
 /* Schnell-Schalter: Klick aufs live/aus-Badge toggelt public sofort per PATCH */
 var DD_LISTS={
   packages:{tbl:'packages',cache:'packages',render:function(){renderPackAdmin()}},
