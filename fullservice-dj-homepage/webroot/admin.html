@@ -844,7 +844,11 @@ function jsq(s){return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'
 function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
 function dt(d){if(!d)return '–';return new Date(d).toLocaleDateString('de-DE')}
 function dtt(d){if(!d)return '–';return new Date(d).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})}
-function custName(c){if(!c)return '–';return c.company?c.company+(c.last_name?' ('+(c.first_name||'')+' '+c.last_name+')':''):((c.first_name||'')+' '+(c.last_name||'')).trim()||c.email||'?'}
+function custName(c){
+  if(!c)return '–';
+  var base=c.company?c.company+(c.last_name?' ('+(c.first_name||'')+' '+c.last_name+')':''):((c.first_name||'')+' '+(c.last_name||'')).trim()||c.email||'?';
+  return base+(c.partner_name?' & '+c.partner_name:'');
+}
 
 function api(path,opts){
   opts=opts||{};
@@ -1263,7 +1267,7 @@ function saveComm(){
     api('communications?select=*&order=occurred_at.desc').then(function(r){CACHE.comms=r||[];renderComms();renderDash()})
   }).catch(function(e){toast(e.message,1)});
 }
-function openCustModal(c){
+function openCustModal(c,onCreated){
   c=c||{};
   openModal(c.id?'Kunde bearbeiten':'Neuer Kunde',
     '<div class="grid3"><div><label>Art</label><select id="kKind"><option value="privat">Privat</option><option value="firma">Firma</option></select></div>'+
@@ -1271,6 +1275,7 @@ function openCustModal(c){
     '<div><label>Quelle</label><input id="kSource" value="'+esc(c.source||'')+'"></div></div>'+
     '<div class="grid2"><div><label>Vorname</label><input id="kFirst" value="'+esc(c.first_name||'')+'"></div><div><label>Nachname</label><input id="kLast" value="'+esc(c.last_name||'')+'"></div></div>'+
     '<label>Firma</label><input id="kComp" value="'+esc(c.company||'')+'">'+
+    '<label>Partner <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional – z. B. bei Hochzeiten Braut/Bräutigam)</span></label><input id="kPartner" value="'+esc(c.partner_name||'')+'">'+
     '<div class="grid3"><div><label>E-Mail</label><input id="kMail" value="'+esc(c.email||'')+'"></div><div><label>Telefon</label><input id="kPhone" value="'+esc(c.phone||'')+'"></div><div><label>WhatsApp</label><input id="kWa" value="'+esc(c.whatsapp||'')+'"></div></div>'+
     '<div class="grid3"><div><label>Straße</label><input id="kStreet" value="'+esc(c.street||'')+'"></div><div><label>PLZ</label><input id="kZip" value="'+esc(c.zip||'')+'"></div><div><label>Ort</label><input id="kCity" value="'+esc(c.city||'')+'"></div></div>'+
     '<label>Tags (Komma-getrennt)</label><input id="kTags" value="'+esc((c.tags||[]).join(', '))+'">'+
@@ -1279,13 +1284,23 @@ function openCustModal(c){
     (c.id?' <button class="btn r" onclick="delCust(\''+c.id+'\')">Löschen</button>':'')+'</div>');
   if(c.kind)document.getElementById('kKind').value=c.kind;
   if(c.status)document.getElementById('kStatus').value=c.status;
+  CUST_MODAL_ONCREATED=onCreated||null;
 }
+var CUST_MODAL_ONCREATED=null;
 function saveCust(id){
   var body={kind:v('kKind'),status:v('kStatus'),source:v('kSource'),first_name:v('kFirst'),last_name:v('kLast'),
-    company:v('kComp'),email:v('kMail'),phone:v('kPhone'),whatsapp:v('kWa'),street:v('kStreet'),zip:v('kZip'),
+    company:v('kComp'),partner_name:v('kPartner'),email:v('kMail'),phone:v('kPhone'),whatsapp:v('kWa'),street:v('kStreet'),zip:v('kZip'),
     city:v('kCity'),notes:v('kNotes'),tags:v('kTags').split(',').map(function(t){return t.trim()}).filter(Boolean)};
-  (id?api('customers?id=eq.'+id,{method:'PATCH',body:body}):api('customers',{method:'POST',body:body}))
-    .then(function(){closeModal();toast('Gespeichert ✓');loadAll();if(id&&curCust)openCustDetail(id)})
+  var cb=CUST_MODAL_ONCREATED;CUST_MODAL_ONCREATED=null;
+  (id?api('customers?id=eq.'+id,{method:'PATCH',body:body}):api('customers',{method:'POST',prefer:'return=representation',body:body}))
+    .then(function(res){
+      closeModal();toast('Gespeichert ✓');
+      var newRow=!id&&res&&res[0]?res[0]:null;
+      if(newRow){CACHE.customers=CACHE.customers||[];CACHE.customers.push(newRow)}
+      loadAll();
+      if(id&&curCust)openCustDetail(id);
+      if(newRow&&cb)cb(newRow.id);
+    })
     .catch(function(e){toast(e.message,1)});
 }
 function delCust(id){
@@ -1640,7 +1655,7 @@ function nextNumber(type){
   }};
 }
 function openDocEditor(id,newType){
-  var custOpts='<option value="">– wählen –</option>'+CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custName(c))+'</option>'}).join('');
+  var custOpts='<option value="">– wählen –</option><option value="__new__">-- NEUER KUNDE --</option>'+CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custName(c))+'</option>'}).join('');
   document.getElementById('docCust').innerHTML=custOpts;
   refreshBookOpts();
   if(id){
@@ -1665,13 +1680,26 @@ function openDocEditor(id,newType){
     fillDocForm();showPage('doc');
   }
 }
+function docCustChanged(){
+  var sel=document.getElementById('docCust');
+  if(sel.value==='__new__'){
+    sel.value='';
+    openCustModal(null,function(newId){
+      document.getElementById('docCust').innerHTML+='<option value="'+newId+'">'+esc(custName(CACHE.customers.find(function(c){return c.id===newId})))+'</option>';
+      document.getElementById('docCust').value=newId;
+      refreshBookOpts();
+    });
+    return;
+  }
+  refreshBookOpts();
+}
 function refreshBookOpts(){
   var custId=document.getElementById('docCust').value;
   var books=CACHE.bookings.filter(function(b){return !custId||b.customer_id===custId});
   document.getElementById('docBook').innerHTML='<option value="">–</option>'+books.map(function(b){
     return '<option value="'+b.id+'">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Auftrag')+'</option>'}).join('');
 }
-document.getElementById('docCust').addEventListener('change',refreshBookOpts);
+document.getElementById('docCust').addEventListener('change',docCustChanged);
 document.getElementById('docType').addEventListener('change',function(){updateDocTypeUI(this.value)});
 function updateDocTypeUI(t){
   document.getElementById('docDepWrap').style.display=t==='schluss'?'':'none';

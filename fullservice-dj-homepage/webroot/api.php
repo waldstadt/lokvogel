@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 51;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 52;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -464,6 +464,9 @@ function upgrade(PDO $p): void {
   if ($v < 51) try {
     $p->exec("alter table partners add column discount_pct real");
   } catch (PDOException $e) {}
+  if ($v < 52) try {
+    $p->exec("alter table customers add column partner_name text");
+  } catch (PDOException $e) {}
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -868,7 +871,7 @@ create table inquiries (id text primary key, name text not null, email text, pho
 create table customers (id text primary key, kind text default 'privat', status text default 'lead',
   first_name text, last_name text, company text, email text, phone text, whatsapp text,
   street text, zip text, city text, source text, tags text default '[]', notes text, tech_check text,
-  portal_hash text, portal_invite text, portal_invite_expires integer,
+  partner_name text, portal_hash text, portal_invite text, portal_invite_expires integer,
   created_at text, updated_at text);
 create table communications (id text primary key,
   customer_id text not null references customers(id) on delete cascade,
