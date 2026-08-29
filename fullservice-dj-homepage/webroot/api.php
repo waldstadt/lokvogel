@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 39;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 40;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -50,7 +50,8 @@ const BOOL_COLS = [
 const TABLES = ['settings','site_content','packages','faq','equipment','locations','inquiries',
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
-  'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items'];
+  'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
+  'calendar_blocks'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -292,6 +293,8 @@ function upgrade(PDO $p): void {
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
   if ($v < 38) seedEquipmentCatalog($p);
   if ($v < 39) seedEquipmentCatalog($p);   // neue Artikel nachziehen (idempotent per SKU)
+  if ($v < 40) try { $p->exec("create table if not exists calendar_blocks (id text primary key,
+    title text not null, start_date text not null, end_date text, note text, created_at text)"); } catch (PDOException $e) {}
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -653,6 +656,8 @@ create table equipment (id text primary key, sort integer default 0, name text n
 create table equipment_sets (id text primary key, sort integer default 0,
   name text not null, description text, image_url text, image_focal text default '50% 50%',
   discount_pct real default 5, fixed_price real, public integer default 1, created_at text);
+create table calendar_blocks (id text primary key, title text not null,
+  start_date text not null, end_date text, note text, created_at text);
 create table equipment_set_items (id text primary key,
   set_id text not null references equipment_sets(id) on delete cascade,
   equipment_id text not null references equipment(id) on delete restrict, qty integer default 1);
@@ -1528,6 +1533,10 @@ function serveIcal(string $typ): never {
         $b['event_date'], $b['end_date'], $b['start_time'], $b['end_time'], $desc,
         trim(($b['venue_name'] ?? '') . ' ' . ($b['venue_address'] ?? '')), false);
     }
+    /* Private Blocker (Urlaub etc.) als Ganztagestermine mit in den Buchungs-Feed */
+    foreach ($p->query('select * from calendar_blocks')->fetchAll() as $bl)
+      $ev .= icsEvent('block-' . $bl['id'], 'Privat: ' . $bl['title'],
+        $bl['start_date'], $bl['end_date'], null, null, (string)($bl['note'] ?? ''), '', false);
   } else {   // technik
     $q = $p->query("select b.*, c.first_name, c.last_name, c.company, c.phone from bookings b
       join customers c on c.id = b.customer_id

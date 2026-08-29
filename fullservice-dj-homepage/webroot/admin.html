@@ -106,6 +106,14 @@ th.num{text-align:right}
 .cal .cdn{color:var(--gl);font-size:9px}
 .cal .ev{display:block;background:rgba(201,162,39,.15);border-left:2px solid var(--acc);padding:1px 4px;margin-top:3px;color:var(--wh);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
 .cal .ev.tech{border-left-color:var(--blu);background:rgba(85,136,221,.13)}
+.cal .ev.ws{border-left-color:var(--grn);background:rgba(90,160,90,.13)}
+.cal .ev.priv{border-left-color:#b08fd8;background:rgba(176,143,216,.14)}
+.cal-legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:10.5px;color:var(--gll)}
+.cal-legend i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px;border-left:3px solid}
+.cal-legend .l-dj i{border-color:var(--acc);background:rgba(201,162,39,.15)}
+.cal-legend .l-tech i{border-color:var(--blu);background:rgba(85,136,221,.13)}
+.cal-legend .l-ws i{border-color:var(--grn);background:rgba(90,160,90,.13)}
+.cal-legend .l-priv i{border-color:#b08fd8;background:rgba(176,143,216,.14)}
 
 /* Items-Editor */
 .it-row{display:grid;grid-template-columns:36px 1fr 70px 60px 90px 90px 28px;gap:6px;align-items:center;margin-bottom:6px}
@@ -229,8 +237,16 @@ th.num{text-align:right}
   <div class="pg" id="pg-book">
     <div class="phead"><div><div class="pt">Buchungen</div><div class="ps">Aufträge &amp; Kalender</div></div>
       <div><button class="btn g sm" onclick="calShift(-1)">‹</button> <span id="calTitle" style="font-weight:700;margin:0 6px"></span> <button class="btn g sm" onclick="calShift(1)">›</button>
+      &nbsp;<button class="btn g" onclick="openBlockModal()">+ Blocken</button>
       &nbsp;<button class="btn" onclick="openBookModal()">+ Neue Buchung</button></div></div>
-    <div class="card"><div class="cal" id="calGrid"></div></div>
+    <div class="card"><div class="cal" id="calGrid"></div>
+      <div class="cal-legend">
+        <span class="l-dj"><i></i>DJ-Auftrag</span>
+        <span class="l-tech"><i></i>Technik / Vermietung</span>
+        <span class="l-ws"><i></i>Workshop</span>
+        <span class="l-priv"><i></i>Privat / geblockt</span>
+      </div>
+    </div>
     <div class="tbl-wrap card"><table><thead><tr><th>Datum</th><th>Titel / Kunde</th><th>Art</th><th>Location</th><th class="num">Gage</th><th>Status</th></tr></thead><tbody id="bookRows"></tbody></table></div>
   </div>
 
@@ -694,7 +710,8 @@ function loadAll(){
     api('workshop_events?select=*&order=event_date'),
     api('workshop_signups?select=*&order=created_at.desc'),
     api('equipment_sets?select=*&order=sort'),
-    api('equipment_set_items?select=*')
+    api('equipment_set_items?select=*'),
+    api('calendar_blocks?select=*&order=start_date')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -704,7 +721,7 @@ function loadAll(){
     CACHE.docEvents=r[12]||[];CACHE.forms=r[13]||[];CACHE.formTpls=r[14]||[];CACHE.upsells=r[15]||[];
     CACHE.reviews=r[16]||[];CACHE.products=r[17]||[];CACHE.partners=r[18]||[];
     CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
-    CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];
+    CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];CACHE.blocks=r[23]||[];
     applyBrand();
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
@@ -1071,10 +1088,44 @@ function renderCal(){
       var end=b.end_date||b.event_date;
       return b.event_date<=ds&&end>=ds;
     });
+    var ws=(CACHE.wsEvents||[]).filter(function(w){return w.event_date===ds&&w.public!==false});
+    var bl=(CACHE.blocks||[]).filter(function(x){var end=x.end_date||x.start_date;return x.start_date<=ds&&end>=ds});
     html+='<div class="cd-c'+(ds===today?' today':'')+'"><div class="cdn">'+d+'</div>'+
-      evs.map(function(b){return '<span class="ev'+(b.kind==='technik'?' tech':'')+'" onclick="openBookDetail(\''+b.id+'\')">'+esc(b.title||b.event_type||'Auftrag')+'</span>'}).join('')+'</div>';
+      evs.map(function(b){return '<span class="ev'+(b.kind==='technik'?' tech':'')+'" onclick="openBookDetail(\''+b.id+'\')">'+esc(b.title||b.event_type||'Auftrag')+'</span>'}).join('')+
+      ws.map(function(w){return '<span class="ev ws" onclick="openWsModal(\''+w.id+'\')">'+esc(w.title||'Workshop')+'</span>'}).join('')+
+      bl.map(function(x){return '<span class="ev priv" onclick="openBlockModal(\''+x.id+'\')">'+esc(x.title)+'</span>'}).join('')+
+      '</div>';
   }
   document.getElementById('calGrid').innerHTML=html;
+}
+/* ===== Blocker: Tage/Zeitraeume ohne Kunde belegen (Urlaub, privat, ...) ===== */
+function openBlockModal(id){
+  var b=id?(CACHE.blocks||[]).find(function(x){return x.id===id}):{};b=b||{};
+  openModal(id?'Geblockten Zeitraum bearbeiten':'Zeitraum blocken',
+    '<p class="mut sml" style="margin-bottom:14px">Blockt Tage im Kalender ohne Kundenbezug – für Urlaub, private Termine oder alles, wo du einfach nicht verfügbar bist.</p>'+
+    '<label>Titel *</label><input id="blTitle" value="'+esc(b.title||'')+'" placeholder="z. B. Urlaub, Familienfeier, kein Bock">'+
+    '<div class="grid2"><div><label>Von *</label><input type="date" id="blFrom" value="'+(b.start_date||'')+'"></div>'+
+    '<div><label>Bis (leer = nur ein Tag)</label><input type="date" id="blTo" value="'+(b.end_date||'')+'"></div></div>'+
+    '<label>Notiz</label><input id="blNote" value="'+esc(b.note||'')+'">'+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveBlock(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delBlock(\''+id+'\')">Löschen</button>':'')+'</div>');
+}
+function saveBlock(id){
+  var t=v('blTitle'),from=v('blFrom');
+  if(!t||!from){toast('Titel und Von-Datum angeben.',1);return}
+  var to=v('blTo');
+  if(to&&to<from){toast('Bis-Datum liegt vor dem Von-Datum.',1);return}
+  var body={title:t,start_date:from,end_date:to||null,note:v('blNote')||null};
+  (id?api('calendar_blocks?id=eq.'+id,{method:'PATCH',body:body}):api('calendar_blocks',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Geblockt ✓');reloadBlocks()})
+    .catch(function(e){toast(e.message,1)});
+}
+function delBlock(id){
+  api('calendar_blocks?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();reloadBlocks()})
+    .catch(function(e){toast(e.message,1)});
+}
+function reloadBlocks(){
+  api('calendar_blocks?select=*&order=start_date').then(function(r){CACHE.blocks=r||[];renderCal()});
 }
 function openBookDetail(id){
   curBook=CACHE.bookings.find(function(b){return b.id===id});if(!curBook)return;
