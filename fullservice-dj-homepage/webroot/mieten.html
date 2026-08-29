@@ -82,7 +82,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86
 
 /* Am Wunschtermin belegt: sichtbar, aber ausgegraut - Badge bleibt in Volltonfarbe */
 .rent.unavail .ri{filter:grayscale(1);opacity:.45}
-.rent.unavail h4,.rent.unavail p,.rent.unavail .rc,.rent.unavail .rp,.rent.unavail .addon{opacity:.5}
+.rent.unavail h4,.rent.unavail .rc,.rent.unavail .rp,.rent.unavail .addon{opacity:.62}
+.rent.unavail p{opacity:.75}
+.avail.checking{font-size:12px;color:var(--mut);margin-top:10px}
 .badge-gone{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;font-weight:700;letter-spacing:.02em;background:#c0392b;color:#fff;padding:6px 11px;border-radius:3px}
 .badge-req{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:11.5px;font-weight:600;color:var(--acc2);background:rgba(60,200,180,.12);border:1px solid rgba(60,200,180,.35);padding:5px 10px;border-radius:3px}
 .badge-gone .ic,.badge-req .ic{width:14px;height:14px;vertical-align:-2px}
@@ -232,6 +234,8 @@ navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{
 
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+/* Sicher als JS-String-Literal in Inline-onclick="fn('…')" – siehe admin.html */
+function jsq(s){return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'))}
 var LEGAL={};
 
 /* Feather-Icons je Kategorie als Bild-Platzhalter, solange kein echtes Foto hinterlegt ist */
@@ -287,7 +291,7 @@ function renderCatChips(){
   EQ.forEach(function(e){if(e.category&&cats.indexOf(e.category)===-1)cats.push(e.category)});
   cats.sort();
   document.getElementById('catChips').innerHTML=['Alle'].concat(cats).map(function(c){
-    return '<span class="cat-chip'+(c===CUR_CAT?' active':'')+'" onclick="setCat(\''+esc(c)+'\')">'+(c!=='Alle'?catIcon(c):'')+esc(c)+'</span>';
+    return '<span class="cat-chip'+(c===CUR_CAT?' active':'')+'" onclick="setCat(\''+jsq(c)+'\')">'+(c!=='Alle'?catIcon(c):'')+esc(c)+'</span>';
   }).join('');
 }
 function setCat(c){CUR_CAT=c;renderCatChips();renderRent()}
@@ -300,8 +304,12 @@ function rentCard(e){
   var pp=partnerPrice(e);
   var price=priceLabel(e.day_rate,pp);
   var onReq=!!e.on_request;
+  var dateChosen=!!(document.getElementById('avFrom')&&document.getElementById('avFrom').value);
   /* Am Wunschtermin belegt: Zeitraum gewählt, Verfügbarkeit geladen, nichts frei und NICHT auf Anfrage */
   var gone=!onReq&&e.id&&AVAIL[e.id]!=null&&!(AVAIL[e.id].available>0);
+  /* Solange die Prüfung für diesen Artikel noch läuft, gilt er als „unklar" und ist nicht buchbar
+     (fail-safe statt fail-open) – kein belegter Artikel soll im Ladefenster buchbar sein. */
+  var pending=!onReq&&e.id&&dateChosen&&AV_LOADING&&AVAIL[e.id]==null;
   var inCart=e.id&&CART.some(function(c){return c.type!=='set'&&c.id===e.id});
   var av='',cartCtrl='';
   if(onReq){
@@ -309,6 +317,8 @@ function rentCard(e){
   } else if(gone){
     av='<div class="badge-gone">'+icGone()+'leider schon vermietet</div>';
     if(inCart)av+='<div class="cart-warn">Liegt im Tourcase, ist aber am Wunschtermin nicht verfügbar.</div>';
+  } else if(pending){
+    av='<div class="avail checking">Verfügbarkeit wird geprüft …</div>';
   } else if(e.id&&AVAIL[e.id]!=null){
     av='<div class="avail ok">✓ Im Zeitraum verfügbar ('+AVAIL[e.id].available+' von '+AVAIL[e.id].total+')</div>';
   }
@@ -317,8 +327,8 @@ function rentCard(e){
     var a=EQ_ALL[e.addon_id]||EQ.find(function(x){return x.id===e.addon_id});
     if(a)addon='<div class="addon">Passt dazu: <b>'+esc(a.name)+'</b> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag) – einfach mit anfragen.</div>';
   }
-  /* Belegte Artikel sind nicht buchbar - keine Mengen-/Buttonzeile */
-  if(e.id&&!gone){
+  /* Belegte und noch ungeprüfte Artikel sind nicht buchbar - keine Mengen-/Buttonzeile */
+  if(e.id&&!gone&&!pending){
     cartCtrl='<div style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
       '<input type="number" min="1" value="1" id="qty-'+e.id+'" style="margin:0;width:60px;padding:8px">'+
       '<button class="btn small'+(inCart?' ghost':'')+'" onclick="addToCart(\''+e.id+'\')">'+(inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>';
@@ -396,13 +406,15 @@ Promise.all([
   sfetch('equipment_set_items?select=*')
 ]).then(function(r){SETS=r[0]||[];SET_ITEMS=r[1]||[];renderSets()}).catch(function(){});
 
+var AV_LOADING=false;
 function checkAvail(){
   var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
   if(!from)return;
+  AVAIL={};AV_LOADING=true;renderRent();   // während der Prüfung sind Artikel „unklar" und nicht buchbar
   Promise.all(EQ.filter(function(e){return e.id}).map(function(e){
     return fetch(API+'/portal/availability?eq='+e.id+'&from='+from+'&to='+to)
       .then(function(r){return r.json()}).then(function(j){AVAIL[e.id]=j}).catch(function(){});
-  })).then(renderRent);
+  })).then(function(){AV_LOADING=false;renderRent()});
 }
 
 /* ---- Tourcase ---- */
@@ -430,6 +442,8 @@ function addToCart(id){
   if(!e.on_request&&AVAIL[id]!=null&&!(AVAIL[id].available>0)){
     toast('Am Wunschtermin leider nicht verfügbar.');return;
   }
+  /* Während die Verfügbarkeit noch geprüft wird, nicht buchen (fail-safe) */
+  if(!e.on_request&&AV_LOADING){toast('Einen Moment – die Verfügbarkeit wird noch geprüft.');return;}
   var qf=document.getElementById('qty-'+id);
   var qty=Math.max(1,Number(qf&&qf.value)||1);
   var existing=CART.find(function(c){return c.type!=='set'&&c.id===id});

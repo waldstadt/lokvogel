@@ -1122,6 +1122,10 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
     } elseif ($method === 'POST' && $t === 'inquiries') {
       $row = array_intersect_key(is_array($body) ? $body : [], array_flip(INQUIRY_FIELDS));
       if (empty($row['name'])) fail('Name erforderlich.', 400);
+      /* E-Mail serverseitig validieren: verhindert, dass krude Zeichenketten gespeichert und
+         später im Backoffice weiterverarbeitet werden (Defense-in-Depth gegen Attribut-Ausbruch). */
+      if (!empty($row['email']) && !filter_var($row['email'], FILTER_VALIDATE_EMAIL))
+        fail('Bitte eine gültige E-Mail-Adresse angeben.', 400);
       $row['id'] = uuid(); $row['status'] = 'neu'; $row['created_at'] = now();
       $cols = array_keys($row);
       $p->prepare("insert into inquiries (" . implode(',', $cols) . ") values (" .
@@ -2067,9 +2071,9 @@ function handlePortal(string $path, string $method, $body): never {
     $partnerPct = (float)($defs['partner_discount_pct'] ?? 20);
     $tiers = rentalTierDefaults($p);
     $days = rentalDays(['event_date' => $from, 'end_date' => $to]);
-    $lines = []; $total = 0.0;
+    $lines = []; $total = 0.0; $claimed = [];   // je Artikel schon im selben Warenkorb beanspruchte Menge
     foreach ($cart as $it) {
-      $qty = max(1, (int)($it['qty'] ?? 1));
+      $qty = min(50, max(1, (int)($it['qty'] ?? 1)));   // sinnvolle Obergrenze gegen Ausreißer/Spam
       if (($it['type'] ?? 'equipment') === 'set') {
         $setId = (string)($it['set_id'] ?? '');
         $st = $p->prepare("select * from equipment_sets where id=? and public=1");
@@ -2086,7 +2090,9 @@ function handlePortal(string $path, string $method, $body): never {
           $compQty = (int)$c['set_qty'] * $qty;
           $av = equipmentAvailability($p, $c['id'], $from, $to);
           /* Anfrage-Artikel passieren die Schranke - Bestätigung erfolgt manuell. */
-          if ($av === null || (empty($av['on_request']) && $av['available'] < $compQty)) fail('„' . $c['name'] . '" (Teil des Sets „' . $set['name'] . '") ist im gewünschten Zeitraum nicht in ausreichender Stückzahl verfügbar.', 409);
+          $free = (int)($av['available'] ?? 0) - ($claimed[$c['id']] ?? 0);
+          if ($av === null || (empty($av['on_request']) && $free < $compQty)) fail('„' . $c['name'] . '" (Teil des Sets „' . $set['name'] . '") ist im gewünschten Zeitraum nicht in ausreichender Stückzahl verfügbar.', 409);
+          $claimed[$c['id']] = ($claimed[$c['id']] ?? 0) + $compQty;
           $rate = $isPartner ? (float)($c['partner_rate'] ?? ((float)$c['day_rate'] * (1 - $partnerPct / 100))) : (float)$c['day_rate'];
           $rawSum += $rate * $compQty;
           $compRates[] = ['equipment_id' => $c['id'], 'name' => $c['name'], 'qty' => $compQty, 'rate' => $rate];
@@ -2110,7 +2116,9 @@ function handlePortal(string $path, string $method, $body): never {
       if (!$eq) fail('Ein Artikel im Warenkorb ist nicht mehr verfügbar.', 404);
       $av = equipmentAvailability($p, $eqId, $from, $to);
       /* Anfrage-Artikel passieren die Schranke - Bestätigung erfolgt manuell. */
-      if ($av === null || (empty($av['on_request']) && $av['available'] < $qty)) fail('„' . $eq['name'] . '" ist im gewünschten Zeitraum nicht in ausreichender Stückzahl verfügbar.', 409);
+      $free = (int)($av['available'] ?? 0) - ($claimed[$eqId] ?? 0);
+      if ($av === null || (empty($av['on_request']) && $free < $qty)) fail('„' . $eq['name'] . '" ist im gewünschten Zeitraum nicht in ausreichender Stückzahl verfügbar.', 409);
+      $claimed[$eqId] = ($claimed[$eqId] ?? 0) + $qty;
       $rate = $isPartner ? (float)($eq['partner_rate'] ?? ((float)$eq['day_rate'] * (1 - $partnerPct / 100))) : (float)$eq['day_rate'];
       $price = rentalPrice($rate, $days, (float)($eq['followup_pct'] ?? 50),
         (float)($eq['tier_week_pct'] ?? $tiers['week']), (float)($eq['tier_2week_pct'] ?? $tiers['twoweek']), (float)($eq['tier_month_pct'] ?? $tiers['month'])

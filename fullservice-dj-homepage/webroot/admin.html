@@ -83,6 +83,7 @@ th.sorted{color:var(--acc)}
 .sortarrow svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 /* Stapel-Bearbeitung Technik */
 #eqBatchBar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+#eqBatchBar[hidden]{display:none}
 #eqBatchBar .grp{display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:6px 8px;border-radius:6px}
 #eqBatchBar .grp .lbl{font-size:10px;color:var(--gl);text-transform:uppercase;letter-spacing:.06em}
 #eqBatchBar input,#eqBatchBar select{margin:0}
@@ -92,7 +93,8 @@ table.batch input,table.batch select{margin:0;padding:4px 6px;font-size:12px}
 table.batch input[type=number]{width:80px}
 table.batch input.cat{width:120px}
 table.batch td select{min-width:92px}
-table.batch tr.dirty td{background:rgba(255,111,91,.08)}
+table.batch tr.dirty td{background:rgba(255,111,91,.14)}
+table.batch tr.dirty td:first-child{box-shadow:inset 3px 0 0 var(--acc)}
 table.batch td.chk,table.batch th.chk{text-align:center}
 
 /* Badges */
@@ -416,6 +418,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <div class="grp"><span class="lbl">Status</span><select id="eqBatchStatus"><option>aktiv</option><option>wartung</option><option>inaktiv</option></select><button class="btn g sm" onclick="eqBatchSet('status',document.getElementById('eqBatchStatus').value)">setzen</button></div>
       <div class="grp"><span class="lbl">Preis</span><select id="eqBatchPriceMode"><option value="pct+">+ %</option><option value="pct-">− %</option><option value="fix">fester Wert €</option></select><input type="number" step="0.01" id="eqBatchPriceVal" placeholder="0" style="width:80px"><button class="btn g sm" onclick="eqBatchPrice()">anpassen</button></div>
       <div class="spacer"></div>
+      <span id="eqBatchCount" class="mut sml"></span>
       <button class="btn" onclick="eqBatchSave()">Änderungen speichern</button>
     </div>
     <div class="tbl-wrap card" id="eqViewWrap"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Heute im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
@@ -711,6 +714,10 @@ var API='api.php';
 var TOKEN=null,S={},CACHE={};
 function toast(msg,err){var t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(err?' err':'');t.style.display='block';setTimeout(function(){t.style.display='none'},3200)}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+/* Sicher als JS-String-Literal in einem Inline-onclick="fn('…')": erst JS-escapen
+   (Backslash/Quote/Zeilenumbruch), dann HTML-escapen. Sonst dekodiert der HTML-Parser
+   ein &#39; im Attribut zurück zu ' und der Wert bricht aus dem String aus (XSS). */
+function jsq(s){return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'))}
 function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
 function dt(d){if(!d)return '–';return new Date(d).toLocaleDateString('de-DE')}
 function dtt(d){if(!d)return '–';return new Date(d).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})}
@@ -2343,6 +2350,12 @@ function renderEq(){
 /* ===== Technik: Stapel-Bearbeitung ===== */
 var eqBatch={on:false,sel:{},changes:{}};
 function eqDirty(){for(var k in eqBatch.changes)return true;return false;}
+function eqBatchCount(){
+  var el=document.getElementById('eqBatchCount');if(!el)return;
+  var ch=Object.keys(eqBatch.changes).length,sel=0;
+  for(var k in eqBatch.sel)if(eqBatch.sel[k])sel++;
+  el.textContent=(sel?sel+' ausgewählt':'')+(sel&&ch?' · ':'')+(ch?ch+' geändert (nicht gespeichert)':'');
+}
 function eqEff(e,field){var c=eqBatch.changes[e.id];return c&&(field in c)?c[field]:e[field];}
 function eqRecord(id,field,val){
   var e=CACHE.equipment.find(function(x){return x.id===id});if(!e)return;
@@ -2360,12 +2373,13 @@ function eqEditField(id,field,raw,type){
   else val=raw;
   eqRecord(id,field,val);
   var tr=document.getElementById('eqbr-'+id);if(tr)tr.classList.toggle('dirty',!!eqBatch.changes[id]);
+  eqBatchCount();
 }
 function renderEqBatch(){
   document.getElementById('eqBatchRows').innerHTML=applySort((CACHE.equipment||[]).slice(),'equipment').map(function(e){
     var pr=eqEff(e,'partner_rate'),st=eqEff(e,'status')||'aktiv';
     return '<tr id="eqbr-'+e.id+'"'+(eqBatch.changes[e.id]?' class="dirty"':'')+'>'+
-      '<td class="chk"><input type="checkbox"'+(eqBatch.sel[e.id]?' checked':'')+' onchange="eqBatch.sel[\''+e.id+'\']=this.checked;eqBatchSyncAll()"></td>'+
+      '<td class="chk"><input type="checkbox"'+(eqBatch.sel[e.id]?' checked':'')+' onchange="eqBatch.sel[\''+e.id+'\']=this.checked;eqBatchSyncAll();eqBatchCount()"></td>'+
       '<td><a onclick="openEqModal(\''+e.id+'\')"><b>'+esc(e.name)+'</b></a></td>'+
       '<td><input class="cat" value="'+esc(eqEff(e,'category')||'')+'" onchange="eqEditField(\''+e.id+'\',\'category\',this.value,\'text\')"></td>'+
       '<td class="num"><input type="number" step="0.01" value="'+(eqEff(e,'day_rate')!=null?eqEff(e,'day_rate'):0)+'" onchange="eqEditField(\''+e.id+'\',\'day_rate\',this.value,\'num\')"></td>'+
@@ -2376,7 +2390,7 @@ function renderEqBatch(){
       '<td class="chk"><input type="checkbox"'+(eqEff(e,'public')!==false?' checked':'')+' onchange="eqEditField(\''+e.id+'\',\'public\',this.checked,\'bool\')"></td>'+
     '</tr>';
   }).join('')||'<tr><td colspan="9" class="mut">Noch keine Artikel.</td></tr>';
-  eqBatchSyncAll();
+  eqBatchSyncAll();eqBatchCount();
 }
 function eqBatchSyncAll(){
   var all=(CACHE.equipment||[]).length&&(CACHE.equipment||[]).every(function(e){return eqBatch.sel[e.id]});
@@ -3715,9 +3729,9 @@ function openCompose(i,t,formLink){
     '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
     '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
-    (i.email?'<button class="btn" onclick="adminSendMail(\''+esc(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+(i.customer_id||i.id||'')+'\',closeModal)">Direkt senden</button>':'')+
+    (i.email?'<button class="btn" onclick="adminSendMail(\''+jsq(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+jsq(i.customer_id||i.id||'')+'\',closeModal)">Direkt senden</button>':'')+
     '<button class="btn g" onclick="copyReply()">Text kopieren</button>'+
-    (i.email?'<button class="btn g" onclick="mailReply(\''+esc(i.email)+'\')">Im Mail-Programm öffnen</button>':'')+
+    (i.email?'<button class="btn g" onclick="mailReply(\''+jsq(i.email)+'\')">Im Mail-Programm öffnen</button>':'')+
     '</div><div class="sml mut" style="margin-top:8px">Tipp: Vor dem Senden prüfen, ob der Termin wirklich frei ist – die Vorlage geht davon aus.</div>');
 }
 function adminSendMail(to,subject,body,custId,cb){
