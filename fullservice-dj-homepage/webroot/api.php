@@ -465,6 +465,12 @@ function seedEquipmentCatalog(PDO $p): void {
     ['522044', 'Licht', 'Ape Labs Connect (Grey)',
      'Bluetooth-Interface zur Steuerung von Ape Labs Leuchten per Smartphone-App, Wireless DMX und KNX. Bis zu 4 Connect parallel für 4 DMX-Universen. Integrierter Akku mit bis zu 50 Std. Laufzeit, DMX Ein-/Ausgang XLR 3-Pin, inkl. Netzteil (27 W) und 2× 2,4-GHz-Antenne. Maße 12,5×12,5×4,8 cm, Gewicht 0,72 kg.',
      15.0, 'https://www.thomann.de/de/ape_labs_connect_grey.htm'],
+    ['573744', 'Mischpult', 'Allen & Heath CQ20B',
+     'Ultrakompakter Bluetooth-Digitalmixer, 96 kHz Signalverarbeitung, Steuerung per App (CQ-MixPad/CQ4You) über integrierten Dualband-Router (2,4/5 GHz). 16 Mikrofon/Line-Vorverstärker (8× XLR + 8× XLR/TRS-Kombibuchse), 2× Stereo-Line-Eingang. Ausgänge: 2× XLR Main, 1× Stereo-Line, 6× Monitor (XLR), 1× Kopfhörer. USB-Soundkarte 24×24, SD-Aufnahme/Wiedergabe, Bluetooth-Stereo-Wiedergabe. Maße (BxHxT) 372×153×133 mm, Gewicht 2,6 kg. Optionales Rackmount-Kit separat erhältlich (Art. 573745).',
+     85.0, 'https://www.thomann.de/de/allen_heath_cq20b.htm'],
+    ['568064', 'Piano', 'Yamaha P-225 B',
+     'Stagepiano mit 88 Tasten Graded Hammer Compact (GHC), gewichtet. Klangerzeugung Yamaha CFX VRM Lite mit Key-Off-Samples, 192-stimmig polyphon, 24 Instrument-Presets. Integrierte Lautsprecher 2×7 Watt, Bluetooth-Audio-Wiedergabe über die internen Lautsprecher. Inkl. Sustain-Pedal (M-Audio SP-2), Netzteil und Notenhalter. Maße 1.326×129×272 mm (BxHxT), Gewicht 11,5 kg.',
+     35.0, 'https://www.thomann.de/de/yamaha_p_225_b.htm'],
   ];
   foreach ($rows as [$sku, $cat, $n, $d, $suggested, $thomann]) {
     $c = $p->prepare('select count(*) from equipment where sku = ?');
