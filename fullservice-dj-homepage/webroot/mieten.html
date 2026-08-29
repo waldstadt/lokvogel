@@ -83,6 +83,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86
 .rent .old{color:var(--mut2);text-decoration:line-through;font-weight:400;font-size:12px;margin-right:6px}
 .rent .addon{font-size:11px;color:var(--mut2);margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
 .rent .addon b{color:var(--acc);font-weight:600}
+.set-hint{font-size:11px;font-weight:600;color:var(--acc2);margin-top:8px}
 
 /* Am Wunschtermin belegt: sichtbar, aber ausgegraut - Badge bleibt in Volltonfarbe */
 .rent.unavail .ri{filter:grayscale(1);opacity:.45}
@@ -373,10 +374,27 @@ function availBadge(e,st){
   return '';
 }
 /* Zubehör-Artikel eines Eintrags auflösen (bis 5 aus addon_ids, Fallback addon_id) */
-function addonItems(e){
-  var ids=(e.addon_ids&&e.addon_ids.length?e.addon_ids:(e.addon_id?[e.addon_id]:[]));
+function allEquip(){
+  var seen={},out=[];
+  EQ.forEach(function(e){if(!seen[e.id]){seen[e.id]=1;out.push(e)}});
+  for(var k in EQ_ALL){if(!seen[k]){seen[k]=1;out.push(EQ_ALL[k])}}
+  return out;
+}
+function relOf(e,ownField,mirrorField){
+  /* Direkte Angabe plus die umgekehrte Angabe anderer Artikel – „passt dazu" und
+     „passend für" spiegeln sich gegenseitig, egal von welcher Seite gepflegt. */
+  var ids=(e[ownField]&&e[ownField].length?e[ownField].slice():(ownField==='addon_ids'&&e.addon_id?[e.addon_id]:[]));
+  allEquip().forEach(function(o){
+    if(o.id===e.id)return;
+    var m=o[mirrorField]||(mirrorField==='addon_ids'&&o.addon_id?[o.addon_id]:[]);
+    if(m&&m.indexOf(e.id)>=0&&ids.indexOf(o.id)<0)ids.push(o.id);
+  });
   return ids.map(function(id){return EQ_ALL[id]||EQ.find(function(x){return x.id===id})}).filter(Boolean);
 }
+function addonItems(e){return relOf(e,'addon_ids','fits_ids')}   // „passt dazu"
+function fitsItems(e){return relOf(e,'fits_ids','addon_ids')}    // „passend für"
+/* Mindestabnahme: manche Artikel nur im Set (z. B. 6er). */
+function minQty(e){return Math.max(1,Number(e&&e.min_qty)||1)}
 function rentCard(e){
   var img=e.image_url?' style="background-image:url(\''+esc(e.image_url)+'\');background-position:'+esc(e.image_focal||'50% 50%')+'"':'';
   var icon=e.image_url?'':catIcon(e.category);
@@ -385,20 +403,25 @@ function rentCard(e){
   var st=availState(e);
   var av=availBadge(e,st),cartCtrl='';
   var addon='';
-  var addons=addonItems(e);
-  if(addons.length){
-    /* Zubehör-Namen öffnen das jeweilige Produktfenster – Klick darf NICHT die Kachel auslösen */
-    addon='<div class="addon">Passt dazu: '+addons.map(function(a){
+  var addons=addonItems(e),fits=fitsItems(e);
+  function relLine(label,list){
+    return '<div class="addon">'+label+': '+list.map(function(a){
       return '<a class="addon-link" onclick="event.stopPropagation();openProductModal(\''+jsq(a.id)+'\')"><b>'+esc(a.name)+'</b></a> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag)';
-    }).join(', ')+' – einfach mit anfragen.</div>';
+    }).join(', ')+'</div>';
   }
+  /* Zubehör-Namen öffnen das jeweilige Produktfenster – Klick darf NICHT die Kachel auslösen */
+  if(addons.length)addon+=relLine('Passt dazu',addons);
+  if(fits.length)addon+=relLine('Passend für',fits);
+  var mq=minQty(e);
+  var setHint=mq>1?'<div class="set-hint">Nur im '+mq+'er-Set (Mindestabnahme '+mq+' Stück, Preis je Stück)</div>':'';
   /* Belegte und noch ungeprüfte Artikel sind nicht buchbar - keine Mengen-/Buttonzeile.
      Der Klick auf die Steuerung darf das Produktfenster NICHT öffnen -> stopPropagation. */
   if(e.id&&!st.gone&&!st.pending){
     cartCtrl='<div onclick="event.stopPropagation()" style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
-      '<input type="number" min="1" value="1" id="qty-'+esc(e.id)+'" style="margin:0;width:60px;padding:8px">'+
+      '<input type="number" min="'+mq+'" step="'+mq+'" value="'+mq+'" id="qty-'+esc(e.id)+'" style="margin:0;width:64px;padding:8px">'+
       '<button class="btn small'+(st.inCart?' ghost':'')+'" onclick="addToCart(\''+jsq(e.id)+'\')">'+(st.inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>';
   }
+  addon+=setHint;
   var open=e.id?' clickable" onclick="openProductModal(\''+jsq(e.id)+'\')"':'"';
   return '<div class="rent reveal vis'+(st.gone?' unavail':'')+open+'><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
     (e.category?'<div class="rc">'+esc(e.category)+'</div>':'')+
@@ -442,16 +465,17 @@ function renderProductModal(){
   }
   var st=availState(e);
   var price=priceLabel(e.day_rate,partnerPrice(e));
+  var mq=minQty(e);
+  var setHint=mq>1?'<div class="set-hint">Nur im '+mq+'er-Set (Mindestabnahme '+mq+' Stück, Preis je Stück)</div>':'';
   var cartCtrl='';
   if(e.id&&!st.gone&&!st.pending){
     cartCtrl='<div class="pm-cart">'+
-      '<input type="number" min="1" value="1" id="qty-m-'+esc(e.id)+'">'+
+      '<input type="number" min="'+mq+'" step="'+mq+'" value="'+mq+'" id="qty-m-'+esc(e.id)+'">'+
       '<button class="btn'+(st.inCart?' ghost':'')+'" onclick="addToCart(\''+jsq(e.id)+'\',\'qty-m-'+jsq(e.id)+'\')">'+(st.inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>';
   }
-  var addons=addonItems(e);
-  var addonHtml='';
-  if(addons.length){
-    addonHtml='<div class="pm-addons"><div class="pm-h">Passt dazu</div><div class="pm-addon-grid">'+addons.map(function(a){
+  function relSection(title,list){
+    if(!list.length)return '';
+    return '<div class="pm-addons"><div class="pm-h">'+title+'</div><div class="pm-addon-grid">'+list.map(function(a){
       var ai=prodImages(a)[0];
       var thumb=ai?'<div class="pm-addon-img" style="background-image:url(\''+esc(ai)+'\')"></div>':'<div class="pm-addon-img">'+catIcon(a.category)+'</div>';
       var ap=PARTNER?partnerPrice(a):a.day_rate;
@@ -460,6 +484,7 @@ function renderProductModal(){
         '<span class="pm-addon-price">'+(ap!=null?'+ '+euro(ap)+' <small>/ Tag</small>':'Preis auf Anfrage')+'</span></button>';
     }).join('')+'</div></div>';
   }
+  var addonHtml=relSection('Passt dazu',addonItems(e))+relSection('Passend für',fitsItems(e));
   document.getElementById('prodBody').innerHTML=
     '<div class="pm-grid"><div class="pm-gallery">'+main+thumbs+'</div>'+
     '<div class="pm-info">'+
@@ -468,7 +493,7 @@ function renderProductModal(){
       '<div class="rp">'+price+'</div>'+
       availBadge(e,st)+
       (e.description?'<div class="pm-desc">'+esc(e.description)+'</div>':'')+
-      cartCtrl+
+      setHint+cartCtrl+
     '</div></div>'+addonHtml;
 }
 function renderRent(){
@@ -578,7 +603,11 @@ function addToCart(id,qtyId){
   /* Während die Verfügbarkeit noch geprüft wird, nicht buchen (fail-safe) */
   if(!e.on_request&&AV_LOADING){toast('Einen Moment – die Verfügbarkeit wird noch geprüft.');return;}
   var qf=document.getElementById(qtyId||('qty-'+id));
-  var qty=Math.max(1,Number(qf&&qf.value)||1);
+  /* Mindestabnahme beachten: auf ein Vielfaches der Set-Größe aufrunden. */
+  var mq=minQty(e);
+  var qty=Math.max(mq,Number(qf&&qf.value)||mq);
+  qty=Math.ceil(qty/mq)*mq;
+  if(qf)qf.value=qty;
   var existing=CART.find(function(c){return c.type!=='set'&&c.id===id});
   if(existing)existing.qty=qty;else CART.push({type:'equipment',id:id,qty:qty});
   saveCart();
