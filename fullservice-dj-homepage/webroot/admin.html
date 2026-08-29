@@ -2283,6 +2283,10 @@ var SORTDEFS={
     {get:function(e){return e.status},type:'text'},
     {get:function(e){return eqInUse(e)},type:'num'}]}
 };
+/* Standardsortierung: benannte Listen alphabetisch (Klick auf einen Kopf ändert sie). */
+SORT.equipment={col:0,dir:1};   // Name
+SORT.customers={col:0,dir:1};   // Name
+SORT.products={col:1,dir:1};    // Name
 function sortTable(name){var d=SORTDEFS[name];if(d.tableEl)return d.tableEl();var tb=document.getElementById(d.rowsId);return tb?tb.closest('table'):null}
 function applySort(list,name){
   var s=SORT[name];if(!s)return list;
@@ -2490,9 +2494,10 @@ function openEqModal(id){
   if(e.status)document.getElementById('eStatus').value=e.status;
 }
 /* Fünf Auswahlfelder für eine Artikel-Beziehung („passt dazu" / „passend für"). */
+function byNameDe(a,b){return String(a.name||'').localeCompare(String(b.name||''),'de')}
 function eqRelSelects(prefix,ids,selfId){
   ids=(ids||[]).slice(0,5);
-  var opts=(CACHE.equipment||[]).filter(function(x){return x.id!==selfId});
+  var opts=(CACHE.equipment||[]).filter(function(x){return x.id!==selfId}).slice().sort(byNameDe);
   var sels='';
   for(var i=0;i<5;i++){
     var cur=ids[i]||'';
@@ -2547,7 +2552,7 @@ function renderSetsAdmin(){
 function renderSetItemRows(){
   document.getElementById('sItemRows').innerHTML=curSetItems.map(function(it,i){
     return '<div class="grid3" style="margin-bottom:6px"><div style="grid-column:span 2"><select onchange="curSetItems['+i+'].equipment_id=this.value">'+
-      (CACHE.equipment||[]).map(function(e){return '<option value="'+e.id+'"'+(it.equipment_id===e.id?' selected':'')+'>'+esc(e.name)+' ('+euro(e.day_rate||0)+'/Tag)</option>'}).join('')+
+      (CACHE.equipment||[]).slice().sort(byNameDe).map(function(e){return '<option value="'+e.id+'"'+(it.equipment_id===e.id?' selected':'')+'>'+esc(e.name)+' ('+euro(e.day_rate||0)+'/Tag)</option>'}).join('')+
       '</select></div><div style="display:flex;gap:6px"><input type="number" min="1" value="'+(it.qty||1)+'" onchange="curSetItems['+i+'].qty=Number(this.value)||1" style="margin:0"><button class="btn r sm" onclick="curSetItems.splice('+i+',1);renderSetItemRows()">✕</button></div></div>';
   }).join('')||'<span class="mut sml">Noch keine Artikel im Set.</span>';
 }
@@ -3662,7 +3667,7 @@ function renderPicker(){
   var q=(v('ppSearch')||'').toLowerCase();
   var list=(CACHE.products||[]).filter(function(p){
     return p.active&&(!q||[p.sku,p.name,p.category].join(' ').toLowerCase().indexOf(q)>=0);
-  });
+  }).sort(byNameDe);
   document.getElementById('ppList').innerHTML=list.map(function(p){
     var isBundle=(p.bundle||[]).length>0;
     return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:10px;align-items:center">'+

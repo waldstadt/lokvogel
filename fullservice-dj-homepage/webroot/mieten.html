@@ -84,6 +84,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86
 .rent .addon{font-size:11px;color:var(--mut2);margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
 .rent .addon b{color:var(--acc);font-weight:600}
 .set-hint{font-size:11px;font-weight:600;color:var(--acc2);margin-top:8px}
+.set-avail{font-size:12.5px;color:var(--mut);margin-top:10px}
+.set-avail .addon-link{cursor:pointer;color:var(--acc);font-weight:600}
+.set-avail .addon-link:hover{color:var(--acc2);text-decoration:underline}
 
 /* Am Wunschtermin belegt: sichtbar, aber ausgegraut - Badge bleibt in Volltonfarbe */
 .rent.unavail .ri{filter:grayscale(1);opacity:.45}
@@ -500,6 +503,10 @@ function renderProductModal(){
     }).join('')+'</div></div>';
   }
   var addonHtml=relSection('Passt dazu',addonItems(e))+relSection('Passend für',fitsItems(e));
+  var inSets=setsWith(e);
+  var setLine=inSets.length?'<div class="set-avail">Auch im Set erhältlich: '+inSets.map(function(s){
+    return '<a class="addon-link" onclick="scrollToSet(\''+jsq(s.id)+'\')"><b>'+esc(s.name)+'</b></a>';
+  }).join(', ')+'</div>':'';
   document.getElementById('prodBody').innerHTML=
     '<div class="pm-grid"><div class="pm-gallery">'+main+thumbs+'</div>'+
     '<div class="pm-info">'+
@@ -508,9 +515,23 @@ function renderProductModal(){
       '<div class="rp">'+price+'</div>'+
       availBadge(e,st)+
       (e.description?'<div class="pm-desc">'+esc(e.description)+'</div>':'')+
-      setHint+cartCtrl+
+      setHint+setLine+cartCtrl+
     '</div></div>'+addonHtml;
 }
+/* Sets, die diesen Artikel enthalten. */
+function setsWith(e){
+  if(!e||!e.id||!SETS.length)return [];
+  var seen={};SET_ITEMS.forEach(function(x){if(x.equipment_id===e.id)seen[x.set_id]=1});
+  return SETS.filter(function(s){return seen[s.id]});
+}
+function scrollToSet(id){
+  closeProductModal();
+  var sec=document.getElementById('setSection');
+  if(sec){sec.style.display='block';sec.scrollIntoView({behavior:'smooth',block:'start'});}
+  var card=document.getElementById('qty-set-'+id);
+  if(card){var box=card.closest('.rent');if(box){box.style.transition='box-shadow .3s';box.style.boxShadow='0 0 0 2px var(--acc)';setTimeout(function(){box.style.boxShadow=''},1800);}}
+}
+function byName(a,b){return String(a.name||'').localeCompare(String(b.name||''),'de')}
 function renderRent(){
   document.getElementById('partnerBadge').innerHTML=PARTNER?('Partnerpreise aktiv für <b style="color:var(--txt)">'+esc(PARTNER.name)+'</b>'):'';
   var html;
@@ -521,11 +542,11 @@ function renderRent(){
     cats.sort();
     if(cats.indexOf('Sonstiges')>-1){cats.splice(cats.indexOf('Sonstiges'),1);cats.push('Sonstiges')}
     html=cats.map(function(c){
-      var items=EQ.filter(function(e){return (e.category||'Sonstiges')===c});
+      var items=EQ.filter(function(e){return (e.category||'Sonstiges')===c}).sort(byName);
       return '<div class="cat-head">'+esc(c)+'<span>'+items.length+' Artikel</span></div>'+items.map(rentCard).join('');
     }).join('');
   } else {
-    html=EQ.filter(function(e){return e.category===CUR_CAT}).map(rentCard).join('');
+    html=EQ.filter(function(e){return e.category===CUR_CAT}).sort(byName).map(rentCard).join('');
   }
   document.getElementById('rentGrid').innerHTML=html||'<p class="lead" style="margin-top:6px">In dieser Kategorie ist gerade nichts verfügbar.</p>';
   renderCart();
