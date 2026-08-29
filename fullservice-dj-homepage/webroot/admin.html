@@ -630,6 +630,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <button class="btn sm ghost" onclick="sLogoFromPool()">Aus Mediathek</button>
           <button class="btn sm ghost" id="sLogoRemoveBtn" style="display:none" onclick="sLogoRemove()">Entfernen</button>
         </div>
+        <div class="mut sml" style="margin:-4px 0 10px">Empfohlen: PNG oder SVG mit transparentem Hintergrund, mindestens 400×400 Px (quadratisch oder quer, je nach Logo) – wird im Briefkopf auf max. 48px Höhe verkleinert, größer schadet also nicht.</div>
         <label>Straße</label><input id="sStreet">
         <label>PLZ / Ort</label><input id="sZip">
         <div class="grid2">
@@ -651,6 +652,8 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <label>Bank</label><input id="sBank">
           <label>IBAN</label><input id="sIban">
           <label>BIC</label><input id="sBic">
+          <label>PayPal <span class="mut sml" style="text-transform:none;letter-spacing:0">– optional, erscheint als zusätzlicher Zahlungshinweis auf Rechnungen (z. B. deine PayPal.Me-Adresse oder E-Mail)</span></label>
+          <input id="sPaypal" placeholder="paypal.me/deinname oder E-Mail-Adresse">
           <div style="margin-top:12px"><button class="btn sm" onclick="saveCompany()">Speichern</button></div>
         </div>
         <div class="card"><h3>Nummernkreise &amp; Vorgaben</h3>
@@ -2268,7 +2271,7 @@ function printDoc(){
   (v('docOutro')?'<p style="margin-bottom:20px;white-space:pre-wrap">'+esc(v('docOutro'))+'</p>':'')+
   '<div style="margin-top:36px;padding-top:10px;border-top:1px solid #ccc;font-size:10px;color:#666;display:flex;justify-content:space-between;gap:20px">'+
   '<div>'+esc(comp.name||'')+'<br>'+(comp.tax_id?'St.-Nr.: '+esc(comp.tax_id):'')+(comp.vat_id?'<br>USt-IdNr.: '+esc(comp.vat_id):'')+'</div>'+
-  '<div>'+(comp.bank?esc(comp.bank)+'<br>':'')+(comp.iban?'IBAN: '+esc(comp.iban)+'<br>':'')+(comp.bic?'BIC: '+esc(comp.bic):'')+'</div>'+
+  '<div>'+(comp.bank?esc(comp.bank)+'<br>':'')+(comp.iban?'IBAN: '+esc(comp.iban)+'<br>':'')+(comp.bic?'BIC: '+esc(comp.bic):'')+(comp.paypal?(comp.bic?'<br>':'')+'PayPal: '+esc(comp.paypal):'')+'</div>'+
   '<div>'+esc(comp.phone||'')+'<br>'+esc(comp.email||'')+'</div></div></div>';
   window.print();
 }
@@ -3610,6 +3613,7 @@ function renderSet(){
   document.getElementById('sBank').value=c.bank||'';
   document.getElementById('sIban').value=c.iban||'';
   document.getElementById('sBic').value=c.bic||'';
+  document.getElementById('sPaypal').value=c.paypal||'';
   document.getElementById('sQPre').value=(n.angebot&&n.angebot.prefix)||'AN-';
   document.getElementById('sQNext').value=(n.angebot&&n.angebot.next)||1;
   document.getElementById('sIPre').value=(n.rechnung&&n.rechnung.prefix)||'RE-';
@@ -3640,7 +3644,7 @@ function sLogoRemove(){sLogoUrl='';renderSLogoPrev()}
 function saveCompany(){
   var val={name:v('sName'),owner:v('sOwner'),street:v('sStreet'),zip_city:v('sZip'),phone:v('sPhone'),email:v('sMail'),
     legal_form:v('sLegal'),tax_id:v('sTaxId'),vat_id:v('sVatId'),small_business:document.getElementById('sSmall').checked,
-    bank:v('sBank'),iban:v('sIban'),bic:v('sBic'),website:(S.company&&S.company.website)||'',logo_url:sLogoUrl};
+    bank:v('sBank'),iban:v('sIban'),bic:v('sBic'),paypal:v('sPaypal'),website:(S.company&&S.company.website)||'',logo_url:sLogoUrl};
   api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'company',value:val}})
     .then(function(){S.company=val;toast('Firmendaten gespeichert ✓')}).catch(function(e){toast(e.message,1)});
 }
