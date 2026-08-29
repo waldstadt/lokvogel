@@ -54,7 +54,32 @@ textarea{min-height:70px;resize:vertical}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 14px}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:0 14px}
 @media(max-width:900px){.grid3,.grid4{grid-template-columns:1fr 1fr}}
-@media(max-width:640px){.grid2,.grid3,.grid4{grid-template-columns:1fr}.side{width:60px}.side .slogo,.side .grp,.sbot{display:none}.sn a{font-size:10px;padding:8px 6px;text-align:center}.cnt{margin-left:60px}}
+
+/* Mobil (Telefon/kleines Tablet): Sidebar wird zur ausklappbaren Schublade statt einer
+   auf 60px gequetschten Icon-Spalte - 20+ Menüpunkte ohne lesbare Beschriftung waren
+   auf dem iPhone praktisch nicht bedienbar. Eingabefelder bekommen 16px Schriftgröße,
+   sonst zoomt iOS Safari beim Antippen automatisch in die Seite hinein. */
+.mtopbar{display:none}
+.mnavBg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:240}
+.mnavBg.v{display:block}
+@media(max-width:820px){
+  .grid2,.grid3,.grid4{grid-template-columns:1fr}
+  .mtopbar{display:flex;align-items:center;gap:4px;position:fixed;top:0;left:0;right:0;height:52px;
+    background:var(--cd);border-bottom:1px solid var(--bdr);z-index:180;padding:0 6px 0 4px}
+  .mtopbar button{background:none;border:none;color:var(--wh);padding:12px;cursor:pointer;line-height:0}
+  .mtopbar .mtb{font-size:13px;font-weight:700;flex:1;text-align:center;padding-right:40px}
+  .mtopbar .mtb b{color:var(--acc)}
+  .side{position:fixed;top:0;bottom:0;left:0;width:250px;transform:translateX(-100%);
+    transition:transform .22s ease;z-index:250;box-shadow:2px 0 24px rgba(0,0,0,.4)}
+  .side.open{transform:translateX(0)}
+  .sn a{font-size:14px;padding:13px 16px}
+  .cnt{margin-left:0!important;padding-top:52px}
+  input,textarea,select{font-size:16px}
+  .btn{padding:10px 16px;font-size:12px}
+  .btn.sm{padding:7px 12px;font-size:11px}
+  .modal-bg{padding:52px 8px 16px}
+  .modal{padding:16px}
+}
 .card{background:var(--cd);border:1px solid var(--bdr);padding:18px;margin-bottom:16px}
 .card h3{border-bottom:1px solid var(--bdr);padding-bottom:8px;margin-bottom:12px;font-size:13px}
 /* Inhalte & Einstellungen: eine ruhige Spalte mit Gruppen-Überschriften und zuklappbaren Karten */
@@ -185,7 +210,12 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 
 <!-- ===== APP ===== -->
 <div class="app" id="appView">
-  <div class="side">
+  <div class="mtopbar">
+    <button onclick="toggleMobileNav()" aria-label="Menü öffnen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px;margin:0"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+    <span class="mtb"><b id="mtbBrand">lauschgift.net</b></span>
+  </div>
+  <div class="mnavBg" id="mnavBg" onclick="closeMobileNav()"></div>
+  <div class="side" id="side">
     <div class="slogo"><span id="sbBrand">lauschgift.net</span><div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);margin-top:2px">Backoffice</div></div>
     <div class="sn" id="nav">
       <a data-pg="dash" class="a"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
@@ -811,7 +841,9 @@ var saved=sessionStorage.getItem('lg_tok');
 if(saved){TOKEN=saved;enter()}
 
 /* ===== Navigation ===== */
-document.querySelectorAll('#nav a').forEach(function(a){a.addEventListener('click',function(){showPage(a.dataset.pg)})});
+document.querySelectorAll('#nav a').forEach(function(a){a.addEventListener('click',function(){showPage(a.dataset.pg);closeMobileNav()})});
+function toggleMobileNav(){document.getElementById('side').classList.toggle('open');document.getElementById('mnavBg').classList.toggle('v')}
+function closeMobileNav(){document.getElementById('side').classList.remove('open');document.getElementById('mnavBg').classList.remove('v')}
 function showPage(id){
   document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('a')});
   document.getElementById('pg-'+id).classList.add('a');
@@ -867,6 +899,7 @@ function applyBrand(){
   var c=S.company||{};
   var b=String(c.website||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'')||c.name||'lauschgift.net';
   var el=document.getElementById('sbBrand');if(el)el.textContent=b;
+  var el2=document.getElementById('mtbBrand');if(el2)el2.textContent=b;
   document.title=b+' \u00b7 Backoffice';
 }
 function renderAll(){
