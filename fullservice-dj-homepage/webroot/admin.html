@@ -584,6 +584,13 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <div><label>Firmierung</label><input id="sName"></div>
           <div><label>Inhaber</label><input id="sOwner"></div>
         </div>
+        <label>Logo</label>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+          <div id="sLogoPrev" style="width:64px;height:64px;border:1px solid rgba(255,255,255,.12);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:rgba(255,255,255,.04)"></div>
+          <label class="btn sm" style="margin:0">Hochladen<input type="file" accept="image/*" style="display:none" onchange="sLogoUpload(this)"></label>
+          <button class="btn sm ghost" onclick="sLogoFromPool()">Aus Mediathek</button>
+          <button class="btn sm ghost" id="sLogoRemoveBtn" style="display:none" onclick="sLogoRemove()">Entfernen</button>
+        </div>
         <label>Straße</label><input id="sStreet">
         <label>PLZ / Ort</label><input id="sZip">
         <div class="grid2">
@@ -694,10 +701,15 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <div id="bkList" class="sml mut">–</div>
         </div>
         <div class="card"><h3>KI-Textassistent</h3>
-          <div class="sml mut" style="margin-bottom:8px">Wird genutzt, um aus Stichpunkten fertige Texte zu machen (z. B. Artikelbeschreibungen). Der eingegebene Text wird dafür an den hier eingestellten KI-Anbieter gesendet – kompatibel mit OpenAI und den meisten OpenAI-kompatiblen Diensten (z. B. auch lokal gehostete Modelle mit passender Schnittstelle).</div>
-          <div class="grid3">
-            <div><label>Basis-URL</label><input id="aiBaseUrl" placeholder="https://api.openai.com/v1"></div>
-            <div><label>Modell</label><input id="aiModel" placeholder="gpt-4o-mini"></div>
+          <div class="sml mut" style="margin-bottom:8px">Wird genutzt, um aus Stichpunkten fertige Texte zu machen (z. B. Artikelbeschreibungen). Der eingegebene Text wird dafür an den hier eingestellten KI-Anbieter gesendet.</div>
+          <label>Anbieter</label>
+          <select id="aiProvider" onchange="aiProviderChanged()">
+            <option value="claude">Claude (Anthropic)</option>
+            <option value="openai">OpenAI / OpenAI-kompatibel</option>
+          </select>
+          <div class="grid3" style="margin-top:8px">
+            <div><label>Basis-URL</label><input id="aiBaseUrl" placeholder="https://api.anthropic.com/v1"></div>
+            <div><label>Modell</label><input id="aiModel" placeholder="claude-opus-5"></div>
             <div><label>API-Schlüssel <span class="mut" id="aiKeyState"></span></label><input id="aiKey" type="password" placeholder="nur zum Ändern ausfüllen"></div>
           </div>
           <button class="btn sm" onclick="saveAiConfig()">Speichern</button>
@@ -2179,6 +2191,7 @@ function printDoc(){
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
   '<div style="display:flex;justify-content:space-between;margin-bottom:36px"><div>'+
+  (comp.logo_url?'<img src="'+esc(comp.logo_url)+'" style="max-height:48px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block">':'')+
   '<div style="font-size:20px;font-weight:700">'+esc(comp.name||'DJ Lauschgift')+'</div>'+
   '<div style="color:#555">'+esc(comp.owner||'')+'</div></div>'+
   '<div style="text-align:right;color:#555">'+esc(comp.street||'')+'<br>'+esc(comp.zip_city||'')+'<br>'+esc(comp.phone||'')+'<br>'+esc(comp.email||'')+'</div></div>'+
@@ -3466,16 +3479,25 @@ function renderCmsReload(){
 }
 
 /* ===== KI-Textassistent ===== */
+var AI_DEFAULTS={claude:{base_url:'https://api.anthropic.com/v1',model:'claude-opus-5'},openai:{base_url:'https://api.openai.com/v1',model:'gpt-4o-mini'}};
+function aiProviderChanged(){
+  var p=v('aiProvider'),d=AI_DEFAULTS[p]||AI_DEFAULTS.claude;
+  document.getElementById('aiBaseUrl').placeholder=d.base_url;
+  document.getElementById('aiModel').placeholder=d.model;
+  if(!v('aiBaseUrl'))document.getElementById('aiBaseUrl').value=d.base_url;
+  if(!v('aiModel'))document.getElementById('aiModel').value=d.model;
+}
 function loadAiConfig(){
   fetch('api.php/ai/config',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(c){
     if(!c)return;
+    document.getElementById('aiProvider').value=c.provider||'claude';
     document.getElementById('aiBaseUrl').value=c.base_url||'';
     document.getElementById('aiModel').value=c.model||'';
     document.getElementById('aiKeyState').textContent=c.has_key?'(hinterlegt ✓)':'(fehlt)';
   }).catch(function(){});
 }
 function saveAiConfig(){
-  var body={base_url:v('aiBaseUrl'),model:v('aiModel')};
+  var body={provider:v('aiProvider'),base_url:v('aiBaseUrl'),model:v('aiModel')};
   if(v('aiKey'))body.api_key=v('aiKey');
   fetch('api.php/ai/config',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(function(r){return r.json()}).then(function(c){
@@ -3491,6 +3513,7 @@ function renderSet(){
   var c=S.company||{},n=S.numbering||{},d=S.defaults||{};
   document.getElementById('sName').value=c.name||'';
   document.getElementById('sOwner').value=c.owner||'';
+  sLogoUrl=c.logo_url||'';renderSLogoPrev();
   document.getElementById('sStreet').value=c.street||'';
   document.getElementById('sZip').value=c.zip_city||'';
   document.getElementById('sPhone').value=c.phone||'';
@@ -3528,10 +3551,24 @@ function saveRental(){
   api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'rental_contract',value:val}})
     .then(function(){S.rental_contract=val;toast('Mietvertrag-Bedingungen gespeichert ✓')}).catch(function(e){toast(e.message,1)});
 }
+var sLogoUrl='';
+function renderSLogoPrev(){
+  var el=document.getElementById('sLogoPrev');
+  el.innerHTML=sLogoUrl?'<img src="'+esc(sLogoUrl)+'" style="width:100%;height:100%;object-fit:contain">':'<span class="mut sml">kein Logo</span>';
+  document.getElementById('sLogoRemoveBtn').style.display=sLogoUrl?'':'none';
+}
+function sLogoUpload(inp){
+  uploadFilesSeq(inp.files,function(url){sLogoUrl=url;renderSLogoPrev()},function(){toast('Logo hochgeladen ✓ – „Speichern" nicht vergessen.')});
+  inp.value='';
+}
+function sLogoFromPool(){
+  openMediaPicker(function(urls){if(urls&&urls[0]){sLogoUrl=urls[0];renderSLogoPrev()}},false);
+}
+function sLogoRemove(){sLogoUrl='';renderSLogoPrev()}
 function saveCompany(){
   var val={name:v('sName'),owner:v('sOwner'),street:v('sStreet'),zip_city:v('sZip'),phone:v('sPhone'),email:v('sMail'),
     legal_form:v('sLegal'),tax_id:v('sTaxId'),vat_id:v('sVatId'),small_business:document.getElementById('sSmall').checked,
-    bank:v('sBank'),iban:v('sIban'),bic:v('sBic'),website:(S.company&&S.company.website)||''};
+    bank:v('sBank'),iban:v('sIban'),bic:v('sBic'),website:(S.company&&S.company.website)||'',logo_url:sLogoUrl};
   api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'company',value:val}})
     .then(function(){S.company=val;toast('Firmendaten gespeichert ✓')}).catch(function(e){toast(e.message,1)});
 }

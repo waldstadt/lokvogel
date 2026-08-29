@@ -2621,16 +2621,19 @@ try {
     $p = db();
     $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
     if ($method === 'POST') {
-      $baseUrl = trim((string)($body['base_url'] ?? '')) ?: 'https://api.openai.com/v1';
+      $provider = (string)($body['provider'] ?? '') === 'claude' ? 'claude' : 'openai';
+      $cfg['provider'] = $provider;
+      $defaultBase = $provider === 'claude' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1';
+      $baseUrl = trim((string)($body['base_url'] ?? '')) ?: $defaultBase;
       if (!preg_match('#^https?://#', $baseUrl)) fail('Bitte eine gültige Basis-URL angeben (https://…).', 400);
       $cfg['base_url'] = $baseUrl;
-      $cfg['model'] = trim((string)($body['model'] ?? '')) ?: 'gpt-4o-mini';
+      $cfg['model'] = trim((string)($body['model'] ?? '')) ?: ($provider === 'claude' ? 'claude-opus-5' : 'gpt-4o-mini');
       if (!empty($body['api_key'])) $cfg['api_key'] = trim((string)$body['api_key']);
       $p->prepare("insert into settings (key, value, updated_at) values ('ai', ?, ?)
           on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
         ->execute([json_encode($cfg, JSON_UNESCAPED_UNICODE), now()]);
     }
-    out(['base_url' => $cfg['base_url'] ?? '', 'model' => $cfg['model'] ?? '', 'has_key' => !empty($cfg['api_key'])]);
+    out(['provider' => $cfg['provider'] ?? 'openai', 'base_url' => $cfg['base_url'] ?? '', 'model' => $cfg['model'] ?? '', 'has_key' => !empty($cfg['api_key'])]);
   }
   /* KI-Textassistent: aus Stichpunkten/schlechtem Text einen fertigen Artikeltext machen.
      Nur der angemeldete Admin darf das aufrufen, sonst könnte jeder Besucher am eigenen
@@ -2646,8 +2649,9 @@ try {
     $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
     $apiKey = trim((string)($cfg['api_key'] ?? ''));
     if ($apiKey === '') fail('Kein KI-Zugang eingerichtet – bitte in den Einstellungen unter „KI-Textassistent" einen API-Schlüssel hinterlegen.', 400);
-    $baseUrl = rtrim((string)($cfg['base_url'] ?: 'https://api.openai.com/v1'), '/');
-    $model = (string)($cfg['model'] ?: 'gpt-4o-mini');
+    $provider = (string)($cfg['provider'] ?? 'openai') === 'claude' ? 'claude' : 'openai';
+    $baseUrl = rtrim((string)($cfg['base_url'] ?: ($provider === 'claude' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1')), '/');
+    $model = (string)($cfg['model'] ?: ($provider === 'claude' ? 'claude-opus-5' : 'gpt-4o-mini'));
     $style = 'Du schreibst deutsche Texte im Ton von Markus, einem DJ und Verleiher für Veranstaltungstechnik: '
       . 'persönlich, locker, professionell – so, wie er es am Telefon sagen würde. Keine Emojis, keine '
       . 'Worthülsen oder Floskeln, keine Aufzählungen und keine Überschriften – nur zusammenhängender '
@@ -2662,30 +2666,58 @@ try {
       $style .= ' Mach aus dem gegebenen Stichpunkte-Text bzw. Rohtext einen ansprechenden Seiten- oder '
         . 'Werbetext. Halte dich dabei ungefähr an die Länge des Eingabetexts.';
     }
-    $reqBody = json_encode([
-      'model' => $model,
-      'messages' => [
-        ['role' => 'system', 'content' => $style],
-        ['role' => 'user', 'content' => $text],
-      ],
-      'temperature' => 0.6,
-      'max_tokens' => 500,
-    ], JSON_UNESCAPED_UNICODE);
-    $ctx = stream_context_create(['http' => [
-      'method' => 'POST',
-      'header' => "Authorization: Bearer $apiKey\r\nContent-Type: application/json\r\n",
-      'content' => $reqBody,
-      'timeout' => 40,
-      'ignore_errors' => true,
-    ]]);
-    $resp = @file_get_contents($baseUrl . '/chat/completions', false, $ctx);
-    if ($resp === false) fail('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.', 502);
-    $j = json_decode($resp, true);
-    if (!is_array($j) || isset($j['error'])) {
-      $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
-      fail('KI-Anfrage fehlgeschlagen: ' . ($msg !== '' ? $msg : 'unerwartete Antwort vom KI-Dienst.'), 502);
+    if ($provider === 'claude') {
+      $reqBody = json_encode([
+        'model' => $model,
+        'max_tokens' => 800,
+        'system' => $style,
+        'messages' => [['role' => 'user', 'content' => $text]],
+      ], JSON_UNESCAPED_UNICODE);
+      $ctx = stream_context_create(['http' => [
+        'method' => 'POST',
+        'header' => "x-api-key: $apiKey\r\nanthropic-version: 2023-06-01\r\nContent-Type: application/json\r\n",
+        'content' => $reqBody,
+        'timeout' => 40,
+        'ignore_errors' => true,
+      ]]);
+      $resp = @file_get_contents($baseUrl . '/messages', false, $ctx);
+      if ($resp === false) fail('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.', 502);
+      $j = json_decode($resp, true);
+      if (!is_array($j) || isset($j['error']) || ($j['type'] ?? '') === 'error') {
+        $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
+        fail('KI-Anfrage fehlgeschlagen: ' . ($msg !== '' ? $msg : 'unerwartete Antwort vom KI-Dienst.'), 502);
+      }
+      $generated = '';
+      foreach ((array)($j['content'] ?? []) as $block) {
+        if (($block['type'] ?? '') === 'text') $generated .= (string)($block['text'] ?? '');
+      }
+      $generated = trim($generated);
+    } else {
+      $reqBody = json_encode([
+        'model' => $model,
+        'messages' => [
+          ['role' => 'system', 'content' => $style],
+          ['role' => 'user', 'content' => $text],
+        ],
+        'temperature' => 0.6,
+        'max_tokens' => 500,
+      ], JSON_UNESCAPED_UNICODE);
+      $ctx = stream_context_create(['http' => [
+        'method' => 'POST',
+        'header' => "Authorization: Bearer $apiKey\r\nContent-Type: application/json\r\n",
+        'content' => $reqBody,
+        'timeout' => 40,
+        'ignore_errors' => true,
+      ]]);
+      $resp = @file_get_contents($baseUrl . '/chat/completions', false, $ctx);
+      if ($resp === false) fail('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.', 502);
+      $j = json_decode($resp, true);
+      if (!is_array($j) || isset($j['error'])) {
+        $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
+        fail('KI-Anfrage fehlgeschlagen: ' . ($msg !== '' ? $msg : 'unerwartete Antwort vom KI-Dienst.'), 502);
+      }
+      $generated = trim((string)($j['choices'][0]['message']['content'] ?? ''));
     }
-    $generated = trim((string)($j['choices'][0]['message']['content'] ?? ''));
     if ($generated === '') fail('KI-Anfrage fehlgeschlagen: keine Antwort erhalten.', 502);
     out(['text' => $generated]);
   }
