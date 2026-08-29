@@ -76,6 +76,23 @@ tr.click{cursor:pointer}tr.click:hover td{background:rgba(255,255,255,.025)}
 .tbl-wrap{overflow-x:auto}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 th.num{text-align:right}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:var(--gll)}
+th.sorted{color:var(--acc)}
+.sortarrow{display:inline-block;margin-left:4px;vertical-align:-2px;line-height:0}
+.sortarrow svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* Stapel-Bearbeitung Technik */
+#eqBatchBar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+#eqBatchBar .grp{display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:6px 8px;border-radius:6px}
+#eqBatchBar .grp .lbl{font-size:10px;color:var(--gl);text-transform:uppercase;letter-spacing:.06em}
+#eqBatchBar input,#eqBatchBar select{margin:0}
+#eqBatchBar .spacer{flex:1}
+table.batch td,table.batch th{white-space:nowrap}
+table.batch input,table.batch select{margin:0;padding:4px 6px;font-size:12px}
+table.batch input[type=number]{width:80px}
+table.batch input.cat{width:120px}
+table.batch tr.dirty td{background:rgba(255,111,91,.08)}
+table.batch td.chk,table.batch th.chk{text-align:center}
 
 /* Badges */
 .b{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:9px;border:1px solid}
@@ -390,8 +407,18 @@ th.num{text-align:right}
   <!-- TECHNIK -->
   <div class="pg" id="pg-tech">
     <div class="phead"><div><div class="pt">Technik</div><div class="ps">Bestand, Verleihpreise &amp; Homepage-Anzeige</div></div>
-      <button class="btn" onclick="openEqModal()">+ Neuer Artikel</button></div>
-    <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Heute im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
+      <div style="display:flex;gap:8px"><button class="btn g" id="eqBatchToggle" onclick="toggleEqBatch()">Stapel bearbeiten</button>
+      <button class="btn" onclick="openEqModal()">+ Neuer Artikel</button></div></div>
+    <div id="eqBatchBar" hidden>
+      <div class="grp"><span class="lbl">Sichtbar</span><button class="btn g sm" onclick="eqBatchSet('public',true)">an</button><button class="btn g sm" onclick="eqBatchSet('public',false)">aus</button></div>
+      <div class="grp"><span class="lbl">Auf Anfrage</span><button class="btn g sm" onclick="eqBatchSet('on_request',true)">an</button><button class="btn g sm" onclick="eqBatchSet('on_request',false)">aus</button></div>
+      <div class="grp"><span class="lbl">Status</span><select id="eqBatchStatus"><option>aktiv</option><option>wartung</option><option>inaktiv</option></select><button class="btn g sm" onclick="eqBatchSet('status',document.getElementById('eqBatchStatus').value)">setzen</button></div>
+      <div class="grp"><span class="lbl">Preis</span><select id="eqBatchPriceMode"><option value="pct+">+ %</option><option value="pct-">− %</option><option value="fix">fester Wert €</option></select><input type="number" step="0.01" id="eqBatchPriceVal" placeholder="0" style="width:80px"><button class="btn g sm" onclick="eqBatchPrice()">anpassen</button></div>
+      <div class="spacer"></div>
+      <button class="btn" onclick="eqBatchSave()">Änderungen speichern</button>
+    </div>
+    <div class="tbl-wrap card" id="eqViewWrap"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Heute im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
+    <div class="tbl-wrap card" id="eqBatchWrap" hidden><table class="batch"><thead><tr><th class="chk"><input type="checkbox" id="eqBatchAll" onclick="eqBatchToggleAll(this.checked)"></th><th>Name</th><th>Kategorie</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th class="num">Bestand</th><th>Status</th><th class="chk">Auf Anfrage</th><th class="chk">Sichtbar</th></tr></thead><tbody id="eqBatchRows"></tbody></table></div>
     <div class="card"><h3>Sets <span class="mut sml" style="font-weight:400">– mehrere Artikel als ein buchbares Paket (z. B. Lautsprecher + Kabel + Endstufe)</span> <button class="btn sm" style="float:right" onclick="openSetModal()">+ Set</button></h3>
       <div id="setAdminList" class="sml"></div></div>
     <div class="card"><h3>Miet-Partner (DJs, Bands, Musiker, Techniker) <span class="mut sml" style="font-weight:400">– registrieren sich über die Technik-Seite, du schaltest frei und teilst den Code mit</span></h3><div id="partnerList" class="sml"></div></div>
@@ -970,7 +997,7 @@ function markFollowDone(id){api('communications?id=eq.'+id,{method:'PATCH',body:
 /* ===== Anfragen ===== */
 var INQ_BADGE={neu:'gold',in_bearbeitung:'blue',erledigt:'green',archiviert:'grey'};
 function renderInq(){
-  document.getElementById('inqRows').innerHTML=CACHE.inquiries.map(function(i){
+  document.getElementById('inqRows').innerHTML=applySort((CACHE.inquiries||[]).slice(),'inquiries').map(function(i){
     return '<tr><td>'+dtt(i.created_at)+'</td><td><b>'+esc(i.name)+'</b><br><span class="mut sml">'+esc(i.email||'')+' '+esc(i.phone||'')+'</span></td>'+
     '<td>'+esc(i.event_type||'–')+'</td><td>'+dt(i.event_date)+'</td>'+
     '<td><span class="b '+(INQ_BADGE[i.status]||'grey')+'">'+i.status.replace('_',' ')+'</span></td>'+
@@ -2185,23 +2212,130 @@ function renderStats(){
     .map(function(k){return '<div style="padding:3px 0">'+esc(k)+' <b style="float:right">'+src[k]+'</b></div>'}).join('')||'<span class="mut">Keine Daten.</span>';
 }
 
+/* ===== Sortierbare Tabellen ===== */
+var SORT={};
+var SORTDEFS={
+  inquiries:{rowsId:'inqRows',render:function(){renderInq()},cols:[
+    {get:function(i){return i.created_at},type:'date'},
+    {get:function(i){return i.name},type:'text'},
+    {get:function(i){return i.event_type},type:'text'},
+    {get:function(i){return i.event_date},type:'date'},
+    {get:function(i){return i.status},type:'text'},null]},
+  customers:{rowsId:'custRows',render:function(){renderCustList()},cols:[
+    {get:function(c){return custName(c)},type:'text'},
+    {get:function(c){return c.email},type:'text'},
+    {get:function(c){return c.city},type:'text'},
+    {get:function(c){return c.source},type:'text'},
+    {get:function(c){return c.status},type:'text'}]},
+  bookings:{rowsId:'bookRows',render:function(){renderBook()},cols:[
+    {get:function(b){return b.event_date},type:'date'},
+    {get:function(b){return b.title||b.event_type},type:'text'},
+    {get:function(b){return b.kind},type:'text'},
+    {get:function(b){return b.venue_name},type:'text'},
+    {get:function(b){return b.fee_net},type:'num'},
+    {get:function(b){return b.status},type:'text'}]},
+  quotes:{rowsId:'quoteRows',render:function(){renderQuotes()},cols:[
+    {get:function(d){return d.number},type:'text'},
+    {get:function(d){return d.doc_date},type:'date'},
+    {get:function(d){return custName(d.customers)},type:'text'},
+    {get:function(d){return d.total_gross},type:'num'},
+    {get:function(d){return d.valid_until},type:'date'},
+    {get:function(d){return d.status},type:'text'}]},
+  invoices:{rowsId:'invRows',render:function(){renderInv()},cols:[
+    {get:function(d){return d.number},type:'text'},
+    {get:function(d){return d.doc_type},type:'text'},
+    {get:function(d){return d.doc_date},type:'date'},
+    {get:function(d){return custName(d.customers)},type:'text'},
+    {get:function(d){return Number(d.total_gross)-Number(d.deposit_deducted||0)},type:'num'},
+    {get:function(d){return d.due_date},type:'date'},
+    {get:function(d){return d.status},type:'text'}]},
+  products:{rowsId:'prodRows',render:function(){renderProducts()},cols:[
+    {get:function(p){return p.sku},type:'text'},
+    {get:function(p){return p.name},type:'text'},
+    {get:function(p){return p.category},type:'text'},
+    {get:function(p){return p.unit},type:'text'},
+    {get:function(p){return prodPrice(p)},type:'num'},
+    {get:function(p){return (p.bundle||[]).length},type:'num'},
+    {get:function(p){return p.active?1:0},type:'num'}]},
+  workshops:{tableEl:function(){var el=document.getElementById('wsAdminList');return el?el.querySelector('table'):null},render:function(){renderWsAdmin()},cols:[
+    {get:function(w){return w.event_date},type:'date'},
+    {get:function(w){return w.title},type:'text'},
+    {get:function(w){return w.price_net},type:'num'},
+    {get:function(w){return wsBooked(w.id)},type:'num'},
+    {get:function(w){return w.public?1:0},type:'num'},null]},
+  equipment:{rowsId:'eqRows',render:function(){renderEq()},cols:[
+    {get:function(e){return e.name},type:'text'},
+    {get:function(e){return e.category},type:'text'},
+    {get:function(e){return e.qty_total},type:'num'},
+    {get:function(e){return e.day_rate},type:'num'},
+    {get:function(e){return e.partner_rate},type:'num'},
+    {get:function(e){return (e.public&&e.rentable)?1:0},type:'num'},
+    {get:function(e){return e.status},type:'text'},
+    {get:function(e){return eqInUse(e)},type:'num'}]}
+};
+function sortTable(name){var d=SORTDEFS[name];if(d.tableEl)return d.tableEl();var tb=document.getElementById(d.rowsId);return tb?tb.closest('table'):null}
+function applySort(list,name){
+  var s=SORT[name];if(!s)return list;
+  var col=SORTDEFS[name].cols[s.col];if(!col)return list;
+  return list.slice().sort(function(a,b){
+    var va=col.get(a),vb=col.get(b),r;
+    if(col.type==='num'){va=(va==null||va==='')?-Infinity:Number(va);vb=(vb==null||vb==='')?-Infinity:Number(vb);r=va-vb}
+    else if(col.type==='date'){va=va?new Date(va).getTime():-Infinity;vb=vb?new Date(vb).getTime():-Infinity;r=va-vb}
+    else{r=String(va==null?'':va).localeCompare(String(vb==null?'':vb),'de',{numeric:true})}
+    return r*s.dir;
+  });
+}
+function onSortClick(name,i){
+  var s=SORT[name];
+  if(s&&s.col===i)s.dir=-s.dir;else SORT[name]={col:i,dir:1};
+  SORTDEFS[name].render();
+  updateSortIndicators(name);
+}
+var SORT_ARROW={up:'<span class="sortarrow"><svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg></span>',
+  down:'<span class="sortarrow"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span>'};
+function updateSortIndicators(name){
+  var table=sortTable(name);if(!table||!table.tHead)return;
+  var ths=table.tHead.rows[0].cells,s=SORT[name];
+  for(var i=0;i<ths.length;i++){
+    var th=ths[i],a=th.querySelector('.sortarrow');if(a)a.parentNode.removeChild(a);
+    th.classList.remove('sorted');
+    if(s&&s.col===i){th.classList.add('sorted');th.insertAdjacentHTML('beforeend',s.dir>0?SORT_ARROW.up:SORT_ARROW.down)}
+  }
+}
+function wireTable(name){
+  var def=SORTDEFS[name],table=sortTable(name);if(!table||!table.tHead)return;
+  var ths=table.tHead.rows[0].cells;
+  for(var i=0;i<ths.length;i++){(function(i,th){
+    if(!def.cols[i])return;
+    th.classList.add('sortable');
+    if(!th.__sortWired){th.__sortWired=true;th.addEventListener('click',function(){onSortClick(name,i)})}
+  })(i,ths[i]);}
+  updateSortIndicators(name);
+}
+function initSort(){for(var name in SORTDEFS){if(name==='workshops')continue;wireTable(name)}}
+
 /* ===== Technik ===== */
-function renderEq(){
+function eqInUse(e){
   var today=new Date().toISOString().slice(0,10);
-  document.getElementById('eqRows').innerHTML=CACHE.equipment.map(function(e){
-    var inUse=CACHE.be.filter(function(x){
-      if(x.equipment_id!==e.id)return false;
-      var b=CACHE.bookings.find(function(bb){return bb.id===x.booking_id});
-      if(!b||b.status==='storniert')return false;
-      return b.event_date<=today&&(b.end_date||b.event_date)>=today;
-    }).reduce(function(s,x){return s+x.qty},0);
-    return '<tr class="click" onclick="openEqModal(\''+e.id+'\')"><td><b>'+esc(e.name)+'</b>'+(e.own_rig?' <span class="b blue" title="Fest im Lokvogel verbaut – Notfall-Reserve">Lokvogel</span>':'')+'</td><td>'+esc(e.category||'–')+'</td>'+
+  return CACHE.be.filter(function(x){
+    if(x.equipment_id!==e.id)return false;
+    var b=CACHE.bookings.find(function(bb){return bb.id===x.booking_id});
+    if(!b||b.status==='storniert')return false;
+    return b.event_date<=today&&(b.end_date||b.event_date)>=today;
+  }).reduce(function(s,x){return s+x.qty},0);
+}
+function renderEq(){
+  if(eqBatch.on){renderEqBatch();return;}
+  document.getElementById('eqRows').innerHTML=applySort((CACHE.equipment||[]).slice(),'equipment').map(function(e){
+    var inUse=eqInUse(e);
+    return '<tr class="click" onclick="openEqModal(\''+e.id+'\')"><td><b>'+esc(e.name)+'</b>'+(e.on_request?' <span class="b yel" title="Nur auf Anfrage – Bestätigung manuell">auf Anfrage</span>':'')+'</td><td>'+esc(e.category||'–')+'</td>'+
     '<td class="num">'+e.qty_total+'</td><td class="num">'+euro(e.day_rate)+'</td>'+
     '<td class="num">'+(e.partner_rate!=null?euro(e.partner_rate):'<span class="mut">auto</span>')+'</td>'+
     '<td>'+(e.public&&e.rentable?'<span class="b green">sichtbar</span>':'<span class="b grey">verborgen</span>')+'</td>'+
     '<td><span class="b '+({aktiv:'green',wartung:'yel',inaktiv:'grey'}[e.status]||'grey')+'">'+e.status+'</span></td>'+
     '<td>'+(inUse?('<span class="b blue">'+inUse+' Stk. unterwegs</span>'):'–')+'</td></tr>';
   }).join('')||'<tr><td colspan="8" class="mut">Noch keine Artikel.</td></tr>';
+  updateSortIndicators('equipment');
 }
 function openEqModal(id){
   var e=id?CACHE.equipment.find(function(x){return x.id===id}):{};e=e||{};
@@ -2221,7 +2355,7 @@ function openEqModal(id){
     (CACHE.equipment||[]).filter(function(x){return x.id!==e.id}).map(function(x){return '<option value="'+x.id+'"'+(e.addon_id===x.id?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select></div></div>'+
     '<div class="grid2"><div><label>Thomann-Link (Nachbestellung / techn. Daten)</label><input id="eThomann" value="'+esc(e.thomann_url||'')+'" placeholder="https://www.thomann.de/…">'+
     (e.thomann_url?'<a href="'+esc(e.thomann_url)+'" target="_blank" rel="noopener" class="mut sml">Bei Thomann ansehen ↗</a>':'')+'</div>'+
-    '<div style="display:flex;align-items:flex-end"><label style="margin:0"><input type="checkbox" id="eOwnRig" style="width:auto;margin-right:6px" '+(e.own_rig?'checked':'')+'>Teil des festen Lokvogel-Setups (Notfall-Reserve)</label></div></div>'+
+    '<div style="display:flex;align-items:flex-end"><label style="margin:0"><input type="checkbox" id="eOnReq" style="width:auto;margin-right:6px" '+(e.on_request?'checked':'')+'>Nur auf Anfrage verfügbar – Kunde kann in den Tourcase legen, Bestätigung machst du manuell</label></div></div>'+
     (id?('<label>Einkaufsbeleg (für Garantiefälle)</label><div style="display:flex;gap:8px;align-items:center">'+
       (e.invoice_name?'<a class="mut sml" onclick="openEqInvoice(\''+id+'\')">'+esc(e.invoice_name)+' ansehen ↗</a>':'<span class="mut sml">Noch kein Beleg hinterlegt.</span>')+
       '<input type="file" accept="application/pdf,image/*" style="display:none" id="upEqInv" onchange="uploadEqInvoice(this,\''+id+'\')">'+
@@ -2241,7 +2375,7 @@ function saveEq(id){
   if(!v('eName')){toast('Name fehlt.',1);return}
   var body={name:v('eName'),category:v('eCat'),sku:v('eSku')||null,description:v('eDesc'),day_rate:Number(v('eRate'))||0,
     partner_rate:v('ePartner')!==''?Number(v('ePartner')):null,addon_id:v('eAddon')||null,
-    thomann_url:v('eThomann')||null,own_rig:document.getElementById('eOwnRig').checked,
+    thomann_url:v('eThomann')||null,on_request:document.getElementById('eOnReq').checked,
     day_rate_suggested:v('eRateSuggested')!==''?Number(v('eRateSuggested')):null,
     followup_pct:Number(v('ePct'))||50,
     tier_week_pct:v('eTierWeek')!==''?Number(v('eTierWeek')):null,
