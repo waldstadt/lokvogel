@@ -4209,6 +4209,33 @@ function igSync(){
 
 /* ===== Text-Editor („Groß bearbeiten") mit Mini-Markdown ===== */
 var ED_TARGET=null,ED_UNDO=null;
+/* Empfohlene Zeichen-Zielbereiche je Textfeld – grobe Richtwerte fürs Lesen am Bildschirm
+   bzw. (bei cSeoDesc) die von Google in der Suche angezeigte Länge. Felder ohne Eintrag
+   zeigen nur die reine Zeichenzahl ohne Zielbereich (z. B. Notizen, Rechtstexte). */
+var EDIT_LEN_HINT={
+  eDesc:[150,400],sDesc:[150,400],pDesc:[150,400],uDesc:[100,350],
+  wLongDesc:[400,900],cHeroText:[80,200],cAboutText:[400,900],cGText:[200,500],
+  cThText:[150,350],cThRentText:[80,200],cThTeaText:[80,200],cLocText:[150,400],
+  nlBody:[300,900],docIntro:[100,300],docOutro:[100,300],ftIntro:[150,400],
+  tBody:[300,900],rBody:[300,900],remBody:[300,900],
+  tcUse:[100,400],tcProb:[100,400],tcWish:[100,400],tcFind:[150,500],
+  tcWhy:[150,500],tcPersonal:[150,500],tcSteps:[150,500],
+  lDesc:[80,250],frDesc:[80,250],fA:[150,500],cSeoDesc:[120,160]
+};
+function edLenUpdate(){
+  var t=document.getElementById('edArea'),h=document.getElementById('edLenHint');
+  if(!t||!h)return;
+  var n=t.value.length,range=EDIT_LEN_HINT[ED_TARGET];
+  if(!range){h.textContent=n+' Zeichen';h.className='mut sml';return}
+  var lo=range[0],hi=range[1],cls,txt;
+  if(n===0){cls='mut';txt=n+' Zeichen – empfohlen '+lo+'–'+hi}
+  else if(n<lo*0.6||n>hi*1.6){cls='';h.style.color='var(--red)';txt=n+' Zeichen – empfohlen '+lo+'–'+hi+' (deutlich '+(n<lo?'zu kurz':'zu lang')+')'}
+  else if(n<lo||n>hi){h.style.color='#c9902e';txt=n+' Zeichen – empfohlen '+lo+'–'+hi+' ('+(n<lo?'etwas knapp':'etwas lang')+')'}
+  else{h.style.color='#3fae5c';txt=n+' Zeichen – im empfohlenen Bereich ('+lo+'–'+hi+')'}
+  if(cls==='mut')h.style.color='';
+  h.className='sml'+(cls==='mut'?' mut':'');
+  h.textContent=txt;
+}
 function edBtn(id){
   return '<div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor(\''+id+'\')">'+
   '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>';
@@ -4224,10 +4251,12 @@ function openTextEditor(id){
     '<button class="btn g sm" id="edAiBtn" title="Aus Stichpunkten oder schlechtem Text einen fertigen Artikeltext machen" onclick="edAiImprove()">'+
     '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Mit KI verbessern</button>'+
     '<a class="sml" id="edAiUndo" style="display:none" onclick="edAiUndo()">Rückgängig</a></div>'+
-    '<textarea id="edArea" style="min-height:320px"></textarea>'+
-    '<div class="mut sml" style="margin-top:6px">**fett**, *kursiv*, [Text](https://…) – wird auf der Homepage formatiert angezeigt.</div>'+
+    '<textarea id="edArea" style="min-height:320px" oninput="edLenUpdate()"></textarea>'+
+    '<div class="sml mut" id="edLenHint" style="margin-top:6px"></div>'+
+    '<div class="mut sml" style="margin-top:2px">**fett**, *kursiv*, [Text](https://…) – wird auf der Homepage formatiert angezeigt.</div>'+
     '<div style="margin-top:12px"><button class="btn" onclick="edApply()">Übernehmen</button> <button class="btn g" onclick="closeOvl2()">Abbrechen</button></div>');
   document.getElementById('edArea').value=src.value;
+  edLenUpdate();
 }
 function edAiImprove(){
   var t=document.getElementById('edArea');if(!t)return;
@@ -4236,6 +4265,7 @@ function edAiImprove(){
   var isEq=['eDesc','sDesc','pDesc','uDesc'].indexOf(ED_TARGET)>=0;
   var body={text:text,kind:isEq?'equipment':'page'};
   if(ED_TARGET==='eDesc')body.category=v('eCat');
+  if(EDIT_LEN_HINT[ED_TARGET])body.target_len=EDIT_LEN_HINT[ED_TARGET];
   var btn=document.getElementById('edAiBtn');
   btn.disabled=true;btn.textContent='Wird generiert …';
   ED_UNDO=t.value;
@@ -4247,6 +4277,7 @@ function edAiImprove(){
       if(!res.ok||res.j.error){toast((res.j&&res.j.error)||'KI-Anfrage fehlgeschlagen.',1);return}
       t.value=res.j.text||'';
       document.getElementById('edAiUndo').style.display='inline';
+      edLenUpdate();
       toast('Text generiert – bei Bedarf anpassen, dann „Übernehmen".');
     }).catch(function(e){
       btn.disabled=false;
@@ -4258,6 +4289,7 @@ function edAiUndo(){
   var t=document.getElementById('edArea');
   if(t&&ED_UNDO!==null)t.value=ED_UNDO;
   document.getElementById('edAiUndo').style.display='none';
+  edLenUpdate();
 }
 function edWrap(pre,post){
   var t=document.getElementById('edArea');if(!t)return;

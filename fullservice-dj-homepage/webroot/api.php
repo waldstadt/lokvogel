@@ -2684,6 +2684,11 @@ try {
       $style .= ' Mach aus dem gegebenen Stichpunkte-Text bzw. Rohtext einen ansprechenden Seiten- oder '
         . 'Werbetext. Halte dich dabei ungefähr an die Länge des Eingabetexts.';
     }
+    $targetLen = (array)($body['target_len'] ?? []);
+    if (count($targetLen) === 2 && is_numeric($targetLen[0]) && is_numeric($targetLen[1])) {
+      $style .= sprintf(' Ziel-Länge des Textes: etwa %d bis %d Zeichen (nicht strikt, aber orientiere dich daran).',
+        (int)$targetLen[0], (int)$targetLen[1]);
+    }
     if ($provider === 'claude') {
       $reqBody = json_encode([
         'model' => $model,
