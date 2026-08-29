@@ -152,7 +152,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .totals{margin-top:12px;text-align:right;font-size:12px}
 .totals b{font-size:15px;color:var(--acc)}
 
-.toast{position:fixed;bottom:20px;right:20px;background:var(--cd2);border:1px solid var(--acc);color:var(--wh);padding:11px 18px;font-size:12px;z-index:300;display:none}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--cd2);border:1px solid var(--acc);color:var(--wh);padding:11px 18px;font-size:12px;z-index:300;display:none;max-width:420px;cursor:pointer;user-select:text}
 .toast.err{border-color:var(--red)}
 .mut{color:var(--gl)}.sml{font-size:11px}
 .theme-sw{display:inline-block;width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;margin-right:6px;vertical-align:middle}
@@ -748,7 +748,15 @@ var API='api.php';
 
 /* ===== Basis ===== */
 var TOKEN=null,S={},CACHE={};
-function toast(msg,err){var t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(err?' err':'');t.style.display='block';setTimeout(function(){t.style.display='none'},3200)}
+var TOAST_HIDE_T=null;
+function toast(msg,err){
+  var t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(err?' err':'');
+  t.title=err?'Zum Ausblenden klicken':'';
+  t.onclick=function(){t.style.display='none';if(TOAST_HIDE_T)clearTimeout(TOAST_HIDE_T)};
+  t.style.display='block';
+  if(TOAST_HIDE_T)clearTimeout(TOAST_HIDE_T);
+  TOAST_HIDE_T=setTimeout(function(){t.style.display='none'},err?20000:3200);
+}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 /* Sicher als JS-String-Literal in einem Inline-onclick="fn('…')": erst JS-escapen
    (Backslash/Quote/Zeilenumbruch), dann HTML-escapen. Sonst dekodiert der HTML-Parser
