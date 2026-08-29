@@ -232,8 +232,11 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <a data-pg="stats"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>Statistik</a>
       <div class="grp">Betrieb</div>
       <a data-pg="tech"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>Technik</a>
+      <a data-pg="workshops"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Workshops</a>
+      <a data-pg="partners"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Miet-Partner</a>
       <div class="grp">Website</div>
       <a data-pg="cms"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Inhalte</a>
+      <a data-pg="media"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Medien-Pool</a>
       <div class="grp">System</div>
       <a data-pg="set"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Einstellungen</a>
     </div>
@@ -454,11 +457,15 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <span id="eqBatchCount" class="mut sml"></span>
       <button class="btn" onclick="eqBatchSave()">Änderungen speichern</button>
     </div>
-    <div class="tbl-wrap card" id="eqViewWrap"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Heute im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
+    <div class="tbl-wrap card" id="eqViewWrap"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Nächstes Mal im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
     <div class="tbl-wrap card" id="eqBatchWrap" hidden><table class="batch"><thead><tr><th class="chk"><input type="checkbox" id="eqBatchAll" onclick="eqBatchToggleAll(this.checked)"></th><th>Name</th><th>Kategorie</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th class="num">Bestand</th><th>Status</th><th class="chk">Auf Anfrage</th><th class="chk">Sichtbar</th></tr></thead><tbody id="eqBatchRows"></tbody></table></div>
     <div class="card"><h3>Sets <span class="mut sml" style="font-weight:400">– mehrere Artikel als ein buchbares Paket (z. B. Lautsprecher + Kabel + Endstufe)</span> <button class="btn sm" style="float:right" onclick="openSetModal()">+ Set</button></h3>
       <div id="setAdminList" class="sml"></div></div>
-    <div class="card"><h3>Miet-Partner (DJs, Bands, Musiker, Techniker) <span class="mut sml" style="font-weight:400">– registrieren sich über die Technik-Seite, du schaltest frei und teilst den Code mit</span></h3><div id="partnerList" class="sml"></div></div>
+  </div>
+
+  <!-- WORKSHOPS -->
+  <div class="pg" id="pg-workshops">
+    <div class="pt">Workshops</div><div class="ps">Termine, Anmeldungen &amp; Newsletter</div>
     <div class="card"><h3>Workshop-Termine <span class="mut sml" style="font-weight:400">– buchbar auf der Technik-Seite, Rechnung geht automatisch per E-Mail raus</span> <button class="btn sm" style="float:right" onclick="openWsModal()">+ Termin</button></h3>
       <div id="wsAdminList" class="sml"></div></div>
     <div class="card"><h3>Workshop-Newsletter <span class="mut sml" style="font-weight:400">– Anmeldung über die Technik-Seite, Double-Opt-in</span></h3>
@@ -473,6 +480,20 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <button class="btn sm" id="nlSendBtn" onclick="nlAdminSend(false)">An alle Abonnenten senden</button>
         </div>
       </div></div>
+  </div>
+
+  <!-- MIET-PARTNER -->
+  <div class="pg" id="pg-partners">
+    <div class="pt">Miet-Partner</div><div class="ps">DJs, Bands, Musiker:innen &amp; Techniker mit vergünstigten Mietpreisen</div>
+    <div class="card"><h3>Anträge &amp; freigeschaltete Partner <span class="mut sml" style="font-weight:400">– Registrierung über den Vermietkatalog; ab Antrag gelten vorläufig schon die Partnerpreise</span></h3><div id="partnerList" class="sml"></div></div>
+  </div>
+
+  <!-- MEDIEN-POOL -->
+  <div class="pg" id="pg-media">
+    <div class="phead"><div><div class="pt">Medien-Pool</div><div class="ps">Alle hochgeladenen Bilder an einem Ort – hochladen und direkt verteilen</div></div>
+      <div><input type="file" accept="image/*" multiple style="display:none" id="mediaPgUp" onchange="mediaPgUpload(this)">
+      <button class="btn" onclick="document.getElementById('mediaPgUp').click()">Bilder hochladen</button></div></div>
+    <div id="mediaPgGrid" class="mut sml">Lade Bilder …</div>
   </div>
 
   <!-- CMS -->
@@ -873,7 +894,8 @@ function showPage(id){
   document.getElementById('pg-'+id).classList.add('a');
   document.querySelectorAll('#nav a').forEach(function(a){a.classList.toggle('a',a.dataset.pg===id)});
   if(id==='stats')loadWebStats();
-  if(id==='tech')loadNewsletter();
+  if(id==='workshops')loadNewsletter();
+  if(id==='media')loadMediaPage();
   window.scrollTo(0,0);
 }
 
@@ -2405,7 +2427,7 @@ var SORTDEFS={
     {get:function(e){return e.partner_rate},type:'num'},
     {get:function(e){return (e.public&&e.rentable)?1:0},type:'num'},
     {get:function(e){return e.status},type:'text'},
-    {get:function(e){return eqInUse(e)},type:'num'}]}
+    {get:function(e){return eqNextUseSortVal(e)},type:'num'}]}
 };
 /* Standardsortierung: benannte Listen alphabetisch (Klick auf einen Kopf ändert sie). */
 SORT.equipment={col:0,dir:1};   // Name
@@ -2453,25 +2475,53 @@ function wireTable(name){
 function initSort(){for(var name in SORTDEFS){if(name==='workshops')continue;wireTable(name)}}
 
 /* ===== Technik ===== */
-function eqInUse(e){
+/* Nächster (laufender oder kommender) Einsatz eines Artikels - für Spalte "Nächstes Mal im
+   Einsatz" in der Technik-Tabelle und die Set-Zeilen. Liefert null, wenn nichts ansteht,
+   sonst {now:bool, date, qty}. */
+function eqNextUse(e){
   var today=new Date().toISOString().slice(0,10);
-  return CACHE.be.filter(function(x){
-    if(x.equipment_id!==e.id)return false;
+  var rows=(CACHE.be||[]).filter(function(x){return x.equipment_id===e.id}).map(function(x){
     var b=CACHE.bookings.find(function(bb){return bb.id===x.booking_id});
-    if(!b||b.status==='storniert')return false;
-    return b.event_date<=today&&(b.end_date||b.event_date)>=today;
-  }).reduce(function(s,x){return s+x.qty},0);
+    if(!b||b.status==='storniert')return null;
+    var end=b.end_date||b.event_date;
+    if(end<today)return null;
+    return {qty:x.qty,start:b.event_date,end:end};
+  }).filter(Boolean);
+  if(!rows.length)return null;
+  var current=rows.filter(function(r){return r.start<=today&&r.end>=today});
+  if(current.length)return {now:true,date:today,qty:current.reduce(function(s,r){return s+r.qty},0)};
+  rows.sort(function(a,b){return a.start<b.start?-1:1});
+  return {now:false,date:rows[0].start,qty:rows[0].qty};
+}
+var WOCHENTAGE=['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+function eqNextUseLabel(e){
+  var n=eqNextUse(e);
+  if(!n)return '–';
+  if(n.now)return n.qty>=e.qty_total?'ist unterwegs':n.qty+' Stück unterwegs';
+  var today=new Date();today.setHours(0,0,0,0);
+  var d=new Date(n.date+'T00:00:00');
+  var diffDays=Math.round((d-today)/86400000);
+  if(diffDays===1)return 'morgen unterwegs';
+  if(diffDays>=2&&diffDays<=7)return 'kommenden '+WOCHENTAGE[d.getDay()]+' unterwegs';
+  return 'am '+String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getFullYear()).slice(-2)+' unterwegs';
+}
+function eqNextUseSortVal(e){
+  var n=eqNextUse(e);
+  if(!n)return Infinity;
+  if(n.now)return -1;
+  var today=new Date();today.setHours(0,0,0,0);
+  return Math.round((new Date(n.date+'T00:00:00')-today)/86400000);
 }
 function renderEq(){
   if(eqBatch.on){renderEqBatch();return;}
   document.getElementById('eqRows').innerHTML=applySort((CACHE.equipment||[]).slice(),'equipment').map(function(e){
-    var inUse=eqInUse(e);
+    var nu=eqNextUse(e),lbl=eqNextUseLabel(e);
     return '<tr class="click" onclick="openEqModal(\''+e.id+'\')"><td><b>'+esc(e.name)+'</b>'+(e.on_request?' <span class="b yel" title="Nur auf Anfrage – Bestätigung manuell">auf Anfrage</span>':'')+'</td><td>'+esc(e.category||'–')+'</td>'+
     '<td class="num">'+e.qty_total+'</td><td class="num">'+euro(e.day_rate)+'</td>'+
     '<td class="num">'+(e.partner_rate!=null?euro(e.partner_rate):'<span class="mut">auto</span>')+'</td>'+
     '<td>'+(e.public&&e.rentable?'<span class="b green">sichtbar</span>':'<span class="b grey">verborgen</span>')+'</td>'+
     '<td><span class="b '+({aktiv:'green',wartung:'yel',inaktiv:'grey'}[e.status]||'grey')+'">'+e.status+'</span></td>'+
-    '<td>'+(inUse?('<span class="b blue">'+inUse+' Stk. unterwegs</span>'):'–')+'</td></tr>';
+    '<td>'+(nu?'<span class="b blue">'+lbl+'</span>':'–')+'</td></tr>';
   }).join('')||'<tr><td colspan="8" class="mut">Noch keine Artikel.</td></tr>';
   updateSortIndicators('equipment');
 }
@@ -2698,14 +2748,16 @@ function setItemDrop(i,ev){
 function renderSetItemRows(){
   document.getElementById('sItemRows').innerHTML=curSetItems.map(function(it,i){
     var mq=clampSetItemQty(it);
-    var hint=mq>1?'<div class="mut sml" style="margin-top:2px">Mindestabnahme '+mq+' Stück</div>':'';
+    var mqHint=mq>1?'<div class="mut sml" style="margin-top:2px">Mindestabnahme '+mq+' Stück</div>':'';
+    var eq=(CACHE.equipment||[]).find(function(x){return x.id===it.equipment_id});
+    var nu=eq?eqNextUse(eq):null;
+    var nuHint=nu?'<div class="mut sml" style="margin-top:2px">'+esc(eqNextUseLabel(eq))+'</div>':'';
     return '<div draggable="true" ondragstart="setItemDragStart('+i+',event)" ondragover="setItemDragOver(event)" ondrop="setItemDrop('+i+',event)" '+
-      'class="grid3" style="margin-bottom:6px;align-items:start;cursor:grab">'+
-      '<div style="display:flex;gap:8px;align-items:flex-start;grid-column:span 2">'+
-      '<span style="opacity:.55;user-select:none;padding-top:9px" title="Ziehen zum Umsortieren">⠿</span>'+
-      '<div style="flex:1"><select onchange="curSetItems['+i+'].equipment_id=this.value;renderSetItemRows()">'+
+      'style="display:grid;grid-template-columns:24px 1fr 140px;gap:8px;align-items:center;margin-bottom:6px;cursor:grab">'+
+      '<span style="opacity:.55;user-select:none;text-align:center" title="Ziehen zum Umsortieren">⠿</span>'+
+      '<div><select onchange="curSetItems['+i+'].equipment_id=this.value;renderSetItemRows()" style="margin:0">'+
       (CACHE.equipment||[]).slice().sort(byNameDe).map(function(e){return '<option value="'+e.id+'"'+(it.equipment_id===e.id?' selected':'')+'>'+esc(e.name)+' ('+euro(e.day_rate||0)+'/Tag)</option>'}).join('')+
-      '</select>'+hint+'</div></div>'+
+      '</select>'+mqHint+nuHint+'</div>'+
       '<div style="display:flex;gap:6px"><input type="number" min="'+mq+'" step="'+mq+'" value="'+it.qty+'" onchange="curSetItems['+i+'].qty=Number(this.value)||'+mq+';renderSetItemRows()" style="margin:0"><button class="btn r sm" onclick="curSetItems.splice('+i+',1);renderSetItemRows()">✕</button></div></div>';
   }).join('')||'<span class="mut sml">Noch keine Artikel im Set.</span>';
   updateSetPricePreview();
@@ -3997,17 +4049,25 @@ function renderPartners(){
   var el=document.getElementById('partnerList');if(!el)return;
   var KIND={dj:'DJ',band:'Band',musiker:'Musiker',techniker:'Techniker'};
   el.innerHTML=(CACHE.partners||[]).map(function(pt){
-    return '<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)"><b>'+esc(pt.name)+'</b> <span class="mut">'+(KIND[pt.kind]||pt.kind)+(pt.company?' · '+esc(pt.company):'')+' · '+esc(pt.email||'')+'</span> '+
-    (pt.status==='freigeschaltet'?
-      '<span class="b green">Code: '+esc(pt.code)+'</span> <a class="sml" onclick="navigator.clipboard.writeText(\''+esc(pt.code)+'\').then(function(){toast(\'Code kopiert ✓\')})"></a>':
-      '<span class="b gold">beantragt</span> <button class="btn sm" onclick="approvePartner(\''+pt.id+'\')">Freischalten</button>')+
-    ' <a onclick="delRow(\'partners\',\''+pt.id+'\',reloadPartners)" style="color:var(--red)">✕</a></div>';
+    return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+
+    '<div><b>'+esc(pt.name)+'</b> <span class="mut">'+(KIND[pt.kind]||pt.kind)+(pt.company?' · '+esc(pt.company):'')+' · '+esc(pt.email||'')+'</span> '+
+    (pt.status==='freigeschaltet'?'<span class="b green">freigeschaltet</span>':'<span class="b gold">beantragt – vorläufig schon Partnerpreise</span>')+
+    ' <a onclick="delRow(\'partners\',\''+pt.id+'\',reloadPartners)" style="color:var(--red)">✕</a></div>'+
+    '<div style="margin-top:5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+    (pt.status!=='freigeschaltet'?'<button class="btn sm" onclick="approvePartner(\''+pt.id+'\')">Freischalten (allgemeiner Rabatt)</button>':'')+
+    '<label class="sml mut" style="margin:0;text-transform:none;letter-spacing:0">Individueller Rabatt %<input type="number" min="0" max="100" step="1" value="'+(pt.discount_pct!=null?pt.discount_pct:'')+'" placeholder="leer = allgemein" style="width:80px;display:inline-block;margin:0 0 0 6px" onchange="setPartnerDiscount(\''+pt.id+'\',this.value)"></label>'+
+    '</div></div>';
   }).join('')||'<span class="mut">Keine Partner-Anträge.</span>';
 }
 function approvePartner(id){
-  var code=Array.from(crypto.getRandomValues(new Uint8Array(4))).map(function(b){return b.toString(16).padStart(2,'0')}).join('').toUpperCase();
-  api('partners?id=eq.'+id,{method:'PATCH',body:{status:'freigeschaltet',code:code}})
-    .then(function(){toast('Freigeschaltet ✓ – Code: '+code+' (dem Partner mitteilen)');reloadPartners()})
+  api('partners?id=eq.'+id,{method:'PATCH',body:{status:'freigeschaltet'}})
+    .then(function(){toast('Freigeschaltet ✓ – die allgemeinen Partnerpreise gelten jetzt fest.');reloadPartners()})
+    .catch(function(e){toast(e.message,1)});
+}
+function setPartnerDiscount(id,val){
+  var pct=val===''?null:Number(val);
+  api('partners?id=eq.'+id,{method:'PATCH',body:{discount_pct:pct}})
+    .then(function(){toast(pct==null?'Individueller Rabatt entfernt – allgemeiner Rabatt gilt wieder ✓':'Individueller Rabatt gespeichert ✓');reloadPartners()})
     .catch(function(e){toast(e.message,1)});
 }
 function reloadPartners(){api('partners?select=*&order=created_at.desc').then(function(r){CACHE.partners=r||[];renderPartners()})}
@@ -4246,6 +4306,47 @@ function mpApply(){
 function mpUpload(inp){
   uploadFilesSeq(inp.files,null,function(urls){toast(urls.length+' Bild(er) hochgeladen ✓');mpLoad()});
   inp.value='';
+}
+/* ===== Medien-Pool als eigene Seite (Hochladen + Verteilen an gängige Bildfelder) ===== */
+var MEDIA_PG_LIST=[];
+function loadMediaPage(){
+  document.getElementById('mediaPgGrid').textContent='Lade Bilder …';
+  fetch(API+'/media/list',{headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){if(!r.ok)throw new Error('list');return r.json()})
+    .then(function(list){MEDIA_PG_LIST=Array.isArray(list)?list:[];renderMediaPage()})
+    .catch(function(){MEDIA_PG_LIST=[];renderMediaPage()});
+}
+function mediaPgUpload(inp){
+  uploadFilesSeq(inp.files,null,function(urls){toast(urls.length+' Bild(er) hochgeladen ✓');loadMediaPage()});
+  inp.value='';
+}
+function renderMediaPage(){
+  var g=document.getElementById('mediaPgGrid');if(!g)return;
+  if(!MEDIA_PG_LIST.length){g.innerHTML='<span class="mut">Noch keine Bilder im Pool – über „Bilder hochladen" landen die ersten hier.</span>';return}
+  g.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px">'+
+    MEDIA_PG_LIST.map(function(m,i){
+      return '<div class="card" style="padding:8px">'+
+      '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px">'+
+      '<div class="mut sml" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
+      '<div class="mut sml" style="margin-bottom:8px">'+mpKb(m.size)+(m.source==='instagram'?' · Instagram':'')+'</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<button class="btn g sm" onclick="mediaPgCopy('+i+')">URL kopieren</button>'+
+      '<button class="btn g sm" onclick="mediaPgToGallery('+i+')">Zur Galerie</button>'+
+      '</div></div>';
+    }).join('')+'</div>';
+}
+function mediaPgCopy(i){
+  var m=MEDIA_PG_LIST[i];if(!m)return;
+  navigator.clipboard.writeText(m.url).then(function(){toast('Bild-URL kopiert ✓ – zum Einfügen in ein Bildfeld bereit.')},
+    function(){toast('Kopieren nicht möglich – URL: '+m.url,1)});
+}
+function mediaPgToGallery(i){
+  var m=MEDIA_PG_LIST[i];if(!m)return;
+  GAL_IMAGES=GAL_IMAGES||[];
+  if(GAL_IMAGES.indexOf(m.url)>=0){toast('Ist schon in der Galerie.');return}
+  GAL_IMAGES.push(m.url);
+  upsertContent('gallery',Object.assign({},CACHE.content.gallery||{},{images:GAL_IMAGES.slice()}));
+  toast('Zur Galerie hinzugefügt ✓');
 }
 /* „Aus Pool"-Button neben Bildfeldern: setzt die URL und aktualisiert die Fokus-Vorschau */
 function poolPick(targetId,focalId){

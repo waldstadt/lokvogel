@@ -338,7 +338,7 @@ footer a:hover{color:var(--acc)}
     </div>
     <div class="card reveal" style="max-width:460px">
       <h3>So kommst du an die Partnerpreise</h3>
-      <p style="font-size:14px;color:var(--mut)">Leg dir im Vermietkatalog ein Konto an und schreib mir kurz, dass du Kollege bist – DJ-Alias, Band- oder Künstlername hilft bei der Prüfung. Ich schalte dein Konto dann für die Partnerpreise frei; sie gelten automatisch, sobald du eingeloggt bist.</p>
+      <p style="font-size:14px;color:var(--mut)">Leg dir im Vermietkatalog ein Konto an und setz beim Registrieren den Haken „DJ/Band/Musiker:in – Partner-Konditionen". Die Partnerpreise gelten dann sofort, vorläufig unter Vorbehalt – ich prüfe den Antrag kurz danach und schalte dein Konto endgültig frei.</p>
       <div style="margin-top:14px"><a href="mieten.html" class="btn g">Zum Vermietkatalog</a></div>
     </div>
   </div>
@@ -501,6 +501,17 @@ footer a:hover{color:var(--acc)}
   </div>
 </div>
 
+<div id="wsDetailBg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;overflow-y:auto;padding:40px 16px" onclick="if(event.target===this)closeWsDetail()">
+  <div style="max-width:640px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:5px;padding:32px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <h3 class="gro" id="wsDetailTitle" style="font-size:22px"></h3>
+      <button onclick="closeWsDetail()" style="background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer;flex-shrink:0;margin-left:12px">✕</button>
+    </div>
+    <div id="wsDetailBody"></div>
+    <div style="margin-top:20px" id="wsDetailAction"></div>
+  </div>
+</div>
+
 <script>
 var API='api.php';
 document.getElementById('year').textContent=new Date().getFullYear();
@@ -597,14 +608,12 @@ function loadWorkshops(){
         (w.image_url?'<img src="'+esc(w.image_url)+'" alt="" style="width:100%;aspect-ratio:4/3;object-fit:cover;object-position:'+esc(w.image_focal||'50% 50%')+';border-radius:4px;margin-bottom:14px">':'')+
         '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:6px">'+wsDate(w)+'</div>'+
         (aud?'<div style="display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:3px;padding:3px 10px;color:var(--mut);margin-bottom:8px">'+aud+'</div>':'')+
-        '<h4 style="font-size:16px;margin-bottom:6px">'+esc(w.title)+'</h4>'+
-        (w.description?'<p style="font-size:13px;color:var(--mut);margin-bottom:10px">'+esc(w.description)+'</p>':'')+
-        (w.long_description?'<div style="font-size:13px;color:var(--mut);margin-bottom:10px;line-height:1.6">'+mdRender(w.long_description)+'</div>':'')+
+        '<h4 style="font-size:16px;margin-bottom:6px'+(w.image_url?'':';font-weight:800')+'">'+esc(w.title)+'</h4>'+
+        (w.description?'<p style="font-size:13px;color:var(--mut);margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(w.description)+'</p>':'')+
         '<div style="font-size:13px;color:var(--mut);margin-bottom:12px">'+(w.location?esc(w.location)+' · ':'')+
         (w.price_net!=null?euro2(w.price_net)+' p. P. · ':'')+
         (full?'<b style="color:var(--mut2)">ausgebucht</b>':'<b style="color:var(--acc)">'+w.free+' Plätze frei</b>')+'</div>'+
-        (full?'<button class="btn ghost small" onclick="openWsForm('+i+',true)">Auf die Warteliste</button>'
-             :'<button class="btn small" onclick="openWsForm('+i+')">Platz reservieren</button>')+
+        '<button class="btn ghost small" onclick="openWsDetail('+i+')">Mehr dazu</button>'+
         '</div>';
     }).join('')+
     '<div style="background:transparent;border:1px dashed var(--line);border-radius:5px;padding:22px 20px;display:flex;flex-direction:column;justify-content:center">'+
@@ -629,6 +638,27 @@ function loadWorkshops(){
     document.head.appendChild(ld);
   }).catch(function(){});
 }
+function openWsDetail(i){
+  var w=WS[i];if(!w)return;
+  var full=w.free<=0;
+  var aud=w.audience==='dj'?'DJs & Alleinunterhalter':(w.audience==='live'?'Livemusik':'');
+  document.getElementById('wsDetailTitle').textContent=w.title;
+  document.getElementById('wsDetailBody').innerHTML=
+    (w.image_url?'<img src="'+esc(w.image_url)+'" alt="" style="width:100%;aspect-ratio:16/9;object-fit:cover;object-position:'+esc(w.image_focal||'50% 50%')+';border-radius:4px;margin-bottom:14px">':'')+
+    '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:8px">'+wsDate(w)+'</div>'+
+    (aud?'<div style="display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:3px;padding:3px 10px;color:var(--mut);margin-bottom:10px">'+aud+'</div>':'')+
+    (w.description?'<p style="font-size:14px;color:var(--mut);margin-bottom:10px">'+esc(w.description)+'</p>':'')+
+    (w.long_description?'<div style="font-size:14px;color:var(--mut);margin-bottom:10px;line-height:1.7">'+mdRender(w.long_description)+'</div>':'')+
+    '<div style="font-size:14px;color:var(--mut)">'+(w.location?esc(w.location)+' · ':'')+
+    (w.price_net!=null?euro2(w.price_net)+' p. P. · ':'')+
+    (full?'<b style="color:var(--mut2)">ausgebucht</b>':'<b style="color:var(--acc)">'+w.free+' Plätze frei</b>')+'</div>';
+  document.getElementById('wsDetailAction').innerHTML=full
+    ?'<button class="btn ghost small" onclick="closeWsDetail();openWsForm('+i+',true)">Auf die Warteliste</button>'
+    :'<button class="btn small" onclick="closeWsDetail();openWsForm('+i+')">Platz buchen</button>';
+  document.getElementById('wsDetailBg').style.display='block';
+  document.body.style.overflow='hidden';
+}
+function closeWsDetail(){document.getElementById('wsDetailBg').style.display='none';document.body.style.overflow=''}
 var wsWl=false;
 function openWsForm(i,wl){
   wsSel=WS[i];wsWl=!!wl;

@@ -787,7 +787,11 @@ function renderCart(){
 function renderCartAuth(){
   var el=document.getElementById('cartAuth');
   if(!CART.length){el.innerHTML='';el.removeAttribute('data-mode');return}
-  if(CUST){el.innerHTML='<div class="sml" style="color:var(--mut);font-size:13px">Eingeloggt als <b style="color:var(--txt)">'+esc(CUST.name)+'</b> · <a onclick="custLogout()">abmelden</a></div>';return}
+  if(CUST){
+    var partnerNote=PARTNER?(' · <span style="color:var(--acc)">Partnerpreise aktiv'+(PARTNER.provisional?' (vorläufig, bis zur Prüfung durch Markus)':'')+'</span>'):'';
+    el.innerHTML='<div class="sml" style="color:var(--mut);font-size:13px">Eingeloggt als <b style="color:var(--txt)">'+esc(CUST.name)+'</b>'+partnerNote+' · <a onclick="custLogout()">abmelden</a></div>';
+    return;
+  }
   if(el.dataset.mode)return; // Formular schon offen, nicht überschreiben während der Eingabe
   el.dataset.mode='login';
   renderAuthForm();
@@ -808,7 +812,7 @@ function renderAuthForm(){
       '<select id="authPartnerKind" style="display:none;margin-top:8px"><option value="dj">DJ</option><option value="band">Band</option><option value="musiker">Musiker:in</option></select>'):'')+
     '<div class="sml" style="margin-top:6px"><a onclick="toggleAuthMode()">'+(reg?'Schon ein Konto? Einloggen':'Noch kein Konto? Registrieren')+'</a></div>';
 }
-function custLogout(){CUST=null;localStorage.removeItem('lg_cust');localStorage.removeItem('lg_cust_token');document.getElementById('cartAuth').removeAttribute('data-mode');renderCart()}
+function custLogout(){CUST=null;PARTNER=null;localStorage.removeItem('lg_cust');localStorage.removeItem('lg_cust_token');sessionStorage.removeItem('lg_partner');document.getElementById('cartAuth').removeAttribute('data-mode');renderCart()}
 function authAndSubmit(){
   var mode=(document.getElementById('cartAuth').dataset.mode)||'login';
   var email=v_('authEmail'),pass=v_('authPass');
@@ -829,6 +833,8 @@ function authAndSubmit(){
       if(res.s>=400){m.className='msg err';m.textContent=res.j.error||'Anmeldung fehlgeschlagen.';return Promise.reject()}
       CUST={name:res.j.name};localStorage.setItem('lg_cust',JSON.stringify(CUST));
       localStorage.setItem('lg_cust_token',res.j.token);
+      PARTNER=res.j.partner||null;
+      if(PARTNER)sessionStorage.setItem('lg_partner',JSON.stringify(PARTNER));else sessionStorage.removeItem('lg_partner');
       document.getElementById('cartAuth').removeAttribute('data-mode');
       renderCart();
     });

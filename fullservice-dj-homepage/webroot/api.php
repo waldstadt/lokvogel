@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 50;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 51;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -38,6 +38,20 @@ const AI_PROVIDER_DEFAULTS = [
   'mistral'  => ['base_url' => 'https://api.mistral.ai/v1', 'model' => 'mistral-small-latest'],
   'deepseek' => ['base_url' => 'https://api.deepseek.com/v1', 'model' => 'deepseek-chat'],
 ];
+
+/* Miet-Partner-Rabatt für eine E-Mail: gilt bereits ab dem Antrag ("beantragt") vorläufig,
+   nicht erst nach Freischaltung - der Admin kann jederzeit einen individuellen Rabatt statt
+   des allgemeinen hinterlegen. Kein Code-Verfahren mehr, Zuordnung läuft rein über das
+   Kundenkonto (E-Mail). */
+function partnerInfoForEmail(PDO $p, string $email): ?array {
+  $st = $p->prepare("select status, discount_pct from partners where lower(email)=? and kind in ('dj','band','musiker') order by created_at desc limit 1");
+  $st->execute([strtolower($email)]);
+  $pt = $st->fetch();
+  if (!$pt) return null;
+  $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
+  $pct = $pt['discount_pct'] !== null ? (float)$pt['discount_pct'] : (float)($defs['partner_discount_pct'] ?? 20);
+  return ['status' => $pt['status'], 'discount_pct' => $pct, 'provisional' => $pt['status'] !== 'freigeschaltet'];
+}
 
 /* Gemeinsamer Aufruf-Code für den KI-Textassistenten UND die FAQ-Vorschläge: baut die
    Anfrage je nach Anbieter (native Anthropic-Messages-API vs. OpenAI-kompatible
@@ -447,6 +461,9 @@ function upgrade(PDO $p): void {
     "alter table friends add column image_url text",
     "alter table friends add column image_focal text default '50% 50%'",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
+  if ($v < 51) try {
+    $p->exec("alter table partners add column discount_pct real");
+  } catch (PDOException $e) {}
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -885,7 +902,7 @@ create table products (id text primary key, sku text unique, sort integer defaul
   price_net real, bundle text default '[]', addon_sku text, active integer default 1, created_at text);
 create table partners (id text primary key, code text unique, name text not null, company text,
   kind text default 'dj', email text, phone text, status text default 'beantragt',
-  notes text, created_at text);
+  discount_pct real, notes text, created_at text);
 create table reviews (id text primary key, sort integer default 0, author text not null,
   event_type text, text text not null, rating integer default 5,
   source text default 'google', review_date text, public integer default 1, created_at text);
@@ -1846,7 +1863,8 @@ function handlePortal(string $path, string $method, $body): never {
     $st->execute([$email]);
     $c = $st->fetch();
     if (!$c || !password_verify($pass, (string)$c['portal_hash'])) { usleep(500000); fail('E-Mail oder Passwort falsch.', 401); }
-    out(['token' => custToken($p, $c['id']), 'name' => trim(($c['company'] ?: trim($c['first_name'] . ' ' . $c['last_name'])))]);
+    out(['token' => custToken($p, $c['id']), 'name' => trim(($c['company'] ?: trim($c['first_name'] . ' ' . $c['last_name']))),
+      'partner' => partnerInfoForEmail($p, $email)]);
   }
   /* Selbstregistrierung für den Mietpark-Warenkorb – Konto ist sofort nutzbar,
      eine Partner-Anmeldung (optional) durchläuft weiter die manuelle Freischaltung. */
@@ -1877,10 +1895,14 @@ function handlePortal(string $path, string $method, $body): never {
     }
     if (!empty($body['partner_interest'])) {
       $kind = in_array($body['partner_kind'] ?? '', ['dj','band','musiker']) ? $body['partner_kind'] : 'dj';
-      $p->prepare('insert into partners (id,name,company,kind,email,phone,status,created_at) values (?,?,?,?,?,?,?,?)')
-        ->execute([uuid(), mb_substr($name,0,120), '', $kind, mb_substr($email,0,160), $phone, 'beantragt', now()]);
+      $st = $p->prepare("select 1 from partners where lower(email)=? limit 1");
+      $st->execute([$email]);
+      if (!$st->fetchColumn()) {
+        $p->prepare('insert into partners (id,name,company,kind,email,phone,status,created_at) values (?,?,?,?,?,?,?,?)')
+          ->execute([uuid(), mb_substr($name,0,120), '', $kind, mb_substr($email,0,160), $phone, 'beantragt', now()]);
+      }
     }
-    out(['token' => custToken($p, $custId), 'name' => $name], 201);
+    out(['token' => custToken($p, $custId), 'name' => $name, 'partner' => partnerInfoForEmail($p, $email)], 201);
   }
   if ($path === 'portal/account/set_password' && $method === 'POST') {
     $inv = (string)($body['invite'] ?? '');
@@ -2204,15 +2226,6 @@ function handlePortal(string $path, string $method, $body): never {
         $kind, mb_substr($email,0,160), mb_substr(trim((string)($body['phone'] ?? '')),0,60), 'beantragt', now()]);
     out(['ok' => true], 201);
   }
-  /* Partner-Code prüfen → Rabatt fürs Anzeigen der Partnerpreise */
-  if (preg_match('#^portal/partner/([a-zA-Z0-9]{6,32})$#', $path, $m) && $method === 'GET') {
-    $st = $p->prepare("select name, kind from partners where code=? and status='freigeschaltet'");
-    $st->execute([strtoupper($m[1])]);
-    $pt = $st->fetch();
-    if (!$pt) { usleep(400000); fail('Partner-Code ungültig oder noch nicht freigeschaltet.', 404); }
-    $defs = json_decode($p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true);
-    out(['ok' => true, 'name' => $pt['name'], 'discount_pct' => (float)($defs['partner_discount_pct'] ?? 20)]);
-  }
   /* Verfügbarkeit eines Artikels im Zeitraum (gegen alle nicht stornierten Aufträge) */
   if ($path === 'portal/availability' && $method === 'GET') {
     $eq = (string)($_GET['eq'] ?? ''); $from = (string)($_GET['from'] ?? ''); $to = (string)($_GET['to'] ?? '');
@@ -2233,12 +2246,11 @@ function handlePortal(string $path, string $method, $body): never {
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) $to = $from;
     $cart = is_array($body['items'] ?? null) ? $body['items'] : [];
     if (!$cart) fail('Der Warenkorb ist leer.');
-    /* Partnerpreis gilt nur für freigeschaltete DJ-/Band-/Musiker-Partner, nicht für Techniker-Partner */
-    $st = $p->prepare("select 1 from partners where lower(email)=lower(?) and status='freigeschaltet' and kind in ('dj','band','musiker') limit 1");
-    $st->execute([(string)$me['email']]);
-    $isPartner = (bool)$st->fetchColumn();
-    $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
-    $partnerPct = (float)($defs['partner_discount_pct'] ?? 20);
+    /* Partnerpreis gilt schon ab dem Antrag (vorläufig) für DJ-/Band-/Musiker-Partner,
+       nicht für Techniker-Partner - kein Code-Verfahren mehr, Zuordnung über das Kundenkonto. */
+    $partnerInfo = partnerInfoForEmail($p, (string)$me['email']);
+    $isPartner = $partnerInfo !== null;
+    $partnerPct = $partnerInfo['discount_pct'] ?? 20;
     $tiers = rentalTierDefaults($p);
     $days = rentalDays(['event_date' => $from, 'end_date' => $to]);
     $lines = []; $total = 0.0; $claimed = [];   // je Artikel schon im selben Warenkorb beanspruchte Menge
@@ -2308,8 +2320,9 @@ function handlePortal(string $path, string $method, $body): never {
     notifyOwner('Neue Miet-Anfrage: ' . $custName,
       "Zeitraum: $from" . ($to !== $from ? " bis $to" : '') . "\n\n" .
       implode("\n", array_map(fn($l) => '- ' . $l['name'] . ' × ' . $l['qty'] . ' = ' . number_format($l['price'], 2, ',', '.') . ' €', $lines)) .
-      "\n\nGesamt (netto): " . number_format($total, 2, ',', '.') . " €" . ($isPartner ? "\n(Partnerpreis angewendet)" : ''));
-    out(['ok' => true, 'booking_id' => $bookingId, 'items' => $lines, 'total' => round($total, 2), 'partner' => $isPartner], 201);
+      "\n\nGesamt (netto): " . number_format($total, 2, ',', '.') . " €" . ($isPartner ? "\n(Partnerpreis angewendet" . (($partnerInfo['provisional'] ?? false) ? ', Partner noch nicht final freigeschaltet' : '') . ')' : ''));
+    out(['ok' => true, 'booking_id' => $bookingId, 'items' => $lines, 'total' => round($total, 2),
+      'partner' => $isPartner, 'partner_provisional' => $isPartner ? ($partnerInfo['provisional'] ?? false) : false], 201);
   }
   /* Newsletter: Anmeldung mit Double-Opt-in, Bestätigung und Ein-Klick-Abmeldung */
   if ($path === 'portal/newsletter' && $method === 'POST') {
