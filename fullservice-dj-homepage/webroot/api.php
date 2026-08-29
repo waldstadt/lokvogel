@@ -462,6 +462,9 @@ function seedEquipmentCatalog(PDO $p): void {
     ['606393', 'DJ-Controller', 'Hercules DJ Control Mix Ultra',
      'Mobiler DJ-Controller mit integriertem Akku (bis zu 10 Std. Laufzeit), drahtlose Anbindung ans Smartphone/Tablet per Bluetooth Low Energy (Android/iOS). 2 virtuelle Decks + Mixer, 2 berührungsgesteuerte Jogwheels, 8 Pads (Hot Cue/Loop/FX/Sampler), EQ/Tempo/Loop/Sample-Bedienelemente. Inkl. Staubschutz-Cover, Audio-Split-Kabel, USB-A/USB-C-Kabel. Maße (BxTxH) 315×174×40 mm, Gewicht 0,85 kg.',
      20.0, 'https://www.thomann.de/de/hercules_dj_control_mix_ultra.htm'],
+    ['522044', 'Licht', 'Ape Labs Connect (Grey)',
+     'Bluetooth-Interface zur Steuerung von Ape Labs Leuchten per Smartphone-App, Wireless DMX und KNX. Bis zu 4 Connect parallel für 4 DMX-Universen. Integrierter Akku mit bis zu 50 Std. Laufzeit, DMX Ein-/Ausgang XLR 3-Pin, inkl. Netzteil (27 W) und 2× 2,4-GHz-Antenne. Maße 12,5×12,5×4,8 cm, Gewicht 0,72 kg.',
+     15.0, 'https://www.thomann.de/de/ape_labs_connect_grey.htm'],
   ];
   foreach ($rows as [$sku, $cat, $n, $d, $suggested, $thomann]) {
     $c = $p->prepare('select count(*) from equipment where sku = ?');
