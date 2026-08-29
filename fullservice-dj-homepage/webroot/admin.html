@@ -2118,6 +2118,10 @@ function openEqModal(id){
     '<div class="grid2"><div><label>Thomann-Link (Nachbestellung / techn. Daten)</label><input id="eThomann" value="'+esc(e.thomann_url||'')+'" placeholder="https://www.thomann.de/…">'+
     (e.thomann_url?'<a href="'+esc(e.thomann_url)+'" target="_blank" rel="noopener" class="mut sml">Bei Thomann ansehen ↗</a>':'')+'</div>'+
     '<div style="display:flex;align-items:flex-end"><label style="margin:0"><input type="checkbox" id="eOwnRig" style="width:auto;margin-right:6px" '+(e.own_rig?'checked':'')+'>Teil des festen Lokvogel-Setups (Notfall-Reserve)</label></div></div>'+
+    (id?('<label>Einkaufsbeleg (für Garantiefälle)</label><div style="display:flex;gap:8px;align-items:center">'+
+      (e.invoice_name?'<a class="mut sml" onclick="openEqInvoice(\''+id+'\')">'+esc(e.invoice_name)+' ansehen ↗</a>':'<span class="mut sml">Noch kein Beleg hinterlegt.</span>')+
+      '<input type="file" accept="application/pdf,image/*" style="display:none" id="upEqInv" onchange="uploadEqInvoice(this,\''+id+'\')">'+
+      '<button class="btn g sm" onclick="document.getElementById(\'upEqInv\').click()">'+(e.invoice_name?'Ersetzen':'Hochladen')+'</button></div>'):'')+
     '<label class="mut sml" style="margin-top:10px;display:block">Rabattstaffel für längere Mietzeiträume (leer = globaler Standard aus den Einstellungen)</label>'+
     '<div class="grid3"><div><label>% ab 1 Woche</label><input type="number" id="eTierWeek" value="'+(e.tier_week_pct!=null?e.tier_week_pct:'')+'"></div>'+
     '<div><label>% ab 2 Wochen</label><input type="number" id="eTier2Week" value="'+(e.tier_2week_pct!=null?e.tier_2week_pct:'')+'"></div>'+
@@ -2328,7 +2332,25 @@ function uploadImg(inp,targetId,previewId){
     }
     toast('Bild hochgeladen ✓ – Server verkleinert große Fotos automatisch. Jetzt Speichern klicken.');
   }).catch(function(e){toast(e.message,1)});
-  inp.value='';
+}
+function uploadEqInvoice(inp,id){
+  var f=inp.files[0];if(!f)return;
+  fetch(API+'/equipment/'+id+'/invoice?name='+encodeURIComponent(f.name),{
+    method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:f
+  }).then(function(r){
+    if(!r.ok)return r.text().then(function(t){throw new Error(t||('Upload fehlgeschlagen ('+r.status+')'))});
+    return r.json();
+  }).then(function(){
+    toast('Beleg hochgeladen ✓');
+    return api('equipment?select=*&order=sort');
+  }).then(function(r){CACHE.equipment=r||[];renderEq();openEqModal(id)})
+  .catch(function(e){toast(e.message,1)});
+}
+function openEqInvoice(id){
+  fetch(API+'/eqfile/'+id,{headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){if(!r.ok)throw new Error('Datei nicht gefunden.');return r.blob()})
+    .then(function(bl){window.open(URL.createObjectURL(bl),'_blank')})
+    .catch(function(e){toast(e.message,1)});
 }
 /* Fokuspunkt-Widget: Klick aufs Vorschaubild legt fest, welcher Bereich beim Zuschneiden (object-fit:cover)
    sichtbar bleibt, statt stur die Mitte zu nehmen. focalId = versteckte Werte-Input-ID, ratio = CSS aspect-ratio

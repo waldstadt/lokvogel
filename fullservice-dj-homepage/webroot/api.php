@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 36;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 37;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -286,6 +286,10 @@ function upgrade(PDO $p): void {
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
   if ($v < 35) seedServiceProducts($p);
   if ($v < 36) try { $p->exec("alter table equipment add column day_rate_suggested real"); } catch (PDOException $e) {}
+  if ($v < 37) foreach ([
+    "alter table equipment add column invoice_file text",
+    "alter table equipment add column invoice_name text",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -557,7 +561,8 @@ create table equipment (id text primary key, sort integer default 0, name text n
   tier_week_pct real, tier_2week_pct real, tier_month_pct real,
   qty_total integer default 1, rentable integer default 1, public integer default 1,
   status text default 'aktiv', notes text, partner_rate real, addon_id text,
-  thomann_url text, own_rig integer default 0, day_rate_suggested real, created_at text);
+  thomann_url text, own_rig integer default 0, day_rate_suggested real,
+  invoice_file text, invoice_name text, created_at text);
 create table equipment_sets (id text primary key, sort integer default 0,
   name text not null, description text, image_url text, image_focal text default '50% 50%',
   discount_pct real default 5, fixed_price real, public integer default 1, created_at text);
@@ -1042,6 +1047,8 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
     case 'GET':
       $st = $p->prepare("select * from \"$t\"$wsql$order"); $st->execute($args);
       $rows = array_map(fn($r) => decodeRow($t, $r), $st->fetchAll());
+      /* Einkaufsbeleg-Dateiname ist kein öffentliches Datenblatt (Download läuft ohnehin nur angemeldet) */
+      if (!$auth && $t === 'equipment') foreach ($rows as &$r) { unset($r['invoice_file']); unset($r['invoice_name']); }
       out(attachEmbeds($t, $rows, $embeds));
 
     case 'POST':
@@ -2133,6 +2140,40 @@ try {
     handleRest($m[1], $method, $q, $body, $prefer);
   }
   if (preg_match('#^storage/(.+)$#', $path, $m) && $method === 'POST') handleUpload($m[1]);
+  /* Einkaufsbeleg zu einem Technik-Artikel hinterlegen (Garantiefall) – nur angemeldet, nie öffentlich */
+  if (preg_match('#^equipment/([a-f0-9-]{30,40})/invoice$#', $path, $m) && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    $chk = $p->prepare('select id from equipment where id = ?'); $chk->execute([$m[1]]);
+    if (!$chk->fetch()) fail('Artikel nicht gefunden.', 404);
+    $raw = file_get_contents('php://input');
+    if (!$raw || strlen($raw) > MAX_UPLOAD) fail('Datei fehlt oder ist zu groß (max. 8 MB).');
+    $orig = mb_substr(preg_replace('/[^\w.\-() äöüÄÖÜß]/u', '_', (string)($_GET['name'] ?? 'rechnung.pdf')), 0, 120);
+    $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+    $isImg = @getimagesizefromstring($raw) !== false;
+    if (!$isImg && !($ext === 'pdf' && str_starts_with($raw, '%PDF'))) fail('Erlaubt: PDF oder Foto der Rechnung.');
+    if ($isImg) $raw = processImage($raw);
+    $dir = DATA_DIR . '/eqfiles';
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    $file = uuid() . '.' . ($isImg ? ($ext ?: 'jpg') : 'pdf');
+    file_put_contents("$dir/$file", $raw);
+    $p->prepare('update equipment set invoice_file = ?, invoice_name = ? where id = ?')
+      ->execute([$file, $orig, $m[1]]);
+    out(['ok' => true, 'name' => $orig], 201);
+  }
+  if (preg_match('#^eqfile/([a-f0-9-]{30,40})$#', $path, $m) && $method === 'GET') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    $st = $p->prepare('select invoice_file, invoice_name from equipment where id = ?'); $st->execute([$m[1]]);
+    $f = $st->fetch();
+    if (!$f || !$f['invoice_file'] || !is_file(DATA_DIR . '/eqfiles/' . $f['invoice_file'])) fail('Datei nicht gefunden.', 404);
+    $ext = strtolower(pathinfo((string)$f['invoice_file'], PATHINFO_EXTENSION));
+    $mime = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp',
+      'pdf' => 'application/pdf'][$ext] ?? 'application/octet-stream';
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: inline; filename="' . rawurlencode((string)$f['invoice_name']) . '"');
+    readfile(DATA_DIR . '/eqfiles/' . $f['invoice_file']); exit;
+  }
   /* Rechnung zu einer Workshop-Anmeldung erzeugen + mailen (z. B. beim Nachrücken) – nur angemeldet */
   if (preg_match('#^workshop/([a-f0-9-]{30,40})/invoice$#', $path, $m) && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
