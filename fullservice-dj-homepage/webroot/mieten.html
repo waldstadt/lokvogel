@@ -23,7 +23,8 @@ a{color:var(--acc);text-decoration:none}
 img{max-width:100%;display:block}
 .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
 section{padding:60px 0 88px}
-.kicker{font-family:'Space Grotesk',sans-serif;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--acc);margin-bottom:14px;font-weight:600}
+.kicker{font-family:'Space Grotesk',sans-serif;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);margin-bottom:14px;font-weight:600}
+.kicker::before{content:"";display:inline-block;width:22px;height:2px;background:var(--acc);vertical-align:middle;margin-right:10px}
 h1{font-size:clamp(30px,4.6vw,44px);font-weight:700;line-height:1.12;margin-bottom:18px;letter-spacing:-.02em}
 .lead{color:var(--mut);max-width:640px}
 
@@ -39,7 +40,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86
 .nav-links a{color:var(--mut);font-size:13px;letter-spacing:.03em;transition:color .2s}
 .nav-links a:hover{color:var(--txt)}
 .nav-links a.cur{color:var(--txt)}
-.btn{display:inline-block;background:var(--acc);color:#0c1513;padding:13px 28px;font-size:13px;font-weight:600;letter-spacing:.04em;border:none;border-radius:8px;cursor:pointer;transition:background .2s;font-family:'Space Grotesk',sans-serif}
+.btn{display:inline-block;background:var(--acc);color:#0c1513;padding:13px 28px;font-size:13px;font-weight:600;letter-spacing:.04em;border:none;border-radius:3px;cursor:pointer;transition:background .2s;font-family:'Space Grotesk',sans-serif}
 .btn:hover{background:var(--acc2)}
 .btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
 .btn.ghost:hover{border-color:var(--acc);color:var(--acc);background:transparent}
@@ -53,13 +54,13 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86
 }
 
 .cats{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
-.cat-chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mut);border:1px solid var(--line);border-radius:20px;padding:8px 15px;cursor:pointer;transition:border-color .2s,color .2s,background .2s;background:transparent}
+.cat-chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mut);border:1px solid var(--line);border-radius:3px;padding:8px 15px;cursor:pointer;transition:border-color .2s,color .2s,background .2s;background:transparent}
 .cat-chip:hover{border-color:var(--acc);color:var(--txt)}
 .cat-chip.active{border-color:var(--acc);color:#0c1513;background:var(--acc)}
 .cat-chip svg{width:14px;height:14px}
 
 .rent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:18px;margin-top:28px}
-.rent{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;transition:border-color .25s}
+.rent{background:var(--card);border:1px solid var(--line);border-radius:5px;overflow:hidden;transition:border-color .25s}
 .rent:hover{border-color:rgba(60,200,180,.5)}
 .rent .ri{aspect-ratio:4/3;background:var(--bg) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--mut2)}
 .rent .ri svg{width:38px;height:38px;stroke-width:1.6}
@@ -76,7 +77,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86
 .rent .addon{font-size:11px;color:var(--mut2);margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
 .rent .addon b{color:var(--acc);font-weight:600}
 
-input,select,textarea{width:100%;padding:13px 15px;background:var(--bg);border:1px solid var(--line);color:var(--txt);font:inherit;font-size:15px;outline:0;margin-bottom:18px;border-radius:9px;transition:border-color .2s}
+input,select,textarea{width:100%;padding:13px 15px;background:var(--bg);border:1px solid var(--line);color:var(--txt);font:inherit;font-size:15px;outline:0;margin-bottom:18px;border-radius:4px;transition:border-color .2s}
 input:focus,select:focus,textarea:focus{border-color:var(--acc)}
 label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:0 0 6px;font-weight:600}
 
@@ -85,15 +86,15 @@ footer{border-top:1px solid var(--line);padding:40px 0;font-size:13px;color:var(
 footer a{color:var(--mut)}
 footer a:hover{color:var(--acc)}
 
-.msg{padding:12px 14px;font-size:13px;margin-bottom:14px;display:none;border:1px solid;border-radius:9px}
+.msg{padding:12px 14px;font-size:13px;margin-bottom:14px;display:none;border:1px solid;border-radius:4px}
 .msg.ok{display:block;border-color:#3d6b3d;background:rgba(60,120,60,.12);color:#9fd49f}
 .msg.err{display:block;border-color:#7a3535;background:rgba(150,60,60,.12);color:#e0a0a0}
 
 /* ---- Tourcase (Warenkorb) ---- */
-.tc-fab{position:fixed;right:22px;bottom:22px;z-index:170;background:var(--acc);color:#0c1513;border:none;border-radius:32px;padding:15px 22px 15px 18px;display:flex;align-items:center;gap:9px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:background .2s,transform .2s}
+.tc-fab{position:fixed;right:22px;bottom:22px;z-index:170;background:var(--acc);color:#0c1513;border:none;border-radius:4px;padding:15px 22px 15px 18px;display:flex;align-items:center;gap:9px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:background .2s,transform .2s}
 .tc-fab:hover{background:var(--acc2);transform:translateY(-1px)}
 .tc-fab svg{width:19px;height:19px;stroke-width:2.2}
-.tc-fab .tc-count{background:#0c1513;color:var(--acc);border-radius:12px;padding:1px 8px;font-size:12px;min-width:20px;text-align:center}
+.tc-fab .tc-count{background:#0c1513;color:var(--acc);border-radius:3px;padding:1px 8px;font-size:12px;min-width:20px;text-align:center}
 .tc-panel{position:fixed;top:0;right:-420px;width:400px;max-width:92vw;height:100%;background:var(--bg2);border-left:1px solid var(--line);z-index:160;overflow-y:auto;transition:right .3s ease;padding:26px 22px 100px}
 .tc-panel.open{right:0}
 .tc-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:155;display:none}
@@ -165,7 +166,7 @@ footer a:hover{color:var(--acc)}
 </footer>
 
 <div id="legalBg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;overflow-y:auto;padding:40px 16px" onclick="if(event.target===this)closeLegal()">
-  <div style="max-width:760px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:36px">
+  <div style="max-width:760px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:5px;padding:36px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
       <h3 class="gro" id="legalTitle" style="font-size:22px"></h3>
       <button onclick="closeLegal()" style="background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer">✕</button>

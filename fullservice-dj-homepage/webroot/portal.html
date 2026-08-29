@@ -21,21 +21,22 @@ a{color:var(--acc);text-decoration:none}
 .logo svg{width:24px;height:24px}
 .logo b{font-family:'Space Grotesk',sans-serif;font-size:19px}
 .logo b i{font-style:normal;color:var(--acc)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px;margin-bottom:18px}
-.kicker{font-family:'Space Grotesk',sans-serif;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:5px;padding:28px;margin-bottom:18px}
+.kicker{font-family:'Space Grotesk',sans-serif;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--mut);font-weight:600;margin-bottom:8px}
+.kicker::before{content:"";display:inline-block;width:18px;height:2px;background:var(--acc);vertical-align:middle;margin-right:8px}
 h1{font-size:clamp(24px,5vw,32px);margin-bottom:6px}
 .sub{color:var(--mut);font-size:14px}
 label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:14px 0 6px;font-weight:600}
-input,select,textarea{width:100%;padding:12px 14px;background:var(--bg);border:1px solid var(--line);color:var(--txt);font:inherit;font-size:15px;outline:0;border-radius:9px}
+input,select,textarea{width:100%;padding:12px 14px;background:var(--bg);border:1px solid var(--line);color:var(--txt);font:inherit;font-size:15px;outline:0;border-radius:4px}
 input:focus,select:focus,textarea:focus{border-color:var(--acc)}
 textarea{min-height:100px;resize:vertical}
-.btn{display:inline-block;background:var(--acc);color:#16110f;padding:13px 26px;font-size:13px;font-weight:600;letter-spacing:.03em;border:none;border-radius:9px;cursor:pointer;font-family:'Space Grotesk',sans-serif;transition:background .2s}
+.btn{display:inline-block;background:var(--acc);color:#16110f;padding:13px 26px;font-size:13px;font-weight:600;letter-spacing:.03em;border:none;border-radius:4px;cursor:pointer;font-family:'Space Grotesk',sans-serif;transition:background .2s}
 .btn:hover{background:var(--acc2)}
 .btn.g{background:transparent;color:var(--txt);border:1px solid var(--line)}
 .btn.g:hover{border-color:var(--acc);color:var(--acc)}
 .btn.green{background:#4f9a4f;color:#0c150c}
 .btn:disabled{opacity:.5;cursor:default}
-.msg{padding:14px 16px;font-size:14px;border:1px solid;border-radius:9px;margin:14px 0;display:none}
+.msg{padding:14px 16px;font-size:14px;border:1px solid;border-radius:4px;margin:14px 0;display:none}
 .msg.ok{display:block;border-color:#3d6b3d;background:rgba(60,120,60,.12);color:#9fd49f}
 .msg.err{display:block;border-color:#7a3535;background:rgba(150,60,60,.12);color:#e0a0a0}
 
@@ -47,18 +48,18 @@ td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align
 th.num{text-align:right}
 .pos-desc{position:relative;cursor:default}
 .pos-desc .info{display:inline-block;margin-left:6px;width:17px;height:17px;line-height:17px;text-align:center;border-radius:50%;background:rgba(255,111,91,.15);color:var(--acc);font-size:11px;font-weight:700;cursor:help}
-.tip{display:none;position:absolute;left:0;top:100%;z-index:20;background:var(--card2);border:1px solid var(--acc);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--txt);max-width:380px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-top:4px}
+.tip{display:none;position:absolute;left:0;top:100%;z-index:20;background:var(--card2);border:1px solid var(--acc);border-radius:4px;padding:12px 14px;font-size:13px;color:var(--txt);max-width:380px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-top:4px}
 .pos-desc:hover .tip,.pos-desc.open .tip{display:block}
 .totals td{border-bottom:none;padding:5px 8px}
 .totals .grand{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--acc)}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
-.status-b{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 12px;border-radius:12px;border:1px solid var(--grn);color:var(--grn)}
+.status-b{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 12px;border-radius:4px;border:1px solid var(--grn);color:var(--grn)}
 .hint{font-size:12px;color:var(--mut2);margin-top:14px}
 footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
 .hidden{display:none}
 .fade{animation:f .5s ease}@keyframes f{from{opacity:0;transform:translateY(10px)}to{opacity:1}}
 .ups{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:14px}
-.up{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:18px}
+.up{background:var(--card2);border:1px solid var(--line);border-radius:4px;padding:18px}
 .up h4{font-size:15px;margin-bottom:5px}
 .up p{font-size:13px;color:var(--mut);margin-bottom:10px}
 .up .upp{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--acc);margin-bottom:10px}
@@ -206,7 +207,7 @@ function renderOffer(){
       '<p class="sub" style="font-size:13px">Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an – danach ist euer Termin fest reserviert und ihr bekommt eine Bestätigung.</p>'+
       '<label>Vor- und Nachname</label><input id="accName" autocomplete="name">'+
       '<label>Unterschrift (mit Finger oder Maus)</label>'+
-      '<canvas id="accSig" style="width:100%;height:150px;background:#fff;border-radius:10px;touch-action:none;cursor:crosshair"></canvas>'+
+      '<canvas id="accSig" style="width:100%;height:150px;background:#fff;border-radius:4px;touch-action:none;cursor:crosshair"></canvas>'+
       '<div style="margin-top:6px"><a onclick="accClear()" style="cursor:pointer;font-size:13px">↺ Feld leeren</a></div>'+
       '<div style="margin-top:12px"><button class="btn green" onclick="doAccept()">✓ Jetzt verbindlich annehmen</button></div></div>'+
       '<div id="cmtBox" class="hidden"><label>Eure Frage oder Anmerkung</label><textarea id="cmt"></textarea>'+
@@ -421,12 +422,12 @@ function renderRental(){
     '<div class="card"><h2>1 · Ausweis fotografieren</h2>'+
     '<p class="sub" style="margin-top:6px">Zur Absicherung der Vermietung brauche ich einmalig eine Kopie eures Personalausweises – Vorder- und Rückseite. Einfach mit der Kamera abfotografieren. Ihr dürft alles schwärzen oder abkleben, was nicht benötigt wird (z. B. Zugangsnummer, Ausweisnummer) – lesbar bleiben müssen Name, Anschrift und Foto.</p>'+
     '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px">'+
-    '<div style="flex:1;min-width:180px"><label>Vorderseite</label><input type="file" accept="image/*" capture="environment" onchange="mvPhoto(this,\'front\')"><img id="pvFront" style="display:none;max-width:100%;border-radius:8px;margin-top:8px"></div>'+
-    '<div style="flex:1;min-width:180px"><label>Rückseite</label><input type="file" accept="image/*" capture="environment" onchange="mvPhoto(this,\'back\')"><img id="pvBack" style="display:none;max-width:100%;border-radius:8px;margin-top:8px"></div></div></div>'+
+    '<div style="flex:1;min-width:180px"><label>Vorderseite</label><input type="file" accept="image/*" capture="environment" onchange="mvPhoto(this,\'front\')"><img id="pvFront" style="display:none;max-width:100%;border-radius:3px;margin-top:8px"></div>'+
+    '<div style="flex:1;min-width:180px"><label>Rückseite</label><input type="file" accept="image/*" capture="environment" onchange="mvPhoto(this,\'back\')"><img id="pvBack" style="display:none;max-width:100%;border-radius:3px;margin-top:8px"></div></div></div>'+
 
     '<div class="card"><h2>2 · Unterschreiben</h2>'+
     '<p class="sub" style="margin-top:6px">Mit dem Finger oder Stift direkt hier im Feld unterschreiben – auf dem Smartphone am besten quer halten.</p>'+
-    '<canvas id="sigPad" style="width:100%;height:170px;background:#fff;border-radius:10px;touch-action:none;margin-top:10px;cursor:crosshair"></canvas>'+
+    '<canvas id="sigPad" style="width:100%;height:170px;background:#fff;border-radius:4px;touch-action:none;margin-top:10px;cursor:crosshair"></canvas>'+
     '<div style="margin-top:6px"><a onclick="sigClear()" style="cursor:pointer;font-size:13px">↺ Feld leeren</a></div>'+
     '<label style="margin-top:14px">Vor- und Nachname (wie im Ausweis)</label><input id="mvName" autocomplete="name">'+
     '<label style="display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-weight:400;font-size:13px;cursor:pointer;text-transform:none;letter-spacing:normal;color:var(--mut,inherit)">'+
