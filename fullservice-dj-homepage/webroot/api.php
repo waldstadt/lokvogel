@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 34;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 35;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -284,6 +284,7 @@ function upgrade(PDO $p): void {
     "alter table equipment add column thomann_url text",
     "alter table equipment add column own_rig integer default 0",
   ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
+  if ($v < 35) seedServiceProducts($p);
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -431,6 +432,8 @@ function seedServiceProducts(PDO $p): void {
      'Kompletter Check eurer vorhandenen Tontechnik vor Ort: Funktionsprüfung aller Komponenten, Klang-Bewertung, Einstellungs- und Ergänzungs-Potenzial. Schriftlicher Bericht mit klarer Empfehlung: neu einstellen, ergänzen oder ersetzen. Wird bei Folgeauftrag verrechnet. Gilt für eine Anlage/einen Raum.', 'pausch.', 149.0],
     ['TECH-CHECK-PLUS', 23, 'Service', 'Technik-Check: weitere Anlage / weiterer Raum',
      'Zusätzliche Anlage oder zusätzlicher Raum im selben Termin – inkl. Aufnahme im selben Bericht.', 'Stk.', 79.0],
+    ['FLUID-01', 30, 'Verbrauchsmaterial', 'Nebelfluid-Nachfüllung (pro Liter)',
+     'Nebelmaschinen sind serienmäßig mit 1 Liter Fluid inklusive. Bei höherem Verbrauch wird die tatsächlich genutzte Menge hierüber nachberechnet.', 'Liter', 5.0],
   ];
   foreach ($rows as [$sku, $s, $cat, $n, $d, $u, $pr]) {
     $c = $p->prepare('select count(*) from products where sku = ?');
