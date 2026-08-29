@@ -693,6 +693,15 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <div class="sml mut" style="margin:8px 0 4px">Wichtig: Backups liegen auf demselben Server – lade dir regelmäßig eins per Klick herunter (externe Kopie).</div>
           <div id="bkList" class="sml mut">–</div>
         </div>
+        <div class="card"><h3>KI-Textassistent</h3>
+          <div class="sml mut" style="margin-bottom:8px">Wird genutzt, um aus Stichpunkten fertige Texte zu machen (z. B. Artikelbeschreibungen). Der eingegebene Text wird dafür an den hier eingestellten KI-Anbieter gesendet – kompatibel mit OpenAI und den meisten OpenAI-kompatiblen Diensten (z. B. auch lokal gehostete Modelle mit passender Schnittstelle).</div>
+          <div class="grid3">
+            <div><label>Basis-URL</label><input id="aiBaseUrl" placeholder="https://api.openai.com/v1"></div>
+            <div><label>Modell</label><input id="aiModel" placeholder="gpt-4o-mini"></div>
+            <div><label>API-Schlüssel <span class="mut" id="aiKeyState"></span></label><input id="aiKey" type="password" placeholder="nur zum Ändern ausfüllen"></div>
+          </div>
+          <button class="btn sm" onclick="saveAiConfig()">Speichern</button>
+        </div>
   </div>
 
   </div></div>
@@ -856,6 +865,10 @@ function openWsModal(id){
     '<option value=""'+(!w.audience?' selected':'')+'>Offen / gemischt</option></select></div>'+
     '<div><label>Titel *</label><input id="wTitle" value="'+esc(w.title||'')+'" placeholder="wird je Schiene vorgeschlagen"></div></div>'+
     '<label>Kurzbeschreibung</label><input id="wDesc" value="'+esc(w.description||'')+'" placeholder="z. B. Grundlagen: Gain, EQ, Feedback – Praxis am Pult">'+
+    '<label>Ausführlicher Text (Homepage)</label><textarea id="wLongDesc" style="min-height:100px">'+esc(w.long_description||'')+'</textarea>'+
+    edBtn('wLongDesc')+
+    '<label>Foto</label><div style="display:flex;gap:8px"><input id="wImg" value="'+esc(w.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upWs" onchange="uploadImg(this,\'wImg\',\'wFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upWs\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'wImg\',\'wFocal\')">Aus Pool</button></div>'+
+    focalWidget(w.image_url,w.image_focal,'wFocal','4/3')+
     '<div class="grid3"><div><label>Datum *</label><input type="date" id="wDate" value="'+(w.event_date||'')+'"></div>'+
     '<div><label>Beginn</label><input type="time" id="wStart" value="'+(w.start_time||'')+'"></div>'+
     '<div><label>Ende</label><input type="time" id="wEnd" value="'+(w.end_time||'')+'"></div></div>'+
@@ -879,8 +892,9 @@ function wsAudPreset(){
 function saveWs(id){
   if(v('wAud')&&!v('wTitle'))wsAudPreset();
   if(!v('wTitle')||!v('wDate')){toast('Titel und Datum fehlen.',1);return}
-  var body={title:v('wTitle'),description:v('wDesc'),audience:v('wAud'),event_date:v('wDate'),start_time:v('wStart')||null,end_time:v('wEnd')||null,
+  var body={title:v('wTitle'),description:v('wDesc'),long_description:v('wLongDesc'),audience:v('wAud'),event_date:v('wDate'),start_time:v('wStart')||null,end_time:v('wEnd')||null,
     price_net:v('wPrice')?Number(v('wPrice')):null,capacity:Number(v('wCap'))||8,location:v('wLoc'),
+    image_url:v('wImg'),image_focal:v('wFocal'),
     public:document.getElementById('wPub').checked};
   if(!id)body.created_at=new Date().toISOString();
   (id?api('workshop_events?id=eq.'+id,{method:'PATCH',body:body}):api('workshop_events',{method:'POST',body:body}))
@@ -2451,7 +2465,7 @@ function openEqModal(id){
     '<div class="grid3"><div><label>Name *</label><input id="eName" value="'+esc(e.name||'')+'"></div>'+
     '<div><label>Kategorie</label><input id="eCat" value="'+esc(e.category||'')+'" placeholder="PA, Licht, Effekt …"></div>'+
     '<div><label>Artikelnummer</label><input id="eSku" value="'+esc(e.sku||'')+'"></div></div>'+
-    '<label>Beschreibung (Homepage)</label><textarea id="eDesc">'+esc(e.description||'')+'</textarea>'+
+    '<label>Beschreibung (Homepage)</label><textarea id="eDesc">'+esc(e.description||'')+'</textarea>'+edBtn('eDesc')+
     '<div class="grid4"><div><label>€ / Miettag</label><input type="number" step="0.01" id="eRate" value="'+(e.day_rate||0)+'">'+
     '<input type="hidden" id="eRateSuggested" value="'+(e.day_rate_suggested!=null?e.day_rate_suggested:'')+'">'+
     (e.day_rate_suggested!=null?'<span class="mut sml" style="font-style:italic">Empfehlung: '+euro(e.day_rate_suggested)+' <a onclick="document.getElementById(\'eRate\').value='+e.day_rate_suggested+'">übernehmen</a></span>':'')+'</div>'+
@@ -2549,25 +2563,56 @@ function renderSetsAdmin(){
       (s.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</div>';
   }).join('')||'<span class="mut">Noch keine Sets.</span>';
 }
+/* Mindestabnahme eines Artikels (z. B. 6er-Set) – ein Set darf nie weniger davon
+   enthalten, sonst wird der Set-Preis rechnerisch zu niedrig. */
+function eqMinQty(e){return Math.max(1,Number(e&&e.min_qty)||1)}
+/* Set-Artikel-Mengen auf ein Vielfaches der jeweiligen Mindestabnahme aufrunden. */
+function clampSetItemQty(it){
+  var e=(CACHE.equipment||[]).find(function(x){return x.id===it.equipment_id});
+  var mq=eqMinQty(e);
+  var q=Math.max(1,Number(it.qty)||1);
+  it.qty=Math.ceil(q/mq)*mq;
+  return mq;
+}
+var setDragIdx=null;
+function setItemDragStart(i,ev){setDragIdx=i;ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',String(i))}catch(e){}}
+function setItemDragOver(ev){if(setDragIdx!==null)ev.preventDefault()}
+function setItemDrop(i,ev){
+  ev.preventDefault();
+  if(setDragIdx===null||setDragIdx===i){setDragIdx=null;return}
+  var m=curSetItems.splice(setDragIdx,1)[0];
+  curSetItems.splice(i,0,m);
+  setDragIdx=null;
+  renderSetItemRows();
+}
 function renderSetItemRows(){
   document.getElementById('sItemRows').innerHTML=curSetItems.map(function(it,i){
-    return '<div class="grid3" style="margin-bottom:6px"><div style="grid-column:span 2"><select onchange="curSetItems['+i+'].equipment_id=this.value">'+
+    var mq=clampSetItemQty(it);
+    var hint=mq>1?'<div class="mut sml" style="margin-top:2px">Mindestabnahme '+mq+' Stück</div>':'';
+    return '<div draggable="true" ondragstart="setItemDragStart('+i+',event)" ondragover="setItemDragOver(event)" ondrop="setItemDrop('+i+',event)" '+
+      'class="grid3" style="margin-bottom:6px;align-items:start;cursor:grab">'+
+      '<div style="display:flex;gap:8px;align-items:flex-start;grid-column:span 2">'+
+      '<span style="opacity:.55;user-select:none;padding-top:9px" title="Ziehen zum Umsortieren">⠿</span>'+
+      '<div style="flex:1"><select onchange="curSetItems['+i+'].equipment_id=this.value;renderSetItemRows()">'+
       (CACHE.equipment||[]).slice().sort(byNameDe).map(function(e){return '<option value="'+e.id+'"'+(it.equipment_id===e.id?' selected':'')+'>'+esc(e.name)+' ('+euro(e.day_rate||0)+'/Tag)</option>'}).join('')+
-      '</select></div><div style="display:flex;gap:6px"><input type="number" min="1" value="'+(it.qty||1)+'" onchange="curSetItems['+i+'].qty=Number(this.value)||1" style="margin:0"><button class="btn r sm" onclick="curSetItems.splice('+i+',1);renderSetItemRows()">✕</button></div></div>';
+      '</select>'+hint+'</div></div>'+
+      '<div style="display:flex;gap:6px"><input type="number" min="'+mq+'" step="'+mq+'" value="'+it.qty+'" onchange="curSetItems['+i+'].qty=Number(this.value)||'+mq+';renderSetItemRows()" style="margin:0"><button class="btn r sm" onclick="curSetItems.splice('+i+',1);renderSetItemRows()">✕</button></div></div>';
   }).join('')||'<span class="mut sml">Noch keine Artikel im Set.</span>';
+  updateSetPricePreview();
 }
 function addSetItemRow(){
-  var first=(CACHE.equipment||[])[0];if(!first){toast('Erst Technik-Artikel anlegen.',1);return}
-  curSetItems.push({equipment_id:first.id,qty:1});renderSetItemRows();
+  var first=(CACHE.equipment||[]).slice().sort(byNameDe)[0];if(!first){toast('Erst Technik-Artikel anlegen.',1);return}
+  curSetItems.push({equipment_id:first.id,qty:eqMinQty(first)});renderSetItemRows();
 }
 function openSetModal(id){
   var s=id?(CACHE.equipmentSets||[]).find(function(x){return x.id===id}):{};s=s||{};
   curSetItems=id?(CACHE.setItems||[]).filter(function(x){return x.set_id===id}).map(function(x){return {equipment_id:x.equipment_id,qty:x.qty}}):[];
   openModal(id?'Set bearbeiten':'Neues Set',
-    '<label>Name *</label><input id="sName" value="'+esc(s.name||'')+'" placeholder="z. B. Gartenparty-Paket">'+
+    '<label>Name *</label><input id="stName" value="'+esc(s.name||'')+'" placeholder="z. B. Gartenparty-Paket">'+
     '<label>Beschreibung (Homepage)</label><textarea id="sDesc">'+esc(s.description||'')+'</textarea>'+
-    '<div class="grid2"><div><label>Rabatt auf die Summe der Einzelpreise (%)</label><input type="number" step="0.1" id="sDiscPct" value="'+(s.discount_pct!=null?s.discount_pct:5)+'"></div>'+
-    '<div><label>oder Festpreis €/Tag (überschreibt den Rabatt)</label><input type="number" step="0.01" id="sFixed" value="'+(s.fixed_price!=null?s.fixed_price:'')+'"></div></div>'+
+    '<div class="grid2"><div><label>Rabatt auf die Summe der Einzelpreise (%)</label><input type="number" step="0.1" id="sDiscPct" value="'+(s.discount_pct!=null?s.discount_pct:5)+'" oninput="updateSetPricePreview()"></div>'+
+    '<div><label>oder Festpreis €/Tag (überschreibt den Rabatt)</label><input type="number" step="0.01" id="sFixed" value="'+(s.fixed_price!=null?s.fixed_price:'')+'" oninput="updateSetPricePreview()"></div></div>'+
+    '<div id="sPricePreview" class="mut sml" style="margin:-8px 0 12px"></div>'+
     '<label style="margin-top:10px">Enthaltene Artikel</label><div id="sItemRows"></div>'+
     '<button class="btn g sm" style="margin-top:6px" onclick="addSetItemRow()">+ Artikel</button>'+
     '<label style="margin-top:14px">Foto <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional – ohne eigenes Foto zeigt die Homepage automatisch eine Collage aus den Hauptbildern der enthaltenen Artikel)</span></label>'+
@@ -2578,10 +2623,26 @@ function openSetModal(id){
     (id?' <button class="btn r" onclick="delSet(\''+id+'\')">Löschen</button>':'')+'</div>');
   renderSetItemRows();
 }
+/* Zusammengesetzter Preis live beim Anlegen/Bearbeiten eines Sets - Summe der Tagespreise
+   der enthaltenen Artikel (× Menge), danach Rabatt bzw. Festpreis angewendet. */
+function setRawSumAdmin(){
+  return curSetItems.reduce(function(sum,it){
+    var e=(CACHE.equipment||[]).find(function(x){return x.id===it.equipment_id});
+    return sum+(e?Number(e.day_rate||0):0)*Number(it.qty||1);
+  },0);
+}
+function updateSetPricePreview(){
+  var el=document.getElementById('sPricePreview');if(!el)return;
+  var raw=setRawSumAdmin(),fixed=v('sFixed'),disc=Number(v('sDiscPct'))||0;
+  var rate=fixed!==''?Number(fixed):raw*(1-disc/100);
+  el.innerHTML='Zusammengesetzter Preis: <b style="color:var(--tx)">'+euro(rate)+' / Miettag</b>'+
+    (fixed===''?' (Summe Einzelpreise '+euro(raw)+' − '+disc+'&nbsp;%)':' (Festpreis – Summe Einzelpreise wäre '+euro(raw)+')');
+}
 function saveSet(id){
-  if(!v('sName')){toast('Name fehlt.',1);return}
+  if(!v('stName')){toast('Name fehlt.',1);return}
   if(!curSetItems.length){toast('Bitte mindestens einen Artikel ins Set aufnehmen.',1);return}
-  var body={name:v('sName'),description:v('sDesc'),
+  curSetItems.forEach(clampSetItemQty);   // Mindestabnahme je Artikel nochmal absichern
+  var body={name:v('stName'),description:v('sDesc'),
     discount_pct:Number(v('sDiscPct'))||0,fixed_price:v('sFixed')!==''?Number(v('sFixed')):null,
     image_url:v('sImg'),image_focal:v('sFocal'),public:document.getElementById('sPub').checked};
   if(!id)body.sort=(CACHE.equipmentSets||[]).length;
@@ -3404,9 +3465,29 @@ function renderCmsReload(){
     CACHE.packages=r[0]||[];CACHE.faq=r[1]||[];renderPackAdmin();renderFaqAdmin()});
 }
 
+/* ===== KI-Textassistent ===== */
+function loadAiConfig(){
+  fetch('api.php/ai/config',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(c){
+    if(!c)return;
+    document.getElementById('aiBaseUrl').value=c.base_url||'';
+    document.getElementById('aiModel').value=c.model||'';
+    document.getElementById('aiKeyState').textContent=c.has_key?'(hinterlegt ✓)':'(fehlt)';
+  }).catch(function(){});
+}
+function saveAiConfig(){
+  var body={base_url:v('aiBaseUrl'),model:v('aiModel')};
+  if(v('aiKey'))body.api_key=v('aiKey');
+  fetch('api.php/ai/config',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json()}).then(function(c){
+      if(c.error){toast(c.error,1);return}
+      document.getElementById('aiKey').value='';
+      toast('Gespeichert ✓');loadAiConfig();
+    }).catch(function(e){toast(e.message,1)});
+}
+
 /* ===== Einstellungen ===== */
 function renderSet(){
-  loadBackups();loadDeploy();loadIcal();renderPacking();
+  loadBackups();loadDeploy();loadIcal();loadAiConfig();renderPacking();
   var c=S.company||{},n=S.numbering||{},d=S.defaults||{};
   document.getElementById('sName').value=c.name||'';
   document.getElementById('sOwner').value=c.owner||'';
@@ -4051,23 +4132,56 @@ function igSync(){
 }
 
 /* ===== Text-Editor („Groß bearbeiten") mit Mini-Markdown ===== */
-var ED_TARGET=null;
+var ED_TARGET=null,ED_UNDO=null;
 function edBtn(id){
   return '<div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor(\''+id+'\')">'+
   '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>';
 }
 function openTextEditor(id){
   var src=document.getElementById(id);if(!src)return;
-  ED_TARGET=id;
+  ED_TARGET=id;ED_UNDO=null;
   openOvl2('Text bearbeiten',
-    '<div style="display:flex;gap:6px;margin-bottom:8px">'+
+    '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+
     '<button class="btn g sm" style="font-weight:700" title="Auswahl fett" onclick="edWrap(\'**\',\'**\')">B</button>'+
     '<button class="btn g sm" style="font-style:italic" title="Auswahl kursiv" onclick="edWrap(\'*\',\'*\')">I</button>'+
-    '<button class="btn g sm" title="Auswahl verlinken" onclick="edLink()">Link</button></div>'+
+    '<button class="btn g sm" title="Auswahl verlinken" onclick="edLink()">Link</button>'+
+    '<button class="btn g sm" id="edAiBtn" title="Aus Stichpunkten oder schlechtem Text einen fertigen Artikeltext machen" onclick="edAiImprove()">'+
+    '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Mit KI verbessern</button>'+
+    '<a class="sml" id="edAiUndo" style="display:none" onclick="edAiUndo()">Rückgängig</a></div>'+
     '<textarea id="edArea" style="min-height:320px"></textarea>'+
     '<div class="mut sml" style="margin-top:6px">**fett**, *kursiv*, [Text](https://…) – wird auf der Homepage formatiert angezeigt.</div>'+
     '<div style="margin-top:12px"><button class="btn" onclick="edApply()">Übernehmen</button> <button class="btn g" onclick="closeOvl2()">Abbrechen</button></div>');
   document.getElementById('edArea').value=src.value;
+}
+function edAiImprove(){
+  var t=document.getElementById('edArea');if(!t)return;
+  var text=t.value.trim();
+  if(!text){toast('Bitte zuerst Stichpunkte oder einen Text eingeben.',1);return}
+  var isEq=ED_TARGET==='eDesc';
+  var body={text:text,kind:isEq?'equipment':'page'};
+  if(isEq)body.category=v('eCat');
+  var btn=document.getElementById('edAiBtn');
+  btn.disabled=true;btn.textContent='Wird generiert …';
+  ED_UNDO=t.value;
+  fetch('api.php/ai/rewrite',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
+    .then(function(res){
+      btn.disabled=false;
+      btn.innerHTML='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Mit KI verbessern';
+      if(!res.ok||res.j.error){toast((res.j&&res.j.error)||'KI-Anfrage fehlgeschlagen.',1);return}
+      t.value=res.j.text||'';
+      document.getElementById('edAiUndo').style.display='inline';
+      toast('Text generiert – bei Bedarf anpassen, dann „Übernehmen".');
+    }).catch(function(e){
+      btn.disabled=false;
+      btn.innerHTML='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Mit KI verbessern';
+      toast(e.message,1);
+    });
+}
+function edAiUndo(){
+  var t=document.getElementById('edArea');
+  if(t&&ED_UNDO!==null)t.value=ED_UNDO;
+  document.getElementById('edAiUndo').style.display='none';
 }
 function edWrap(pre,post){
   var t=document.getElementById('edArea');if(!t)return;

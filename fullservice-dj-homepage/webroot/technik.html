@@ -156,7 +156,7 @@ footer a:hover{color:var(--acc)}
       <a href="#fuer-wen">Für wen</a>
       <a href="mieten.html">Technik mieten</a>
       <a href="#techniker">Techniker buchen</a>
-      <a href="#installation">Installation</a>
+      <a href="#installation">Technik-Check</a>
       <a href="#partner">Für Kollegen</a>
       <a href="#workshops">Workshops</a>
       <a href="#konditionen">Konditionen</a>
@@ -196,7 +196,7 @@ footer a:hover{color:var(--acc)}
     <div class="reveal">
       <div class="kicker">Für wen ich arbeite</div>
       <h2>Kennt ihr das?</h2>
-      <p class="lead">Drei Situationen, für die man mich holt – und was ich daraus mache.</p>
+      <p class="lead">Ob kleine Kneipe oder großer Saal – ein paar Situationen, für die man mich holt, und was ich daraus mache.</p>
     </div>
     <div class="trio">
       <div class="card reveal" id="fw-reden">
@@ -215,7 +215,7 @@ footer a:hover{color:var(--acc)}
         <p class="sol">Ich kenne genau diese Räume: wenig Stellfläche, kurze Aufbauzeiten, Nachbarn. Technik, die in die Ecke passt und trotzdem den Raum füllt – geliefert, aufgebaut, nachts wieder weg.</p>
       </div>
     </div>
-    <p class="statement reveal">Enge Räume, schwierige Akustik, Publikum mittendrin: <b>Genau für solche Läden habe ich mein Lager zusammengestellt.</b> Hochwertige, kompakte Technik statt möglichst viel für möglichst wenig.</p>
+    <p class="statement reveal">Vom kleinen Konzert bis zur großen Feier: <b>Für all das habe ich mein Lager zusammengestellt.</b> Hochwertige Technik, die zur Location passt – statt möglichst viel für möglichst wenig.</p>
   </div>
 </section>
 
@@ -265,11 +265,12 @@ footer a:hover{color:var(--acc)}
 <section id="installation" style="background:var(--bg2)">
   <div class="wrap">
     <div class="reveal">
-      <div class="kicker">Festinstallation &amp; Wartung</div>
-      <h2>Einmal ordentlich – statt jedes Jahr Flickwerk</h2>
-      <p class="lead">Für Schulen, Vereine, Bars und Kneipen, die es ordentlich haben wollen: Ich plane und installiere eure Beschallung fest im Raum – und halte sie mit einem Wartungsvertrag dauerhaft in Schuss.</p>
+      <div class="kicker">Technik-Check</div>
+      <h2>Damit ihr wisst, woran ihr seid</h2>
+      <p class="lead">Ihr habt schon eine Anlage, wisst aber nicht, was sie noch taugt? Ich prüfe sie durch und ihr bekommt einen ehrlichen, schriftlichen Bericht.</p>
     </div>
-    <div class="trio">
+    <!-- Festinstallation & Wartung: erst wieder einblenden, wenn das Angebot offiziell steht (nach HWK-Zulassung) -->
+    <div class="trio" style="display:none">
       <div class="card reveal">
         <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Vereinsheim</h3>
         <p class="prob">„Die Anlage brummt seit Jahren, das Mischpult hat 40 Regler und keiner weiß mehr, wie es mal eingestellt war."</p>
@@ -286,7 +287,7 @@ footer a:hover{color:var(--acc)}
         <p class="sol">Eine Anlage, die beides kann: abends angenehmer Klang auf Gesprächslautstärke, am Live-Abend druckvoll – mit vorbereitetem Anschluss für Gesang und Gitarre.</p>
       </div>
     </div>
-    <div class="card reveal" style="background:var(--card);border:1px solid var(--acc);border-radius:5px;padding:26px 24px;margin-top:36px">
+    <div class="card reveal" style="background:var(--card);border:1px solid var(--acc);border-radius:5px;padding:26px 24px;margin-top:12px">
       <h3 style="margin-bottom:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Der Technik-Check: damit ihr wisst, woran ihr seid</h3>
       <p style="font-size:14px;color:var(--mut);margin-bottom:14px">Ihr habt schon eine Anlage, aber keiner weiß, was sie noch taugt? Ich prüfe sie komplett durch und ihr bekommt einen <b style="color:var(--txt)">schriftlichen Bericht</b>, der diese Fragen beantwortet:</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 28px;font-size:13.5px;color:var(--mut)" class="tc-list">
@@ -302,7 +303,7 @@ footer a:hover{color:var(--acc)}
         <span style="font-size:12px;color:var(--mut2)">Pauschalpreis für eine Anlage – jede weitere Anlage bzw. jeder weitere Raum im selben Termin zum kleinen Aufpreis. Wird bei einem Folgeauftrag verrechnet. Keine Verkaufsshow: Wenn eure Anlage gut ist, steht das genau so im Bericht.</span>
       </div>
     </div>
-    <div class="duo">
+    <div class="duo" style="display:none">
       <div class="card reveal">
         <h3>So läuft's</h3>
         <ul>
@@ -324,7 +325,7 @@ footer a:hover{color:var(--acc)}
         <div style="margin-top:18px"><a class="btn" href="#anfrage" onclick="pickInstallation()">Bestandsaufnahme anfragen</a></div>
       </div>
     </div>
-    <p class="rent-note reveal" style="margin-top:20px">Sauber getrennt: Ich montiere, verkable (Signal- und Lautsprecherleitungen) und schließe steckerfertig an. Arbeiten am Hausstromnetz übernimmt ein Elektro-Partnerbetrieb – fachgerecht und dokumentiert.</p>
+    <p class="rent-note reveal" style="margin-top:20px;display:none">Sauber getrennt: Ich montiere, verkable (Signal- und Lautsprecherleitungen) und schließe steckerfertig an. Arbeiten am Hausstromnetz übernimmt ein Elektro-Partnerbetrieb – fachgerecht und dokumentiert.</p>
   </div>
 </section>
 
@@ -333,14 +334,12 @@ footer a:hover{color:var(--acc)}
     <div class="reveal">
       <div class="kicker">Für Kollegen</div>
       <h2>DJs, Bands &amp; Musiker mieten günstiger</h2>
-      <p class="lead">Du stehst selbst auf der Bühne oder hinter den Decks? Als Miet-Partner bekommst du vergünstigte Preise im Mietpark. Die Partner-Registrierung läuft künftig direkt über die Buchung – hast du schon einen Partner-Code, gib ihn hier ein.</p>
+      <p class="lead">Du stehst selbst auf der Bühne oder hinter den Decks? Als Miet-Partner bekommst du vergünstigte Preise im Mietpark – ganz ohne Code.</p>
     </div>
     <div class="card reveal" style="max-width:460px">
-      <h3>Partner-Code eingeben</h3>
-      <div class="msg" id="cMsg"></div>
-      <label>Partner-Code</label><input id="pCode" placeholder="z. B. 4F9A2B77" style="text-transform:uppercase">
-      <div style="margin-top:14px"><button class="btn g" onclick="checkPartner()">Partnerpreise anzeigen</button></div>
-      <p style="font-size:12px;color:var(--mut2);margin-top:10px">Mit gültigem Code werden oben im Mietpark automatisch deine vergünstigten Partnerpreise angezeigt.</p>
+      <h3>So kommst du an die Partnerpreise</h3>
+      <p style="font-size:14px;color:var(--mut)">Leg dir im Vermietkatalog ein Konto an und schreib mir kurz, dass du Kollege bist – DJ-Alias, Band- oder Künstlername hilft bei der Prüfung. Ich schalte dein Konto dann für die Partnerpreise frei; sie gelten automatisch, sobald du eingeloggt bist.</p>
+      <div style="margin-top:14px"><a href="mieten.html" class="btn g">Zum Vermietkatalog</a></div>
     </div>
   </div>
 </section>
@@ -432,6 +431,7 @@ footer a:hover{color:var(--acc)}
       <div class="card reveal"><h4>Abholung</h4><p>Abholung nach Terminabsprache am Lager in Hemer – mit kurzer Einweisung in die Geräte.</p></div>
       <div class="card reveal"><h4>Lieferung &amp; Aufbau</h4><p>Auf Wunsch liefere ich, baue auf und wieder ab. Preis nach Entfernung und Aufwand – steht transparent im Angebot.</p></div>
       <div class="card reveal"><h4>Techniker-Einsatz</h4><p>Als Techniker inkl. Equipment kalkuliere ich nach Stunden und Materialeinsatz. Ihr bekommt vorab ein klares Angebot.</p></div>
+      <div class="card reveal"><h4>Dauermiete</h4><p>Braucht ihr Technik über Wochen oder Monate? Ab einer Woche gelten automatisch günstigere Staffelpreise, ab zwei Wochen und ab einem Monat noch mal weniger – einfach anfragen, ich rechne es individuell durch.</p></div>
     </div>
   </div>
 </section>
@@ -514,23 +514,11 @@ try{var _tp=JSON.stringify({p:location.pathname.split('/').pop()||'technik.html'
 navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
-function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 var LEGAL={};
 
 function sfetch(path){
   return fetch(API+'/rest/'+path).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()});
-}
-function checkPartner(){
-  var code=document.getElementById('pCode').value.trim().toUpperCase(),m=document.getElementById('cMsg');
-  if(!code){m.className='msg err';m.textContent='Bitte Code eingeben.';return}
-  fetch(API+'/portal/partner/'+encodeURIComponent(code))
-    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
-    .then(function(res){
-      if(res.s!==200){m.className='msg err';m.textContent=res.j.error||'Code ungültig.';return}
-      sessionStorage.setItem('lg_partner',JSON.stringify(res.j));
-      m.className='msg ok';m.textContent='Willkommen, '+res.j.name+'! Deine Partnerpreise ('+res.j.discount_pct+' % Rabatt, sofern kein Festpreis hinterlegt) sind jetzt im Vermietkatalog aktiv – du wirst gleich weitergeleitet …';
-      setTimeout(function(){location.href='mieten.html'},900);
-    }).catch(function(){m.className='msg err';m.textContent='Prüfung fehlgeschlagen – bitte später erneut versuchen.'});
 }
 sfetch('site_content?select=key,value').then(function(rows){
   var c={};rows.forEach(function(r){c[r.key]=r.value});
@@ -569,6 +557,17 @@ function openLegal(key){
 }
 function closeLegal(){document.getElementById('legalBg').style.display='none';document.body.style.overflow=''}
 
+function mdRender(t){
+  var s=esc(t);
+  s=s.replace(/\[([^\]]+)\]\(([^()\s]+)\)/g,function(m,txt,url){
+    if(!/^https?:\/\//i.test(url))return m;
+    var href=url.replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    return '<a href="'+href+'" target="_blank" rel="noopener">'+txt+'</a>';
+  });
+  s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+  s=s.replace(/\*([^*\s][^*]*)\*/g,'<i>$1</i>');
+  return s.replace(/\n/g,'<br>');
+}
 var WS=[],wsSel=null;
 function euro2(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
 function wsDate(w){
@@ -584,10 +583,12 @@ function loadWorkshops(){
       var full=w.free<=0;
       var aud=w.audience==='dj'?'DJs & Alleinunterhalter':(w.audience==='live'?'Livemusik':'');
       return '<div style="background:var(--card);border:1px solid var(--line);border-radius:5px;padding:22px 20px">'+
+        (w.image_url?'<img src="'+esc(w.image_url)+'" alt="" style="width:100%;aspect-ratio:4/3;object-fit:cover;object-position:'+esc(w.image_focal||'50% 50%')+';border-radius:4px;margin-bottom:14px">':'')+
         '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:6px">'+wsDate(w)+'</div>'+
         (aud?'<div style="display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:3px;padding:3px 10px;color:var(--mut);margin-bottom:8px">'+aud+'</div>':'')+
         '<h4 style="font-size:16px;margin-bottom:6px">'+esc(w.title)+'</h4>'+
         (w.description?'<p style="font-size:13px;color:var(--mut);margin-bottom:10px">'+esc(w.description)+'</p>':'')+
+        (w.long_description?'<div style="font-size:13px;color:var(--mut);margin-bottom:10px;line-height:1.6">'+mdRender(w.long_description)+'</div>':'')+
         '<div style="font-size:13px;color:var(--mut);margin-bottom:12px">'+(w.location?esc(w.location)+' · ':'')+
         (w.price_net!=null?euro2(w.price_net)+' p. P. · ':'')+
         (full?'<b style="color:var(--mut2)">ausgebucht</b>':'<b style="color:var(--acc)">'+w.free+' Plätze frei</b>')+'</div>'+

@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 47;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 49;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -337,6 +337,26 @@ function upgrade(PDO $p): void {
     /* Auswählbares Platzhalter-Icon je Artikel (falls noch kein Foto hinterlegt ist). */
     try { $p->exec("alter table equipment add column placeholder text"); } catch (PDOException $e) {}
   }
+  if ($v < 48) foreach ([
+    "alter table workshop_events add column long_description text",
+    "alter table workshop_events add column image_url text",
+    "alter table workshop_events add column image_focal text default '50% 50%'",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
+  if ($v < 49) {
+    /* Set-Preise waren zu niedrig, wenn ein enthaltener Artikel eine Mindestabnahme hat
+       (z. B. 6er-Set) und im Set mit weniger als der Mindestmenge eingetragen war -
+       bestehende Set-Positionen auf ein Vielfaches der jeweiligen Mindestabnahme aufrunden. */
+    try {
+      $rows = $p->query("select si.id, si.qty, e.min_qty from equipment_set_items si
+        join equipment e on e.id = si.equipment_id where coalesce(e.min_qty,1) > 1")->fetchAll();
+      $upd = $p->prepare("update equipment_set_items set qty = ? where id = ?");
+      foreach ($rows as $r) {
+        $mq = max(1, (int)$r['min_qty']); $q = max(1, (int)$r['qty']);
+        $fixed = (int)(ceil($q / $mq) * $mq);
+        if ($fixed !== $q) $upd->execute([$fixed, $r['id']]);
+      }
+    } catch (PDOException $e) {}
+  }
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -642,8 +662,9 @@ function seedExtraTemplates(PDO $p): void {
 function workshopsDdl(): array {
   return [
     "create table if not exists workshop_events (id text primary key, sort integer default 0,
-      title text not null, description text, audience text default '', event_date text not null, start_time text, end_time text,
-      location text, price_net real, capacity integer default 8, public integer default 0, created_at text)",
+      title text not null, description text, long_description text, audience text default '', event_date text not null, start_time text, end_time text,
+      location text, price_net real, capacity integer default 8, public integer default 0,
+      image_url text, image_focal text default '50% 50%', created_at text)",
     "create table if not exists workshop_signups (id text primary key,
       workshop_id text not null references workshop_events(id) on delete cascade,
       name text not null, email text, phone text, seats integer default 1, message text,
@@ -2001,9 +2022,11 @@ function handlePortal(string $path, string $method, $body): never {
       from workshop_events w where w.public = 1 and w.event_date >= date('now')
       order by w.event_date, w.start_time")->fetchAll();
     out(array_map(fn($w) => [
-      'id' => $w['id'], 'title' => $w['title'], 'description' => $w['description'], 'audience' => $w['audience'] ?? '',
+      'id' => $w['id'], 'title' => $w['title'], 'description' => $w['description'],
+      'long_description' => $w['long_description'] ?? '', 'audience' => $w['audience'] ?? '',
       'event_date' => $w['event_date'], 'start_time' => $w['start_time'], 'end_time' => $w['end_time'],
       'location' => $w['location'], 'price_net' => $w['price_net'],
+      'image_url' => $w['image_url'] ?? '', 'image_focal' => $w['image_focal'] ?? '50% 50%',
       'free' => max(0, (int)$w['capacity'] - (int)$w['booked']),
     ], $rows));
   }
@@ -2590,6 +2613,81 @@ try {
       'subdir' => $cfg['subdir'] ?? '', 'key' => $cfg['key'] ?? '',
       'has_token' => !empty($cfg['token']),
       'last_sha' => $cfg['last_sha'] ?? null, 'last_time' => $cfg['last_time'] ?? null]);
+  }
+  /* KI-Textassistent: Konfiguration (Basis-URL/Modell/API-Schlüssel) liegt in settings.ai –
+     nur angemeldet, der Schlüssel selbst wird nie zurückgegeben. */
+  if ($path === 'ai/config' && in_array($method, ['GET', 'POST'])) {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
+    if ($method === 'POST') {
+      $baseUrl = trim((string)($body['base_url'] ?? '')) ?: 'https://api.openai.com/v1';
+      if (!preg_match('#^https?://#', $baseUrl)) fail('Bitte eine gültige Basis-URL angeben (https://…).', 400);
+      $cfg['base_url'] = $baseUrl;
+      $cfg['model'] = trim((string)($body['model'] ?? '')) ?: 'gpt-4o-mini';
+      if (!empty($body['api_key'])) $cfg['api_key'] = trim((string)$body['api_key']);
+      $p->prepare("insert into settings (key, value, updated_at) values ('ai', ?, ?)
+          on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
+        ->execute([json_encode($cfg, JSON_UNESCAPED_UNICODE), now()]);
+    }
+    out(['base_url' => $cfg['base_url'] ?? '', 'model' => $cfg['model'] ?? '', 'has_key' => !empty($cfg['api_key'])]);
+  }
+  /* KI-Textassistent: aus Stichpunkten/schlechtem Text einen fertigen Artikeltext machen.
+     Nur der angemeldete Admin darf das aufrufen, sonst könnte jeder Besucher am eigenen
+     API-Schlüssel des Betreibers mitverdienen. */
+  if ($path === 'ai/rewrite' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $text = trim((string)($body['text'] ?? ''));
+    if ($text === '') fail('Bitte zuerst einen Text eingeben.', 400);
+    if (mb_strlen($text) > 4000) fail('Text ist zu lang (max. 4000 Zeichen).', 400);
+    $kind = (string)($body['kind'] ?? 'page');
+    $category = trim((string)($body['category'] ?? ''));
+    $p = db();
+    $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
+    $apiKey = trim((string)($cfg['api_key'] ?? ''));
+    if ($apiKey === '') fail('Kein KI-Zugang eingerichtet – bitte in den Einstellungen unter „KI-Textassistent" einen API-Schlüssel hinterlegen.', 400);
+    $baseUrl = rtrim((string)($cfg['base_url'] ?: 'https://api.openai.com/v1'), '/');
+    $model = (string)($cfg['model'] ?: 'gpt-4o-mini');
+    $style = 'Du schreibst deutsche Texte im Ton von Markus, einem DJ und Verleiher für Veranstaltungstechnik: '
+      . 'persönlich, locker, professionell – so, wie er es am Telefon sagen würde. Keine Emojis, keine '
+      . 'Worthülsen oder Floskeln, keine Aufzählungen und keine Überschriften – nur zusammenhängender '
+      . 'Fließtext. Ein Gedankenstrich wird als Halbgeviertstrich „–" geschrieben, nicht als Bindestrich. '
+      . 'Du darfst sparsam **fett** oder *kursiv* markieren (einfaches Markdown, kein HTML).';
+    if ($kind === 'equipment') {
+      $style .= ' Schreibe aus den gegebenen Stichpunkten/technischen Daten einen kurzen, prägnanten '
+        . 'Vermietungs-Artikeltext (ca. 2–4 Sätze) für die Produktseite eines DJ- und Veranstaltungstechnik-'
+        . 'Verleihs. Zielgruppe sind Kunden, die dieses Gerät mieten möchten.';
+      if ($category !== '') $style .= ' Kategorie: ' . $category . '.';
+    } else {
+      $style .= ' Mach aus dem gegebenen Stichpunkte-Text bzw. Rohtext einen ansprechenden Seiten- oder '
+        . 'Werbetext. Halte dich dabei ungefähr an die Länge des Eingabetexts.';
+    }
+    $reqBody = json_encode([
+      'model' => $model,
+      'messages' => [
+        ['role' => 'system', 'content' => $style],
+        ['role' => 'user', 'content' => $text],
+      ],
+      'temperature' => 0.6,
+      'max_tokens' => 500,
+    ], JSON_UNESCAPED_UNICODE);
+    $ctx = stream_context_create(['http' => [
+      'method' => 'POST',
+      'header' => "Authorization: Bearer $apiKey\r\nContent-Type: application/json\r\n",
+      'content' => $reqBody,
+      'timeout' => 40,
+      'ignore_errors' => true,
+    ]]);
+    $resp = @file_get_contents($baseUrl . '/chat/completions', false, $ctx);
+    if ($resp === false) fail('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.', 502);
+    $j = json_decode($resp, true);
+    if (!is_array($j) || isset($j['error'])) {
+      $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
+      fail('KI-Anfrage fehlgeschlagen: ' . ($msg !== '' ? $msg : 'unerwartete Antwort vom KI-Dienst.'), 502);
+    }
+    $generated = trim((string)($j['choices'][0]['message']['content'] ?? ''));
+    if ($generated === '') fail('KI-Anfrage fehlgeschlagen: keine Antwort erhalten.', 502);
+    out(['text' => $generated]);
   }
   /* Technik-Check-Fotos: geschützt in data/checkpics, Zugriff nur angemeldet */
   if (preg_match('#^checkpic/([a-f0-9-]{30,40})$#', $path, $m) && $method === 'POST') {
