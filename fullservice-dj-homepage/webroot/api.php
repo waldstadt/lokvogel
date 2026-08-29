@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 45;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 46;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
@@ -327,6 +327,11 @@ function upgrade(PDO $p): void {
     /* Umgekehrte Zubehör-Beziehung „passend für": z. B. ein Kabel/Stativ gibt an,
        zu welchen Hauptartikeln es passt. Beide Richtungen werden im Frontend gespiegelt. */
     try { $p->exec("alter table equipment add column fits_ids text"); } catch (PDOException $e) {}
+  }
+  if ($v < 46) {
+    /* Mindestabnahmemenge: manche Artikel gibt es nur im Set (z. B. 6er), Preis pro Stück. */
+    try { $p->exec("alter table equipment add column min_qty integer default 1"); } catch (PDOException $e) {}
+    try { $p->exec("update equipment set min_qty = 6 where name like '%Maxi V2%' or name like '%Neon Tube%'"); } catch (PDOException $e) {}
   }
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
@@ -683,7 +688,7 @@ create table equipment (id text primary key, sort integer default 0, name text n
   day_rate real default 0, followup_pct integer default 50,
   tier_week_pct real, tier_2week_pct real, tier_month_pct real,
   qty_total integer default 1, rentable integer default 1, public integer default 1,
-  status text default 'aktiv', notes text, partner_rate real, addon_id text, addon_ids text, images text, fits_ids text,
+  status text default 'aktiv', notes text, partner_rate real, addon_id text, addon_ids text, images text, fits_ids text, min_qty integer default 1,
   thomann_url text, own_rig integer default 0, day_rate_suggested real,
   invoice_file text, invoice_name text, on_request integer default 0, created_at text);
 create table equipment_sets (id text primary key, sort integer default 0,
@@ -775,6 +780,8 @@ SQL);
   seedEquipmentCatalog($p);
   /* Frühere Lokvogel-Artikel (own_rig) sind jetzt „auf Anfrage verfügbar". */
   $p->exec("update equipment set on_request = 1 where own_rig = 1");
+  /* Set-Artikel (z. B. 6er) mit passender Mindestabnahme. */
+  $p->exec("update equipment set min_qty = 6 where name like '%Maxi V2%' or name like '%Neon Tube%'");
 }
 
 function seed(PDO $p): void {
@@ -1186,7 +1193,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       if (!$auth && $t === 'equipment') {
         $pubCols = ['id','sort','name','slug','category','description','image_url','image_focal',
           'day_rate','followup_pct','tier_week_pct','tier_2week_pct','tier_month_pct',
-          'qty_total','rentable','public','status','addon_id','addon_ids','images','fits_ids','on_request'];
+          'qty_total','rentable','public','status','addon_id','addon_ids','images','fits_ids','on_request','min_qty'];
         foreach ($rows as &$r) $r = array_intersect_key($r, array_flip($pubCols));
         unset($r);
       }
