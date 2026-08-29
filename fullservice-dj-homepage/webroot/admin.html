@@ -2455,19 +2455,33 @@ function openEqModal(id){
     '<div><label>Bestand</label><input type="number" id="eQty" value="'+(e.qty_total||1)+'"></div>'+
     '<div><label>Status</label><select id="eStatus"><option>aktiv</option><option>wartung</option><option>inaktiv</option></select></div></div>'+
     '<div class="grid2"><div><label>Partner-Preis €/Tag (leer = Rabatt % aus Einstellungen)</label><input type="number" step="0.01" id="ePartner" value="'+(e.partner_rate!=null?e.partner_rate:'')+'"></div>'+
-    '<div><label>Zubehör-Empfehlung („passt dazu“)</label><select id="eAddon"><option value="">–</option>'+
-    (CACHE.equipment||[]).filter(function(x){return x.id!==e.id}).map(function(x){return '<option value="'+x.id+'"'+(e.addon_id===x.id?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select></div></div>'+
-    '<div class="grid2"><div><label>Thomann-Link (Nachbestellung / techn. Daten)</label><input id="eThomann" value="'+esc(e.thomann_url||'')+'" placeholder="https://www.thomann.de/…">'+
-    (e.thomann_url?'<a href="'+esc(e.thomann_url)+'" target="_blank" rel="noopener" class="mut sml">Bei Thomann ansehen ↗</a>':'')+'</div>'+
+    '<div><label>Zubehör-Empfehlung („passt dazu“ – bis zu 5)</label>'+
+    (function(){
+      var ids=(e.addon_ids&&e.addon_ids.length?e.addon_ids:(e.addon_id?[e.addon_id]:[])).slice(0,5);
+      var opts=(CACHE.equipment||[]).filter(function(x){return x.id!==e.id});
+      var sels='';
+      for(var i=0;i<5;i++){
+        var cur=ids[i]||'';
+        sels+='<select id="eAddon'+i+'" style="margin-bottom:6px"><option value="">–</option>'+
+          opts.map(function(x){return '<option value="'+x.id+'"'+(cur===x.id?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select>';
+      }
+      return sels;
+    })()+'</div></div>'+
+    '<div class="grid2"><div><label>Produktlink (Hersteller/Händler – Nachbestellung, techn. Daten)</label><input id="eThomann" value="'+esc(e.thomann_url||'')+'" placeholder="https://…">'+
+    (e.thomann_url?'<a href="'+esc(e.thomann_url)+'" target="_blank" rel="noopener" class="mut sml">Produktseite ansehen ↗</a>':'')+'</div>'+
     '<div style="display:flex;align-items:flex-end"><label style="margin:0"><input type="checkbox" id="eOnReq" style="width:auto;margin-right:6px" '+(e.on_request?'checked':'')+'>Nur auf Anfrage verfügbar – Kunde kann in den Tourcase legen, Bestätigung machst du manuell</label></div></div>'+
     (id?('<label>Einkaufsbeleg (für Garantiefälle)</label><div style="display:flex;gap:8px;align-items:center">'+
       (e.invoice_name?'<a class="mut sml" onclick="openEqInvoice(\''+id+'\')">'+esc(e.invoice_name)+' ansehen ↗</a>':'<span class="mut sml">Noch kein Beleg hinterlegt.</span>')+
       '<input type="file" accept="application/pdf,image/*" style="display:none" id="upEqInv" onchange="uploadEqInvoice(this,\''+id+'\')">'+
       '<button class="btn g sm" onclick="document.getElementById(\'upEqInv\').click()">'+(e.invoice_name?'Ersetzen':'Hochladen')+'</button></div>'):'')+
-    '<label class="mut sml" style="margin-top:10px;display:block">Rabattstaffel für längere Mietzeiträume (leer = globaler Standard aus den Einstellungen)</label>'+
-    '<div class="grid3"><div><label>% ab 1 Woche</label><input type="number" id="eTierWeek" value="'+(e.tier_week_pct!=null?e.tier_week_pct:'')+'"></div>'+
-    '<div><label>% ab 2 Wochen</label><input type="number" id="eTier2Week" value="'+(e.tier_2week_pct!=null?e.tier_2week_pct:'')+'"></div>'+
-    '<div><label>% ab 1 Monat</label><input type="number" id="eTierMonth" value="'+(e.tier_month_pct!=null?e.tier_month_pct:'')+'"></div></div>'+
+    '<label class="mut sml" style="margin-top:10px;display:block">Rabattstaffel für längere Mietzeiträume (leer = globaler Standard aus den Einstellungen, grau angezeigt)</label>'+
+    (function(){
+      var d=S.defaults||{};
+      var gw=d.tier_week_pct!=null?d.tier_week_pct:30,g2=d.tier_2week_pct!=null?d.tier_2week_pct:20,gm=d.tier_month_pct!=null?d.tier_month_pct:12;
+      return '<div class="grid3"><div><label>% ab 1 Woche</label><input type="number" id="eTierWeek" placeholder="'+gw+'" value="'+(e.tier_week_pct!=null?e.tier_week_pct:'')+'"></div>'+
+        '<div><label>% ab 2 Wochen</label><input type="number" id="eTier2Week" placeholder="'+g2+'" value="'+(e.tier_2week_pct!=null?e.tier_2week_pct:'')+'"></div>'+
+        '<div><label>% ab 1 Monat</label><input type="number" id="eTierMonth" placeholder="'+gm+'" value="'+(e.tier_month_pct!=null?e.tier_month_pct:'')+'"></div></div>';
+    })()+
     '<label>Bild</label><div style="display:flex;gap:8px"><input id="eImg" value="'+esc(e.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upEq" onchange="uploadImg(this,\'eImg\',\'eFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'eImg\',\'eFocal\')">Aus Pool</button></div>'+
     focalWidget(e.image_url,e.image_focal,'eFocal','4/3')+
     '<label style="margin-top:12px"><input type="checkbox" id="ePub" style="width:auto;margin-right:6px" '+(e.public!==false?'checked':'')+'>Auf Homepage anzeigen (mietbar)</label>'+
@@ -2477,8 +2491,10 @@ function openEqModal(id){
 }
 function saveEq(id){
   if(!v('eName')){toast('Name fehlt.',1);return}
+  var addonIds=[];
+  for(var ai=0;ai<5;ai++){var s=document.getElementById('eAddon'+ai);var val=s&&s.value;if(val&&addonIds.indexOf(val)===-1)addonIds.push(val)}
   var body={name:v('eName'),category:v('eCat'),sku:v('eSku')||null,description:v('eDesc'),day_rate:Number(v('eRate'))||0,
-    partner_rate:v('ePartner')!==''?Number(v('ePartner')):null,addon_id:v('eAddon')||null,
+    partner_rate:v('ePartner')!==''?Number(v('ePartner')):null,addon_ids:addonIds,addon_id:addonIds[0]||null,
     thomann_url:v('eThomann')||null,on_request:document.getElementById('eOnReq').checked,
     day_rate_suggested:v('eRateSuggested')!==''?Number(v('eRateSuggested')):null,
     followup_pct:Number(v('ePct'))||50,

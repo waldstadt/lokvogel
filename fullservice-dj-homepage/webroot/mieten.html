@@ -323,9 +323,12 @@ function rentCard(e){
     av='<div class="avail ok">✓ Im Zeitraum verfügbar ('+AVAIL[e.id].available+' von '+AVAIL[e.id].total+')</div>';
   }
   var addon='';
-  if(e.addon_id){
-    var a=EQ_ALL[e.addon_id]||EQ.find(function(x){return x.id===e.addon_id});
-    if(a)addon='<div class="addon">Passt dazu: <b>'+esc(a.name)+'</b> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag) – einfach mit anfragen.</div>';
+  var addonIds=(e.addon_ids&&e.addon_ids.length?e.addon_ids:(e.addon_id?[e.addon_id]:[]));
+  var addons=addonIds.map(function(id){return EQ_ALL[id]||EQ.find(function(x){return x.id===id})}).filter(Boolean);
+  if(addons.length){
+    addon='<div class="addon">Passt dazu: '+addons.map(function(a){
+      return '<b>'+esc(a.name)+'</b> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag)';
+    }).join(', ')+' – einfach mit anfragen.</div>';
   }
   /* Belegte und noch ungeprüfte Artikel sind nicht buchbar - keine Mengen-/Buttonzeile */
   if(e.id&&!gone&&!pending){
