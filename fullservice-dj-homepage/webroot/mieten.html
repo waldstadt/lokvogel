@@ -167,6 +167,22 @@ footer a:hover{color:var(--acc)}
 .pm-addon-name{font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:600;line-height:1.25}
 .pm-addon-price{font-size:12px;color:var(--acc);font-weight:600}
 .pm-addon-price small{color:var(--mut2);font-weight:400}
+/* Set-Produktfenster: Collage im Hauptbild + Liste der enthaltenen Artikel mit Info */
+.pm-main.pm-collage{display:grid;gap:1px;background:var(--line);grid-auto-rows:1fr;align-items:stretch;justify-content:stretch;padding:0}
+.pm-main.pm-collage>div{background:var(--bg) center/cover no-repeat;min-height:0;min-width:0}
+.pm-main.pm-collage.n1{grid-template-columns:1fr}
+.pm-main.pm-collage.n2{grid-template-columns:1fr 1fr}
+.pm-main.pm-collage.n3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.pm-main.pm-collage.n3>div:first-child{grid-row:span 2}
+.pm-main.pm-collage.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.pm-items{display:flex;flex-direction:column;gap:10px}
+.pm-item{display:flex;gap:12px;align-items:flex-start;text-align:left;background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:10px;cursor:pointer}
+.pm-item:hover{border-color:var(--acc)}
+.pm-item-img{flex:none;width:64px;aspect-ratio:4/3;background:var(--bg) center/cover no-repeat;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--mut2)}
+.pm-item-img svg{width:24px;height:24px;stroke-width:1.5;stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.pm-item-txt{min-width:0}
+.pm-item-name{font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:600;line-height:1.3;color:var(--txt)}
+.pm-item-desc{font-size:12px;color:var(--mut);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
 /* Mobil: kompakte Zeilen statt hoher Karten + wischbare, mitlaufende Kategorie-Leiste */
 @media(max-width:700px){
@@ -428,16 +444,8 @@ function rentCard(e){
   var price=priceLabel(e.day_rate,pp);
   var st=availState(e);
   var av=availBadge(e,st),cartCtrl='';
+  /* „Passt dazu"/„Passend für" nehmen zu viel Platz in der Kachel weg – stehen nur noch im Produktfenster. */
   var addon='';
-  var addons=addonItems(e),fits=fitsItems(e);
-  function relLine(label,list){
-    return '<div class="addon">'+label+': '+list.map(function(a){
-      return '<a class="addon-link" onclick="event.stopPropagation();openProductModal(\''+jsq(a.id)+'\')"><b>'+esc(a.name)+'</b></a> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag)';
-    }).join(', ')+'</div>';
-  }
-  /* Zubehör-Namen öffnen das jeweilige Produktfenster – Klick darf NICHT die Kachel auslösen */
-  if(addons.length)addon+=relLine('Passt dazu',addons);
-  if(fits.length)addon+=relLine('Passend für',fits);
   var mq=minQty(e);
   var setHint=mq>1?'<div class="set-hint">Nur im '+mq+'er-Set (Mindestabnahme '+mq+' Stück, Preis je Stück)</div>':'';
   /* Belegte und noch ungeprüfte Artikel sind nicht buchbar - keine Mengen-/Buttonzeile.
@@ -455,7 +463,7 @@ function rentCard(e){
     '<div class="rp">'+price+'</div>'+av+addon+cartCtrl+'</div></div>';
 }
 /* ---- Produktfenster (Detailansicht) ---- */
-var PROD_OPEN=null,GAL_IDX=0;
+var PROD_OPEN=null,SET_PROD_OPEN=null,GAL_IDX=0;
 /* Nur lokale/relative Bild-URLs zulassen – keine externen Hosts, kein javascript:/data: */
 function localImg(u){return typeof u==='string'&&u.trim()!==''&&!/^[a-z][a-z0-9+.-]*:/i.test(u)&&u.indexOf('//')!==0}
 function prodImages(e){
@@ -465,14 +473,14 @@ function prodImages(e){
 function findEq(id){return EQ_ALL[id]||EQ.find(function(x){return String(x.id)===String(id)})}
 function openProductModal(id){
   var e=findEq(id);if(!e)return;
-  PROD_OPEN=e.id;GAL_IDX=0;
+  PROD_OPEN=e.id;SET_PROD_OPEN=null;GAL_IDX=0;
   renderProductModal();
   document.getElementById('prodBg').style.display='block';
   document.body.style.overflow='hidden';
 }
 function closeProductModal(){
   document.getElementById('prodBg').style.display='none';
-  PROD_OPEN=null;document.body.style.overflow='';
+  PROD_OPEN=null;SET_PROD_OPEN=null;document.body.style.overflow='';
 }
 function galSet(i){GAL_IDX=i;renderProductModal()}
 function renderProductModal(){
@@ -599,26 +607,78 @@ function setImageArea(s){
     return '<div style="background-image:url(\''+esc(u)+'\')"></div>';
   }).join('')+'</div>';
 }
+/* Enthaltene Artikel eines Sets, in Set-Reihenfolge - {qty, e}. */
+function setItemsOf(s){
+  return SET_ITEMS.filter(function(x){return x.set_id===s.id}).map(function(x){
+    return {qty:x.qty,e:EQ_ALL[x.equipment_id]};
+  }).filter(function(it){return it.e});
+}
+/* Set-Hauptbild fürs Produktfenster - eigene Auszeichnung unabhängig von .rent (Kachel). */
+function setImageAreaModal(s){
+  if(s.image_url)
+    return '<div class="pm-main"><img src="'+esc(s.image_url)+'" alt="'+esc(s.name)+'" style="object-position:'+esc(s.image_focal||'50% 50%')+'" onerror="this.remove()"></div>';
+  var imgs=setItemImages(s).slice(0,4);
+  if(!imgs.length)return '<div class="pm-main"><span class="pm-fallback">'+catIcon('')+'</span></div>';
+  return '<div class="pm-main pm-collage n'+imgs.length+'">'+imgs.map(function(u){
+    return '<div style="background-image:url(\''+esc(u)+'\')"></div>';
+  }).join('')+'</div>';
+}
 function renderSets(){
   var box=document.getElementById('setSection');
   if(!SETS.length){box.style.display='none';return}
   box.style.display='block';
   document.getElementById('setGrid').innerHTML=SETS.map(function(s){
-    var items=SET_ITEMS.filter(function(x){return x.set_id===s.id});
-    var contains=items.map(function(x){var e=EQ_ALL[x.equipment_id];return (x.qty>1?x.qty+'× ':'')+(e?e.name:'?')}).join(', ');
+    var items=setItemsOf(s);
+    var contains=items.map(function(it){return (it.qty>1?it.qty+'× ':'')+it.e.name}).join(', ');
     var rate=setDayRate(s);
     var price=rate?euro(rate)+' <small>/ Miettag</small>':'Preis auf Anfrage';
     var inCart=CART.some(function(c){return c.type==='set'&&c.set_id===s.id});
-    return '<div class="rent reveal vis">'+setImageArea(s)+'<div class="rb">'+
+    return '<div class="rent reveal vis clickable" onclick="openSetProductModal(\''+jsq(s.id)+'\')">'+setImageArea(s)+'<div class="rb">'+
       '<div class="rc">SET</div>'+
       '<h4>'+esc(s.name)+'</h4><p>'+esc(s.description||'')+'</p>'+
       (contains?'<div class="addon">Enthält: '+esc(contains)+'</div>':'')+
       '<div class="rp">'+price+'</div>'+
-      '<div style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
+      '<div onclick="event.stopPropagation()" style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
       '<input type="number" min="1" value="1" id="qty-set-'+s.id+'" style="margin:0;width:60px;padding:8px">'+
-      '<button class="btn small'+(inCart?' ghost':'')+'" onclick="addSetToCart(\''+s.id+'\')">'+(inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>'+
+      '<button class="btn small'+(inCart?' ghost':'')+'" onclick="addSetToCart(\''+jsq(s.id)+'\')">'+(inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>'+
       '</div></div>';
   }).join('');
+}
+/* ---- Set-Produktfenster: volle Beschreibung + Artikelinfos aller enthaltenen Geräte ---- */
+function findSet(id){return SETS.find(function(x){return String(x.id)===String(id)})}
+function openSetProductModal(id){
+  var s=findSet(id);if(!s)return;
+  SET_PROD_OPEN=s.id;PROD_OPEN=null;
+  renderSetProductModal();
+  document.getElementById('prodBg').style.display='block';
+  document.body.style.overflow='hidden';
+}
+function renderSetProductModal(){
+  var s=findSet(SET_PROD_OPEN);
+  if(!s){closeProductModal();return}
+  var rate=setDayRate(s);
+  var price=rate?euro(rate)+' <small>/ Miettag</small>':'Preis auf Anfrage';
+  var inCart=CART.some(function(c){return c.type==='set'&&c.set_id===s.id});
+  var cartCtrl='<div class="pm-cart">'+
+    '<input type="number" min="1" value="1" id="qty-set-m-'+esc(s.id)+'">'+
+    '<button class="btn'+(inCart?' ghost':'')+'" onclick="addSetToCart(\''+jsq(s.id)+'\',\'qty-set-m-'+jsq(s.id)+'\')">'+(inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>';
+  var items=setItemsOf(s);
+  var itemsHtml=items.length?'<div class="pm-addons"><div class="pm-h">Enthaltene Artikel</div><div class="pm-items">'+items.map(function(it){
+    var img=prodImages(it.e)[0];
+    var thumb=img?'<div class="pm-item-img" style="background-image:url(\''+esc(img)+'\')"></div>':'<div class="pm-item-img">'+itemIcon(it.e)+'</div>';
+    return '<div class="pm-item" onclick="openProductModal(\''+jsq(it.e.id)+'\')">'+thumb+
+      '<div class="pm-item-txt"><div class="pm-item-name">'+(it.qty>1?it.qty+'× ':'')+esc(it.e.name)+'</div>'+
+      (it.e.description?'<div class="pm-item-desc">'+esc(it.e.description)+'</div>':'')+'</div></div>';
+  }).join('')+'</div></div>':'';
+  document.getElementById('prodBody').innerHTML=
+    '<div class="pm-grid"><div class="pm-gallery">'+setImageAreaModal(s)+'</div>'+
+    '<div class="pm-info">'+
+      '<div class="rc">SET</div>'+
+      '<h3>'+esc(s.name)+'</h3>'+
+      '<div class="rp">'+price+'</div>'+
+      (s.description?'<div class="pm-desc">'+esc(s.description)+'</div>':'')+
+      cartCtrl+
+    '</div></div>'+itemsHtml;
 }
 Promise.all([
   sfetch('equipment_sets?select=*&public=eq.true&order=sort'),
@@ -676,11 +736,14 @@ function addToCart(id,qtyId){
   if(document.getElementById('prodBg').style.display==='block')closeProductModal();
   renderRent();openTourcase();
 }
-function addSetToCart(setId){
-  var qty=Math.max(1,Number(document.getElementById('qty-set-'+setId).value)||1);
+function addSetToCart(setId,qtyId){
+  var qf=document.getElementById(qtyId||('qty-set-'+setId));
+  var qty=Math.max(1,Number(qf&&qf.value)||1);
   var existing=CART.find(function(c){return c.type==='set'&&c.set_id===setId});
   if(existing)existing.qty=qty;else CART.push({type:'set',set_id:setId,qty:qty});
-  saveCart();renderSets();renderCart();openTourcase();
+  saveCart();
+  if(document.getElementById('prodBg').style.display==='block')closeProductModal();
+  renderSets();renderCart();openTourcase();
 }
 function removeFromCart(idx){CART.splice(idx,1);saveCart();renderRent();renderSets()}
 function renderCart(){
