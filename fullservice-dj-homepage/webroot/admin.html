@@ -817,6 +817,7 @@ function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
   renderEq();renderSetsAdmin();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
   renderProducts();renderPartners();renderWsAdmin();
+  initSort();
 }
 /* ===== Workshop-Termine & Anmeldungen ===== */
 function wsBooked(wid){return (CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===wid&&s.status==='angemeldet'})
@@ -824,7 +825,7 @@ function wsBooked(wid){return (CACHE.wsSignups||[]).filter(function(s){return s.
 function wsWaitlist(wid){return (CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===wid&&s.status==='warteliste'})
   .reduce(function(a,s){return a+(Number(s.seats)||1)},0)}
 function renderWsAdmin(){
-  var list=CACHE.wsEvents||[];
+  var list=applySort((CACHE.wsEvents||[]).slice(),'workshops');
   document.getElementById('wsAdminList').innerHTML=list.length?('<table><thead><tr><th>Datum</th><th>Titel</th><th class="num">Preis p. P.</th><th class="num">Belegt</th><th>Sichtbar</th><th></th></tr></thead><tbody>'+
     list.map(function(w){
       var b=wsBooked(w.id),wl=wsWaitlist(w.id);
@@ -836,6 +837,7 @@ function renderWsAdmin(){
       '<td>'+(w.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</td>'+
       '<td><a onclick="openWsModal(\''+w.id+'\')">Bearbeiten</a></td></tr>';
     }).join('')+'</tbody></table>'):'<span class="mut">Noch keine Termine – lege den ersten an, dann erscheint er buchbar auf der Technik-Seite.</span>';
+  wireTable('workshops');
 }
 function openWsModal(id){
   var w=id?(CACHE.wsEvents||[]).find(function(x){return x.id===id}):{};w=w||{};
@@ -1049,7 +1051,7 @@ function renderCustList(){
     return [custName(c),c.city,c.email,c.phone,(c.tags||[]).join(' '),c.source].join(' ').toLowerCase().indexOf(q)>=0;
   });
   var STB={lead:'gold',kunde:'green',inaktiv:'grey'};
-  document.getElementById('custRows').innerHTML=list.map(function(c){
+  document.getElementById('custRows').innerHTML=applySort(list,'customers').map(function(c){
     return '<tr class="click" onclick="openCustDetail(\''+c.id+'\')"><td><b>'+esc(custName(c))+'</b>'+((c.tags||[]).length?'<br><span class="mut sml">'+c.tags.map(esc).join(', ')+'</span>':'')+'</td>'+
     '<td class="sml">'+esc(c.email||'')+'<br>'+esc(c.phone||'')+'</td><td>'+esc(c.city||'–')+'</td><td>'+esc(c.source||'–')+'</td>'+
     '<td><span class="b '+(STB[c.status]||'grey')+'">'+c.status+'</span></td></tr>';
@@ -1145,7 +1147,7 @@ function bookBadge(st){return {anfrage:'gold',angebot:'blue',gebucht:'green',abg
 function renderBook(){
   renderCal();
   var rows=CACHE.bookings.slice().sort(function(a,b){return a.event_date<b.event_date?1:-1});
-  document.getElementById('bookRows').innerHTML=rows.map(function(b){
+  document.getElementById('bookRows').innerHTML=applySort(rows,'bookings').map(function(b){
     return '<tr class="click" onclick="openBookDetail(\''+b.id+'\')"><td>'+dt(b.event_date)+(b.end_date?' – '+dt(b.end_date):'')+'</td>'+
     '<td><b>'+esc(b.title||b.event_type||'Auftrag')+'</b><br><span class="mut sml">'+esc(custName(b.customers))+'</span></td>'+
     '<td>'+({dj:'DJ',technik:'Technik',dj_technik:'DJ + Technik'}[b.kind]||b.kind)+'</td>'+
@@ -1452,7 +1454,7 @@ function renderQuotes(){
   var sent=list.filter(function(d){return ['versendet','angenommen','abgelehnt'].indexOf(d.status)>=0});
   var acc=list.filter(function(d){return d.status==='angenommen'});
   document.getElementById('qStats').textContent=sent.length?('Annahmequote: '+Math.round(acc.length/sent.length*100)+' % ('+acc.length+'/'+sent.length+')'):'Noch keine versendeten Angebote';
-  document.getElementById('quoteRows').innerHTML=list.map(function(d){
+  document.getElementById('quoteRows').innerHTML=applySort(list,'quotes').map(function(d){
     return '<tr class="click" onclick="openDocEditor(\''+d.id+'\')"><td><b>'+esc(d.number)+'</b></td><td>'+dt(d.doc_date)+'</td>'+
     '<td>'+esc(custName(d.customers))+'</td><td class="num">'+euro(d.total_gross)+'</td><td>'+dt(d.valid_until)+'</td>'+
     '<td><span class="b '+docBadge(d.status)+'">'+d.status+'</span></td></tr>';
@@ -1460,7 +1462,7 @@ function renderQuotes(){
 }
 function renderInv(){
   var list=CACHE.documents.filter(function(d){return d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'});
-  document.getElementById('invRows').innerHTML=list.map(function(d){
+  document.getElementById('invRows').innerHTML=applySort(list,'invoices').map(function(d){
     return '<tr class="click" onclick="openDocEditor(\''+d.id+'\')"><td><b>'+esc(d.number)+'</b></td><td>'+docTypeName(d.doc_type)+'</td><td>'+dt(d.doc_date)+'</td>'+
     '<td>'+esc(custName(d.customers))+'</td><td class="num">'+euro(Number(d.total_gross)-Number(d.deposit_deducted||0))+'</td><td>'+dt(d.due_date)+'</td>'+
     '<td>'+(isOverdue(d)?'<span class="b red">überfällig</span>':'<span class="b '+docBadge(d.status)+'">'+d.status+'</span>')+'</td></tr>';
@@ -2336,6 +2338,93 @@ function renderEq(){
     '<td>'+(inUse?('<span class="b blue">'+inUse+' Stk. unterwegs</span>'):'–')+'</td></tr>';
   }).join('')||'<tr><td colspan="8" class="mut">Noch keine Artikel.</td></tr>';
   updateSortIndicators('equipment');
+}
+/* ===== Technik: Stapel-Bearbeitung ===== */
+var eqBatch={on:false,sel:{},changes:{}};
+function eqDirty(){for(var k in eqBatch.changes)return true;return false;}
+function eqEff(e,field){var c=eqBatch.changes[e.id];return c&&(field in c)?c[field]:e[field];}
+function eqRecord(id,field,val){
+  var e=CACHE.equipment.find(function(x){return x.id===id});if(!e)return;
+  var orig=e[field],same;
+  if(typeof orig==='boolean'||typeof val==='boolean')same=(!!orig===!!val);
+  else same=((orig==null?'':String(orig))===(val==null?'':String(val)));
+  if(!eqBatch.changes[id])eqBatch.changes[id]={};
+  if(same)delete eqBatch.changes[id][field];else eqBatch.changes[id][field]=val;
+  if(!Object.keys(eqBatch.changes[id]).length)delete eqBatch.changes[id];
+}
+function eqEditField(id,field,raw,type){
+  var val;
+  if(type==='num')val=(raw===''?(field==='partner_rate'?null:0):Number(raw));
+  else if(type==='bool')val=!!raw;
+  else val=raw;
+  eqRecord(id,field,val);
+  var tr=document.getElementById('eqbr-'+id);if(tr)tr.classList.toggle('dirty',!!eqBatch.changes[id]);
+}
+function renderEqBatch(){
+  document.getElementById('eqBatchRows').innerHTML=applySort((CACHE.equipment||[]).slice(),'equipment').map(function(e){
+    var pr=eqEff(e,'partner_rate'),st=eqEff(e,'status')||'aktiv';
+    return '<tr id="eqbr-'+e.id+'"'+(eqBatch.changes[e.id]?' class="dirty"':'')+'>'+
+      '<td class="chk"><input type="checkbox"'+(eqBatch.sel[e.id]?' checked':'')+' onchange="eqBatch.sel[\''+e.id+'\']=this.checked;eqBatchSyncAll()"></td>'+
+      '<td><a onclick="openEqModal(\''+e.id+'\')"><b>'+esc(e.name)+'</b></a></td>'+
+      '<td><input class="cat" value="'+esc(eqEff(e,'category')||'')+'" onchange="eqEditField(\''+e.id+'\',\'category\',this.value,\'text\')"></td>'+
+      '<td class="num"><input type="number" step="0.01" value="'+(eqEff(e,'day_rate')!=null?eqEff(e,'day_rate'):0)+'" onchange="eqEditField(\''+e.id+'\',\'day_rate\',this.value,\'num\')"></td>'+
+      '<td class="num"><input type="number" step="0.01" placeholder="auto" value="'+(pr!=null?pr:'')+'" onchange="eqEditField(\''+e.id+'\',\'partner_rate\',this.value,\'num\')"></td>'+
+      '<td class="num"><input type="number" value="'+(eqEff(e,'qty_total')!=null?eqEff(e,'qty_total'):1)+'" onchange="eqEditField(\''+e.id+'\',\'qty_total\',this.value,\'num\')"></td>'+
+      '<td><select onchange="eqEditField(\''+e.id+'\',\'status\',this.value,\'text\')">'+['aktiv','wartung','inaktiv'].map(function(o){return '<option'+(st===o?' selected':'')+'>'+o+'</option>'}).join('')+'</select></td>'+
+      '<td class="chk"><input type="checkbox"'+(eqEff(e,'on_request')?' checked':'')+' onchange="eqEditField(\''+e.id+'\',\'on_request\',this.checked,\'bool\')"></td>'+
+      '<td class="chk"><input type="checkbox"'+(eqEff(e,'public')!==false?' checked':'')+' onchange="eqEditField(\''+e.id+'\',\'public\',this.checked,\'bool\')"></td>'+
+    '</tr>';
+  }).join('')||'<tr><td colspan="9" class="mut">Noch keine Artikel.</td></tr>';
+  eqBatchSyncAll();
+}
+function eqBatchSyncAll(){
+  var all=(CACHE.equipment||[]).length&&(CACHE.equipment||[]).every(function(e){return eqBatch.sel[e.id]});
+  var cb=document.getElementById('eqBatchAll');if(cb)cb.checked=!!all;
+}
+function eqBatchToggleAll(ch){(CACHE.equipment||[]).forEach(function(e){eqBatch.sel[e.id]=ch});renderEqBatch();}
+function eqSelIds(){return Object.keys(eqBatch.sel).filter(function(k){return eqBatch.sel[k]&&(CACHE.equipment||[]).some(function(e){return e.id===k})});}
+function eqBatchSet(field,val){
+  var ids=eqSelIds();if(!ids.length){toast('Erst Zeilen auswählen.',1);return}
+  ids.forEach(function(id){eqRecord(id,field,val)});renderEqBatch();
+}
+function eqBatchPrice(){
+  var ids=eqSelIds();if(!ids.length){toast('Erst Zeilen auswählen.',1);return}
+  var mode=document.getElementById('eqBatchPriceMode').value,val=Number(document.getElementById('eqBatchPriceVal').value);
+  if(mode!=='fix'&&!val){toast('Prozentwert fehlt.',1);return}
+  ids.forEach(function(id){
+    var e=CACHE.equipment.find(function(x){return x.id===id});if(!e)return;
+    var cur=Number(eqEff(e,'day_rate'))||0,nv;
+    if(mode==='pct+')nv=cur*(1+val/100);else if(mode==='pct-')nv=cur*(1-val/100);else nv=val;
+    eqRecord(id,'day_rate',Math.round(nv*100)/100);
+  });
+  renderEqBatch();
+}
+function eqBatchSave(){
+  var ids=Object.keys(eqBatch.changes);
+  if(!ids.length){toast('Keine Änderungen zu speichern.',1);return}
+  Promise.all(ids.map(function(id){return api('equipment?id=eq.'+id,{method:'PATCH',body:eqBatch.changes[id]})}))
+    .then(function(){toast('Gespeichert ✓');eqBatch.changes={};return api('equipment?select=*&order=sort')})
+    .then(function(r){CACHE.equipment=r||[];renderEqBatch()})
+    .catch(function(e){toast(e.message,1)});
+}
+function toggleEqBatch(){
+  var tgl=document.getElementById('eqBatchToggle');
+  if(eqBatch.on){
+    if(eqDirty()&&!confirm('Es gibt ungespeicherte Änderungen. Stapelmodus verlassen und verwerfen?'))return;
+    eqBatch.on=false;eqBatch.changes={};eqBatch.sel={};
+    tgl.textContent='Stapel bearbeiten';tgl.classList.add('g');
+    document.getElementById('eqBatchBar').hidden=true;
+    document.getElementById('eqBatchWrap').hidden=true;
+    document.getElementById('eqViewWrap').hidden=false;
+    renderEq();
+  }else{
+    eqBatch.on=true;
+    tgl.textContent='Stapelmodus schließen';tgl.classList.remove('g');
+    document.getElementById('eqBatchBar').hidden=false;
+    document.getElementById('eqBatchWrap').hidden=false;
+    document.getElementById('eqViewWrap').hidden=true;
+    renderEqBatch();
+  }
 }
 function openEqModal(id){
   var e=id?CACHE.equipment.find(function(x){return x.id===id}):{};e=e||{};
@@ -3389,7 +3478,7 @@ function renderProducts(){
   var list=(CACHE.products||[]).filter(function(p){
     return !q||[p.sku,p.name,p.category].join(' ').toLowerCase().indexOf(q)>=0;
   });
-  document.getElementById('prodRows').innerHTML=list.map(function(p){
+  document.getElementById('prodRows').innerHTML=applySort(list,'products').map(function(p){
     var isBundle=(p.bundle||[]).length>0;
     return '<tr class="click" onclick="openProdModal(\''+p.id+'\')"><td><b>'+esc(p.sku||'–')+'</b></td>'+
     '<td>'+esc(p.name)+(p.description?'<br><span class="mut sml">'+esc(p.description.slice(0,80))+'…</span>':'')+'</td>'+
