@@ -740,6 +740,14 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           </div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveNumbering()">Speichern</button></div>
         </div>
+        <div class="card"><h3>Automatische Fahrtstrecke</h3>
+          <div class="sml mut" style="margin-bottom:8px">Berechnet im Rider auf Knopfdruck die Autostrecke von deiner Firmenadresse (Firmendaten) zur Location, über <a href="https://openrouteservice.org" target="_blank" rel="noopener">OpenRouteService</a> (EU-Anbieter, kostenloser API-Schlüssel). Ergebnis bleibt danach ein ganz normales, frei überschreibbares Eingabefeld – ohne Schlüssel gibst du Kilometer/Fahrzeit wie bisher von Hand ein.</div>
+          <div class="grid2">
+            <div><label>API-Schlüssel <span class="mut" id="orsKeyState"></span></label><input id="orsKey" type="password" placeholder="nur zum Ändern ausfüllen"></div>
+            <div style="display:flex;align-items:flex-end"><a href="https://openrouteservice.org/dev/#/signup" target="_blank" rel="noopener" class="sml">Kostenlosen Schlüssel holen →</a></div>
+          </div>
+          <button class="btn sm" onclick="saveRoutingConfig()">Speichern</button>
+        </div>
     <div class="sec-label">Verträge &amp; Vermietung</div>
         <div class="card"><h3>Mietvertrag – Vertragsbedingungen</h3>
           <textarea id="sRental" style="min-height:160px;font-size:11px"></textarea>
@@ -1557,6 +1565,7 @@ function openRiderModal(){
     '<div class="sml mut" id="rKmHint" style="margin:2px 0 8px"></div>'+
     '<div class="grid2"><div><label>Location</label><input id="rVenue" value="'+esc(r.venue_name||b.venue_name||'')+'"></div>'+
     '<div><label>Adresse (Straße, PLZ Ort)</label><input id="rAddr" value="'+esc(r.venue_address||b.venue_address||'')+'"></div></div>'+
+    '<div style="text-align:right;margin:-6px 0 8px"><a class="sml" onclick="calcRouteDistance()">Strecke automatisch berechnen (ab Firmenadresse)</a></div>'+
     '<div class="grid2"><div><label>Ansprechpartner vor Ort</label><input id="rContact" value="'+esc(r.contact_name||'')+'"></div>'+
     '<div><label>Telefon vor Ort</label><input id="rPhone" value="'+esc(r.contact_phone||'')+'"></div></div>'+
     '<div class="grid2"><div><label>Strom</label><input id="rPower" value="'+esc(r.power||'')+'" placeholder="z. B. 2× 230 V Schuko in Bühnennähe"></div>'+
@@ -1574,6 +1583,19 @@ function riderKmHint(){
   var onEnabled=overnightEnabled(),thresh=overnightThresholdType()==='zeit'?min:km,thVal=overnightThresholdValue();
   if(onEnabled&&thresh>=thVal&&thVal>0)hint+=(hint?'<br>':'')+'Ab '+thVal+(overnightThresholdType()==='zeit'?' Min. Fahrzeit':' km Fahrtstrecke')+': automatische Übernachtung ('+euro(overnightPrice())+') wird beim Rechnung/Angebot erstellen ergänzt.';
   document.getElementById('rKmHint').innerHTML=hint;
+}
+function calcRouteDistance(){
+  var dest=v('rAddr');
+  if(!dest){toast('Bitte zuerst die Adresse der Location eintragen.',1);return}
+  toast('Strecke wird berechnet …');
+  fetch('api.php/routing/distance',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify({destination:dest})})
+    .then(function(r){return r.json()}).then(function(c){
+      if(c.error){toast(c.error,1);return}
+      document.getElementById('rKm').value=c.km;
+      document.getElementById('rMin').value=c.minutes;
+      riderKmHint();
+      toast('Strecke berechnet: '+c.km+' km, '+c.minutes+' Min. – bei Bedarf von Hand anpassen ✓');
+    }).catch(function(e){toast(e.message,1)});
 }
 function saveRider(){
   var r={guests:v('rGuests')?Number(v('rGuests')):null,setup_from:v('rSetup')||null,
@@ -3770,10 +3792,25 @@ function saveAiConfig(){
       toast('Gespeichert ✓');loadAiConfig();
     }).catch(function(e){toast(e.message,1)});
 }
+function loadRoutingConfig(){
+  fetch('api.php/routing/config',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(c){
+    if(!c)return;
+    document.getElementById('orsKeyState').textContent=c.has_key?'(hinterlegt ✓)':'(fehlt)';
+  }).catch(function(){});
+}
+function saveRoutingConfig(){
+  if(!v('orsKey')){toast('Bitte einen API-Schlüssel eingeben.',1);return}
+  fetch('api.php/routing/config',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify({api_key:v('orsKey')})})
+    .then(function(r){return r.json()}).then(function(c){
+      if(c.error){toast(c.error,1);return}
+      document.getElementById('orsKey').value='';
+      toast('Gespeichert ✓');loadRoutingConfig();
+    }).catch(function(e){toast(e.message,1)});
+}
 
 /* ===== Einstellungen ===== */
 function renderSet(){
-  loadBackups();loadDeploy();loadIcal();loadAiConfig();renderPacking();
+  loadBackups();loadDeploy();loadIcal();loadAiConfig();loadRoutingConfig();renderPacking();
   var c=S.company||{},n=S.numbering||{},d=S.defaults||{};
   document.getElementById('sName').value=c.name||'';
   document.getElementById('sOwner').value=c.owner||'';

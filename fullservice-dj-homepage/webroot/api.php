@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 55;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 56;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -126,6 +126,39 @@ function aiConfigOrFail(): array {
     'model' => (string)($cfg['model'] ?: $defaults['model']),
     'workspaceId' => trim((string)($cfg['workspace_id'] ?? '')),
   ];
+}
+
+/* Automatische Fahrtstrecke Lager -> Location über OpenRouteService (EU-Anbieter, freier
+   API-Schlüssel). Geokodiert Adresse in Koordinaten, dann Routenberechnung Auto. Ergebnis
+   bleibt im Rider frei überschreibbar - reine Rechenhilfe, kein Zwang. */
+function orsGet(string $url, string $apiKey): array {
+  $ctx = stream_context_create(['http' => [
+    'method' => 'GET',
+    'header' => "Authorization: $apiKey\r\nAccept: application/json, application/geo+json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\n",
+    'timeout' => 20, 'ignore_errors' => true,
+  ]]);
+  $resp = @file_get_contents($url, false, $ctx);
+  if ($resp === false) fail('Routendienst (OpenRouteService) ist gerade nicht erreichbar – bitte später erneut versuchen oder die Strecke manuell eintragen.', 502);
+  $j = json_decode($resp, true);
+  if (!is_array($j)) fail('Unerwartete Antwort vom Routendienst.', 502);
+  return $j;
+}
+function orsGeocode(string $address, string $apiKey): ?array {
+  $url = 'https://api.openrouteservice.org/geocode/search?text=' . urlencode($address) . '&size=1';
+  $j = orsGet($url, $apiKey);
+  $coords = $j['features'][0]['geometry']['coordinates'] ?? null;
+  return (is_array($coords) && count($coords) === 2) ? $coords : null;
+}
+function orsDrivingRoute(array $from, array $to, string $apiKey): array {
+  $url = 'https://api.openrouteservice.org/v2/directions/driving-car?start=' . $from[0] . ',' . $from[1] . '&end=' . $to[0] . ',' . $to[1];
+  $j = orsGet($url, $apiKey);
+  $seg = $j['features'][0]['properties']['segments'][0] ?? null;
+  if (!$seg) {
+    $msg = '';
+    if (isset($j['error'])) $msg = is_string($j['error']) ? $j['error'] : (string)($j['error']['message'] ?? json_encode($j['error']));
+    fail('Route konnte nicht berechnet werden' . ($msg !== '' ? ': ' . $msg : '.') . ' Bitte Kilometer/Fahrzeit manuell eintragen.', 502);
+  }
+  return ['km' => round(((float)$seg['distance']) / 1000, 1), 'minutes' => (int)round(((float)$seg['duration']) / 60)];
 }
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
@@ -473,6 +506,7 @@ function upgrade(PDO $p): void {
   }
   if ($v < 54) mergeOldCatalogPdf($p);
   if ($v < 55) removePlaceholderProducts($p);
+  if ($v < 56) reAddCorePositions($p);
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -908,6 +942,27 @@ function removePlaceholderProducts(PDO $p): void {
   $p->prepare("delete from products where sku in ($in)")->execute($skus);
 }
 
+/* DJ-100/DJ-110/TON-200/LICHT-300 waren keine reinen Fake-Platzhalter, sondern echte
+   Standard-Leistungspositionen - werden hier mit den korrekten Werten neu angelegt.
+   FAHRT-900 kommt bewusst nicht zurück: Anfahrt läuft jetzt über die automatische
+   Streckenberechnung im Rider (siehe routing/distance), nicht mehr über einen
+   statischen Katalog-Artikel. */
+function reAddCorePositions(PDO $p): void {
+  $rows = [
+    ['DJ-100', 'DJ-Leistung', 'DJ-Abend Basis', 'DJ-Leistung bis 6 Stunden inkl. Musikplanung, Kennenlerngespräch, kompakter Ton- und Lichttechnik, Auf- und Abbau.', 'pausch.', 'dienstleistung', 1200],
+    ['DJ-110', 'DJ-Leistung', 'Zusätzliche DJ-Stunde', 'Verlängerung über den vereinbarten Zeitraum hinaus, je angefangene Stunde.', 'Std.', 'dienstleistung', 100],
+    ['TON-200', 'Ton', 'Ton für freie Trauung', 'Funkmikrofon und Lautsprecher für Trauredner sowie Musik-Einspielungen im Außenbereich, inkl. Backup-Akku.', 'pausch.', 'dienstleistung', 200],
+    ['LICHT-300', 'Licht', 'Ambiente-Licht Basis', 'Dezentes Grundlicht passend zur Location (Uplights, Tanzflächenlicht).', 'pausch.', 'dienstleistung', 150],
+  ];
+  foreach ($rows as [$sku, $cat, $n, $d, $u, $kind, $pr]) {
+    $chk = $p->prepare("select 1 from products where sku=?"); $chk->execute([$sku]);
+    if ($chk->fetchColumn()) continue;
+    $p->prepare("insert into products (id,sku,sort,category,name,description,unit,kind,price_net,bundle,active,created_at)
+      values (?,?,?,?,?,?,?,?,?,?,?,?)")
+      ->execute([uuid(), $sku, 0, $cat, $n, $d, $u, $kind, $pr, '[]', 1, now()]);
+  }
+}
+
 function friendsDdl(): string {
   return "create table if not exists friends (id text primary key, sort integer default 0,
     name text not null, category text, description text, website text,
@@ -1040,6 +1095,7 @@ SQL);
   seedExtraTemplates($p);
   seedServiceProducts($p);
   mergeOldCatalogPdf($p);
+  reAddCorePositions($p);
   seedTechCheckForm($p);
   seedEquipmentCatalog($p);
   /* Frühere Lokvogel-Artikel (own_rig) sind jetzt „auf Anfrage verfügbar". */
@@ -2873,6 +2929,41 @@ try {
     }
     out(['provider' => $cfg['provider'] ?? 'openai', 'base_url' => $cfg['base_url'] ?? '', 'model' => $cfg['model'] ?? '',
       'style' => $cfg['style'] ?? '', 'workspace_id' => $cfg['workspace_id'] ?? '', 'has_key' => !empty($cfg['api_key'])]);
+  }
+  /* Automatische Fahrtstrecke: Konfiguration (OpenRouteService-API-Schlüssel) liegt in
+     settings.routing - nur angemeldet, der Schlüssel selbst wird nie zurückgegeben. */
+  if ($path === 'routing/config' && in_array($method, ['GET', 'POST'])) {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    $cfg = json_decode((string)$p->query("select value from settings where key='routing'")->fetchColumn() ?: '{}', true) ?: [];
+    if ($method === 'POST') {
+      if (!empty($body['api_key'])) $cfg['api_key'] = trim((string)$body['api_key']);
+      $p->prepare("insert into settings (key, value, updated_at) values ('routing', ?, ?)
+          on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
+        ->execute([json_encode($cfg, JSON_UNESCAPED_UNICODE), now()]);
+    }
+    out(['has_key' => !empty($cfg['api_key'])]);
+  }
+  /* Fahrtstrecke Lager/Zuhause -> Location automatisch berechnen. Startpunkt ist die
+     Firmenadresse aus den Firmendaten, Ziel die übergebene Adresse (i. d. R. die Location
+     aus dem Rider). Ergebnis (km, Minuten) füllt das Rider-Formular vor, bleibt dort aber
+     ein ganz normales, frei überschreibbares Eingabefeld. */
+  if ($path === 'routing/distance' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $dest = trim((string)($body['destination'] ?? ''));
+    if ($dest === '') fail('Bitte zuerst eine Adresse für die Location eintragen.', 400);
+    $p = db();
+    $comp = json_decode((string)$p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true) ?: [];
+    $origin = trim((string)($body['origin'] ?? '')) ?: trim(trim((string)($comp['street'] ?? '')) . ', ' . trim((string)($comp['zip_city'] ?? '')), ' ,');
+    if ($origin === '') fail('Bitte zuerst deine Adresse (Lager/Zuhause) unter Einstellungen → Firmendaten hinterlegen.', 400);
+    $cfg = json_decode((string)$p->query("select value from settings where key='routing'")->fetchColumn() ?: '{}', true) ?: [];
+    $apiKey = trim((string)($cfg['api_key'] ?? ''));
+    if ($apiKey === '') fail('Kein Routendienst eingerichtet – bitte in den Einstellungen unter „Automatische Fahrtstrecke" einen OpenRouteService-Schlüssel hinterlegen.', 400);
+    $from = orsGeocode($origin, $apiKey);
+    if (!$from) fail('Deine Adresse („' . $origin . '") konnte nicht gefunden werden – bitte in den Firmendaten prüfen.', 502);
+    $to = orsGeocode($dest, $apiKey);
+    if (!$to) fail('Die Adresse der Location („' . $dest . '") konnte nicht gefunden werden.', 502);
+    out(orsDrivingRoute($from, $to, $apiKey));
   }
   /* KI-Textassistent: aus Stichpunkten/schlechtem Text einen fertigen Artikeltext machen.
      Nur der angemeldete Admin darf das aufrufen, sonst könnte jeder Besucher am eigenen
