@@ -471,15 +471,34 @@ function seedEquipmentCatalog(PDO $p): void {
     ['568064', 'Piano', 'Yamaha P-225 B',
      'Stagepiano mit 88 Tasten Graded Hammer Compact (GHC), gewichtet. Klangerzeugung Yamaha CFX VRM Lite mit Key-Off-Samples, 192-stimmig polyphon, 24 Instrument-Presets. Integrierte Lautsprecher 2×7 Watt, Bluetooth-Audio-Wiedergabe über die internen Lautsprecher. Inkl. Sustain-Pedal (M-Audio SP-2), Netzteil und Notenhalter. Maße 1.326×129×272 mm (BxHxT), Gewicht 11,5 kg.',
      35.0, 'https://www.thomann.de/de/yamaha_p_225_b.htm'],
+    // Rechnung 84734246 – Lokvogel-Bestand (own_rig): normalerweise im eigenen Setup im Einsatz,
+    // bei Bedarf aber auch für größere Vermiet-/DJ-Aufträge verfügbar
+    ['160142', 'Mikrofon', 'Audix D6', 'Spezialmikrofon für Bass Drum (auch E-Bass geeignet), dynamisches Großmembran-Mikrofon, Nierencharakteristik, Frequenzgang 30–15.000 Hz, max. SPL sehr hoch (bassdrumtauglich), Gewicht 254 g.', 25.0, 'https://www.thomann.de/de/audix_d6_bassdrummikro.htm', 1, true],
+    ['479553', 'Signal', 'IMG Stageline FGA-202', '2-Kanal-Line-Übertrager zur Reduktion von Signalstörungen/Brummschleifen. 2 Eingänge (XLR/6,3-mm-Kombibuchse, 600 Ω), 2 galvanisch getrennte XLR-Ausgänge mit Groundlift-Schalter. Frequenzbereich 20–20.000 Hz, Maße 125×55×75 mm, Gewicht 650 g.', 10.0, 'https://www.thomann.de/de/img_stageline_fga_202.htm', 1, true],
+    ['436138', 'Mikrofon', 'the t.bone BD 500 Beta', 'Kondensator-Grenzflächenmikrofon (halbe Niere) für Bass-Drum oder Piano/Sprache, schaltbarer Frequenzgang, 30–20.000 Hz, robustes Metallgehäuse, 3/8"-Gewinde, Gewicht 480 g.', 15.0, 'https://www.thomann.de/de/the_t.bone_bd_500_beta.htm', 1, true],
+    ['129171', 'Mikrofon', 'Sennheiser E609 Silver', 'Dynamisches Instrumentenmikrofon (Superniere) für E-Gitarre, Percussion, Bläser, Drums. Frequenzgang 40–15.000 Hz, Gewicht 140 g. Inkl. MZQ-100-Klemme und Tasche.', 15.0, 'https://www.thomann.de/de/sennheiser_e609_evolution.htm', 1, true],
+    ['326853', 'Mikrofon', 'Rode M5 MP', 'Stereo-Set Kleinmembran-Kondensatormikrofone (matched pair), Nierencharakteristik, Frequenzbereich 20 Hz–20 kHz, max. 140 dB SPL, benötigt Phantomspeisung 24/48 V, Metallgehäuse.', 20.0, 'https://www.thomann.de/de/rode_m5_mp.htm', 2, true],
+    ['395760', 'Stativ', 'Gravity MS 3122 HDB', 'Kurzes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), Höhe 320 mm, Zinkdruckguss-Sockel, Gewicht 2,8 kg.', 8.0, 'https://www.thomann.de/de/gravity_ms_3122_hdb_microphone_stand.htm', 2, true],
+    ['426274', 'Stativ', 'Gravity MS 4322 HDB', 'Extra schweres, langes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), höhenverstellbar 1030–1690 mm, Gewicht 4,26 kg.', 9.0, 'https://www.thomann.de/de/gravity_ms_4322_hdb_microphone_stand.htm', 2, true],
+    ['370954', 'Stativ', 'Gravity MS 4322 B', 'Langes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), höhenverstellbar 1030–1690 mm, Gewicht 2,7 kg.', 8.0, 'https://www.thomann.de/de/gravity_ms_4322_b_microphone_stand.htm', 2, true],
+    ['370937', 'Stativ', 'Gravity MS 4222 B', 'Kurzes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), höhenverstellbar 510–740 mm, Gewicht 2,2 kg.', 7.0, 'https://www.thomann.de/de/gravity_ms_4222_b_microphone_stand.htm', 1, true],
+    ['435574', 'Zubehör', 'Gravity MS CAB CL 01', 'Cab-Clamp-Mikrofonhalterung für Gitarrenboxen, schwenkbarer Arm, justierbare Klemmen (Klemmbereich 300–400 mm), Gewindeanschluss 3/8", Gewicht 0,6 kg.', 6.0, 'https://www.thomann.de/de/gravity_ms_cab_cl_01.htm', 2, true],
+    ['160358', 'Signal', 'Behringer DI20 Ultra-DI', 'Aktive 2-Kanal-DI-Box, XLR-Out, -20/40 dB PAD (bis 3000 W), Batterie (9 V) oder Phantomspeisung (15–52 V), Groundlift, auch als 1-auf-2-Splitter nutzbar, Gewicht 0,65 kg.', 8.0, 'https://www.thomann.de/de/behringer_di20_di_box.htm', 1, true],
+    // Ohne Rechnung von Markus durchgegeben – ebenfalls Lokvogel-Bestand
+    ['MANUAL-PLAUDIO-B215', 'Lautsprecher', 'PL Audio B215 Aktiv', 'Aktiver 2×15"-Subwoofer (Bus) mit eingebauter 3-Kanal-Endstufe: 2.500 W im Bassbereich + 2×800 W für den Betrieb von Topteilen. Eingebauter DSP mit 80 Presets, Faital-Chassis, Pascal-Endstufen. Kombiniert Sub + Endstufe für die angeschlossenen Topteile in einem Gerät.', 60.0, 'https://pl-audio.de/en/products/speaker/subwoofer/b-215-sub/', 2, true],
+    ['MANUAL-SEEBURG-A3', 'Lautsprecher', 'Seeburg Acoustic Line A3', 'Passives Mittelhochton-Topteil, 2×8" Neodym-Tieftöner + 1" Hochtontreiber. Belastbarkeit 500 W AES / 1500 W Peak, 4 Ω, max. SPL 132 dB. Frequenzbereich 80 Hz–20 kHz, Abstrahlwinkel 90°×60° (drehbar). Anschluss 2× Speakon NL4MP, 35-mm-Stativhalterung. Maße 59×25×25 cm, Gewicht 12,5 kg.', 35.0, 'https://www.thomann.de/de/seeburg_acoustic_line_a3.htm', 2, true],
   ];
-  foreach ($rows as [$sku, $cat, $n, $d, $suggested, $thomann]) {
+  foreach ($rows as $row) {
+    [$sku, $cat, $n, $d, $suggested, $thomann] = $row;
+    $qty = $row[6] ?? 1;
+    $ownRig = $row[7] ?? false;
     $c = $p->prepare('select count(*) from equipment where sku = ?');
     $c->execute([$sku]);
     if (!(int)$c->fetchColumn())
       $p->prepare('insert into equipment (id,sort,name,slug,sku,category,description,day_rate,day_rate_suggested,
-          followup_pct,qty_total,rentable,public,status,thomann_url,created_at) values (?,?,?,?,?,?,?,0,?,50,1,1,1,?,?,?)')
+          followup_pct,qty_total,rentable,public,status,thomann_url,own_rig,created_at) values (?,?,?,?,?,?,?,0,?,50,?,1,1,?,?,?,?)')
         ->execute([uuid(), 0, $n,
-          strtolower(preg_replace('/[^a-z0-9äöüß]+/i', '-', $n)), $sku, $cat, $d, $suggested, 'aktiv', $thomann, now()]);
+          strtolower(preg_replace('/[^a-z0-9äöüß]+/i', '-', $n)), $sku, $cat, $d, $suggested, $qty, 'aktiv', $thomann, $ownRig ? 1 : 0, now()]);
   }
 }
 
