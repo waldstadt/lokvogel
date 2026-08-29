@@ -60,6 +60,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86
 .cat-chip svg{width:14px;height:14px}
 
 .rent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:18px;margin-top:28px}
+.cat-head{grid-column:1/-1;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);border-bottom:1px solid var(--line);padding-bottom:8px;margin-top:18px}
+.cat-head:first-child{margin-top:0}
+.cat-head span{color:var(--mut2);font-family:'Inter',sans-serif;font-weight:400;letter-spacing:0;text-transform:none;font-size:12px;margin-left:8px}
 .rent{background:var(--card);border:1px solid var(--line);border-radius:5px;overflow:hidden;transition:border-color .25s}
 .rent:hover{border-color:rgba(60,200,180,.5)}
 .rent .ri{aspect-ratio:4/3;background:var(--bg) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--mut2)}
@@ -104,6 +107,22 @@ footer a:hover{color:var(--acc)}
 .tc-close{background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer;line-height:1}
 .tc-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;gap:10px}
 .tc-item span:first-child{flex:1}
+
+/* Mobil: kompakte Zeilen statt hoher Karten + wischbare, mitlaufende Kategorie-Leiste */
+@media(max-width:700px){
+  .cats{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;position:sticky;top:57px;z-index:90;background:var(--bg);padding:10px 0;scrollbar-width:none}
+  .cats::-webkit-scrollbar{display:none}
+  .cat-chip{flex-shrink:0;white-space:nowrap}
+  .rent-grid{grid-template-columns:1fr;gap:12px}
+  .rent{display:grid;grid-template-columns:96px 1fr}
+  .rent .ri{aspect-ratio:auto;height:100%;min-height:96px}
+  .rent .ri svg{width:26px;height:26px}
+  .rent .rb{padding:12px 14px}
+  .rent h4{font-size:15px}
+  .rent p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12.5px;margin-bottom:8px}
+  .rent .addon{display:none}
+  .cat-head{margin-top:14px}
+}
 </style>
 </head>
 <body>
@@ -222,7 +241,7 @@ var CAT_ICONS={
   'Video':'<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'
 };
 var CAT_ICON_DEFAULT='<line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>';
-function catIcon(cat){return '<svg viewBox="0 0 24 24" aria-hidden="true">'+(CAT_ICONS[cat]||CAT_ICON_DEFAULT)+'</svg>'}
+function catIcon(cat){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(CAT_ICONS[cat]||CAT_ICON_DEFAULT)+'</svg>'}
 
 var EQ=[],SETS=[],SET_ITEMS=[],EQ_ALL={};
 var PARTNER=JSON.parse(sessionStorage.getItem('lg_partner')||'null');
@@ -263,33 +282,47 @@ function renderCatChips(){
   }).join('');
 }
 function setCat(c){CUR_CAT=c;renderCatChips();renderRent()}
+function rentCard(e){
+  var img=e.image_url?' style="background-image:url(\''+esc(e.image_url)+'\');background-position:'+esc(e.image_focal||'50% 50%')+'"':'';
+  var icon=e.image_url?'':catIcon(e.category);
+  var pp=partnerPrice(e);
+  var price=priceLabel(e.day_rate,pp);
+  var av='';
+  if(e.id&&AVAIL[e.id]!=null){
+    av=AVAIL[e.id].available>0?'<div class="avail ok">✓ Im Zeitraum verfügbar ('+AVAIL[e.id].available+' von '+AVAIL[e.id].total+')</div>':
+      '<div class="avail no">✗ Im Zeitraum bereits vergeben</div>';
+  }
+  var addon='';
+  if(e.addon_id){
+    var a=EQ_ALL[e.addon_id]||EQ.find(function(x){return x.id===e.addon_id});
+    if(a)addon='<div class="addon">Passt dazu: <b>'+esc(a.name)+'</b> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag) – einfach mit anfragen.</div>';
+  }
+  var inCart=e.id&&CART.some(function(c){return c.type!=='set'&&c.id===e.id});
+  var cartCtrl=e.id?('<div style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
+    '<input type="number" min="1" value="1" id="qty-'+e.id+'" style="margin:0;width:60px;padding:8px">'+
+    '<button class="btn small'+(inCart?' ghost':'')+'" onclick="addToCart(\''+e.id+'\')">'+(inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>'):'';
+  return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
+    (e.category?'<div class="rc">'+esc(e.category)+'</div>':'')+
+    '<h4>'+esc(e.name)+'</h4><p>'+esc(e.description||'')+'</p>'+
+    '<div class="rp">'+price+'</div>'+av+addon+cartCtrl+'</div></div>';
+}
 function renderRent(){
   document.getElementById('partnerBadge').innerHTML=PARTNER?('Partnerpreise aktiv für <b style="color:var(--txt)">'+esc(PARTNER.name)+'</b>'):'';
-  var list=CUR_CAT==='Alle'?EQ:EQ.filter(function(e){return e.category===CUR_CAT});
-  document.getElementById('rentGrid').innerHTML=list.map(function(e){
-    var img=e.image_url?' style="background-image:url(\''+esc(e.image_url)+'\');background-position:'+esc(e.image_focal||'50% 50%')+'"':'';
-    var icon=e.image_url?'':catIcon(e.category);
-    var pp=partnerPrice(e);
-    var price=priceLabel(e.day_rate,pp);
-    var av='';
-    if(e.id&&AVAIL[e.id]!=null){
-      av=AVAIL[e.id].available>0?'<div class="avail ok">✓ Im Zeitraum verfügbar ('+AVAIL[e.id].available+' von '+AVAIL[e.id].total+')</div>':
-        '<div class="avail no">✗ Im Zeitraum bereits vergeben</div>';
-    }
-    var addon='';
-    if(e.addon_id){
-      var a=EQ_ALL[e.addon_id]||EQ.find(function(x){return x.id===e.addon_id});
-      if(a)addon='<div class="addon">Passt dazu: <b>'+esc(a.name)+'</b> (+ '+euro(PARTNER?partnerPrice(a):a.day_rate)+'/Tag) – einfach mit anfragen.</div>';
-    }
-    var inCart=e.id&&CART.some(function(c){return c.type!=='set'&&c.id===e.id});
-    var cartCtrl=e.id?('<div style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
-      '<input type="number" min="1" value="1" id="qty-'+e.id+'" style="margin:0;width:60px;padding:8px">'+
-      '<button class="btn small'+(inCart?' ghost':'')+'" onclick="addToCart(\''+e.id+'\')">'+(inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>'):'';
-    return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
-      (e.category?'<div class="rc">'+esc(e.category)+'</div>':'')+
-      '<h4>'+esc(e.name)+'</h4><p>'+esc(e.description||'')+'</p>'+
-      '<div class="rp">'+price+'</div>'+av+addon+cartCtrl+'</div></div>';
-  }).join('')||'<p class="lead" style="margin-top:6px">In dieser Kategorie ist gerade nichts verfügbar.</p>';
+  var html;
+  if(CUR_CAT==='Alle'){
+    /* Gesamtansicht nach Kategorien gruppiert, damit die Liste scanbar bleibt */
+    var cats=[];
+    EQ.forEach(function(e){var c=e.category||'Sonstiges';if(cats.indexOf(c)===-1)cats.push(c)});
+    cats.sort();
+    if(cats.indexOf('Sonstiges')>-1){cats.splice(cats.indexOf('Sonstiges'),1);cats.push('Sonstiges')}
+    html=cats.map(function(c){
+      var items=EQ.filter(function(e){return (e.category||'Sonstiges')===c});
+      return '<div class="cat-head">'+esc(c)+'<span>'+items.length+' Artikel</span></div>'+items.map(rentCard).join('');
+    }).join('');
+  } else {
+    html=EQ.filter(function(e){return e.category===CUR_CAT}).map(rentCard).join('');
+  }
+  document.getElementById('rentGrid').innerHTML=html||'<p class="lead" style="margin-top:6px">In dieser Kategorie ist gerade nichts verfügbar.</p>';
   renderCart();
 }
 renderRent();
