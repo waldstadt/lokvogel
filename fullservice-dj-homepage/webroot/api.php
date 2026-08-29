@@ -26,18 +26,18 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 40;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 41;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* Spalten, die als JSON bzw. Bool behandelt werden */
 const JSON_COLS = [
-  'settings' => ['value'], 'site_content' => ['value'],
+  'settings' => ['value'], 'site_content' => ['value'], 'content_versions' => ['value'],
   'packages' => ['features'],
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
   'products' => ['bundle'], 'bookings' => ['rider', 'customer_notes'], 'rental_contracts' => ['snapshot'],
   'customers' => ['tags', 'tech_check'],
 ];
 const BOOL_COLS = [
-  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved'], 'friends' => ['public'],
+  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'],
   'workshop_events' => ['public'],
   'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
   'bookings' => ['review_requested','open_ended'],
@@ -51,7 +51,7 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks'];
+  'calendar_blocks','content_versions'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -295,6 +295,11 @@ function upgrade(PDO $p): void {
   if ($v < 39) seedEquipmentCatalog($p);   // neue Artikel nachziehen (idempotent per SKU)
   if ($v < 40) try { $p->exec("create table if not exists calendar_blocks (id text primary key,
     title text not null, start_date text not null, end_date text, note text, created_at text)"); } catch (PDOException $e) {}
+  if ($v < 41) foreach ([
+    "alter table locations add column highlight integer default 0",
+    "create table if not exists content_versions (id text primary key, key text not null,
+      label text, value text not null default '{}', created_at text)",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) { /* Spalte existiert bereits */ } }
   if ($v < 31) try {
     $p->exec("alter table bookings add column billable_days integer");
   } catch (PDOException $e) {}
@@ -665,7 +670,9 @@ create table locations (id text primary key, sort integer default 0, name text n
   city text, region text, address text, phone text, description text, image_url text,
   image_focal text default '50% 50%', website text,
   image_source text default 'eigen', image_approved integer default 0,
-  public integer default 1, created_at text);
+  highlight integer default 0, public integer default 1, created_at text);
+create table content_versions (id text primary key, key text not null,
+  label text, value text not null default '{}', created_at text);
 create table inquiries (id text primary key, name text not null, email text, phone text,
   event_type text, event_date text, location text, guests text, message text,
   status text default 'neu', customer_id text, created_at text);
@@ -2219,6 +2226,50 @@ function handleUpload(string $name): never {
   out(['url' => 'uploads/' . $name], 201);
 }
 
+/* Instagram-Feed spiegeln: Bilder nach uploads/instagram laden und die Liste in site_content
+   ablegen. Der Zugriffstoken bleibt in settings (nicht öffentlich) und landet nie im Feed-JSON. */
+function instagramSync(PDO $p): never {
+  $cfg = json_decode((string)$p->query("select value from settings where key='instagram'")->fetchColumn() ?: '{}', true) ?: [];
+  $token = trim((string)($cfg['token'] ?? ''));
+  if ($token === '') fail('Kein Instagram-Token hinterlegt – bitte zuerst in den Einstellungen unter „Instagram" eintragen.');
+  $max = max(1, min(50, (int)($cfg['max'] ?? 12)));
+  $ctx = stream_context_create(['http' => ['timeout' => 15, 'ignore_errors' => true]]);
+  $resp = @file_get_contents('https://graph.instagram.com/me/media'
+    . '?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp'
+    . '&limit=' . $max . '&access_token=' . rawurlencode($token), false, $ctx);
+  if ($resp === false) fail('Instagram ist gerade nicht erreichbar – bitte später noch einmal versuchen.');
+  $j = json_decode($resp, true);
+  if (!is_array($j) || isset($j['error']))
+    fail('Instagram-Abruf fehlgeschlagen: ' . ($j['error']['message'] ?? 'unerwartete Antwort')
+      . ' – ist der Token noch gültig?');
+  $dir = UPLOAD_DIR . '/instagram';
+  if (!is_dir($dir)) mkdir($dir, 0755, true);
+  $images = []; $keep = [];
+  foreach (($j['data'] ?? []) as $m) {
+    $type = (string)($m['media_type'] ?? '');
+    $src = $type === 'VIDEO' ? (string)($m['thumbnail_url'] ?? '') : (string)($m['media_url'] ?? '');
+    $id = preg_replace('/\D/', '', (string)($m['id'] ?? ''));
+    if ($id === '' || $src === '' || !in_array($type, ['IMAGE', 'CAROUSEL_ALBUM', 'VIDEO'])) continue;
+    $file = "ig-$id.jpg";
+    $bin = @file_get_contents($src, false, $ctx);
+    if ($bin !== false && @getimagesizefromstring($bin) !== false)
+      file_put_contents("$dir/$file", processImage($bin));
+    if (!is_file("$dir/$file")) continue;   // Download fehlgeschlagen und kein alter Stand vorhanden
+    $keep[] = $file;
+    $images[] = ['file' => "uploads/instagram/$file",
+      'permalink' => (string)($m['permalink'] ?? ''),
+      'caption' => mb_substr(trim((string)($m['caption'] ?? '')), 0, 200)];
+  }
+  /* Bilder aufräumen, die nicht mehr im Feed sind */
+  foreach (glob("$dir/ig-*.jpg") ?: [] as $f)
+    if (!in_array(basename($f), $keep)) @unlink($f);
+  $p->prepare("insert into site_content (key,value,updated_at) values ('instagram_feed',?,?)
+      on conflict(key) do update set value=excluded.value, updated_at=excluded.updated_at")
+    ->execute([json_encode(['images' => $images, 'synced_at' => now(), 'count' => count($images)],
+      JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), now()]);
+  out(['ok' => true, 'count' => count($images)], 201);
+}
+
 /* ---------- Router ---------- */
 $path = trim($_SERVER['PATH_INFO'] ?? ($_GET['_p'] ?? ''), '/');
 $method = $_SERVER['REQUEST_METHOD'];
@@ -2237,6 +2288,24 @@ try {
     handleRest($m[1], $method, $q, $body, $prefer);
   }
   if (preg_match('#^storage/(.+)$#', $path, $m) && $method === 'POST') handleUpload($m[1]);
+  /* Medienpool: alle Bilder im uploads-Ordner (inkl. gespiegelter Instagram-Bilder) – nur angemeldet */
+  if ($path === 'media/list' && $method === 'GET') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $files = [];
+    $scan = function (string $dir, string $prefix, string $source) use (&$files) {
+      foreach (glob($dir . '/*.{jpg,jpeg,png,webp,gif}', GLOB_BRACE) ?: [] as $f)
+        if (is_file($f)) $files[] = ['name' => basename($f), 'url' => $prefix . basename($f),
+          'size' => filesize($f), 'mtime' => filemtime($f), 'source' => $source];
+    };
+    $scan(UPLOAD_DIR, 'uploads/', 'upload');
+    $scan(UPLOAD_DIR . '/instagram', 'uploads/instagram/', 'instagram');
+    usort($files, fn($a, $b) => $b['mtime'] <=> $a['mtime']);
+    out($files);
+  }
+  if ($path === 'instagram/sync' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    instagramSync(db());
+  }
   /* Einkaufsbeleg zu einem Technik-Artikel hinterlegen (Garantiefall) – nur angemeldet, nie öffentlich */
   if (preg_match('#^equipment/([a-f0-9-]{30,40})/invoice$#', $path, $m) && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
