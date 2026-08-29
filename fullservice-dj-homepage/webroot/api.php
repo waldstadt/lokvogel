@@ -752,6 +752,8 @@ SQL);
   seedServiceProducts($p);
   seedTechCheckForm($p);
   seedEquipmentCatalog($p);
+  /* Frühere Lokvogel-Artikel (own_rig) sind jetzt „auf Anfrage verfügbar". */
+  $p->exec("update equipment set on_request = 1 where own_rig = 1");
 }
 
 function seed(PDO $p): void {
