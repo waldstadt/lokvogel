@@ -2475,6 +2475,8 @@ function openEqModal(id){
         '<div><label>% ab 2 Wochen</label><input type="number" id="eTier2Week" placeholder="'+g2+'" value="'+(e.tier_2week_pct!=null?e.tier_2week_pct:'')+'"></div>'+
         '<div><label>% ab 1 Monat</label><input type="number" id="eTierMonth" placeholder="'+gm+'" value="'+(e.tier_month_pct!=null?e.tier_month_pct:'')+'"></div></div>';
     })()+
+    '<label>Platzhalter-Icon <span class="mut sml" style="text-transform:none;letter-spacing:0">(wird angezeigt, solange kein Foto hinterlegt ist)</span></label>'+
+    '<div id="eqPhRow" style="margin-bottom:14px"></div>'+
     '<label>Bilder</label>'+
     '<div class="mut sml" style="margin-bottom:6px;text-transform:none;letter-spacing:0">Das erste Bild ist das Hauptbild – es steht in der Übersicht und als großes Foto oben. Reihenfolge per Ziehen ändern.</div>'+
     '<div style="display:flex;gap:8px;margin-bottom:8px"><input type="file" accept="image/*" multiple style="display:none" id="upEq" onchange="eqUpload(this)"><button class="btn g sm" onclick="document.getElementById(\'upEq\').click()">Bilder hochladen</button><button class="btn g sm" onclick="eqFromPool()">Aus Pool wählen</button></div>'+
@@ -2484,6 +2486,7 @@ function openEqModal(id){
     '<div style="margin-top:14px"><button class="btn" onclick="saveEq(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delEq(\''+id+'\')">Löschen</button>':'')+'</div>');
   EQ_IMAGES=eqImagesOf(e);EQ_FOCAL=e.image_focal||'50% 50%';renderEqImgGrid();renderEqFocal();
+  EQ_PH=e.placeholder||'';renderEqPhRow();
   if(e.status)document.getElementById('eStatus').value=e.status;
 }
 /* Fünf Auswahlfelder für eine Artikel-Beziehung („passt dazu" / „passend für"). */
@@ -2515,7 +2518,7 @@ function saveEq(id){
     tier_week_pct:v('eTierWeek')!==''?Number(v('eTierWeek')):null,
     tier_2week_pct:v('eTier2Week')!==''?Number(v('eTier2Week')):null,
     tier_month_pct:v('eTierMonth')!==''?Number(v('eTierMonth')):null,
-    qty_total:Number(v('eQty'))||1,min_qty:Math.max(1,Number(v('eMinQty'))||1),status:v('eStatus'),
+    qty_total:Number(v('eQty'))||1,min_qty:Math.max(1,Number(v('eMinQty'))||1),placeholder:EQ_PH||null,status:v('eStatus'),
     images:eqImgs,image_url:eqImgs[0]||'',image_focal:v('eFocal'),public:document.getElementById('ePub').checked,rentable:document.getElementById('ePub').checked,
     slug:v('eName').toLowerCase().replace(/[^a-z0-9äöüß]+/g,'-').replace(/^-|-$/g,'')};
   (id?api('equipment?id=eq.'+id,{method:'PATCH',body:body}):api('equipment',{method:'POST',body:body}))
@@ -2777,6 +2780,33 @@ function eqImagesOf(e){
   if(Array.isArray(im)){im=im.filter(Boolean);if(im.length)return im.slice()}
   return e&&e.image_url?[e.image_url]:[];
 }
+/* Platzhalter-Icons – müssen mit mieten.html (PLACEHOLDERS) übereinstimmen. */
+var EQ_PH='';
+var PLACEHOLDERS={
+  stativ:{label:'Stativ',p:'<circle cx="12" cy="4" r="2"/><line x1="12" y1="6" x2="12" y2="13"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="12" y1="13" x2="5" y2="21"/><line x1="12" y1="13" x2="19" y2="21"/><line x1="12" y1="13" x2="12" y2="21"/>'},
+  lautsprecher:{label:'Lautsprecher',p:'<rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="15" r="3.5"/><circle cx="12" cy="6" r="1.2"/>'},
+  movinghead:{label:'Moving Head',p:'<rect x="6" y="20" width="12" height="2" rx="1"/><path d="M8 20v-5"/><path d="M16 20v-5"/><circle cx="12" cy="10" r="4"/><line x1="12" y1="6" x2="12" y2="2"/>'},
+  scheinwerfer:{label:'Scheinwerfer',p:'<path d="M4 6h10l4 3v2H4z"/><line x1="18" y1="9" x2="21" y2="7"/><line x1="18" y1="11" x2="21" y2="12"/><line x1="9" y1="13" x2="9" y2="20"/><line x1="6" y1="20" x2="12" y2="20"/>'},
+  kabel:{label:'Kabel',p:'<path d="M6 4v4a3 3 0 0 0 3 3h6a3 3 0 0 1 3 3v6"/><line x1="4" y1="3" x2="4" y2="6"/><line x1="8" y1="3" x2="8" y2="6"/><line x1="16" y1="21" x2="16" y2="18"/><line x1="20" y1="21" x2="20" y2="18"/>'},
+  leinwand:{label:'Leinwand',p:'<line x1="3" y1="4" x2="21" y2="4"/><rect x="4" y="4" width="16" height="11" rx="1"/><line x1="12" y1="15" x2="12" y2="20"/><line x1="8" y1="20" x2="16" y2="20"/>'},
+  nebelmaschine:{label:'Nebelmaschine',p:'<rect x="3" y="12" width="12" height="8" rx="1"/><circle cx="6" cy="16" r="1"/><path d="M15 14c2 0 2-2 4-2s2 2 4 2"/><path d="M15 18c2 0 2-2 4-2"/>'},
+  mikrofon:{label:'Mikrofon',p:'<path d="M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/>'},
+  instrument:{label:'Instrument',p:'<circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M9 18V6l12-2v12"/>'}
+};
+function phSvg(key){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px" aria-hidden="true">'+PLACEHOLDERS[key].p+'</svg>'}
+function renderEqPhRow(){
+  var el=document.getElementById('eqPhRow');if(!el)return;
+  var html='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+  html+='<button type="button" title="Kein Icon (Kategorie-Standard)" onclick="eqPickPh(\'\')" '+
+    'style="width:44px;height:44px;border:1px solid '+(EQ_PH?'var(--bdr)':'var(--acc)')+';border-radius:6px;background:'+(EQ_PH?'transparent':'rgba(255,111,91,.12)')+';color:var(--gl);cursor:pointer;font-size:16px">–</button>';
+  Object.keys(PLACEHOLDERS).forEach(function(k){
+    var on=EQ_PH===k;
+    html+='<button type="button" title="'+esc(PLACEHOLDERS[k].label)+'" onclick="eqPickPh(\''+k+'\')" '+
+      'style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:1px solid '+(on?'var(--acc)':'var(--bdr)')+';border-radius:6px;background:'+(on?'rgba(255,111,91,.12)':'transparent')+';color:'+(on?'var(--acc)':'var(--tx)')+';cursor:pointer">'+phSvg(k)+'</button>';
+  });
+  el.innerHTML=html+'</div>';
+}
+function eqPickPh(k){EQ_PH=k;renderEqPhRow()}
 function renderEqImgGrid(){
   var el=document.getElementById('eqImgGrid');if(!el)return;
   el.innerHTML=EQ_IMAGES.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">'+
