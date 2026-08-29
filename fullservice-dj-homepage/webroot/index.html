@@ -440,7 +440,7 @@ var FALLBACK={
 var LEGAL={};
 
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
-function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
 /* Tages-Seed: deterministisch pro Tag, damit die Seite nicht bei jedem Reload springt */
 var DAY_SEED=Math.floor(Date.now()/864e5);
@@ -450,6 +450,16 @@ var HIDDEN_SECTIONS=[];
 function showSection(id){
   var el=document.getElementById(id);if(!el)return;
   el.style.display=HIDDEN_SECTIONS.indexOf(id)>=0?'none':'';
+}
+/* Blendet die Galerie-Sektion aus, wenn nach fehlgeschlagenen Bildern weder eigene
+   Fotos noch Instagram-Bilder übrig sind - keine leere Überschrift stehen lassen. */
+function galCleanup(){
+  var gal=document.getElementById('galGrid'),ig=document.getElementById('igGrid');
+  if((!gal||!gal.querySelector('img'))&&(!ig||!ig.querySelector('img'))){
+    var sec=document.getElementById('galerie');if(sec)sec.style.display='none';
+  } else if(ig&&!ig.querySelector('img')){
+    var b=document.getElementById('igBlock');if(b)b.style.display='none';
+  }
 }
 
 /* Auswahl + Rotation: Highlights immer dabei (Position rotiert täglich),
@@ -582,7 +592,7 @@ function applyContent(rows){
   if(c.gallery&&c.gallery.images&&c.gallery.images.length){
     if(c.gallery.title)document.getElementById('galTitle').textContent=c.gallery.title;
     document.getElementById('galGrid').innerHTML=c.gallery.images.map(function(src){
-      return '<img src="'+esc(src)+'" alt="" loading="lazy" onerror="this.closest(\'.gal-grid\').removeChild(this)">';
+      return '<img src="'+esc(src)+'" alt="" loading="lazy" onerror="this.remove();galCleanup()">';
     }).join('');
     showSection('galerie');
   }
@@ -598,7 +608,7 @@ function applyContent(rows){
   if(c.instagram_feed&&c.instagram_feed.images&&c.instagram_feed.images.length){
     document.getElementById('igGrid').innerHTML=c.instagram_feed.images.map(function(im){
       if(!im||!im.file)return '';
-      var img='<img src="'+esc(im.file)+'" alt="'+esc(im.caption||'Instagram-Beitrag')+'" loading="lazy" onerror="(this.closest(\'a\')||this).remove()">';
+      var img='<img src="'+esc(im.file)+'" alt="'+esc(im.caption||'Instagram-Beitrag')+'" loading="lazy" onerror="(this.closest(\'a\')||this).remove();galCleanup()">';
       if(im.permalink&&/^https?:\/\//i.test(im.permalink))
         return '<a href="'+esc(im.permalink)+'" target="_blank" rel="noopener">'+img+'</a>';
       return img;

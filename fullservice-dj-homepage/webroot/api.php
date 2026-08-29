@@ -1147,8 +1147,15 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
     case 'GET':
       $st = $p->prepare("select * from \"$t\"$wsql$order"); $st->execute($args);
       $rows = array_map(fn($r) => decodeRow($t, $r), $st->fetchAll());
-      /* Einkaufsbeleg-Dateiname ist kein öffentliches Datenblatt (Download läuft ohnehin nur angemeldet) */
-      if (!$auth && $t === 'equipment') foreach ($rows as &$r) { unset($r['invoice_file']); unset($r['invoice_name']); }
+      /* Ohne Login nur die Felder ausliefern, die die öffentliche Seite wirklich braucht -
+         interne Vermerke, Partner-/Empfehlungspreise, Einkaufsbelege bleiben drin. */
+      if (!$auth && $t === 'equipment') {
+        $pubCols = ['id','sort','name','slug','category','description','image_url','image_focal',
+          'day_rate','followup_pct','tier_week_pct','tier_2week_pct','tier_month_pct',
+          'qty_total','rentable','public','status','addon_id'];
+        foreach ($rows as &$r) $r = array_intersect_key($r, array_flip($pubCols));
+        unset($r);
+      }
       out(attachEmbeds($t, $rows, $embeds));
 
     case 'POST':
@@ -2211,9 +2218,18 @@ function processImage(string $raw, int $maxDim = 2000, int $quality = 85): strin
   imagedestroy($img);
   return ($out !== false && strlen($out) > 0) ? $out : $raw;
 }
+/* Schützt uploads/ als Defense-in-Depth: keine Skript-Ausführung, egal was hochgeladen wurde
+   (Apache-Produktion; php -S ignoriert .htaccess). */
+function ensureUploadDir(string $dir): void {
+  if (!is_dir($dir)) mkdir($dir, 0755, true);
+  $ht = UPLOAD_DIR . '/.htaccess';
+  if (!file_exists($ht)) file_put_contents($ht,
+    "php_flag engine off\nRemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phar .cgi .pl\n" .
+    "<FilesMatch \"\\.(php|phtml|php3|php4|php5|php7|phar|cgi|pl|py|svg|htm|html)\$\">\n  Require all denied\n</FilesMatch>\n");
+}
 function handleUpload(string $name): never {
   if (!currentUser()) fail('Nicht angemeldet.', 401);
-  if (!is_dir(UPLOAD_DIR)) mkdir(UPLOAD_DIR, 0755, true);
+  ensureUploadDir(UPLOAD_DIR);
   $raw = file_get_contents('php://input');
   if (!$raw || strlen($raw) > MAX_UPLOAD) fail('Datei fehlt oder ist zu groß (max. 8 MB).');
   $name = strtolower(preg_replace('/[^a-z0-9._-]+/i', '-', basename($name)));
@@ -2231,7 +2247,7 @@ function handleUpload(string $name): never {
 function instagramSync(PDO $p): never {
   $cfg = json_decode((string)$p->query("select value from settings where key='instagram'")->fetchColumn() ?: '{}', true) ?: [];
   $token = trim((string)($cfg['token'] ?? ''));
-  if ($token === '') fail('Kein Instagram-Token hinterlegt – bitte zuerst in den Einstellungen unter „Instagram" eintragen.');
+  if ($token === '') fail('Kein Instagram-Token hinterlegt – bitte zuerst oben auf dieser Karte („Inhalte → Instagram-Galerie") den Zugriffstoken eintragen und speichern.');
   $max = max(1, min(50, (int)($cfg['max'] ?? 12)));
   $ctx = stream_context_create(['http' => ['timeout' => 15, 'ignore_errors' => true]]);
   $resp = @file_get_contents('https://graph.instagram.com/me/media'
@@ -2243,7 +2259,7 @@ function instagramSync(PDO $p): never {
     fail('Instagram-Abruf fehlgeschlagen: ' . ($j['error']['message'] ?? 'unerwartete Antwort')
       . ' – ist der Token noch gültig?');
   $dir = UPLOAD_DIR . '/instagram';
-  if (!is_dir($dir)) mkdir($dir, 0755, true);
+  ensureUploadDir($dir);
   $images = []; $keep = [];
   foreach (($j['data'] ?? []) as $m) {
     $type = (string)($m['media_type'] ?? '');

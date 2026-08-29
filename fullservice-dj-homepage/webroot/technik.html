@@ -44,8 +44,8 @@ h2{font-size:clamp(28px,4.2vw,40px);font-weight:700;line-height:1.12;margin-bott
 nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86);backdrop-filter:blur(12px);border-bottom:1px solid transparent;transition:border-color .3s}
 nav.scrolled{border-bottom-color:var(--line)}
 .nav-in{max-width:1080px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
-.nav-links{display:flex;gap:26px;align-items:center}
-.nav-links a{color:var(--mut);font-size:13px;letter-spacing:.03em;transition:color .2s}
+.nav-links{display:flex;gap:20px;align-items:center;flex-wrap:nowrap}
+.nav-links a{color:var(--mut);font-size:13px;letter-spacing:.03em;transition:color .2s;white-space:nowrap}
 .nav-links a:hover{color:var(--txt)}
 .btn{display:inline-block;background:var(--acc);color:#0c1513;padding:13px 28px;font-size:13px;font-weight:600;letter-spacing:.04em;border:none;border-radius:3px;cursor:pointer;transition:background .2s;font-family:'Space Grotesk',sans-serif}
 .btn:hover{background:var(--acc2)}
@@ -56,7 +56,7 @@ nav.scrolled{border-bottom-color:var(--line)}
 .switch:hover{border-color:#ff6f5b;color:#ff6f5b}
 .nav-links .btn{color:#0c1513}
 .burger{display:none;background:none;border:none;color:var(--txt);font-size:24px;cursor:pointer}
-@media(max-width:860px){
+@media(max-width:1024px){
   .nav-links{display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);flex-direction:column;padding:20px;gap:18px;border-bottom:1px solid var(--line)}
   .nav-links.open{display:flex}
   .burger{display:block}

@@ -682,7 +682,7 @@ var API='api.php';
 /* ===== Basis ===== */
 var TOKEN=null,S={},CACHE={};
 function toast(msg,err){var t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(err?' err':'');t.style.display='block';setTimeout(function(){t.style.display='none'},3200)}
-function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
 function dt(d){if(!d)return '–';return new Date(d).toLocaleDateString('de-DE')}
 function dtt(d){if(!d)return '–';return new Date(d).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})}
@@ -2480,8 +2480,12 @@ function openEqInvoice(id){
 function focalWidget(imgUrl,focal,focalId,ratio){
   focal=focal||'50% 50%';
   var parts=focal.split(' '),fx=parseFloat(parts[0])||50,fy=parseFloat(parts[1])||50;
+  /* Ohne Bild macht der Ausschnitt-Wähler keinen Sinn - dann nur ein Hinweis, kein leerer Kreis. */
+  if(!imgUrl)
+    return '<div id="'+focalId+'-wrap" class="mut sml" style="margin-top:10px">Bildausschnitt: erst ein Foto hochladen oder aus dem Pool wählen.</div>'+
+      '<input type="hidden" id="'+focalId+'" value="'+esc(focal)+'">';
   return '<label style="margin-top:10px">Bildausschnitt <span class="mut sml" style="text-transform:none;letter-spacing:0">(aufs Vorschaubild klicken, um z. B. ein Gesicht im Ausschnitt zu halten)</span></label>'+
-    '<div id="'+focalId+'-box" onclick="setFocal(event,\''+focalId+'\')" style="position:relative;width:180px;aspect-ratio:'+ratio+';border-radius:8px;overflow:hidden;border:1px solid var(--line);cursor:crosshair;background-color:var(--card);background-size:cover;background-repeat:no-repeat;background-position:'+fx+'% '+fy+'%;'+(imgUrl?"background-image:url('"+esc(imgUrl)+"')":'')+'">'+
+    '<div id="'+focalId+'-box" onclick="setFocal(event,\''+focalId+'\')" style="position:relative;width:180px;aspect-ratio:'+ratio+';border-radius:8px;overflow:hidden;border:1px solid var(--line);cursor:crosshair;background-color:var(--card);background-size:cover;background-repeat:no-repeat;background-position:'+fx+'% '+fy+'%;background-image:url(\''+esc(imgUrl)+'\')">'+
     '<div id="'+focalId+'-marker" style="position:absolute;left:'+fx+'%;top:'+fy+'%;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.5);pointer-events:none"></div></div>'+
     '<input type="hidden" id="'+focalId+'" value="'+esc(focal)+'">';
 }
@@ -2591,7 +2595,9 @@ function saveFaq(id){
   (id?api('faq?id=eq.'+id,{method:'PATCH',body:body}):api('faq',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');renderCmsReload()}).catch(function(e){toast(e.message,1)});
 }
-function delRow(tbl,id,cb){api(tbl+'?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();cb()}).catch(function(e){toast(e.message,1)})}
+function delRow(tbl,id,cb){
+  if(!confirm('Wirklich endgültig löschen? Das lässt sich nicht rückgängig machen.'))return;
+  api(tbl+'?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();cb()}).catch(function(e){toast(e.message,1)})}
 function renderLocAdmin(){
   document.getElementById('locAdminList').innerHTML=(CACHE.locations||[]).map(function(l,i){
     return '<div'+ddAttrs('locations',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
@@ -3772,7 +3778,8 @@ function renderVersionBars(unavailable){
       (vs.length?('<select id="vsel_'+key+'" style="width:auto;max-width:280px;padding:5px 8px;font-size:11px">'+
         vs.map(function(x){return '<option value="'+esc(String(x.id))+'">'+esc(x.label||'ohne Namen')+' · '+dtt(x.created_at)+'</option>'}).join('')+'</select>'+
         '<button class="btn g sm" onclick="loadVersion(\''+key+'\')">In Formular laden</button>'+
-        '<button class="btn g sm" onclick="delVersion(\''+key+'\')">Löschen</button>')
+        '<button class="btn g sm" onclick="delVersion(\''+key+'\')">Löschen</button>'+
+        '<span class="mut sml" style="flex-basis:100%">Es werden die letzten 5 Versionen behalten – ältere fallen beim Sichern automatisch weg.</span>')
         :'<span class="mut sml">'+(unavailable?'Versionen sind gleich verfügbar – das Server-Update läuft noch.':'Noch keine Versionen. „Als Version sichern" legt einen Entwurf an – live geht weiterhin nur „Speichern".')+'</span>')+
       '</div>';
   });

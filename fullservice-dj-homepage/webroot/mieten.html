@@ -36,8 +36,8 @@ h1{font-size:clamp(30px,4.6vw,44px);font-weight:700;line-height:1.12;margin-bott
 
 nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .nav-in{max-width:1080px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
-.nav-links{display:flex;gap:26px;align-items:center}
-.nav-links a{color:var(--mut);font-size:13px;letter-spacing:.03em;transition:color .2s}
+.nav-links{display:flex;gap:20px;align-items:center;flex-wrap:nowrap}
+.nav-links a{color:var(--mut);font-size:13px;letter-spacing:.03em;transition:color .2s;white-space:nowrap}
 .nav-links a:hover{color:var(--txt)}
 .nav-links a.cur{color:var(--txt)}
 .btn{display:inline-block;background:var(--acc);color:#0c1513;padding:13px 28px;font-size:13px;font-weight:600;letter-spacing:.04em;border:none;border-radius:3px;cursor:pointer;transition:background .2s;font-family:'Space Grotesk',sans-serif}
@@ -47,7 +47,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86
 .btn.small{padding:9px 18px;font-size:12px}
 .nav-links .btn{color:#0c1513}
 .burger{display:none;background:none;border:none;color:var(--txt);font-size:24px;cursor:pointer}
-@media(max-width:860px){
+@media(max-width:1024px){
   .nav-links{display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);flex-direction:column;padding:20px;gap:18px;border-bottom:1px solid var(--line)}
   .nav-links.open{display:flex}
   .burger{display:block}
@@ -223,7 +223,7 @@ try{var _tp=JSON.stringify({p:location.pathname.split('/').pop()||'mieten.html',
 navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
-function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 var LEGAL={};
 
 /* Feather-Icons je Kategorie als Bild-Platzhalter, solange kein echtes Foto hinterlegt ist */
@@ -411,26 +411,38 @@ function removeFromCart(idx){CART.splice(idx,1);saveCart();renderRent();renderSe
 function renderCart(){
   var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
   var days=from?rentalDaysClient(from,to):1;
-  var total=0;
+  var total=0,onRequest=false;
+  function line(rate,qty,e){
+    if(!rate)return null;   // Preis auf Anfrage - fließt nicht in die Summe
+    return rentalPriceClient(rate,days,
+      Number(e&&e.followup_pct!=null?e.followup_pct:50),
+      Number(e&&e.tier_week_pct!=null?e.tier_week_pct:30),
+      Number(e&&e.tier_2week_pct!=null?e.tier_2week_pct:20),
+      Number(e&&e.tier_month_pct!=null?e.tier_month_pct:12))*qty;
+  }
+  function row(name,amount,idx){
+    var priceTxt=amount==null?'<span style="color:var(--mut2)">auf Anfrage</span>':euro(amount);
+    return '<div class="tc-item"><span>'+esc(name)+'</span><span>'+priceTxt+
+      ' <a onclick="removeFromCart('+idx+')" style="color:var(--mut2);margin-left:8px" title="Entfernen">✕</a></span></div>';
+  }
   var html=CART.map(function(c,idx){
     if(c.type==='set'){
       var s=SETS.find(function(x){return x.id===c.set_id});if(!s)return'';
-      var line=rentalPriceClient(setDayRate(s),days,50,30,20,12)*c.qty;
-      total+=line;
-      return '<div class="tc-item"><span>Set: '+esc(s.name)+' × '+c.qty+'</span><span>'+euro(line)+' <a onclick="removeFromCart('+idx+')" style="color:var(--mut2);margin-left:8px" title="Entfernen">✕</a></span></div>';
+      var sl=rentalPriceClient(setDayRate(s),days,50,30,20,12)*c.qty;
+      total+=sl;
+      return row('Set: '+s.name+' × '+c.qty,sl,idx);
     }
     var e=EQ.find(function(x){return x.id===c.id})||EQ_ALL[c.id];if(!e)return'';
     var rate=partnerPrice(e)!=null?partnerPrice(e):Number(e.day_rate||0);
-    var line=rentalPriceClient(rate,days,Number(e.followup_pct!=null?e.followup_pct:50),
-      Number(e.tier_week_pct!=null?e.tier_week_pct:30),Number(e.tier_2week_pct!=null?e.tier_2week_pct:20),Number(e.tier_month_pct!=null?e.tier_month_pct:12))*c.qty;
-    total+=line;
-    return '<div class="tc-item"><span>'+esc(e.name)+' × '+c.qty+'</span><span>'+euro(line)+' <a onclick="removeFromCart('+idx+')" style="color:var(--mut2);margin-left:8px" title="Entfernen">✕</a></span></div>';
+    var l=line(rate,c.qty,e);
+    if(l==null)onRequest=true; else total+=l;
+    return row(e.name+' × '+c.qty,l,idx);
   }).join('');
   document.getElementById('cartItems').innerHTML=html;
   document.getElementById('cartEmpty').style.display=CART.length?'none':'block';
   document.getElementById('cartTotalRow').style.display=CART.length?'flex':'none';
   document.getElementById('cartSubmitWrap').style.display=CART.length?'block':'none';
-  document.getElementById('cartTotal').textContent=euro(total)+(from&&days>1?' · '+days+' Tage':'');
+  document.getElementById('cartTotal').textContent=euro(total)+(from&&days>1?' · '+days+' Tage':'')+(onRequest?' + Artikel auf Anfrage':'');
   renderTcBadge();
   renderCartAuth();
 }
