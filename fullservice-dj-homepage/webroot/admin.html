@@ -378,13 +378,15 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div></div>
       </div>
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
+      <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('docIntro')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
     </div>
     <div class="card"><h3>Positionen <span style="float:right" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()"> + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()"> + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button></span></h3>
       <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel netto</div><div>Gesamt</div><div></div></div>
       <div id="docItems"></div>
       <div class="totals" id="docTotals"></div>
     </div>
-    <div class="card"><label>Schlusstext</label><textarea id="docOutro" style="min-height:46px"></textarea></div>
+    <div class="card"><label>Schlusstext</label><textarea id="docOutro" style="min-height:46px"></textarea>
+      <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('docOutro')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div></div>
   </div>
 
   <!-- STATISTIK -->
@@ -434,6 +436,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <label>Betreff</label><input id="nlSubject" placeholder="z. B. Neue Workshop-Termine im November">
         <label>Text <span class="mut sml" style="text-transform:none;letter-spacing:0">– {vorname} wird je Empfänger ersetzt, Abmeldelink kommt automatisch ans Ende</span></label>
         <textarea id="nlBody" style="min-height:120px" placeholder="Hallo {vorname},&#10;&#10;es gibt neue Termine …"></textarea>
+        <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('nlBody')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
         <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn g sm" onclick="nlAdminSend(true)">Testmail an mich</button>
           <button class="btn sm" id="nlSendBtn" onclick="nlAdminSend(false)">An alle Abonnenten senden</button>
@@ -494,8 +497,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cThText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Mietpark-Titel</label><input id="cThRentTitle">
           <label>Mietpark-Text</label><textarea id="cThRentText" style="min-height:46px"></textarea>
+          <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cThRentText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Teaser auf der DJ-Seite (Titel)</label><input id="cThTeaTitle">
           <label>Teaser auf der DJ-Seite (Text)</label><textarea id="cThTeaText" style="min-height:46px"></textarea>
+          <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cThTeaText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('tech')">Speichern</button></div></div>
     <div class="sec-label">Kontakt</div>
         <div class="card"><h3>Kontaktdaten (öffentlich)</h3>
@@ -565,12 +570,16 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div class="card"><h3>SEO</h3>
           <label>Seitentitel</label><input id="cSeoTitle">
           <label>Beschreibung</label><textarea id="cSeoDesc" style="min-height:46px"></textarea>
+          <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cSeoDesc')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('seo')">Speichern</button></div>
           <div id="vb_seo"></div></div>
         <div class="card"><h3>Rechtstexte</h3>
           <label>Impressum</label><textarea id="cLegImp" style="min-height:90px"></textarea>
+          <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cLegImp')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Datenschutzerklärung</label><textarea id="cLegDs" style="min-height:90px"></textarea>
+          <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cLegDs')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>AGB (inkl. Vermittlungsklausel DJ Bande)</label><textarea id="cLegAgb" style="min-height:90px"></textarea>
+          <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cLegAgb')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('legal')">Speichern</button></div>
           <div id="vb_legal"></div></div>
   </div>
@@ -658,6 +667,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <div class="sec-label">Verträge &amp; Vermietung</div>
         <div class="card"><h3>Mietvertrag – Vertragsbedingungen</h3>
           <textarea id="sRental" style="min-height:160px;font-size:11px"></textarea>
+          <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('sRental')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <div class="mut sml" style="margin-top:6px">Erscheint auf jedem gedruckten Mietvertrag (Buchungs-Detail → „ Mietvertrag“). Vor Livegang anwaltlich prüfen lassen.</div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveRental()">Speichern</button></div>
         </div>
@@ -1132,7 +1142,7 @@ function openCommModal(){
     '<div><label>Richtung</label><select id="cmDir"><option value="in">eingehend</option><option value="out">ausgehend</option></select></div>'+
     '<div><label>Zeitpunkt</label><input type="datetime-local" id="cmAt" value="'+new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)+'"></div></div>'+
     '<label>Betreff / Kurzfassung</label><input id="cmSub">'+
-    '<label>Inhalt / Gesprächsnotiz</label><textarea id="cmTxt" style="min-height:100px"></textarea>'+
+    '<label>Inhalt / Gesprächsnotiz</label><textarea id="cmTxt" style="min-height:100px"></textarea>'+edBtn('cmTxt')+
     '<label>Wiedervorlage (nachfassen am)</label><input type="date" id="cmFup">'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveComm()">Speichern</button></div>');
 }
@@ -1155,7 +1165,7 @@ function openCustModal(c){
     '<div class="grid3"><div><label>E-Mail</label><input id="kMail" value="'+esc(c.email||'')+'"></div><div><label>Telefon</label><input id="kPhone" value="'+esc(c.phone||'')+'"></div><div><label>WhatsApp</label><input id="kWa" value="'+esc(c.whatsapp||'')+'"></div></div>'+
     '<div class="grid3"><div><label>Straße</label><input id="kStreet" value="'+esc(c.street||'')+'"></div><div><label>PLZ</label><input id="kZip" value="'+esc(c.zip||'')+'"></div><div><label>Ort</label><input id="kCity" value="'+esc(c.city||'')+'"></div></div>'+
     '<label>Tags (Komma-getrennt)</label><input id="kTags" value="'+esc((c.tags||[]).join(', '))+'">'+
-    '<label>Notizen</label><textarea id="kNotes">'+esc(c.notes||'')+'</textarea>'+
+    '<label>Notizen</label><textarea id="kNotes">'+esc(c.notes||'')+'</textarea>'+edBtn('kNotes')+
     '<div style="margin-top:14px"><button class="btn" onclick="saveCust(\''+(c.id||'')+'\')">Speichern</button>'+
     (c.id?' <button class="btn r" onclick="delCust(\''+c.id+'\')">Löschen</button>':'')+'</div>');
   if(c.kind)document.getElementById('kKind').value=c.kind;
@@ -1353,7 +1363,7 @@ function openBookModal(b,presetCust){
     '<div><label>Adresse</label><input id="bAddr" value="'+esc(b.venue_address||'')+'"></div>'+
     '<div><label>Gäste</label><input type="number" id="bGuests" value="'+(b.guests||'')+'"></div></div>'+
     '<label>Gage netto (€, ohne Technik)</label><input type="number" step="0.01" id="bFee" value="'+(b.fee_net||'')+'">'+
-    '<label>Notizen</label><textarea id="bNotes">'+esc(b.notes||'')+'</textarea>'+
+    '<label>Notizen</label><textarea id="bNotes">'+esc(b.notes||'')+'</textarea>'+edBtn('bNotes')+
     '<div style="margin-top:14px"><button class="btn" onclick="saveBook(\''+(b.id||'')+'\')">Speichern</button>'+
     (b.id?' <button class="btn r" onclick="delBook(\''+b.id+'\')">Löschen</button>':'')+'</div>');
   if(b.status)document.getElementById('bStatus').value=b.status;
@@ -1427,7 +1437,7 @@ function openRiderModal(){
     '<label>Aufbauort / Bühne / Platz</label><input id="rStage" value="'+esc(r.stage||'')+'" placeholder="z. B. Ecke neben der Tanzfläche, ca. 3 × 2 m">'+
     '<div class="grid2"><div><label>Musikwünsche</label><input id="rMusic" value="'+esc(r.music||'')+'"></div>'+
     '<div><label>No-Gos</label><input id="rNogos" value="'+esc(r.nogos||'')+'"></div></div>'+
-    '<label>Sonstiges / Ablauf</label><textarea id="rNotes">'+esc(r.notes||'')+'</textarea>'+
+    '<label>Sonstiges / Ablauf</label><textarea id="rNotes">'+esc(r.notes||'')+'</textarea>'+edBtn('rNotes')+
     '<div style="margin-top:14px"><button class="btn" onclick="saveRider()">Speichern</button></div>');
   riderKmHint();
 }
@@ -1671,7 +1681,7 @@ function composeReminderMail(){
   openModal('Zahlungserinnerung – '+esc(d.number),
     '<label>An</label><input id="remTo" value="'+esc(cust.email||'')+'">'+
     '<label>Betreff</label><input id="remSubject" value="'+esc(subj)+'">'+
-    '<label>Text</label><textarea id="remBody" style="min-height:220px">'+esc(body)+'</textarea>'+
+    '<label>Text</label><textarea id="remBody" style="min-height:220px">'+esc(body)+'</textarea>'+edBtn('remBody')+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
     '<button class="btn" onclick="adminSendMail(v(\'remTo\'),v(\'remSubject\'),document.getElementById(\'remBody\').value,curDoc.customer_id,closeModal)">Direkt senden</button>'+
     '<button class="btn g" onclick="sendReminder()">Im Mailprogramm öffnen</button></div>'+
@@ -2622,7 +2632,7 @@ function openSetModal(id){
   curSetItems=id?(CACHE.setItems||[]).filter(function(x){return x.set_id===id}).map(function(x){return {equipment_id:x.equipment_id,qty:x.qty}}):[];
   openModal(id?'Set bearbeiten':'Neues Set',
     '<label>Name *</label><input id="stName" value="'+esc(s.name||'')+'" placeholder="z. B. Gartenparty-Paket">'+
-    '<label>Beschreibung (Homepage)</label><textarea id="sDesc">'+esc(s.description||'')+'</textarea>'+
+    '<label>Beschreibung (Homepage)</label><textarea id="sDesc">'+esc(s.description||'')+'</textarea>'+edBtn('sDesc')+
     '<div class="grid2"><div><label>Rabatt auf die Summe der Einzelpreise (%)</label><input type="number" step="0.1" id="sDiscPct" value="'+(s.discount_pct!=null?s.discount_pct:5)+'" oninput="updateSetPricePreview()"></div>'+
     '<div><label>oder Festpreis €/Tag (überschreibt den Rabatt)</label><input type="number" step="0.01" id="sFixed" value="'+(s.fixed_price!=null?s.fixed_price:'')+'" oninput="updateSetPricePreview()"></div></div>'+
     '<div id="sPricePreview" class="mut sml" style="margin:-8px 0 12px"></div>'+
@@ -3046,7 +3056,7 @@ function openLocModal(id){
     '<div><label>Region</label><input id="lRegion" value="'+esc(l.region||'')+'" placeholder="z. B. NRW, Bayern"></div></div>'+
     '<div class="grid2"><div><label>Adresse</label><input id="lAddr" value="'+esc(l.address||'')+'" placeholder="Straße, Hausnummer"></div>'+
     '<div><label>Telefon</label><input id="lPhone" value="'+esc(l.phone||'')+'" placeholder="z. B. 02371 123456"></div></div>'+
-    '<label>Warum empfehle ich sie? (kurz)</label><textarea id="lDesc">'+esc(l.description||'')+'</textarea>'+
+    '<label>Warum empfehle ich sie? (kurz)</label><textarea id="lDesc">'+esc(l.description||'')+'</textarea>'+edBtn('lDesc')+
     '<label>Website der Location</label><input id="lWeb" value="'+esc(l.website||'')+'" placeholder="https://…">'+
     (webPending?
       '<div style="margin:6px 0 14px;padding:12px 14px;border:1px solid #c98a3c;border-radius:9px;background:rgba(201,138,60,.08)">'+
@@ -3097,7 +3107,7 @@ function openFriendModal(id){
   openModal(id?'Empfehlung bearbeiten':'Neue Empfehlung',
     '<div class="grid2"><div><label>Name *</label><input id="frName" value="'+esc(f.name||'')+'"></div>'+
     '<div><label>Kategorie</label><input id="frCat" value="'+esc(f.category||'')+'" placeholder="z. B. Fotografie, Sängerin, Hochzeitsplanung"></div></div>'+
-    '<label>Warum empfehle ich sie/ihn? (kurz)</label><textarea id="frDesc">'+esc(f.description||'')+'</textarea>'+
+    '<label>Warum empfehle ich sie/ihn? (kurz)</label><textarea id="frDesc">'+esc(f.description||'')+'</textarea>'+edBtn('frDesc')+
     '<label>Website</label><input id="frWeb" value="'+esc(f.website||'')+'" placeholder="https://…">'+
     '<label style="margin-top:12px"><input type="checkbox" id="frPub" style="width:auto;margin-right:6px" '+(f.public!==false&&f.public!==0?'checked':'')+'>Auf Homepage anzeigen</label>'+
     SORT_HINT+
@@ -3169,9 +3179,9 @@ function openTechCheck(){
     '<div class="grid2"><div><label>Datum des Checks</label><input type="date" id="tcDate" value="'+(t.date||new Date().toISOString().slice(0,10))+'"></div>'+
     '<div><label>Anlage / Ort</label><input id="tcWhere" value="'+esc(t.where||'')+'" placeholder="z. B. Saalanlage Vereinsheim Musterstraße"></div></div>'+
     '<div class="sml mut" style="margin:10px 0 2px">– Vom Kunden (aus dem Vorab-Fragebogen übernehmen oder vor Ort erfragen) –</div>'+
-    '<label>Wofür wird die Tontechnik genutzt? / Anforderungen</label><textarea id="tcUse" style="min-height:52px">'+esc(t.use||'')+'</textarea>'+
-    '<label>Aktuelle Probleme</label><textarea id="tcProb" style="min-height:52px">'+esc(t.problems||'')+'</textarea>'+
-    '<label>Wünsche des Kunden</label><textarea id="tcWish" style="min-height:52px">'+esc(t.wishes||'')+'</textarea>'+
+    '<label>Wofür wird die Tontechnik genutzt? / Anforderungen</label><textarea id="tcUse" style="min-height:52px">'+esc(t.use||'')+'</textarea>'+edBtn('tcUse')+
+    '<label>Aktuelle Probleme</label><textarea id="tcProb" style="min-height:52px">'+esc(t.problems||'')+'</textarea>'+edBtn('tcProb')+
+    '<label>Wünsche des Kunden</label><textarea id="tcWish" style="min-height:52px">'+esc(t.wishes||'')+'</textarea>'+edBtn('tcWish')+
     '<label>Budgetrahmen des Kunden</label><input id="tcBudget" value="'+esc(t.budget||'')+'" placeholder="z. B. 500–1.500 €, noch offen …">'+
     '<div class="sml mut" style="margin:10px 0 2px">– Befund –</div>'+
     '<div class="grid2"><div><label>Funktionsstatus</label>'+tcSel('tcFunc',TC_FUNK,t.func)+'</div>'+
@@ -3179,16 +3189,16 @@ function openTechCheck(){
     '<div class="grid3"><div><label>Klang (1–10)</label><input type="number" id="tcSound" min="1" max="10" value="'+(t.sound||'')+'"></div>'+
     '<div><label>Potenzial Neueinstellung</label>'+tcSel('tcTune',TC_POT,t.tune)+'</div>'+
     '<div><label>Potenzial Ergänzung</label>'+tcSel('tcAdd',TC_POT,t.add)+'</div></div>'+
-    '<label>Befund im Detail (was geprüft, was aufgefallen)</label><textarea id="tcFind" style="min-height:70px">'+esc(t.findings||'')+'</textarea>'+
+    '<label>Befund im Detail (was geprüft, was aufgefallen)</label><textarea id="tcFind" style="min-height:70px">'+esc(t.findings||'')+'</textarea>'+edBtn('tcFind')+
     '<label>Fotos (Anlage, Verkabelung, Problemstellen)</label>'+
     '<div id="tcPhotos" style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 6px"></div>'+
     '<input type="file" accept="image/*" capture="environment" multiple id="tcPicIn" onchange="tcAddPhotos(this)">'+
     '<div class="mut sml">Werden verkleinert, liegen zugriffsgeschützt auf dem Server und erscheinen im Bericht.</div>'+
     '<div class="sml mut" style="margin:10px 0 2px">– Empfehlung –</div>'+
     '<label>Empfehlung</label>'+tcSel('tcEmpf',TC_EMPF,t.recommendation)+
-    '<label>Begründung (verbessern vs. neu anschaffen – wirtschaftliche Einordnung)</label><textarea id="tcWhy" style="min-height:60px">'+esc(t.reasoning||'')+'</textarea>'+
-    '<label>Meine persönliche Empfehlung (in deinen Worten – steht hervorgehoben im Bericht)</label><textarea id="tcPersonal" style="min-height:60px" placeholder="z. B. An eurer Stelle würde ich zuerst … – das bringt am meisten fürs Geld.">'+esc(t.personal||'')+'</textarea>'+
-    '<label>Konkrete Maßnahmen (mit grobem Preisrahmen)</label><textarea id="tcSteps" style="min-height:60px">'+esc(t.steps||'')+'</textarea>'+
+    '<label>Begründung (verbessern vs. neu anschaffen – wirtschaftliche Einordnung)</label><textarea id="tcWhy" style="min-height:60px">'+esc(t.reasoning||'')+'</textarea>'+edBtn('tcWhy')+
+    '<label>Meine persönliche Empfehlung (in deinen Worten – steht hervorgehoben im Bericht)</label><textarea id="tcPersonal" style="min-height:60px" placeholder="z. B. An eurer Stelle würde ich zuerst … – das bringt am meisten fürs Geld.">'+esc(t.personal||'')+'</textarea>'+edBtn('tcPersonal')+
+    '<label>Konkrete Maßnahmen (mit grobem Preisrahmen)</label><textarea id="tcSteps" style="min-height:60px">'+esc(t.steps||'')+'</textarea>'+edBtn('tcSteps')+
     '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">'+
     '<button class="btn" onclick="saveTechCheck()">Speichern</button>'+
     (t.date?'<button class="btn g" onclick="printTechCheck()">Bericht drucken / PDF</button>':'')+
@@ -3666,7 +3676,7 @@ function openFtModal(id){
   var lines=(t.fields||[]).map(function(f){return f.label+' | '+(f.type||'text')+(f.options?' | '+f.options.join(', '):'')}).join('\n');
   openModal(id?'Bogen-Vorlage bearbeiten':'Neue Bogen-Vorlage',
     '<label>Name *</label><input id="ftName" value="'+esc(t.name||'')+'">'+
-    '<label>Einleitung</label><textarea id="ftIntro" style="min-height:56px">'+esc(t.intro||'')+'</textarea>'+
+    '<label>Einleitung</label><textarea id="ftIntro" style="min-height:56px">'+esc(t.intro||'')+'</textarea>'+edBtn('ftIntro')+
     '<label>Fragen – eine pro Zeile: Frage | Typ | Optionen (Typ: text, textarea, select, checkbox)</label>'+
     '<textarea id="ftFields" style="min-height:180px;font-size:11px">'+esc(lines)+'</textarea>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveFt(\''+(id||'')+'\')">Speichern</button>'+
@@ -3702,7 +3712,7 @@ function openTplModal(id){
     '<div class="grid2"><div><label>Name *</label><input id="tName" value="'+esc(t.name||'')+'"></div>'+
     '<div><label>Sortierung</label><input type="number" id="tSort" value="'+(t.sort||0)+'"></div></div>'+
     '<label>Betreff</label><input id="tSubject" value="'+esc(t.subject||'')+'">'+
-    '<label>Text</label><textarea id="tBody" style="min-height:260px">'+esc(t.body||'')+'</textarea>'+
+    '<label>Text</label><textarea id="tBody" style="min-height:260px">'+esc(t.body||'')+'</textarea>'+edBtn('tBody')+
     '<div class="sml mut" style="margin-top:6px">Platzhalter: {vorname} {name} {datum} {anlass} {ort} – werden beim Antworten automatisch aus der Anfrage gefüllt.</div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveTpl(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'email_templates\',\''+id+'\',reloadTpls)">Löschen</button>':'')+'</div>');
@@ -3746,7 +3756,7 @@ function openProdModal(id){
     '<div><label>Kategorie</label><input id="pCat" value="'+esc(p.category||'')+'" placeholder="DJ-Leistung, Ton, Licht …"></div>'+
     '<div><label>Sortierung</label><input type="number" id="pSort" value="'+(p.sort||0)+'"></div></div>'+
     '<label>Name *</label><input id="pName" value="'+esc(p.name||'')+'">'+
-    '<label>Beschreibung (erscheint als Erklärung im Kundenportal)</label><textarea id="pDesc">'+esc(p.description||'')+'</textarea>'+
+    '<label>Beschreibung (erscheint als Erklärung im Kundenportal)</label><textarea id="pDesc">'+esc(p.description||'')+'</textarea>'+edBtn('pDesc')+
     '<div class="grid2"><div><label>Einheit</label><input id="pUnit" value="'+esc(p.unit||'Stk.')+'"></div>'+
     '<div><label>Preis netto (€) – bei Paketen leer = Summe der Bestandteile</label><input type="number" step="0.01" id="pPrice" value="'+(p.price_net!=null?p.price_net:'')+'"></div></div>'+
     '<label>Paket-Bestandteile (eine Zeile je Artikel: Artikelnummer | Menge) – leer = normaler Artikel</label>'+
@@ -3898,7 +3908,7 @@ function openUpModal(id){
   openModal(id?'Extra bearbeiten':'Neues Extra',
     '<div class="grid2"><div><label>Titel *</label><input id="uTitle" value="'+esc(u.title||'')+'"></div>'+
     '<div><label>Preis netto (€)</label><input type="number" step="0.01" id="uPrice" value="'+(u.price_net||0)+'"></div></div>'+
-    '<label>Beschreibung (sieht der Kunde)</label><textarea id="uDesc">'+esc(u.description||'')+'</textarea>'+
+    '<label>Beschreibung (sieht der Kunde)</label><textarea id="uDesc">'+esc(u.description||'')+'</textarea>'+edBtn('uDesc')+
     '<div class="grid2"><div><label>Passt zu (nur intern)</label><input id="uOcc" value="'+esc(u.occasions||'')+'" placeholder="Hochzeit, Firmenfeier …"></div>'+
     '<div><label>Sortierung</label><input type="number" id="uSort" value="'+(u.sort||0)+'"></div></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="uActive" style="width:auto;margin-right:6px" '+(u.active!==false?'checked':'')+'>Aktiv</label>'+
@@ -3962,7 +3972,7 @@ function openCompose(i,t,formLink){
   if(formLink)body=body.replace(/\{fragebogen\}/g,formLink);
   openModal('Antwort an '+esc(i.name)+(i.email?' <span class="mut sml">('+esc(i.email)+')</span>':''),
     '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
-    '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+
+    '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+edBtn('rBody')+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
     (i.email?'<button class="btn" onclick="adminSendMail(\''+jsq(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+jsq(i.customer_id||i.id||'')+'\',closeModal)">Direkt senden</button>':'')+
     '<button class="btn g" onclick="copyReply()">Text kopieren</button>'+
@@ -4194,9 +4204,9 @@ function edAiImprove(){
   var t=document.getElementById('edArea');if(!t)return;
   var text=t.value.trim();
   if(!text){toast('Bitte zuerst Stichpunkte oder einen Text eingeben.',1);return}
-  var isEq=ED_TARGET==='eDesc';
+  var isEq=['eDesc','sDesc','pDesc','uDesc'].indexOf(ED_TARGET)>=0;
   var body={text:text,kind:isEq?'equipment':'page'};
-  if(isEq)body.category=v('eCat');
+  if(ED_TARGET==='eDesc')body.category=v('eCat');
   var btn=document.getElementById('edAiBtn');
   btn.disabled=true;btn.textContent='Wird generiert …';
   ED_UNDO=t.value;
