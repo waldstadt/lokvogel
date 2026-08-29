@@ -399,7 +399,7 @@ function rentCard(e){
       '<input type="number" min="1" value="1" id="qty-'+esc(e.id)+'" style="margin:0;width:60px;padding:8px">'+
       '<button class="btn small'+(st.inCart?' ghost':'')+'" onclick="addToCart(\''+jsq(e.id)+'\')">'+(st.inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>';
   }
-  var open=e.id?' clickable" onclick="openProductModal(\''+jsq(e.id)+'\')':'"';
+  var open=e.id?' clickable" onclick="openProductModal(\''+jsq(e.id)+'\')"':'"';
   return '<div class="rent reveal vis'+(st.gone?' unavail':'')+open+'><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
     (e.category?'<div class="rc">'+esc(e.category)+'</div>':'')+
     '<h4>'+esc(e.name)+'</h4><p>'+esc(e.description||'')+'</p>'+
