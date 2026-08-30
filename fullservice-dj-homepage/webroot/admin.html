@@ -1163,7 +1163,7 @@ function renderDash(){
   document.getElementById('dashPlan').innerHTML=openPlan.slice(0,8).map(function(c){
     var bk=CACHE.bookings.find(function(x){return x.id===c.booking_id});
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+c.booking_id+'\')">'+esc(c.field_label||c.field_path)+'</a> <span class="mut">'+(bk?esc(custName(bk.customers))+' · '+dt(bk.event_date):'')+'</span>'+
-      '<div class="mut sml">„'+esc(String(c.old_value||'–'))+'" → „'+esc(String(c.new_value||''))+'"</div></div>';
+      '<div class="mut sml">„'+esc(planChangeValueText(c.field_path,c.old_value))+'" → „'+esc(planChangeValueText(c.field_path,c.new_value))+'"</div></div>';
   }).join('')||'Keine offenen Vorschläge.';
   var answered=(CACHE.forms||[]).filter(function(f){return f.status==='beantwortet'});
   document.getElementById('dashForms').innerHTML=answered.slice(0,5).map(function(f){
@@ -1871,7 +1871,7 @@ function planSet(obj,path,val){
   cur[parts[parts.length-1]]=val;
 }
 function fmtPlaylists(list){
-  if(!list||!list.length)return '';
+  if(!Array.isArray(list)||!list.length)return '';
   return list.map(function(pl){return '<a href="'+esc(pl.url)+'" target="_blank" rel="noopener">'+esc(pl.label||pl.url)+'</a>'}).join('<br>');
 }
 function parsePlaylists(text){
@@ -1881,9 +1881,9 @@ function parsePlaylists(text){
     return {label:'Playlist',url:l};
   });
 }
-function playlistsToText(list){return (list||[]).map(function(pl){return (pl.label&&pl.label!=='Playlist'?pl.label+' | ':'')+pl.url}).join('\n')}
+function playlistsToText(list){return (Array.isArray(list)?list:[]).map(function(pl){return (pl.label&&pl.label!=='Playlist'?pl.label+' | ':'')+pl.url}).join('\n')}
 function fmtTimetable(list){
-  if(!list||!list.length)return '';
+  if(!Array.isArray(list)||!list.length)return '';
   return '<table>'+list.map(function(t){return '<tr><td style="padding:2px 10px 2px 0;color:var(--mut);white-space:nowrap">'+esc(t.time||'')+'</td><td>'+esc(t.label||'')+'</td></tr>'}).join('')+'</table>';
 }
 function parseTimetable(text){
@@ -1892,7 +1892,7 @@ function parseTimetable(text){
     return m?{time:m[1].replace('.',':'),label:m[2]}:{time:'',label:l};
   });
 }
-function timetableToText(list){return (list||[]).map(function(t){return (t.time?t.time+' ':'')+t.label}).join('\n')}
+function timetableToText(list){return (Array.isArray(list)?list:[]).map(function(t){return (t.time?t.time+' ':'')+t.label}).join('\n')}
 function renderPlan(){
   var b=curBook,pl=planOf(b),bas=pl.basics||{},inv=pl.invoice||{},mus=pl.music||{};
   var filled=Object.keys(pl).length>0;
@@ -1905,12 +1905,26 @@ function renderPlan(){
     row('Rechnungsadresse',[inv.company,inv.name,inv.street,inv.zip_city].filter(Boolean).join(', '))+
     row('Musik-Musts',mus.musts)+row('No-Gos',mus.nogos)+
     '</div>'+
-    (mus.playlists&&mus.playlists.length?'<div style="margin-top:6px">'+row('Playlists',fmtPlaylists(mus.playlists))+'</div>':'')+
-    (pl.timetable&&pl.timetable.length?'<div style="margin-top:6px"><b>Ablaufplan</b>'+fmtTimetable(pl.timetable)+'</div>':'')+
+    (Array.isArray(mus.playlists)&&mus.playlists.length?'<div style="margin-top:6px">'+row('Playlists',fmtPlaylists(mus.playlists))+'</div>':'')+
+    (Array.isArray(pl.timetable)&&pl.timetable.length?'<div style="margin-top:6px"><b>Ablaufplan</b>'+fmtTimetable(pl.timetable)+'</div>':'')+
     (pl.freitext?'<div style="margin-top:6px">'+row('Freitext',pl.freitext)+'</div>':'')
     :'Noch kein Planer ausgefüllt – mit „Bearbeiten" alles Wichtige erfassen, das sonst mühsam am Telefon herausgefunden werden müsste.';
   document.getElementById('bdPlan').innerHTML=html;
   renderPlanChanges();
+}
+function planChangeValueText(fieldPath,raw){
+  if(raw==null||raw==='')return '–';
+  if(fieldPath==='music.playlists'||fieldPath==='timetable'){
+    try{
+      var arr=JSON.parse(raw);
+      if(Array.isArray(arr)){
+        if(!arr.length)return '–';
+        if(fieldPath==='music.playlists')return arr.map(function(pl){return (pl.label&&pl.label!=='Playlist'?pl.label+': ':'')+pl.url}).join(', ');
+        return arr.map(function(t){return (t.time?t.time+' ':'')+t.label}).join(', ');
+      }
+    }catch(e){}
+  }
+  return String(raw);
 }
 function renderPlanChanges(){
   var list=(CACHE.planChanges||[]).filter(function(c){return c.booking_id===curBook.id});
@@ -1921,12 +1935,18 @@ function renderPlanChanges(){
   var html='';
   if(open.length)html+='<div style="border-top:1px solid var(--line);padding-top:8px"><b style="color:var(--acc)">Offene Vorschläge vom Kunden</b>'+
     open.map(function(c){return '<div style="padding:4px 0;display:flex;justify-content:space-between;gap:10px;align-items:center">'+
-      '<span>'+esc(c.field_label||c.field_path)+': „'+esc(String(c.old_value||'–'))+'" → „'+esc(String(c.new_value||''))+'"</span>'+
+      '<span>'+esc(c.field_label||c.field_path)+': „'+esc(planChangeValueText(c.field_path,c.old_value))+'" → „'+esc(planChangeValueText(c.field_path,c.new_value))+'"</span>'+
       '<span><a onclick="applyPlanChange(\''+c.id+'\')">Übernehmen</a> &nbsp;<a onclick="rejectPlanChange(\''+c.id+'\')" style="color:var(--mut)">Verwerfen</a></span></div>';
     }).join('')+'</div>';
   if(log.length)html+='<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px;color:var(--mut)"><b>Verlauf</b>'+
-    log.map(function(c){return '<div style="padding:2px 0">'+esc(c.field_label||c.field_path)+': „'+esc(String(c.new_value||''))+'" – '+
-      (c.status==='uebernommen'?'vom Kunden direkt eingetragen':'abgelehnt')+(c.created_at?' · '+dtt(c.created_at):'')+'</div>';
+    log.map(function(c){
+      /* old_value ist nur null, wenn das Feld vorher leer war und der Kunde direkt gespeichert
+         hat (siehe plan-suggest in api.php) - kam es aus einem offenen Vorschlag, den du per
+         "Übernehmen" bestätigt hast, steht dort der vorherige Wert, auch wenn Status jetzt
+         ebenfalls "uebernommen" ist. */
+      var note=c.status!=='uebernommen'?'abgelehnt':(c.old_value==null?'vom Kunden direkt eingetragen':'von dir übernommen');
+      return '<div style="padding:2px 0">'+esc(c.field_label||c.field_path)+': „'+esc(planChangeValueText(c.field_path,c.new_value))+'" – '+
+      note+(c.created_at?' · '+dtt(c.created_at):'')+'</div>';
     }).join('')+'</div>';
   el.innerHTML=html;
 }
@@ -2013,11 +2033,11 @@ function printEventPlan(){
   pr('Aufbau ab',bas.setup_from)+pr('Abbau bis',bas.teardown_until)+
   pr('Rechnungsadresse',[inv.company,inv.name,inv.street,inv.zip_city].filter(Boolean).join(', '))+
   pr('Musik-Musts',mus.musts)+pr('No-Gos',mus.nogos)+
-  pr('Playlists',(mus.playlists||[]).map(function(pl2){return pl2.url}).join(', '))+
+  pr('Playlists',(Array.isArray(mus.playlists)?mus.playlists:[]).map(function(pl2){return (pl2.label&&pl2.label!=='Playlist'?pl2.label+': ':'')+pl2.url}).join(', '))+
   pr('Technik',tech)+
   pr('Freitext',pl.freitext)+
   '</table>'+
-  ((pl.timetable||[]).length?'<div style="margin-top:16px;font-weight:700">Ablaufplan</div><table style="width:100%;border-collapse:collapse">'+
+  (Array.isArray(pl.timetable)&&pl.timetable.length?'<div style="margin-top:16px;font-weight:700">Ablaufplan</div><table style="width:100%;border-collapse:collapse">'+
     pl.timetable.map(function(t){return '<tr><td style="padding:4px 10px 4px 0;color:#777;white-space:nowrap">'+esc(t.time||'')+'</td><td style="padding:4px 0">'+esc(t.label||'')+'</td></tr>'}).join('')+'</table>':'')+
   (ip.technik_assignment||ip.handover_notes?'<div style="margin-top:16px;font-weight:700">Intern</div><table style="width:100%;border-collapse:collapse">'+
     pr('Technik-Zuordnung',ip.technik_assignment)+pr('Handover-Notizen',ip.handover_notes)+'</table>':'')+

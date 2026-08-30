@@ -2309,6 +2309,31 @@ function handlePortal(string $path, string $method, $body): never {
       if (!preg_match('/^[a-z_]+(\.[a-z_]+)*$/', $fieldPath)) fail('Ungültiges Feld.');
       $fieldLabel = mb_substr(trim((string)($body['field_label'] ?? $fieldPath)), 0, 120);
       $value = $body['value'] ?? null;
+      /* music.playlists und timetable sind die einzigen Array-Felder im Planer - jeder andere
+         Pfad muss ein Skalar sein. Ohne diese Prüfung könnte ein falscher Werttyp (z.B. ein
+         String statt eines Arrays) unbemerkt in event_plan landen und fmtPlaylists()/
+         fmtTimetable() beim Rendern crashen lassen (admin.html wie portal.html). */
+      $isArrayField = in_array($fieldPath, ['music.playlists', 'timetable'], true);
+      if ($isArrayField) {
+        if (!is_array($value)) fail('Ungültiger Wert für dieses Feld.');
+        if ($fieldPath === 'music.playlists') {
+          $value = array_values(array_filter(array_map(function ($it) {
+            if (!is_array($it) || empty($it['url']) || !is_string($it['url'])) return null;
+            return ['label' => is_string($it['label'] ?? null) ? mb_substr($it['label'], 0, 120) : 'Playlist',
+              'url' => mb_substr((string)$it['url'], 0, 500)];
+          }, $value)));
+        } else {
+          $value = array_values(array_filter(array_map(function ($it) {
+            if (!is_array($it) || !isset($it['label'])) return null;
+            return ['time' => is_string($it['time'] ?? null) ? mb_substr($it['time'], 0, 10) : '',
+              'label' => mb_substr((string)$it['label'], 0, 300)];
+          }, $value)));
+        }
+      } elseif (is_array($value)) {
+        fail('Ungültiger Wert für dieses Feld.');
+      } else {
+        $value = $value === null ? null : mb_substr((string)$value, 0, 2000);
+      }
       $plan = json_decode((string)($b['event_plan'] ?? ''), true) ?: [];
       $current = planPathGet($plan, $fieldPath);
       $isEmpty = $current === null || $current === '' || (is_array($current) && count($current) === 0);

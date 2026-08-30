@@ -669,7 +669,7 @@ function loadAccount(){
    Handler nicht mit escapten Werten hantieren müssen. */
 var PLAN_STATE={};
 function fmtPlaylists(list){
-  if(!list||!list.length)return '';
+  if(!Array.isArray(list)||!list.length)return '';
   return list.map(function(pl){return '<a href="'+esc(pl.url)+'" target="_blank" rel="noopener">'+esc(pl.label||pl.url)+'</a>'}).join('<br>');
 }
 function parsePlaylists(text){
@@ -679,9 +679,9 @@ function parsePlaylists(text){
     return {label:'Playlist',url:l};
   });
 }
-function playlistsToText(list){return (list||[]).map(function(pl){return (pl.label&&pl.label!=='Playlist'?pl.label+' | ':'')+pl.url}).join('\n')}
+function playlistsToText(list){return (Array.isArray(list)?list:[]).map(function(pl){return (pl.label&&pl.label!=='Playlist'?pl.label+' | ':'')+pl.url}).join('\n')}
 function fmtTimetable(list){
-  if(!list||!list.length)return '';
+  if(!Array.isArray(list)||!list.length)return '';
   return '<table>'+list.map(function(t){return '<tr><td style="padding:2px 10px 2px 0;color:var(--mut);white-space:nowrap">'+esc(t.time||'')+'</td><td>'+esc(t.label||'')+'</td></tr>'}).join('')+'</table>';
 }
 function parseTimetable(text){
@@ -690,7 +690,7 @@ function parseTimetable(text){
     return m?{time:m[1].replace('.',':'),label:m[2]}:{time:'',label:l};
   });
 }
-function timetableToText(list){return (list||[]).map(function(t){return (t.time?t.time+' ':'')+t.label}).join('\n')}
+function timetableToText(list){return (Array.isArray(list)?list:[]).map(function(t){return (t.time?t.time+' ':'')+t.label}).join('\n')}
 function planRow(bookingId,key,path,label,cfg){
   cfg=cfg||{};
   PLAN_STATE[key]={bookingId:bookingId,path:path,label:label,kind:cfg.kind||'text'};
@@ -747,10 +747,10 @@ function planCard(b,i){
     planRow(b.id,k('musts'),'music.musts','Musik-Musts',{val:mus.musts,empty:!mus.musts,locked:locked})+
     planRow(b.id,k('nogos'),'music.nogos','No-Gos',{val:mus.nogos,empty:!mus.nogos,locked:locked})+
     planRow(b.id,k('playlists'),'music.playlists','Spotify-Playlists',{
-      empty:!(mus.playlists&&mus.playlists.length),locked:locked,multiline:true,rows:60,kind:'playlists',
+      empty:!(Array.isArray(mus.playlists)&&mus.playlists.length),locked:locked,multiline:true,rows:60,kind:'playlists',
       displayHtml:fmtPlaylists(mus.playlists),editVal:playlistsToText(mus.playlists)})+
     planRow(b.id,k('timetable'),'timetable','Ablaufplan',{
-      empty:!(pl.timetable&&pl.timetable.length),locked:locked,multiline:true,rows:90,kind:'timetable',
+      empty:!(Array.isArray(pl.timetable)&&pl.timetable.length),locked:locked,multiline:true,rows:90,kind:'timetable',
       displayHtml:fmtTimetable(pl.timetable),editVal:timetableToText(pl.timetable)})+
     planRow(b.id,k('freitext'),'freitext','Freitext',{val:pl.freitext,empty:!pl.freitext,locked:locked,multiline:true,rows:70});
   return '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">Veranstaltungsplaner <span style="color:var(--mut);font-size:13px;font-weight:400">· '+esc(b.title||'Termin')+'</span></h2>'+
