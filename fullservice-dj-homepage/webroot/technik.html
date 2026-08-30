@@ -55,10 +55,12 @@ nav.scrolled{border-bottom-color:var(--line)}
 .switch{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:3px;padding:6px 14px;transition:border-color .2s}
 .switch:hover{border-color:#ff6f5b;color:#ff6f5b}
 .nav-links .btn{color:#0c1513}
+.nav-links a.nav-more{display:none}
 .burger{display:none;background:none;border:none;color:var(--txt);font-size:24px;cursor:pointer}
 @media(max-width:1360px){
   .nav-links{display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);flex-direction:column;padding:20px;gap:18px;border-bottom:1px solid var(--line)}
   .nav-links.open{display:flex}
+  .nav-links a.nav-more{display:block}
   .burger{display:block}
 }
 
@@ -153,13 +155,13 @@ footer a:hover{color:var(--acc)}
     </a>
     <button class="burger" onclick="document.getElementById('nl').classList.toggle('open')">☰</button>
     <div class="nav-links" id="nl">
-      <a href="#fuer-wen">Für wen</a>
+      <a href="#fuer-wen" class="nav-more">Für wen</a>
       <a href="mieten.html">Technik mieten</a>
-      <a href="#techniker">Techniker buchen</a>
+      <a href="#techniker" class="nav-more">Techniker buchen</a>
       <a href="#installation">Technik-Check</a>
       <a href="#partner">Für Kollegen</a>
       <a href="#workshops">Workshops</a>
-      <a href="#konditionen">Konditionen</a>
+      <a href="#konditionen" class="nav-more">Konditionen</a>
       <a href="index.html" class="switch"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg> Zur DJ-Seite</a>
       <a href="#anfrage" class="btn small">Anfragen</a>
     </div>
