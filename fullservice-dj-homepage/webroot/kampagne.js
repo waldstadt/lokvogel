@@ -156,6 +156,9 @@ function render(pg){
     fetch(API+'/rest/inquiries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
     .then(function(r){
       if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.json().catch(function(){return null});
+    })
+    .then(function(antwort){
       /* Kurzfristige Termine bekommen dieselbe ehrliche Ansage wie auf der Startseite */
       var tage=data.event_date?Math.round((new Date(data.event_date)-new Date())/86400000):null;
       msg.className='form-msg ok';
@@ -163,6 +166,16 @@ function render(pg){
         ?'Danke! Euer Termin ist ja bald – ich melde mich so schnell wie möglich, meist noch am selben Tag. Wenn es eilig ist, schreibt mir gern zusätzlich per WhatsApp.'
         :(cfg.success_text||'Danke! Eure Anfrage ist angekommen – ich melde mich innerhalb von 24 Stunden mit einer ehrlichen Antwort.');
       document.getElementById('inqForm').reset();
+      /* Beim Technik-Check kommt der Fragebogen-Link mit: direkt anzeigen, damit das
+         Versprechen auch hält, wenn die Mail im Spamfilter hängt. */
+      if(antwort&&antwort.form_link){
+        var box=document.createElement('div');
+        box.style.cssText='margin-top:14px;padding:16px 18px;border:1px solid var(--acc);border-radius:12px;background:var(--card)';
+        box.innerHTML='<div style="font-weight:600;margin-bottom:6px">Euer Vorab-Fragebogen</div>'+
+          '<div style="color:var(--mut);font-size:14px;line-height:1.6">Er ist auch per Mail unterwegs – hier könnt ihr ihn direkt ausfüllen:</div>'+
+          '<a class="btn" style="margin-top:12px" href="'+esc(antwort.form_link)+'">Fragebogen öffnen</a>';
+        msg.parentNode.insertBefore(box,msg.nextSibling);
+      }
       showRegHint(data);
     }).catch(function(){
       msg.className='form-msg err';

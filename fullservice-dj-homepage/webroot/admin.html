@@ -2305,9 +2305,19 @@ function isOverdue(d){
     &&d.due_date&&d.due_date<new Date().toISOString().slice(0,10);
 }
 function composeReminderMail(){
-  var d=curDoc,cust=CACHE.customers.find(function(c){return c.id===d.customer_id})||{};
+  var d=curDoc;
+  /* Ohne Freigabe-Token stand im Mailtext wörtlich "(erst Kundenlink erzeugen)" und
+     ließ sich trotzdem versenden - deshalb hier automatisch einen Link anlegen. */
+  if(!d.share_token){
+    var tok=hexToken()+hexToken().slice(0,16);
+    api('documents?id=eq.'+d.id,{method:'PATCH',body:{share_token:tok}})
+      .then(function(){d.share_token=tok;composeReminderMail()})
+      .catch(function(e){toast('Kundenlink konnte nicht erzeugt werden: '+e.message,1)});
+    return;
+  }
+  var cust=CACHE.customers.find(function(c){return c.id===d.customer_id})||{};
   var tpl=(CACHE.tpls||[]).find(function(t){return /zahlungserinnerung/i.test(t.name)})||{subject:'Kleine Erinnerung: Rechnung {nr}',body:''};
-  var link=d.share_token?portalUrl('a',d.share_token):'(erst „Kundenlink“ erzeugen)';
+  var link=portalUrl('a',d.share_token);
   var map={'{vorname}':cust.first_name||'','{name}':custName(cust),'{nr}':d.number,
     '{betrag}':euro(d.total_gross),'{faellig}':dt(d.due_date),'{link}':link,'{datum}':dt(d.due_date)};
   var fill=function(s){return (s||'').replace(/\{vorname\}|\{name\}|\{nr\}|\{betrag\}|\{faellig\}|\{link\}|\{datum\}/g,function(m){return map[m]!==undefined?map[m]:m})};
@@ -4190,8 +4200,18 @@ function tcAddPhotos(inp){
 }
 function tcDelPhoto(i){
   var n=TC_PHOTOS[i];
-  fetch('api.php/checkpic/get/'+n,{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}}).catch(function(){});
+  if(!confirm('Foto endgültig löschen?'))return;
   TC_PHOTOS.splice(i,1);tcRenderPhotos();
+  /* Datei UND Datensatz zusammen aktualisieren: Wurde nur die Datei gelöscht und das
+     Protokoll danach nicht gespeichert, blieb ein toter Dateiname im Datensatz. */
+  fetch('api.php/checkpic/get/'+n,{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}})
+    .catch(function(){})
+    .then(function(){
+      if(!curCust)return;
+      var t=Object.assign({},curCust.tech_check||{},{photos:TC_PHOTOS.slice()});
+      return api('customers?id=eq.'+curCust.id,{method:'PATCH',body:{tech_check:t}})
+        .then(function(){curCust.tech_check=t});
+    }).catch(function(e){toast(e.message,1)});
 }
 function saveTechCheck(){
   var t={date:v('tcDate'),where:v('tcWhere'),use:v('tcUse'),problems:v('tcProb'),wishes:v('tcWish'),

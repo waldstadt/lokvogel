@@ -696,7 +696,7 @@ function seedTechCheckForm(PDO $p): void {
      'options' => ['Täglich', 'Mehrmals pro Woche', 'Wöchentlich', 'Nur zu Veranstaltungen']],
     ['label' => 'Was muss die Anlage können? (eure Anforderungen)', 'type' => 'textarea'],
     ['label' => 'Wo liegen aktuell die Probleme? (Brummen, Pfeifen, zu leise, unverständlich …)', 'type' => 'textarea'],
-    ['label' => 'Was wünscht ihr euch am Ende? (z. B. „Reden versteht man bis hinten", „einfacher bedienbar")', 'type' => 'textarea'],
+    ['label' => 'Was wünscht ihr euch am Ende? (z. B. „Reden versteht man bis hinten“, „einfacher bedienbar“)', 'type' => 'textarea'],
     ['label' => 'Was ist an Technik vorhanden? (Hersteller/Modelle, so gut ihr es wisst – Fotos gern per Mail)', 'type' => 'textarea'],
     ['label' => 'Wie alt ist die Anlage ungefähr?', 'type' => 'select',
      'options' => ['unter 5 Jahre', '5–10 Jahre', '10–20 Jahre', 'älter/unbekannt']],
@@ -1103,7 +1103,7 @@ function splitPersonName(string $name): array {
   $words = explode(' ', $name);
   $last = end($words);
   if (preg_match('/^(Familie|Fam\.|Eheleute)\b/iu', $name))
-    return [$name, $last];                       // Anrede: "Hallo Familie Brinkmann,"
+    return [$name, ''];   // Anrede "Hallo Familie Brinkmann," - der Nachname steckt schon drin
   if (preg_match('/\s(und|&|\+)\s/iu', $name) && count($words) > 2)
     return [implode(' ', array_slice($words, 0, -1)), $last];  // "Lena und Tobias" / "Vogt"
   if (count($words) === 1) return [$name, ''];
@@ -1121,7 +1121,12 @@ function autoInquiryPlanner(PDO $p, array $row): void {
     /* Vereine, Gemeinden und Schulen sind die Kernzielgruppe der Technik-Seite - als
        "privat" mit zerlegtem Namen ("Schuetzenverein" / "Testdorf") wären sie im
        Backoffice falsch einsortiert und in Anschreiben falsch angeredet. */
-    $istOrg = (bool)preg_match('/\b(verein|e\.?\s?v\.?|gemeinde|kirchengemeinde|schule|gymnasium|stadt|firma|gmbh|ug|ag|kg|ohg|verband|club|stiftung|freiwillige feuerwehr|feuerwehr)\b/iu', (string)$row['name']);
+    /* Zusammengesetzte Wörter mitnehmen ("Schützenverein", "Musikverein", "Realschule"),
+       kurze Rechtsformen dagegen nur als eigenständiges Wort, damit z.B. "Aga" nicht
+       als AG durchgeht. */
+    $name = (string)$row['name'];
+    $istOrg = (bool)preg_match('/(verein|gemeinde|schule|gymnasium|kollegium|verband|feuerwehr|stiftung|kirche|pfarrei|kita|kindergarten|jugendzentrum|förderkreis|foerderkreis|freundeskreis)/iu', $name)
+      || (bool)preg_match('/(^|\s)(e\.?\s?v\.?|gmbh|mbh|ug|ag|kg|ohg|gbr|firma|stadt|klub|club)(\s|$|\.|,)/iu', $name);
     $custId = uuid();
     $p->prepare('insert into customers (id, kind, status, first_name, last_name, company, email, phone, source, created_at, updated_at)
       values (?,?,?,?,?,?,?,?,?,?,?)')
@@ -1145,7 +1150,10 @@ function autoInquiryPlanner(PDO $p, array $row): void {
       ->execute([uuid(), $custId, 'note', 'in', 'Anfrage über die Website', $inhalt, now(), now()]);
   }
   $p->prepare('update inquiries set customer_id = ? where id = ?')->execute([$custId, $row['id']]);
-  if (($row['event_type'] ?? '') === 'Technik-Check bestehende Anlage') autoTechCheckInvite($p, $custId, $row);
+  if (($row['event_type'] ?? '') === 'Technik-Check bestehende Anlage') {
+    $formLink = autoTechCheckInvite($p, $custId, $row);
+    if ($formLink) $GLOBALS['_techCheckFormLink'] = $formLink;
+  }
   if (empty($row['event_date'])) return;
   /* Termine in der Vergangenheit (Tippfehler im Datumsfeld) erzeugen keine Buchung -
      sonst hängt ein Geisterauftrag dauerhaft in der Liste. Die Anfrage selbst bleibt. */
@@ -1167,7 +1175,7 @@ function autoInquiryPlanner(PDO $p, array $row): void {
     values (?,?,?,?,?,?,?,?,?,?,?,?,?)')
     ->execute([$bookingId, $custId, 'anfrage', $kind, $row['event_type'] ?? null,
       trim(($row['event_type'] ?: 'Anfrage') . ' ' . $row['name']), $row['event_date'],
-      $row['location'] ?? null, $row['location'] ?? null, $guests,
+      $row['location'] ?? null, null, $guests,   /* Adresse bleibt leer statt den Ortsnamen zu doppeln */
       json_encode(['basics' => $basics], JSON_UNESCAPED_UNICODE), now(), now()]);
 }
 
@@ -1175,23 +1183,32 @@ function autoInquiryPlanner(PDO $p, array $row): void {
    ausgefüllten Formular-Link per Mail - kein manueller Admin-Klick nötig. Schlägt eine
    Teil-Aktion fehl (z. B. keine Firmen-Mail hinterlegt), bleibt der Kunde/die Anfrage
    trotzdem angelegt; der Aufruf erfolgt daher immer in einem eigenen try/catch. */
-function autoTechCheckInvite(PDO $p, string $custId, array $row): void {
-  if (empty($row['email'])) return;
+function autoTechCheckInvite(PDO $p, string $custId, array $row): ?string {
+  if (empty($row['email'])) return null;
   $tpl = $p->prepare('select * from form_templates where name = ? limit 1');
   $tpl->execute(['Technik-Check – Vorab-Fragen']);
   $t = $tpl->fetch();
-  if (!$t) return;
+  if (!$t) return null;
   $token = bin2hex(random_bytes(24));
   $p->prepare('insert into forms (id, token, title, intro, fields, status, inquiry_id, customer_id, created_at)
       values (?,?,?,?,?,?,?,?,?)')
     ->execute([uuid(), $token, $t['name'], $t['intro'], $t['fields'], 'offen', $row['id'], $custId, now()]);
   $link = baseUrl() . '/portal.html?f=' . $token;
   $vn = trim((string)$row['name']) !== '' ? (preg_split('/\s+/', trim((string)$row['name']), 2)[0] ?? $row['name']) : 'zusammen';
-  sendMailSafe($row['email'], 'Kurzer Vorab-Fragebogen zu eurem Technik-Check',
+  $mailed = sendMailSafe($row['email'], 'Kurzer Vorab-Fragebogen zu eurem Technik-Check',
     "Hallo $vn,\n\n" .
     "schön, dass ihr euren Technik-Check angefragt habt! Damit ich beim Termin direkt gezielt loslegen kann, " .
     "beantwortet mir vorab kurz ein paar Fragen zu eurer Anlage - dauert keine 5 Minuten:\n\n$link\n\n" .
     "Ich melde mich in Kürze bei euch, um einen Termin abzustimmen.\n\nBis bald!\nMarkus");
+  /* Scheitert der Versand (Spamfilter, Tippfehler, Serverproblem), erfuhr das bisher
+     niemand - der Bogen stand für immer auf "offen". Jetzt steht es in der Timeline,
+     und der Link wird dem Kunden zusätzlich direkt auf der Bestätigungsseite gezeigt. */
+  if (!$mailed)
+    $p->prepare('insert into communications (id,customer_id,channel,direction,subject,content,occurred_at,created_at)
+      values (?,?,?,?,?,?,?,?)')
+      ->execute([uuid(), $custId, 'note', 'out', 'Vorab-Fragebogen konnte NICHT gemailt werden',
+        "Bitte den Link manuell schicken:\n$link", now(), now()]);
+  return $link;
 }
 
 /* Markus duzt auf der ganzen Seite durchgehend - die Angebots-/Rechnungs-Standardtexte
@@ -2327,7 +2344,9 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
             "https://wa.me/" . $waDigits . "\n\n" : '') .
           "Bis gleich!\n" . ($comp['owner'] ?? 'Markus'));
       }
-      out(null, 201);
+      /* Bei einer Technik-Check-Anfrage den Fragebogen-Link mitgeben: Die Seite verspricht
+         ihn "sofort im Postfach" - falls die Mail hängt, sieht der Kunde ihn wenigstens hier. */
+      out(!empty($GLOBALS['_techCheckFormLink']) ? ['ok' => true, 'form_link' => $GLOBALS['_techCheckFormLink']] : null, 201);
     } else fail('Nicht angemeldet.', 401);
   }
 
