@@ -401,7 +401,7 @@ footer a:hover{color:var(--acc)}
       <span class="wm" style="font-size:16px">lauschgift<i>.</i></span>
     </a>
     <div>© <span id="year"></span> Markus Jankowski · Hemer</div>
-    <div><a onclick="openLegal('impressum')">Impressum</a> &nbsp;·&nbsp; <a onclick="openLegal('datenschutz')">Datenschutz</a> &nbsp;·&nbsp; <a onclick="openLegal('agb')">AGB</a></div>
+    <div><a onclick="openLegal('impressum')">Impressum</a> &nbsp;·&nbsp; <a onclick="openLegal('datenschutz')">Datenschutz</a> &nbsp;·&nbsp; <a onclick="openLegal('agb')">AGB</a> &nbsp;·&nbsp; <a onclick="openLegal('widerrufsformular')">Widerrufsformular</a></div>
   </div>
 </footer>
 
@@ -652,7 +652,7 @@ function applyFont(f){
   s.textContent='h1,h2,h3,h4,.gro,.kicker,.btn,.logo .wm,.badge b,.step .n,.pack .price{font-family:'+FONT_HEADS[f]+' !important}';
   document.head.appendChild(s);
 }
-var LEGAL_TITLES={impressum:'Impressum',datenschutz:'Datenschutzerklärung',agb:'AGB'};
+var LEGAL_TITLES={impressum:'Impressum',datenschutz:'Datenschutzerklärung',agb:'AGB',widerrufsformular:'Muster-Widerrufsformular'};
 function openLegal(key){
   document.getElementById('legalTitle').textContent=LEGAL_TITLES[key]||key;
   document.getElementById('legalBody').textContent=LEGAL[key]||'Dieser Text wird gerade überarbeitet. Bei Fragen ruft mich gerne direkt an.';

@@ -495,7 +495,7 @@ footer a:hover{color:var(--acc)}
       <span class="wm" style="font-size:15px">lauschgift<i>.</i><small>Veranstaltungstechnik</small></span>
     </a>
     <div>© <span id="year"></span> Markus Jankowski · Hemer &nbsp;·&nbsp; <a href="index.html">Zur DJ-Seite: DJ Lauschgift</a></div>
-    <div><a onclick="openLegal('impressum')">Impressum</a> &nbsp;·&nbsp; <a onclick="openLegal('datenschutz')">Datenschutz</a> &nbsp;·&nbsp; <a onclick="openLegal('agb')">AGB</a></div>
+    <div><a onclick="openLegal('impressum')">Impressum</a> &nbsp;·&nbsp; <a onclick="openLegal('datenschutz')">Datenschutz</a> &nbsp;·&nbsp; <a onclick="openLegal('agb')">AGB</a> &nbsp;·&nbsp; <a onclick="openLegal('widerrufsformular')">Widerrufsformular</a></div>
   </div>
 </footer>
 
@@ -578,7 +578,7 @@ function applyFont(f){
   document.head.appendChild(s);
 }
 
-var LEGAL_TITLES={impressum:'Impressum',datenschutz:'Datenschutzerklärung',agb:'AGB'};
+var LEGAL_TITLES={impressum:'Impressum',datenschutz:'Datenschutzerklärung',agb:'AGB',widerrufsformular:'Muster-Widerrufsformular'};
 function openLegal(key){
   document.getElementById('legalTitle').textContent=LEGAL_TITLES[key]||key;
   document.getElementById('legalBody').textContent=LEGAL[key]||'Dieser Text wird gerade überarbeitet. Bei Fragen ruft mich gerne direkt an.';
