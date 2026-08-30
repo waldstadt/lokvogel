@@ -1512,8 +1512,11 @@ function equipTierLineItems(eq,days,menge,startPos){
     qty:menge,unit:'Stk.',unit_price:Number(eq.day_rate)||0,is_header:1,_gid:gid};
   var subs=stages.map(function(st,i){
     var desc=i===0?'1. Miettag':dayRangeLabel(st.startDay,st.count)+' ('+st.pct+' % von '+euro(Number(eq.day_rate)||0)+')';
+    /* Einzel brutto ist immer der echte rabattierte Stückpreis für einen Tag dieser Stufe
+       (nicht mit den Tagen dieser Stufe multipliziert) - die Tage stecken stattdessen in der
+       Menge (Stückzahl × Tage dieser Stufe) bzw. in der Einheit "Stk. (N Tage)". */
     return{pos:startPos+1+i,description:desc,note:'',
-      qty:menge,unit:st.count===1?'Stk.':'Stk. ('+st.count+' Tage)',unit_price:st.rate*st.count,_pgid:gid};
+      qty:menge*st.count,unit:st.count===1?'Stk.':'Stk. ('+st.count+' Tage)',unit_price:st.rate,_pgid:gid};
   });
   return[header].concat(subs);
 }
