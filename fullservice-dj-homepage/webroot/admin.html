@@ -1984,6 +1984,16 @@ function groupDocItems(items){
   return groups;
 }
 function groupTotal(items,g){return g.subs.reduce(function(s,i){return s+lineTotal(items[i])},lineTotal(items[g.main]))}
+/* Bei einer Rabattstaffel-Unterposition steckt in it.qty Stückzahl × Tage dieser Stufe (für die
+   korrekte Summe, qty×unit_price). Angezeigt wird aber die tatsächliche Stückzahl - es bleiben ja
+   immer gleich viele Geräte, egal wie viele Miettage - die Tage stehen dafür in der Einheit
+   ("Stk. (N Tage)"). Die Tage werden aus der Einheit zurückgerechnet, kein Zusatzfeld nötig. */
+function subMenge(it){
+  var m=(it.unit||'').match(/\((\d+) Tage\)/);
+  if(!m)return it.qty;
+  var days=Number(m[1]);
+  return days?Math.round((it.qty/days)*100)/100:it.qty;
+}
 function itemRowHtml(it,i,posLabel,locked,sml){
   var sum=lineTotal(it);
   if(sml){
@@ -1992,7 +2002,7 @@ function itemRowHtml(it,i,posLabel,locked,sml){
     return '<div class="it-row sml">'+
     '<div style="display:flex;align-items:center;justify-content:center;color:var(--gll);user-select:none">'+posLabel+'</div>'+
     '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
-    '<input type="number" step="0.5" value="'+it.qty+'" oninput="itSet('+i+',\'qty\',this.value)">'+
+    '<input value="'+subMenge(it)+'" disabled title="Stückzahl - zum Ändern die ganze Position löschen und neu einfügen">'+
     '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
     '<input type="number" step="0.01" value="'+it.unit_price+'" oninput="itSet('+i+',\'unit_price\',this.value)">'+
     '<input value="'+euro(sum)+'" disabled class="num">'+
@@ -2529,7 +2539,7 @@ function docRowsHtml(items,f){
       var rab=Number(sit.discount_value)?'<span style="font-size:8px;color:#888"> · Rabatt −'+(sit.discount_type==='eur'?euro(sit.discount_value*f):sit.discount_value+' %')+'</span>':'';
       return '<tr style="font-size:9px;color:#555"><td style="padding:0 6px 0 18px">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
       '<td style="padding:0 6px">'+esc(sit.description)+rab+'</td>'+
-      '<td style="padding:0 6px;text-align:right">'+sit.qty+' '+esc(sit.unit||'')+'</td>'+
+      '<td style="padding:0 6px;text-align:right">'+subMenge(sit)+' '+esc(sit.unit||'')+'</td>'+
       '<td style="padding:0 6px;text-align:right">'+euro(sit.unit_price*f)+'</td>'+
       '<td style="padding:0 6px;text-align:right">'+euro(lineTotal(sit)*f)+'</td></tr>';
     }).join('');

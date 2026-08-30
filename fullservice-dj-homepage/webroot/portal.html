@@ -158,6 +158,15 @@ function groupDocItems(items){
   return groups;
 }
 function groupTotal(items,g){return g.subs.reduce(function(s,i){return s+lineTotal(items[i])},lineTotal(items[g.main]))}
+/* Bei einer Rabattstaffel-Unterposition steckt in it.qty Stückzahl × Tage dieser Stufe (für die
+   korrekte Summe). Angezeigt wird die tatsächliche Stückzahl - es bleiben ja immer gleich viele
+   Geräte, egal wie viele Miettage - die Tage stehen in der Einheit ("Stk. (N Tage)"). */
+function subMenge(it){
+  var m=(it.unit||'').match(/\((\d+) Tage\)/);
+  if(!m)return it.qty;
+  var days=Number(m[1]);
+  return days?Math.round((it.qty/days)*100)/100:it.qty;
+}
 function docRowsHtml(items,f){
   var groups=groupDocItems(items);
   return groups.map(function(g,gi){
@@ -179,7 +188,7 @@ function docRowsHtml(items,f){
       var info=sit.note?'<span class="info">i</span><span class="tip">'+esc(sit.note)+'</span>':'';
       return '<tr class="subrow" style="color:var(--mut)"><td class="num">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
         '<td class="pos-desc" style="padding-left:18px" onclick="this.classList.toggle(\'open\')">'+esc(sit.description)+info+'</td>'+
-        '<td class="num">'+Number(sit.qty)+' '+esc(sit.unit||'')+'</td>'+
+        '<td class="num">'+subMenge(sit)+' '+esc(sit.unit||'')+'</td>'+
         '<td class="num">'+euro(lineTotal(sit)*f)+'</td></tr>';
     }).join('');
     var foot='<tr class="groupfoot"><td></td><td colspan="2" style="text-align:right;font-weight:700;font-size:12.5px">Gesamtsumme der Position</td>'+
@@ -362,7 +371,7 @@ function docRowsHtmlPrint(items,f){
       return '<tr style="font-size:9px;color:#555"><td style="padding:0 6px 0 18px">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
       '<td style="padding:0 6px">'+esc(sit.description)+
       (sit.note?'<div style="font-size:8px;color:#888">'+esc(sit.note)+'</div>':'')+'</td>'+
-      '<td style="padding:0 6px;text-align:right;white-space:nowrap">'+Number(sit.qty)+' '+esc(sit.unit||'')+'</td>'+
+      '<td style="padding:0 6px;text-align:right;white-space:nowrap">'+subMenge(sit)+' '+esc(sit.unit||'')+'</td>'+
       '<td style="padding:0 6px;text-align:right;white-space:nowrap">'+euro(lineTotal(sit)*f)+'</td></tr>';
     }).join('');
     var foot='<tr><td></td><td colspan="2" style="padding:2px 6px 5px;text-align:right;font-weight:700;border-bottom:1px solid #ddd;font-size:10.5px">Gesamtsumme der Position</td>'+
