@@ -2183,8 +2183,10 @@ function handlePortal(string $path, string $method, $body): never {
       $rc->execute([$me['id']]);
       $ff = $p->prepare('select id, booking_id, kind, name, size, created_at from customer_files where customer_id = ? order by created_at desc');
       $ff->execute([$me['id']]);
+      $fm = $p->prepare("select token, title, status, created_at, submitted_at from forms where customer_id = ? order by created_at desc");
+      $fm->execute([$me['id']]);
       out(['customer' => ['name' => trim(($me['company'] ?: trim($me['first_name'] . ' ' . $me['last_name']))), 'email' => $me['email']],
-        'bookings' => $bookings, 'documents' => $docs, 'rentals' => $rc->fetchAll(), 'files' => $ff->fetchAll()]);
+        'bookings' => $bookings, 'documents' => $docs, 'rentals' => $rc->fetchAll(), 'files' => $ff->fetchAll(), 'forms' => $fm->fetchAll()]);
     }
     if (preg_match('#^portal/account/booking/([a-f0-9-]{30,40})/notes$#', $path, $m) && $method === 'POST') {
       $chk = $p->prepare('select id, title, event_type, event_date from bookings where id = ? and customer_id = ?');
@@ -2281,6 +2283,7 @@ function handlePortal(string $path, string $method, $body): never {
     if (!in_array($kind, ['accept','decline','comment','callback','bande'])) fail('Unbekannte Aktion.');
     $msg = mb_substr(trim((string)($body['message'] ?? '')), 0, 4000);
     $phone = mb_substr(trim((string)($body['phone'] ?? '')), 0, 60);
+    if ($kind === 'callback' && $phone === '') fail('Bitte eine Rückrufnummer angeben.');
     if ($kind === 'accept' && $d['status'] !== 'storniert') {
       $accName = mb_substr(trim((string)($body['name'] ?? '')), 0, 120);
       $sigRaw = (string)($body['signature'] ?? '');

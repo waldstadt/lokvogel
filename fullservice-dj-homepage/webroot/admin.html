@@ -1144,7 +1144,9 @@ function renderDash(){
   var unseen=(CACHE.docEvents||[]).filter(function(e){return !e.seen});
   document.getElementById('dashPortal').innerHTML=unseen.slice(0,8).map(function(e){
     var d=CACHE.documents.find(function(x){return x.id===e.document_id});
+    var custEmail=d&&d.customers?d.customers.email:'';
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openEventDoc(\''+e.id+'\',\''+e.document_id+'\')">'+(EV_LBL[e.kind]||e.kind)+'</a> <span class="mut">'+(d?esc(d.number)+' · '+esc(custName(d.customers)):'')+' · '+dtt(e.created_at)+'</span>'+
+      ((e.kind==='comment'||e.kind==='callback')&&custEmail?' <a href="mailto:'+encodeURIComponent(custEmail)+'?subject='+encodeURIComponent('Re: '+(d?d.number:'')+' – '+(EV_LBL[e.kind]||e.kind))+'" class="sml">Antworten</a>':'')+
       (e.message?'<div class="mut sml" style="white-space:pre-wrap">„'+esc(e.message.slice(0,140))+'“</div>':'')+
       (e.phone?'<div class="mut sml"> '+esc(e.phone)+'</div>':'')+'</div>';
   }).join('')||'Keine neuen Reaktionen.';

@@ -646,6 +646,9 @@ function renderAccount(){
   var rentals=(me.rentals||[]).map(function(r){
     return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>Mietvertrag</b> <span style="color:var(--mut);font-size:13px">· Termin '+dt(r.event_date)+' · '+(r.status==='unterschrieben'?'unterschrieben ✓':'offen')+'</span> &nbsp;<a href="?mv='+r.token+'">Öffnen →</a></div>';
   }).join('');
+  var forms=(me.forms||[]).map(function(f){
+    return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>'+esc(f.title)+'</b> <span style="color:var(--mut);font-size:13px">· '+(f.status==='beantwortet'?'beantwortet am '+dt(f.submitted_at):'noch offen')+'</span> &nbsp;<a href="?f='+f.token+'">'+(f.status==='beantwortet'?'Ansehen':'Jetzt ausfüllen')+' →</a></div>';
+  }).join('');
   var books=me.bookings.map(function(b,i){
     var n=b.notes||{};
     return '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">'+esc(b.title||'Termin')+' <span style="color:var(--mut);font-size:13px;font-weight:400">· '+dt(b.event_date)+'</span></h2>'+
@@ -663,6 +666,7 @@ function renderAccount(){
   app('<div class="card"><div class="kicker">Dein Kunden-Backoffice</div><h1>Hallo, '+esc(me.customer.name)+'!</h1>'+
     '<p class="sub">Hier findet ihr alle Unterlagen und könnt alles für eure Termine pflegen. <a onclick="logout()" style="cursor:pointer">Abmelden</a></p></div>'+
     '<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Meine Unterlagen</h2>'+docs+rentals+'</div>'+
+    (forms?'<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Fragebögen</h2>'+forms+'</div>':'')+
     books+
     '<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Fotos &amp; Dokumente</h2>'+
     '<p class="sub" style="font-size:13px">Locationfotos helfen mir enorm bei der Planung – Raum, Bühne, Stromanschlüsse, Parkplatz. Auch Dokumente (z. B. Ablaufpläne als PDF) sind willkommen.</p>'+
