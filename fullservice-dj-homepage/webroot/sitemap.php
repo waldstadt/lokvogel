@@ -10,6 +10,10 @@ $pages = [
   ['technik.html', '0.9', 'weekly'],
   ['weihnachtsfeier.html', '0.8', 'monthly'],
   ['halloween.html', '0.8', 'monthly'],
+  ['hochzeit.html', '0.8', 'monthly'],
+  ['vereinsfest-technik.html', '0.8', 'monthly'],
+  ['abiball.html', '0.8', 'monthly'],
+  ['firmensommerfest.html', '0.8', 'monthly'],
 ];
 echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";

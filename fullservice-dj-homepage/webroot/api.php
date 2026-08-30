@@ -1098,7 +1098,7 @@ function autoInquiryPlanner(PDO $p, array $row): void {
     'guest_count' => $guests, 'occasion' => $row['event_type'] ?? null,
   ], fn($v) => $v !== null && $v !== '');
   $bookingId = uuid();
-  $kind = ($row['event_type'] ?? '') === 'Technik mieten' ? 'technik' : 'dj';
+  $kind = stripos((string)($row['event_type'] ?? ''), 'technik') !== false ? 'technik' : 'dj';
   $p->prepare('insert into bookings (id, customer_id, status, kind, event_type, title, event_date,
       venue_name, venue_address, guests, event_plan, created_at, updated_at)
     values (?,?,?,?,?,?,?,?,?,?,?,?,?)')
