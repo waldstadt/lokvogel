@@ -2188,10 +2188,17 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
   $auth = currentUser() !== null;
   $p = db();
 
-  /* Zugriffsregeln für nicht eingeloggte Aufrufer */
+  /* Zugriffsregeln für nicht eingeloggte Aufrufer.
+     Achtung: Filter auf Spalten, die es in der Tabelle nicht gibt, werden beim
+     Bauen der Abfrage stillschweigend verworfen (siehe restQuery). Die
+     Sichtbarkeits-Spalte muss deshalb pro Tabelle stimmen, sonst wäre die
+     Tabelle unbemerkt komplett öffentlich. */
   if (!$auth) {
     if ($method === 'GET' && in_array($t, PUBLIC_READ)) {
-      if ($t !== 'site_content') { $q['public'] = 'eq.true'; }
+      if ($t === 'campaign_pages') { $q['enabled'] = 'eq.true'; }   // Aktionsseiten: Entwürfe bleiben privat
+      elseif ($t === 'site_content') { /* Website-Texte sind vollständig öffentlich */ }
+      elseif ($t === 'equipment_set_items') { /* reine Zuordnungstabelle, Sichtbarkeit steuert das Set */ }
+      else { $q['public'] = 'eq.true'; }
       if ($t === 'equipment') { $q['status'] = 'eq.aktiv'; }
     } elseif ($method === 'POST' && $t === 'inquiries') {
       $row = array_intersect_key(is_array($body) ? $body : [], array_flip(INQUIRY_FIELDS));
