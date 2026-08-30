@@ -1214,6 +1214,14 @@ function viewInq(id){
 function setInqStatus(id,st){api('inquiries?id=eq.'+id,{method:'PATCH',body:{status:st}}).then(function(){closeModal();loadAll()})}
 function inqToCust(id){
   var i=CACHE.inquiries.find(function(x){return x.id===id});if(!i)return;
+  /* Seit die Anfrage-API automatisch schon Kunde+Buchung+Planer anlegt (autoInquiryPlanner),
+     ist customer_id bei neuen Anfragen meist schon gesetzt - dann nur noch den Status
+     weitersetzen, statt einen zweiten Kunden/eine zweite Buchung anzulegen. */
+  if(i.customer_id){
+    api('inquiries?id=eq.'+id,{method:'PATCH',body:{status:'in_bearbeitung'}})
+      .then(function(){closeModal();toast('In CRM übernommen ✓');loadAll()}).catch(function(e){toast(e.message,1)});
+    return;
+  }
   var parts=(i.name||'').trim().split(/\s+/),first=parts.slice(0,-1).join(' '),last=parts.slice(-1)[0]||'';
   api('customers',{method:'POST',prefer:'return=representation',body:{
     first_name:first||i.name,last_name:first?last:'',email:i.email,phone:i.phone,source:'Homepage',status:'lead',

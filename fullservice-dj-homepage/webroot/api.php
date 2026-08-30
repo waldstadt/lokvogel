@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 60;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 61;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -166,7 +166,7 @@ const JSON_COLS = [
   'settings' => ['value'], 'site_content' => ['value'], 'content_versions' => ['value'],
   'packages' => ['features'],
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
-  'products' => ['bundle'], 'quote_templates' => ['items'], 'bookings' => ['rider', 'customer_notes'], 'rental_contracts' => ['snapshot'],
+  'products' => ['bundle'], 'quote_templates' => ['items'], 'bookings' => ['rider', 'customer_notes', 'event_plan', 'event_plan_internal'], 'rental_contracts' => ['snapshot'],
   'customers' => ['tags', 'tech_check'],
   'equipment' => ['addon_ids', 'images', 'fits_ids'],
 ];
@@ -185,7 +185,7 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -524,6 +524,20 @@ function upgrade(PDO $p): void {
     ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   }
   if ($v < 60) renameEquipmentCategories($p);
+  if ($v < 61) {
+    /* Veranstaltungsplaner: event_plan ist der mit dem Kunden geteilte Teil (Grunddaten,
+       Rechnungsadresse, Musik/Playlist, Ablaufplan, Freitext), event_plan_internal bleibt
+       immer admin-only (Handover-Notizen, Technik-Zuordnung). event_plan_changes ist die
+       Vorschlags-Warteschlange für Änderungen an bereits gesetzten event_plan-Feldern. */
+    foreach ([
+      "alter table bookings add column event_plan text",
+      "alter table bookings add column event_plan_internal text",
+    ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+    try { $p->exec("create table if not exists event_plan_changes (id text primary key,
+      booking_id text not null references bookings(id) on delete cascade,
+      field_path text not null, field_label text, old_value text, new_value text,
+      status text default 'offen', created_at text, reviewed_at text)"); } catch (PDOException $e) {}
+  }
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -991,6 +1005,44 @@ function renameEquipmentCategories(PDO $p): void {
   foreach ($map as $old => $new) $st->execute([$new, $old]);
 }
 
+/* Bei jeder eingehenden Anfrage direkt Kunde + Buchung + Veranstaltungsplaner anlegen, damit
+   Markus sofort im Backoffice weiterarbeiten kann, ohne erst manuell "In CRM übernehmen" zu
+   klicken. Sucht den Kunden per E-Mail (case-insensitive) und legt ihn nur an, wenn noch keiner
+   existiert - dieselbe Zuordnungslogik wie bei portal/account/register, damit eine spätere
+   Registrierung mit derselben Adresse automatisch an denselben Datensatz andockt. Ohne Termin
+   wird keine Buchung angelegt (analog zur bisherigen manuellen inqToCust()-Übernahme). */
+function autoInquiryPlanner(PDO $p, array $row): void {
+  if (empty($row['email'])) return;
+  $email = mb_substr(strtolower(trim((string)$row['email'])), 0, 160);
+  $st = $p->prepare('select id from customers where lower(email) = ? limit 1');
+  $st->execute([$email]);
+  $custId = $st->fetchColumn();
+  if (!$custId) {
+    $parts = preg_split('/\s+/', trim((string)$row['name']), 2);
+    $custId = uuid();
+    $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, phone, source, created_at, updated_at)
+      values (?,?,?,?,?,?,?,?,?,?)')
+      ->execute([$custId, 'privat', 'lead', $parts[0] ?: $row['name'], $parts[1] ?? '', $email,
+        $row['phone'] ?? null, 'Homepage', now(), now()]);
+  }
+  $p->prepare('update inquiries set customer_id = ? where id = ?')->execute([$custId, $row['id']]);
+  if (empty($row['event_date'])) return;
+  $guests = is_numeric($row['guests'] ?? null) ? (int)$row['guests'] : null;
+  $basics = array_filter([
+    'venue_name' => $row['location'] ?? null, 'venue_address' => $row['location'] ?? null,
+    'guest_count' => $guests, 'occasion' => $row['event_type'] ?? null,
+  ], fn($v) => $v !== null && $v !== '');
+  $bookingId = uuid();
+  $kind = ($row['event_type'] ?? '') === 'Technik mieten' ? 'technik' : 'dj';
+  $p->prepare('insert into bookings (id, customer_id, status, kind, event_type, title, event_date,
+      venue_name, venue_address, guests, event_plan, created_at, updated_at)
+    values (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    ->execute([$bookingId, $custId, 'anfrage', $kind, $row['event_type'] ?? null,
+      trim(($row['event_type'] ?: 'Anfrage') . ' ' . $row['name']), $row['event_date'],
+      $row['location'] ?? null, $row['location'] ?? null, $guests,
+      json_encode(['basics' => $basics], JSON_UNESCAPED_UNICODE), now(), now()]);
+}
+
 /* Markus duzt auf der ganzen Seite durchgehend - die Angebots-/Rechnungs-Standardtexte
    und die Firmenfeier-Mailvorlage waren versehentlich noch im Sie-Ton. Ersetzt die
    Texte NUR, wenn sie noch exakt dem alten Sie-Standard entsprechen (eigene Anpassungen
@@ -1095,8 +1147,13 @@ create table bookings (id text primary key,
   status text default 'anfrage', kind text default 'dj', event_type text, title text,
   event_date text not null, end_date text, start_time text, end_time text,
   venue_name text, venue_address text, guests integer, fee_net real, notes text, rider text, customer_notes text,
+  event_plan text, event_plan_internal text,
   billable_days integer, open_ended integer default 0,
   review_requested integer default 0, created_at text, updated_at text);
+create table event_plan_changes (id text primary key,
+  booking_id text not null references bookings(id) on delete cascade,
+  field_path text not null, field_label text, old_value text, new_value text,
+  status text default 'offen', created_at text, reviewed_at text);
 create table booking_equipment (id text primary key,
   booking_id text not null references bookings(id) on delete cascade,
   equipment_id text not null references equipment(id) on delete restrict,
@@ -1536,6 +1593,9 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       $cols = array_keys($row);
       $p->prepare("insert into inquiries (" . implode(',', $cols) . ") values (" .
         implode(',', array_fill(0, count($cols), '?')) . ")")->execute(array_values($row));
+      /* Fehler beim automatischen Anlegen des Veranstaltungsplaners dürfen die Anfrage selbst
+         nie verhindern - das ist ein Service-Extra, kein kritischer Pfad. */
+      try { autoInquiryPlanner($p, $row); } catch (Throwable $e) {}
       notifyOwner('Neue Anfrage: ' . $row['name'] . ($row['event_type'] ?? '' ? ' – ' . $row['event_type'] : ''),
         "Name: {$row['name']}\nE-Mail: " . ($row['email'] ?? '–') . "\nTelefon: " . ($row['phone'] ?? '–') .
         "\nAnlass: " . ($row['event_type'] ?? '–') . "\nDatum: " . ($row['event_date'] ?? '–') .
