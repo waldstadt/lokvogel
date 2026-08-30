@@ -10,11 +10,13 @@ $pages = [
   ['technik.html', '0.9', 'weekly'],
   ['weihnachtsfeier.html', '0.8', 'monthly'],
   ['halloween.html', '0.8', 'monthly'],
-  ['hochzeit.html', '0.8', 'monthly'],
-  ['vereinsfest-technik.html', '0.8', 'monthly'],
-  ['abiball.html', '0.8', 'monthly'],
-  ['firmensommerfest.html', '0.8', 'monthly'],
 ];
+/* Aktionsseiten nur listen, wenn sie im Backoffice eingeschaltet sind */
+try {
+  $db = new PDO('sqlite:' . __DIR__ . '/data/dj.sqlite');
+  foreach ($db->query("select slug from campaign_pages where enabled = 1 order by sort") as $row)
+    $pages[] = [$row['slug'] . '.html', '0.8', 'monthly'];
+} catch (Throwable $e) {}
 echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
 foreach ($pages as [$f, $prio, $freq]) {

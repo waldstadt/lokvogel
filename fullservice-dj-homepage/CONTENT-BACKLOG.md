@@ -214,3 +214,54 @@ Gilt unabhängig davon, ob Markus am Wunschtermin Zeit hat. Konsequenzen im Syst
 - Textbausteine nie wortgleich auf mehreren Seiten wiederholen –
   gleiche Aussage, andere Formulierung.
 - Prüffrage vor Veröffentlichung: Würde Markus das am Telefon so sagen?
+
+## Aktionsseiten-System + Wochentags-Offensive (gebaut 2026-08-30, alle Seiten AUS)
+
+13 Landingpages liegen als Aktionsseiten im Backoffice (komplett editierbar,
+einzeln ein-/ausschaltbar, ausgeschaltet = Weiterleitung zur Startseite und
+nicht in der Sitemap): hochzeit, vereinsfest-technik, abiball,
+firmensommerfest, betriebsversammlung, seminartechnik, messe,
+objektbeleuchtung, instore-dj, produktpraesentation, tagesparty,
+technik-check, workshops. Markus schaltet sie einzeln frei, sobald die
+Texte abgesegnet sind.
+
+### Begriffs-Recherche Corporate (2026-08-30)
+Was Markus "Produktvorstellung" nennt, heißt in der Branche:
+**Produktlaunch / Launch-Event** (Enthüllung), **Brand Activation /
+Markenaktivierung** (Marke erlebbar machen), **Instore-Event / Instore-DJ**
+(DJ im Laden, etablierter Begriff im Fashion-Retail), **POS-Promotion**
+(Aktion am Point of Sale), **Roadshow** (Produkt tourt durch Städte).
+Kundenseitig bewusst "Produktpräsentation" als verständlichster Begriff,
+die Fachbegriffe stehen für Google in Titel/Beschreibung.
+
+### House-Konzept: Wie Markus wieder mehr Deep House/Disco/French House spielt
+Leitidee: House nicht als neues Genre "anbieten", sondern die Termine
+erschließen, zu denen House sowieso am besten passt - und die liegen fast
+alle tagsüber/unter der Woche (= Auslastungsziel):
+1. **Tagesparty-Seite** (privat): Daydrinking/Sundowner/Garten ab 14 Uhr,
+   House als Kernversprechen ("Musik zum Feiern und Unterhalten
+   gleichzeitig"). Preisargument: Tagestermine deutlich günstiger.
+2. **Instore-DJ** (Retail): Modegeschäfte/Kaufhäuser - Markus' echte
+   Erfahrung, House ist dort der Standard-Sound.
+3. **Produktpräsentation/Launch** (Corporate): Empfang "housig, dezent,
+   erwachsen" ist auf der Seite bereits als Versprechen verankert.
+4. **Upsell im Bestandsgeschäft**: "Sektempfang mit House-Set" als Extra
+   bei Hochzeiten/Firmenfeiern anbieten (Markus spielt was er liebt,
+   innerhalb ohnehin gebuchter Gigs). TODO: als Upsell-Extra einpflegen.
+5. **Eigenes Format vor Ort**: Frühschoppen/Sundowner-Reihe in Kooperation
+   mit Gastro (z. B. Lokvogel) - geteilte Tür oder feste Gage, gleichzeitig
+   Bühne + Content für die Tagesparty-Kampagne.
+6. **Content**: kurze Set-Ausschnitte als Reels für Instagram (Achtung:
+   komplette Mixes online sind GEMA-/lizenzrechtlich heikel, kurze
+   Story-Clips vom Event sind unkritischer).
+
+### Weitere Wochentags-/Tagsüber-Ideen (noch keine Seiten, bewusst gesammelt)
+- Tag der offenen Tür / Firmenjubiläum tagsüber (passt zu Objektbeleuchtung)
+- Autohaus-Events (Neuwagen-Präsentation = produktpraesentation-Zielgruppe)
+- Verkaufsoffener Sonntag / Stadtfest-Beschallung (instore-dj erweitern)
+- Hybrid-Tagungen (Seminartechnik + Streaming - erst wenn Technik dafür da)
+- Schulveranstaltungen tagsüber: Einschulung, Abschlussfeiern, Schulfeste
+- Sportturniere/Vereinsturniere (Beschallung + Durchsagen, ganztags)
+- Weihnachtsmarkt-Beschallung (Dauerauftrag November/Dezember)
+- Trauerfeiern (echtes Wochentags-Tagesgeschäft, aber sensibel - nur
+  über Mundpropaganda/Bestatter-Kontakte, keine Kampagnenseite)

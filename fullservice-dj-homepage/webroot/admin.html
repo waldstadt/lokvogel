@@ -240,6 +240,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <a data-pg="partners"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Miet-Partner</a>
       <div class="grp">Website</div>
       <a data-pg="cms"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Inhalte</a>
+      <a data-pg="camp"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>Aktionsseiten</a>
       <a data-pg="media"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Medien-Pool</a>
       <div class="grp">System</div>
       <a data-pg="set"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Einstellungen</a>
@@ -508,6 +509,13 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <div><input type="file" accept="image/*" multiple style="display:none" id="mediaPgUp" onchange="mediaPgUpload(this)">
       <button class="btn" onclick="document.getElementById('mediaPgUp').click()">Bilder hochladen</button></div></div>
     <div id="mediaPgGrid" class="mut sml">Lade Bilder …</div>
+  </div>
+
+  <!-- AKTIONSSEITEN -->
+  <div class="pg" id="pg-camp">
+    <div class="pt">Aktionsseiten</div><div class="ps">Eigene Landingpages für Kampagnen (z. B. Hochzeit, Abiball, Instore-DJ) – komplett editierbar und einzeln ein-/ausschaltbar. Ausgeschaltete Seiten leiten auf die Startseite um und tauchen nicht in der Sitemap auf.</div>
+    <div class="tbl-wrap card"><table><thead><tr><th>Seite</th><th>Adresse</th><th>Status</th><th></th></tr></thead><tbody id="campRows"></tbody></table></div>
+    <div class="mut sml" style="margin-top:10px">Eine neue Aktionsseite braucht zusätzlich eine kleine HTML-Datei auf dem Server – sag dafür kurz Bescheid, die Inhalte pflegst du danach komplett hier.</div>
   </div>
 
   <!-- CMS -->
@@ -958,7 +966,8 @@ function loadAll(){
     api('calendar_blocks?select=*&order=start_date'),
     api('quote_templates?select=*&order=sort'),
     api('event_plan_changes?select=*&order=created_at.desc'),
-    api('rental_contracts?select=*')
+    api('rental_contracts?select=*'),
+    api('campaign_pages?select=*&order=sort')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -970,6 +979,7 @@ function loadAll(){
     CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
     CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];CACHE.blocks=r[23]||[];
     CACHE.quoteTpls=r[24]||[];CACHE.planChanges=r[25]||[];CACHE.rentalContracts=r[26]||[];
+    CACHE.campaigns=r[27]||[];
     applyBrand();
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
@@ -985,7 +995,7 @@ function applyBrand(){
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
   renderEq();renderSetsAdmin();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
-  renderProducts();renderPartners();renderWsAdmin();
+  renderProducts();renderPartners();renderWsAdmin();renderCampaigns();
   initSort();
 }
 /* ===== Workshop-Termine & Anmeldungen ===== */
@@ -4796,6 +4806,108 @@ function setPartnerDiscount(id,val){
     .catch(function(e){toast(e.message,1)});
 }
 function reloadPartners(){api('partners?select=*&order=created_at.desc').then(function(r){CACHE.partners=r||[];renderPartners()})}
+
+/* ===== Aktionsseiten (Kampagnen-Landingpages) ===== */
+var CAMP_ICONS=['mic','music','users','money','shield','chat','sun','home','cloud','gear','zap','light','monitor','cart','calendar','check','doc','search','clock'];
+function renderCampaigns(){
+  var el=document.getElementById('campRows');if(!el)return;
+  el.innerHTML=(CACHE.campaigns||[]).map(function(c){
+    return '<tr><td><b>'+esc(c.h1_line1||c.slug)+'</b><br><span class="mut sml">'+esc(c.page_title||'')+'</span></td>'+
+    '<td><a href="'+esc(c.slug)+'.html" target="_blank">'+esc(c.slug)+'.html'+(Number(c.enabled)?' ↗':'')+'</a>'+
+    (Number(c.enabled)?'':'<br><span class="mut sml">Vorschau nur nach Einschalten</span>')+'</td>'+
+    '<td>'+(Number(c.enabled)?'<span class="b green">online</span>':'<span class="b grey">aus</span>')+'</td>'+
+    '<td style="white-space:nowrap"><button class="btn g sm" onclick="toggleCamp(\''+c.id+'\')">'+(Number(c.enabled)?'Ausschalten':'Einschalten')+'</button> '+
+    '<button class="btn sm" onclick="openCampModal(\''+c.id+'\')">Bearbeiten</button></td></tr>';
+  }).join('')||'<tr><td colspan="4" class="mut">Keine Aktionsseiten angelegt.</td></tr>';
+}
+function toggleCamp(id){
+  var c=(CACHE.campaigns||[]).find(function(x){return x.id===id});if(!c)return;
+  var on=!Number(c.enabled);
+  api('campaign_pages?id=eq.'+id,{method:'PATCH',body:{enabled:on?1:0,updated_at:new Date().toISOString()}})
+    .then(function(){c.enabled=on?1:0;renderCampaigns();
+      toast(on?'Seite ist jetzt online ✓ – auch in der Sitemap gelistet.':'Seite ausgeschaltet – Besucher landen auf der Startseite.')})
+    .catch(function(e){toast(e.message,1)});
+}
+function campCardRow(i,card){
+  card=card||{};
+  return '<div class="card" style="margin:8px 0;padding:12px" data-campcard>'+
+    '<div class="grid3"><div><label>Icon</label><select data-ci>'+CAMP_ICONS.map(function(k){return '<option'+(card.icon===k?' selected':'')+'>'+k+'</option>'}).join('')+'</select></div>'+
+    '<div style="grid-column:span 2"><label>Überschrift der Karte</label><input data-ct value="'+esc(card.title||'')+'"></div></div>'+
+    '<label>Text</label><textarea data-cx rows="4">'+esc(card.text||'')+'</textarea>'+
+    '<a onclick="this.parentNode.remove()" style="color:var(--red);font-size:12px">Karte entfernen</a></div>';
+}
+function campAddCard(){
+  var wrap=document.getElementById('campCards');
+  if(wrap.querySelectorAll('[data-campcard]').length>=4){toast('Mehr als vier Karten werden auf der Seite eng.',1);return}
+  wrap.insertAdjacentHTML('beforeend',campCardRow());
+}
+function openCampModal(id){
+  var c=(CACHE.campaigns||[]).find(function(x){return x.id===id});if(!c)return;
+  window._campId=id;
+  var cfg=c.form_cfg||{};
+  openModal('Aktionsseite bearbeiten – '+c.slug+'.html',
+    '<div class="grid3">'+
+    '<div><label>Akzentfarbe</label><input type="color" id="cpAccent" value="'+esc(c.accent||'#d9a84e')+'" style="height:42px;padding:4px"></div>'+
+    '<div style="grid-column:span 2"><label>Browser-Titel</label><input id="cpTitle" value="'+esc(c.page_title||'')+'"></div></div>'+
+    '<label>Beschreibung für Google (150–160 Zeichen)</label><textarea id="cpMeta" rows="2">'+esc(c.meta_desc||'')+'</textarea>'+
+    '<div class="sec-label" style="margin-top:14px">Kopfbereich</div>'+
+    '<label>Badge (kleine Zeile über der Überschrift, leer = ausblenden)</label><input id="cpBadge" value="'+esc(c.badge||'')+'">'+
+    '<div class="grid3"><div style="grid-column:span 2"><label>Überschrift Zeile 1</label><input id="cpH11" value="'+esc(c.h1_line1||'')+'"></div>'+
+    '<div><label>Zeile 2 (farbig)</label><input id="cpH12" value="'+esc(c.h1_line2||'')+'"></div></div>'+
+    '<label>Einleitungstext</label><textarea id="cpSub" rows="4">'+esc(c.sub||'')+'</textarea>'+
+    '<div class="sec-label" style="margin-top:14px">Karten-Abschnitt</div>'+
+    '<div class="grid3"><div><label>Kicker (kleine Zeile)</label><input id="cpK1" value="'+esc(c.kicker1||'')+'"></div>'+
+    '<div style="grid-column:span 2"><label>Überschrift</label><input id="cpH21" value="'+esc(c.h2_1||'')+'"></div></div>'+
+    '<div id="campCards">'+(c.cards||[]).map(function(card,i){return campCardRow(i,card)}).join('')+'</div>'+
+    '<button class="btn g sm" onclick="campAddCard()">+ Karte</button>'+
+    '<div class="sec-label" style="margin-top:14px">Listen-Abschnitt</div>'+
+    '<div class="grid3"><div><label>Kicker</label><input id="cpK2" value="'+esc(c.kicker2||'')+'"></div>'+
+    '<div style="grid-column:span 2"><label>Überschrift</label><input id="cpH22" value="'+esc(c.h2_2||'')+'"></div></div>'+
+    '<label>Häkchen-Punkte (einer pro Zeile)</label><textarea id="cpFeat" rows="6">'+esc((c.features||[]).join('\n'))+'</textarea>'+
+    '<label>Hinweis unter der Liste (Preis-Klartext; Link-Schreibweise: [Text](seite.html))</label><textarea id="cpNote" rows="3">'+esc(c.pricenote||'')+'</textarea>'+
+    '<div class="sec-label" style="margin-top:14px">Anfrage-Bereich</div>'+
+    '<div class="grid3"><div><label>Kicker</label><input id="cpFK" value="'+esc(c.form_kicker||'')+'"></div>'+
+    '<div style="grid-column:span 2"><label>Überschrift</label><input id="cpFH" value="'+esc(c.form_h2||'')+'"></div></div>'+
+    '<label>Text über dem Formular</label><textarea id="cpFL" rows="3">'+esc(c.form_lead||'')+'</textarea>'+
+    '<div class="grid3">'+
+    '<div><label>Anfrage-Art(en), Komma-getrennt</label><input id="cpTypes" value="'+esc((cfg.event_types||[]).join(', '))+'"></div>'+
+    '<div><label>Firmen-/Vereinsfeld (leer = ohne)</label><input id="cpComp" value="'+esc(cfg.company_label||'')+'"></div>'+
+    '<div><label>WhatsApp-Vorbelegung</label><input id="cpWa" value="'+esc(cfg.wa_text||'')+'"></div></div>'+
+    '<div class="grid3">'+
+    '<div><label style="text-transform:none;letter-spacing:0"><input type="checkbox" id="cpDate" style="width:auto;margin-right:6px"'+(cfg.show_date!==false?' checked':'')+'>Wunschtermin-Feld</label></div>'+
+    '<div><label style="text-transform:none;letter-spacing:0"><input type="checkbox" id="cpGuests" style="width:auto;margin-right:6px"'+(cfg.show_guests?' checked':'')+'>Gäste-/Teilnehmerfeld</label></div>'+
+    '<div></div></div>'+
+    '<div style="margin-top:16px;display:flex;gap:8px">'+
+    '<button class="btn" onclick="saveCamp()">Speichern</button>'+
+    '<a class="btn g" href="'+esc(c.slug)+'.html" target="_blank" style="text-decoration:none">Seite ansehen</a></div>');
+}
+function saveCamp(){
+  var c=(CACHE.campaigns||[]).find(function(x){return x.id===window._campId});if(!c)return;
+  var v=function(id){return document.getElementById(id).value.trim()};
+  var cards=[].map.call(document.querySelectorAll('#campCards [data-campcard]'),function(div){
+    return {icon:div.querySelector('[data-ci]').value,
+      title:div.querySelector('[data-ct]').value.trim(),
+      text:div.querySelector('[data-cx]').value.trim()};
+  }).filter(function(card){return card.title||card.text});
+  var cfg=Object.assign({},c.form_cfg||{});
+  cfg.event_types=v('cpTypes').split(',').map(function(s){return s.trim()}).filter(Boolean);
+  if(!cfg.event_types.length)cfg.event_types=['Sonstiges'];
+  var comp=v('cpComp');
+  if(comp)cfg.company_label=comp;else delete cfg.company_label;
+  cfg.wa_text=v('cpWa');
+  cfg.show_date=document.getElementById('cpDate').checked;
+  cfg.show_guests=document.getElementById('cpGuests').checked;
+  var body={accent:v('cpAccent'),page_title:v('cpTitle'),meta_desc:v('cpMeta'),badge:v('cpBadge'),
+    h1_line1:v('cpH11'),h1_line2:v('cpH12'),sub:v('cpSub'),
+    kicker1:v('cpK1'),h2_1:v('cpH21'),cards:cards,
+    kicker2:v('cpK2'),h2_2:v('cpH22'),
+    features:v('cpFeat').split('\n').map(function(s){return s.trim()}).filter(Boolean),
+    pricenote:v('cpNote'),form_kicker:v('cpFK'),form_h2:v('cpFH'),form_lead:v('cpFL'),
+    form_cfg:cfg,updated_at:new Date().toISOString()};
+  api('campaign_pages?id=eq.'+c.id,{method:'PATCH',body:body}).then(function(){
+    Object.assign(c,body);closeModal();renderCampaigns();toast('Aktionsseite gespeichert ✓');
+  }).catch(function(e){toast(e.message,1)});
+}
 
 /* ===== Bewertungen ===== */
 function renderRevAdmin(){

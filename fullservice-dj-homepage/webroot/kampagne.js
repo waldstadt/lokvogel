@@ -1,0 +1,180 @@
+/* Renderer für alle Aktionsseiten: lädt den Inhalt der Seite (Slug = Dateiname)
+   aus der Datenbank (Tabelle campaign_pages, im Backoffice unter "Aktionsseiten"
+   pflegbar) und baut die komplette Seite auf. Ist die Seite im Backoffice
+   ausgeschaltet oder unbekannt, geht es kommentarlos zur Startseite. */
+(function(){
+var API='api.php';
+var SLUG=(location.pathname.split('/').pop()||'').replace(/\.html$/,'');
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+/* Nur für die Preis-Notiz: erlaubt [Text](seite.html) als internen Link, sonst reiner Text */
+function noteHtml(s){return esc(s).replace(/\[([^\]]+)\]\(([a-z0-9\-]+\.html(?:#[a-z0-9\-]*)?)\)/g,'<a href="$2">$1</a>')}
+function hexRgb(h){h=(h||'#d9a84e').replace('#','');return parseInt(h.slice(0,2),16)+','+parseInt(h.slice(2,4),16)+','+parseInt(h.slice(4,6),16)}
+
+/* Icon-Satz im Linienstil - Schlüssel wählbar im Backoffice-Editor */
+var ICONS={
+  mic:'<path d="M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/>',
+  music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  money:'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  chat:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+  home:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+  cloud:'<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  zap:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  light:'<line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>',
+  monitor:'<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+  cart:'<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
+  calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  check:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+  search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  clock:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'
+};
+function ic(k){return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">'+(ICONS[k]||ICONS.check)+'</svg> '}
+
+var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif",poppins:"'Poppins',sans-serif",montserrat:"'Montserrat',sans-serif",bebas:"'Bebas Neue',cursive",merriweather:"'Merriweather',serif",oswald:"'Oswald',sans-serif",caveat:"'Caveat',cursive",anton:"'Anton',sans-serif"};
+
+function render(pg){
+  var acc=pg.accent||'#d9a84e',rgb=hexRgb(acc);
+  var rs=document.documentElement.style;
+  rs.setProperty('--acc',acc);
+  rs.setProperty('--acc2',pg.accent2||acc);
+  rs.setProperty('--btn-txt',pg.btn_txt||'#1a1408');
+  rs.setProperty('--glow1','rgba('+rgb+',.10)');
+  rs.setProperty('--glow2','rgba('+rgb+',.05)');
+  rs.setProperty('--badge-line','rgba('+rgb+',.45)');
+  rs.setProperty('--badge-bg','rgba('+rgb+',.07)');
+  if(pg.page_title)document.title=pg.page_title;
+  if(pg.meta_desc){
+    var md=document.querySelector('meta[name="description"]');
+    if(md)md.setAttribute('content',pg.meta_desc);
+  }
+  var fav=document.querySelector('link[rel="icon"]');
+  if(fav)fav.href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23"+acc.replace('#','')+"'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E";
+
+  var cfg=pg.form_cfg||{};
+  var cards=(pg.cards||[]).map(function(c){
+    return '<div class="pt"><h3>'+ic(c.icon)+esc(c.title)+'</h3><p>'+esc(c.text)+'</p></div>';
+  }).join('');
+  var feats=(pg.features||[]).map(function(f){return '<li>'+esc(f)+'</li>'}).join('');
+  var types=cfg.event_types||['Sonstiges'];
+  var typeField=types.length>1
+    ?'<div><label for="cpType">'+esc(cfg.type_label||'Was braucht ihr?')+'</label><select id="cpType">'+types.map(function(t){return '<option>'+esc(t)+'</option>'}).join('')+'</select></div>'
+    :'';
+  var homeHref=pg.footer_target==='technik'?'technik.html':'index.html';
+  var homeLabel=pg.footer_target==='technik'?'Zur Technik-Seite':'Zur Hauptseite';
+  var brand=pg.footer_target==='technik'?'DJ Lauschgift Veranstaltungstechnik':'DJ Lauschgift';
+  var wa=cfg.wa_text||'Hallo Markus, ';
+
+  document.getElementById('app').innerHTML=
+  '<nav><div class="nav-in">'+
+    '<a class="logo" href="'+homeHref+'" aria-label="'+esc(brand)+'">'+
+      '<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>'+
+      '<span class="wm">lauschgift<i>.</i></span></a>'+
+    '<a href="#anfrage" class="btn" style="padding:9px 18px;font-size:12px">Anfragen</a>'+
+  '</div></nav>'+
+
+  '<header class="hero"><div class="wrap">'+
+    (pg.badge?'<div class="badge">'+esc(pg.badge)+'</div>':'')+
+    '<h1>'+esc(pg.h1_line1)+'<br><em>'+esc(pg.h1_line2)+'</em></h1>'+
+    '<p class="sub">'+esc(pg.sub)+'</p>'+
+    '<a href="#anfrage" class="btn">'+esc(cfg.cta_label||'Unverbindlich anfragen')+'</a>'+
+  '</div></header>'+
+
+  '<section><div class="wrap">'+
+    '<div class="kicker">'+esc(pg.kicker1)+'</div><h2>'+esc(pg.h2_1)+'</h2>'+
+    '<div class="pts">'+cards+'</div>'+
+  '</div></section>'+
+
+  '<section class="inc"><div class="wrap">'+
+    '<div class="kicker">'+esc(pg.kicker2)+'</div><h2>'+esc(pg.h2_2)+'</h2>'+
+    '<ul>'+feats+'</ul>'+
+    (pg.pricenote?'<p class="pricenote">'+noteHtml(pg.pricenote)+'</p>':'')+
+  '</div></section>'+
+
+  '<section id="anfrage"><div class="wrap">'+
+    '<div class="kicker">'+esc(pg.form_kicker||'Jetzt anfragen')+'</div>'+
+    '<h2>'+esc(pg.form_h2||'Wann ist es so weit?')+'</h2>'+
+    '<p class="lead">'+esc(pg.form_lead||'')+'</p>'+
+    (function(){
+      /* Felder je nach Seiten-Konfiguration einsammeln und paarweise in Zeilen legen */
+      var fields=[
+        '<div><label for="cpName">'+esc(cfg.name_label||'Name *')+'</label><input type="text" id="cpName" required></div>'
+      ];
+      if(cfg.company_label)fields.push('<div><label for="cpCompany">'+esc(cfg.company_label)+'</label><input type="text" id="cpCompany"></div>');
+      fields.push('<div><label for="cpEmail">E-Mail *</label><input type="email" id="cpEmail" required></div>');
+      fields.push('<div><label for="cpPhone">Telefon</label><input type="tel" id="cpPhone"></div>');
+      if(cfg.show_date!==false)fields.push('<div><label for="cpDate">Wunschtermin</label><input type="date" id="cpDate"></div>');
+      if(typeField)fields.push(typeField);
+      if(cfg.show_guests)fields.push('<div><label for="cpGuests">'+esc(cfg.guests_label||'Gäste (ca.)')+'</label><input type="number" id="cpGuests" min="1" placeholder="'+esc(cfg.guests_ph||'z. B. 80')+'"></div>');
+      var rows='';
+      for(var i=0;i<fields.length;i+=2)rows+='<div class="row">'+fields[i]+(fields[i+1]||'')+'</div>';
+      return '<form id="inqForm"><div class="form-msg" id="formMsg"></div>'+rows;
+    })()+
+      '<label for="cpLocation">'+esc(cfg.location_label||'Ort / Location')+'</label>'+
+      '<input type="text" id="cpLocation" placeholder="'+esc(cfg.location_ph||'')+'">'+
+      '<label for="cpMsg">'+esc(cfg.msg_label||'Worum geht es?')+'</label>'+
+      '<textarea id="cpMsg" placeholder="'+esc(cfg.msg_ph||'')+'"></textarea>'+
+      '<button class="btn" type="submit" id="sendBtn">Anfrage senden</button>'+
+    '</form>'+
+    '<div style="margin-top:18px;font-size:13px;color:var(--mut2)">Lieber direkt schreiben? '+
+      '<a href="https://wa.me/4915236439373?text='+encodeURIComponent(wa)+'" target="_blank" rel="noopener">'+ic('chat')+'WhatsApp</a>'+
+      ' &nbsp;·&nbsp; <a href="tel:+4915236439373">01523 6439373</a></div>'+
+  '</div></section>'+
+
+  '<footer><div class="wrap">'+
+    '<div>'+esc(brand)+' · Markus Jankowski · Hemer</div>'+
+    '<div><a href="index.html?legal=impressum">Impressum</a> &nbsp;·&nbsp; <a href="index.html?legal=datenschutz">Datenschutz</a> &nbsp;·&nbsp; <a href="'+homeHref+'">'+esc(homeLabel)+'</a></div>'+
+  '</div></footer>';
+
+  document.getElementById('inqForm').addEventListener('submit',function(ev){
+    ev.preventDefault();
+    var v=function(id){var el=document.getElementById(id);return el?el.value.trim():''};
+    var msg=document.getElementById('formMsg'),btn=document.getElementById('sendBtn');
+    var extra=[];
+    if(cfg.company_label&&v('cpCompany'))extra.push(cfg.company_label.replace(/\s*\*.*$/,'')+': '+v('cpCompany'));
+    var data={
+      name:v('cpName'),email:v('cpEmail'),phone:v('cpPhone'),
+      event_type:types.length>1?v('cpType'):types[0],
+      event_date:v('cpDate')||null,guests:v('cpGuests')||null,
+      location:v('cpLocation'),
+      message:(extra.length?extra.join('\n')+'\n':'')+v('cpMsg')
+    };
+    if(!data.name||!data.email){msg.className='form-msg err';msg.textContent='Bitte Name und E-Mail angeben.';return}
+    btn.disabled=true;btn.textContent='Wird gesendet …';
+    fetch(API+'/rest/inquiries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+    .then(function(r){
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      msg.className='form-msg ok';
+      msg.textContent=cfg.success_text||'Danke! Eure Anfrage ist angekommen – ich melde mich innerhalb von 24 Stunden mit einer ehrlichen Antwort.';
+      document.getElementById('inqForm').reset();
+    }).catch(function(){
+      msg.className='form-msg err';
+      msg.textContent='Senden fehlgeschlagen – bitte versucht es später erneut oder ruft direkt an: 01523 6439373.';
+    }).finally(function(){btn.disabled=false;btn.textContent='Anfrage senden'});
+  });
+}
+
+/* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */
+try{var _tp=JSON.stringify({p:SLUG+'.html',r:document.referrer||''});
+navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
+
+Promise.all([
+  fetch(API+'/rest/campaign_pages?slug=eq.'+encodeURIComponent(SLUG)).then(function(r){return r.json()}),
+  fetch(API+'/rest/site_content?select=key,value').then(function(r){return r.json()}).catch(function(){return[]})
+]).then(function(res){
+  var rows=res[0]||[],pg=rows[0];
+  if(!pg||!Number(pg.enabled)){location.replace('index.html');return}
+  (res[1]||[]).forEach(function(row){
+    if(row.key==='theme'&&row.value&&FONT_HEADS[row.value.font]&&row.value.font!=='grotesk'){
+      var s=document.createElement('style');
+      s.textContent='h1,h2,h3,h4,.kicker,.btn,.logo .wm{font-family:'+FONT_HEADS[row.value.font]+' !important}';
+      document.head.appendChild(s);
+    }
+  });
+  render(pg);
+}).catch(function(){location.replace('index.html')});
+})();

@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 63;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 64;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -169,6 +169,7 @@ const JSON_COLS = [
   'products' => ['bundle'], 'quote_templates' => ['items'], 'bookings' => ['rider', 'customer_notes', 'event_plan', 'event_plan_internal'], 'rental_contracts' => ['snapshot'],
   'customers' => ['tags', 'tech_check'],
   'equipment' => ['addon_ids', 'images', 'fits_ids'],
+  'campaign_pages' => ['cards', 'features', 'form_cfg'],
 ];
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'],
@@ -185,11 +186,11 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates','event_plan_changes'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
-const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items'];
+const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items','campaign_pages'];
 const INQUIRY_FIELDS = ['name','email','phone','event_type','event_date','location','guests','message'];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -541,6 +542,12 @@ function upgrade(PDO $p): void {
   if ($v < 62) legalComplianceUpdate($p);
   if ($v < 63) {
     try { $p->exec("alter table rental_contracts add column deposit_amount real"); } catch (PDOException $e) {}
+  }
+  if ($v < 64) {
+    /* Aktionsseiten: Inhalte der Kampagnen-Minipages in die DB, damit Markus sie
+       im Backoffice komplett bearbeiten und einzeln ein-/ausschalten kann. */
+    try { $p->exec(campaignPagesDdl()); } catch (PDOException $e) {}
+    try { seedCampaignPages($p); } catch (PDOException $e) {}
   }
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
@@ -1180,6 +1187,487 @@ function rentalContractDefault(): string {
   return "§ 1 Mietgegenstand und Mietzeit\nVermietet werden die im Vertrag aufgeführten Geräte für den genannten Zeitraum. Ein Miettag entspricht 24 Stunden ab Übergabe; jeder weitere Tag wird mit 50 % des Tagespreises berechnet. Übergabe und Rückgabe erfolgen, sofern nicht anders vereinbart, am Lager des Vermieters in Hemer.\n\n§ 2 Zustand, Einweisung und Nutzung\nDie Geräte werden in geprüftem, funktionsfähigem Zustand übergeben; der Mieter erhält eine kurze Einweisung. Die Nutzung erfolgt sachgemäß und nur durch den Mieter bzw. von ihm beauftragte, eingewiesene Personen.\n\n§ 3 Haftung des Mieters\nDer Mieter haftet ab Übergabe bis zur Rückgabe für Verlust, Diebstahl und Beschädigung der Mietsachen in Höhe des Wiederbeschaffungswerts bzw. der Reparaturkosten. Mängel und Schäden sind unverzüglich zu melden.\n\n§ 4 Rückgabe\nDie Rückgabe erfolgt vollständig, gereinigt und ordnungsgemäß verpackt zum vereinbarten Zeitpunkt. Bei verspäteter Rückgabe wird je angefangenem Tag der Folgetagespreis berechnet.\n\n§ 5 Kaution\nEine vereinbarte Kaution wird bei vollständiger, unbeschädigter Rückgabe erstattet.\n\n§ 6 Schlussbestimmungen\nEs gelten ergänzend die AGB des Vermieters. Es gilt deutsches Recht.";
 }
 
+/* ---------- Aktionsseiten (Kampagnen-Minipages) ----------
+   Jede Zeile ist eine komplette Landingpage (hochzeit.html, abiball.html, ...),
+   deren Inhalt kampagne.js aus dieser Tabelle lädt. Im Backoffice unter
+   "Aktionsseiten" komplett editierbar und einzeln ein-/ausschaltbar.
+   Alle Seiten starten AUSGESCHALTET - Markus schaltet sie bewusst frei. */
+function campaignPagesDdl(): string {
+  return "create table if not exists campaign_pages (id text primary key,
+    slug text unique not null, enabled integer default 0, sort integer default 0,
+    accent text, accent2 text, btn_txt text,
+    page_title text, meta_desc text, badge text,
+    h1_line1 text, h1_line2 text, sub text,
+    kicker1 text, h2_1 text, cards text default '[]',
+    kicker2 text, h2_2 text, features text default '[]', pricenote text,
+    form_kicker text, form_h2 text, form_lead text, form_cfg text default '{}',
+    footer_target text default 'index', created_at text, updated_at text)";
+}
+
+/* Nur einfügen, was noch fehlt (Slug-Abgleich) - Markus' Änderungen an
+   bestehenden Seiten werden bei Migrationen nie überschrieben. */
+function seedCampaignPages(PDO $p): void {
+  $ins = $p->prepare('insert into campaign_pages (id, slug, enabled, sort, accent, accent2, btn_txt,
+      page_title, meta_desc, badge, h1_line1, h1_line2, sub,
+      kicker1, h2_1, cards, kicker2, h2_2, features, pricenote,
+      form_kicker, form_h2, form_lead, form_cfg, footer_target, created_at, updated_at)
+    values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+  $has = $p->prepare('select count(*) from campaign_pages where slug = ?');
+  foreach (campaignPageRows() as $r) {
+    $has->execute([$r['slug']]);
+    if ((int)$has->fetchColumn()) continue;
+    $ins->execute([uuid(), $r['slug'], 0, $r['sort'], $r['accent'], $r['accent2'], $r['btn_txt'],
+      $r['page_title'], $r['meta_desc'], $r['badge'], $r['h1_line1'], $r['h1_line2'], $r['sub'],
+      $r['kicker1'], $r['h2_1'], json_encode($r['cards'], JSON_UNESCAPED_UNICODE),
+      $r['kicker2'], $r['h2_2'], json_encode($r['features'], JSON_UNESCAPED_UNICODE), $r['pricenote'],
+      $r['form_kicker'], $r['form_h2'], $r['form_lead'],
+      json_encode($r['form_cfg'], JSON_UNESCAPED_UNICODE), $r['footer_target'], now(), now()]);
+  }
+}
+
+function campaignPageRows(): array {
+  return [
+
+  ['slug' => 'hochzeit', 'sort' => 10, 'accent' => '#d9a84e', 'accent2' => '#e8c078', 'btn_txt' => '#2b1d08',
+   'page_title' => 'DJ für eure Hochzeit | DJ Lauschgift, Hemer',
+   'meta_desc' => 'Hochzeits-DJ aus Hemer: Ich bin Markus, seit 23 Jahren DJ. Wir lernen uns vorher kennen, eure Musikwünsche zählen, und am Abend lese ich den Raum statt eine Standard-Playlist abzuspielen. Jetzt unverbindlich anfragen.',
+   'badge' => 'Beliebte Samstage sind bei mir oft ein Jahr vorher weg – fragt lieber früh',
+   'h1_line1' => 'Ihr heiratet.', 'h1_line2' => 'Ich sorge dafür, dass getanzt wird.',
+   'sub' => 'Ich bin Markus, seit 23 Jahren DJ. Hochzeiten sind für mich immer noch das Schönste an diesem Beruf – und gleichzeitig der Tag, an dem nichts schiefgehen darf. Deshalb reden wir vorher in Ruhe, und am Abend kümmere ich mich um Musik, Ton und Licht, während ihr einfach feiert.',
+   'kicker1' => 'So arbeite ich', 'h2_1' => 'Drei Dinge, auf die ihr euch verlassen könnt',
+   'cards' => [
+     ['icon' => 'chat', 'title' => 'Wir lernen uns vorher kennen',
+      'text' => 'Bevor ihr euch festlegt, telefonieren wir oder treffen uns. Ich will wissen, wie ihr feiern wollt, welche Musik euch etwas bedeutet – und was auf gar keinen Fall laufen darf. Danach wisst ihr, ob es zwischen uns passt. Erst dann gibt es ein Angebot.'],
+     ['icon' => 'music', 'title' => 'Ich lese den Raum',
+      'text' => 'Auf einer Hochzeit sitzen drei Generationen an einem Tisch, und alle sollen einen schönen Abend haben. Ich ziehe kein Programm durch, sondern schaue, was gerade passiert: beim Essen dezent, später die Klassiker, und wenn die Tanzfläche läuft, bleibe ich dran. Wünsche eurer Gäste nehme ich den ganzen Abend an.'],
+     ['icon' => 'shield', 'title' => 'Es gibt immer einen Plan B',
+      'text' => 'Die wichtige Technik habe ich doppelt dabei. Und sollte ich selbst mal ausfallen, lasse ich euch nicht hängen: Dann schlage ich euch persönlich Kollegen aus meinem Netzwerk vor, die ich kenne und denen ich eure Feier anvertrauen würde. Das steht übrigens auch so in meinen AGB, nicht nur hier.'],
+   ],
+   'kicker2' => 'Leistungen', 'h2_2' => 'Das ist mit dabei',
+   'features' => [
+     'Kennenlerngespräch, bevor ihr euch entscheidet',
+     'Musikwünsche und No-Gos sammelt ihr bequem online – kein Zettelchaos',
+     'Ton für die freie Trauung, Funkmikrofon für Reden und Spiele',
+     'Profi-Tonanlage und dezentes Licht, passend zur Location',
+     'Aufbau und Soundcheck, bevor der erste Gast da ist',
+     'Ich bleibe den ganzen Abend ansprechbar – für euch und eure Gäste',
+   ],
+   'pricenote' => 'Was kostet das? Ehrliche Antwort: Es hängt von Dauer, Technik und Termin ab. Nach dem Kennenlerngespräch bekommt ihr einen Festpreis, in dem jeder Posten einzeln draufsteht – und der gilt dann auch.',
+   'form_kicker' => 'Termin sichern', 'form_h2' => 'Wann ist euer großer Tag?',
+   'form_lead' => 'Schreibt mir kurz, was ihr plant – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort. Auch wenn der Termin bei mir schon vergeben ist: Dann sage ich euch das direkt und helfe euch trotzdem weiter.',
+   'form_cfg' => ['event_types' => ['Hochzeit'], 'name_label' => 'Namen (Brautpaar) *', 'show_guests' => true,
+     'location_label' => 'Location / Ort', 'location_ph' => 'z. B. Schloss, Scheune, Hemer …',
+     'msg_label' => 'Erzählt kurz von eurer Feier', 'msg_ph' => 'z. B. freie Trauung vor Ort, Dinner, danach Party bis 2 Uhr, Musikrichtung …',
+     'wa_text' => 'Hallo Markus, es geht um unsere Hochzeit: '],
+   'footer_target' => 'index'],
+
+  ['slug' => 'vereinsfest-technik', 'sort' => 20, 'accent' => '#3cc8b4', 'accent2' => '#5fdcc9', 'btn_txt' => '#0a2420',
+   'page_title' => 'Tontechnik für Vereinsfeste | Lauschgift Veranstaltungstechnik, Hemer',
+   'meta_desc' => 'Tontechnik fürs Vereinsfest aus Hemer: mieten und selbst bedienen (mit ordentlicher Einweisung) oder mit Techniker – Reden versteht man bis in die letzte Reihe. Faire Preise für Vereine, unter der Woche günstiger.',
+   'badge' => 'Für Vereine, Schulen und alle, die im Saal oder Festzelt feiern',
+   'h1_line1' => 'Vereinsfest geplant?', 'h1_line2' => 'Um den Ton kümmere ich mich.',
+   'sub' => 'Ich bin Markus von Lauschgift Veranstaltungstechnik in Hemer. Ob Jubiläum, Sommerfest oder Karnevalssitzung: Ihr bekommt Technik, die einfach funktioniert – zum Selbstbedienen mit ordentlicher Einweisung, oder ich stehe selbst am Pult und ihr habt den Kopf frei für euer Fest.',
+   'kicker1' => 'Zwei Wege', 'h2_1' => 'Mieten und selbst machen – oder machen lassen',
+   'cards' => [
+     ['icon' => 'gear', 'title' => 'Ihr macht es selbst',
+      'text' => 'Ihr mietet eine kompakte Anlage, ich baue sie auf oder ihr holt sie ab – und dann zeige ich der Person, die den Abend macht, in Ruhe die paar Handgriffe, die sie braucht. Wenige Regler, klar beschriftet. Und falls am Festabend doch eine Frage aufkommt: Ihr habt meine Handynummer.'],
+     ['icon' => 'mic', 'title' => 'Ich mache es für euch',
+      'text' => 'Bei vollem Programm mit Reden, Ehrungen und Musik komme ich einfach mit. Dann kümmert sich niemand aus dem Verein um die Technik, und ich sorge dafür, dass man den Vorsitzenden auch in der letzten Reihe versteht – ohne Pfeifen, ohne Brummen. Reden, die ankommen, sind mein Spezialgebiet.'],
+     ['icon' => 'money', 'title' => 'Preise, die zur Vereinskasse passen',
+      'text' => 'Ich weiß, wie Vereinskassen aussehen – ich komme selbst aus der Ecke. Feste unter der Woche oder tagsüber kalkuliere ich spürbar günstiger, und im Angebot steht jeder Posten einzeln drin. Was da steht, gilt.'],
+   ],
+   'kicker2' => 'Im Detail', 'h2_2' => 'Womit ihr rechnen könnt',
+   'features' => [
+     'Tonanlage passend zur Größe von Saal oder Zelt',
+     'Funkmikrofone für Reden, Ehrungen und Tombola',
+     'Licht dazu, wenn abends getanzt werden soll',
+     'Einweisung, bei der wirklich jeder mitkommt',
+     'Auf- und Abbau nach Absprache, gern auch unter der Woche',
+     'Mietvertrag digital, ohne Papierkram – alle Konditionen stehen drin',
+   ],
+   'pricenote' => 'Ihr bekommt ein klares Angebot, bevor ihr euch entscheidet. Und falls die fest eingebaute Anlage in eurem Vereinsheim sowieso schon länger Ärger macht: Das ist ein Thema für sich – schaut dafür mal auf meiner [Technik-Seite](technik.html) vorbei.',
+   'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Was braucht euer Fest?',
+   'form_lead' => 'Schreibt mir kurz, was ihr vorhabt – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort mit Verfügbarkeit und Preisrahmen. Kostet nichts und verpflichtet zu nichts.',
+   'form_cfg' => ['event_types' => ['Technik mieten', 'Techniker inkl. Technik buchen', 'Beratung / Sonstiges'],
+     'type_label' => 'Was braucht ihr?', 'company_label' => 'Verein / Organisation',
+     'location_label' => 'Ort / Vereinsheim', 'location_ph' => 'z. B. Vereinsheim in Hemer, Turnhalle …',
+     'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. Jubiläumsfeier, ca. 80 Gäste, Reden und danach Musik …',
+     'wa_text' => 'Hallo Markus, es geht um unser Vereinsfest: '],
+   'footer_target' => 'technik'],
+
+  ['slug' => 'abiball', 'sort' => 30, 'accent' => '#8b93ff', 'accent2' => '#a8afff', 'btn_txt' => '#1a1730',
+   'page_title' => 'DJ & Technik für den Abiball | DJ Lauschgift, Hemer',
+   'meta_desc' => 'Abiball-DJ aus Hemer: Die ganze Stufe trägt Musikwünsche online ein, ich baue daraus den Abend. Ordentlicher Ton fürs Programm, danach volle Tanzfläche – zu einem Festpreis, den die Abikasse trägt.',
+   'badge' => 'Die Frühjahrs-Termine werden meist schon im Herbst vergeben',
+   'h1_line1' => 'Einen Abiball feiert ihr genau einmal.', 'h1_line2' => 'Die Musik muss sitzen.',
+   'sub' => 'Ich bin Markus, seit 23 Jahren DJ – ich habe Abibälle gespielt, da wart ihr noch nicht auf der Welt. Was ihr von mir bekommt: einen Abend, an dem eure Stufe und die Eltern gemeinsam auf der Tanzfläche stehen, sauberen Ton fürs Programm und einen Preis, den die Abikasse trägt.',
+   'kicker1' => 'So läuft\'s', 'h2_1' => 'So wird das was mit eurem Abend',
+   'cards' => [
+     ['icon' => 'users', 'title' => 'Eure Stufe entscheidet mit',
+      'text' => 'Ihr bekommt von mir einen Link, den ihr einfach in eure Stufengruppe werft: Jeder trägt ein, was laufen soll und was bitte nicht. Daraus baue ich den Abend. So bestimmt nicht der Geschmack von zwei Leuten aus dem Orga-Team, sondern von allen, die da feiern.'],
+     ['icon' => 'mic', 'title' => 'Euer Programm läuft rund',
+      'text' => 'Reden, Ehrungen, Auftritte, die Abizeitung: Ich stelle die Mikros, gebe die Einsätze und halte das Tempo hoch, damit es zwischen den Programmpunkten nicht zäh wird. Und wenn der offizielle Teil durch ist, wird durchgetanzt – auch die Lehrer, versprochen.'],
+     ['icon' => 'money', 'title' => 'Ihr müsst euch fürs Geld rechtfertigen',
+      'text' => 'Das Geld kommt aus der Abikasse, und ihr müsst vor der Stufe gerade dafür stehen. Deshalb gibt es von mir einen Festpreis mit allen Posten einzeln aufgeschlüsselt – den könnt ihr so ins Orga-Protokoll kopieren. Hinterher kommt nichts obendrauf.'],
+   ],
+   'kicker2' => 'Leistungen', 'h2_2' => 'Alles drin für euren Abend',
+   'features' => [
+     'Online-Umfrage für die Musikwünsche der ganzen Stufe',
+     'DJ von der Begrüßung bis zum letzten Song',
+     'Tonanlage und Licht passend zu Aula, Stadthalle oder Festsaal',
+     'Funkmikros für Reden, Ehrungen und Auftritte',
+     'Ein Ansprechpartner für Orga-Team und Elternbeirat',
+     'Aufbau vor dem Einlass, Abbau nach dem letzten Gast',
+   ],
+   'pricenote' => 'Sagt mir Termin, Location und ungefähre Gästezahl – dann bekommt ihr ein Festpreis-Angebot, mit dem ihr in die Orga-Sitzung gehen könnt.',
+   'form_kicker' => 'Termin sichern', 'form_h2' => 'Wann ist euer Abiball?',
+   'form_lead' => 'Kurz eintragen – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort mit Verfügbarkeit und Preisrahmen. Kostet nichts, verpflichtet zu nichts.',
+   'form_cfg' => ['event_types' => ['Abiball'], 'name_label' => 'Name (Ansprechpartner) *',
+     'company_label' => 'Schule / Jahrgangsstufe', 'show_guests' => true, 'guests_ph' => 'z. B. 150',
+     'location_label' => 'Location', 'location_ph' => 'z. B. Aula, Stadthalle, Festsaal …',
+     'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. Einlass, Programm mit Reden, danach Party bis 1 Uhr, Musikrichtung …',
+     'wa_text' => 'Hallo Markus, es geht um unseren Abiball: '],
+   'footer_target' => 'index'],
+
+  ['slug' => 'firmensommerfest', 'sort' => 40, 'accent' => '#e0c93a', 'accent2' => '#ecdb6c', 'btn_txt' => '#2b2506',
+   'page_title' => 'DJ & Technik fürs Firmen-Sommerfest | DJ Lauschgift, Hemer',
+   'meta_desc' => 'DJ und Technik fürs Firmen-Sommerfest: Ich bin Markus aus Hemer – DJ und Veranstaltungstechniker. Musik vom Grillnachmittag bis zur Party am Abend, Strom und Wetter vorher geklärt. Termine unter der Woche kalkuliere ich günstiger.',
+   'badge' => 'Termine unter der Woche kalkuliere ich spürbar günstiger als den Samstag',
+   'h1_line1' => 'Sommerfest draußen?', 'h1_line2' => 'Ich bringe den Sound mit.',
+   'sub' => 'Ich bin Markus – DJ und Veranstaltungstechniker aus Hemer. Fürs Sommerfest heißt das: Die Technik verträgt auch mal einen Schauer, der Strom ist vorher geklärt, nachmittags läuft entspannte Musik zum Grillen, und abends wird gefeiert. Ob Betriebsgelände, Garten oder gemietete Wiese.',
+   'kicker1' => 'Draußen feiern', 'h2_1' => 'Worauf es bei einem Fest im Freien ankommt',
+   'cards' => [
+     ['icon' => 'cloud', 'title' => 'Draußen ist nicht drinnen',
+      'text' => 'Auf der Wiese gibt es keine Steckdose alle fünf Meter, und das Wetter fragt nicht nach eurem Termin. Deshalb kläre ich Stromversorgung und Stellplatz vorher mit euch – am Telefon oder direkt vor Ort. Dann steht die Anlage sicher und trocken, auch wenn ein Schauer durchzieht.'],
+     ['icon' => 'music', 'title' => 'Der Nachmittag gehört dem Grill',
+      'text' => 'Um 15 Uhr will niemand Partybeschallung. Ich fange leise an, die Ansprache der Geschäftsführung versteht jeder bis zum letzten Stehtisch, und wenn es dämmert, ziehe ich langsam an – bis von ganz allein getanzt wird. Das funktioniert besser, als um 20 Uhr das Licht auszuknipsen und auf Party zu schalten.'],
+     ['icon' => 'home', 'title' => 'Die Nachbarn feiern nicht mit',
+      'text' => 'Open Air hört eben nicht am Zaun auf. Lautstärke und Ruhezeiten sprechen wir vorher ab, und ich richte die Anlage so aus, dass die Stimmung bei euch bleibt statt beim Nachbarn im Schlafzimmer. So gibt es am Montag keine unangenehmen Anrufe.'],
+   ],
+   'kicker2' => 'Leistungen', 'h2_2' => 'Damit könnt ihr planen',
+   'features' => [
+     'Wetterfeste Ton- und Lichttechnik fürs Gelände',
+     'Musik vom lockeren Grillnachmittag bis zur Party am Abend',
+     'Funkmikrofon für Ansprache und Ehrungen',
+     'Strom- und Stellplatz-Planung vorab',
+     'Absprache zu Lautstärke und Ruhezeiten',
+     'Auf- und Abbau passend zu eurem Ablauf',
+   ],
+   'pricenote' => 'Sommerfeste liegen oft auf einem Donnerstag oder Freitagnachmittag – genau die Termine, die ich günstiger anbieten kann als einen Samstagabend in der Hochsaison. Nennt mir euren Wunschtermin, ich rechne es ehrlich durch.',
+   'form_kicker' => 'Termin sichern', 'form_h2' => 'Wann feiert ihr?',
+   'form_lead' => 'Schreibt mir kurz, was ihr plant – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort mit Verfügbarkeit und Preisrahmen. Unverbindlich, versteht sich.',
+   'form_cfg' => ['event_types' => ['Firmenfeier'], 'company_label' => 'Firma', 'show_guests' => true, 'guests_ph' => 'z. B. 100',
+     'location_label' => 'Ort / Location', 'location_ph' => 'z. B. Betriebsgelände, Garten, Vereinsplatz …',
+     'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. Grillen ab 15 Uhr, Ansprache der Geschäftsführung, danach Party im Freien …',
+     'wa_text' => 'Hallo Markus, es geht um unser Firmen-Sommerfest: '],
+   'footer_target' => 'index'],
+
+  ['slug' => 'betriebsversammlung', 'sort' => 50, 'accent' => '#7fb4e6', 'accent2' => '#a3cbf0', 'btn_txt' => '#0d1a26',
+   'page_title' => 'Ton für Betriebsversammlungen | Lauschgift Veranstaltungstechnik, Hemer',
+   'meta_desc' => 'Beschallung für Betriebs- und Mitarbeiterversammlungen: verständliche Sprache statt Hallensound, Saalmikrofon für Wortmeldungen, Auf- und Abbau im Takt eures Betriebs. Aus Hemer, unter der Woche mein Alltag.',
+   'badge' => 'Unter der Woche, tagsüber, zwischen zwei Schichten – genau mein Terrain',
+   'h1_line1' => 'Ihr habt eurer Belegschaft etwas zu sagen.', 'h1_line2' => 'Dann muss es auch ankommen.',
+   'sub' => 'Ich bin Markus von Lauschgift Veranstaltungstechnik in Hemer. Betriebsversammlungen finden in Werkhallen, Kantinen und Lagern statt – Räume, die nie für Sprache gebaut wurden. Ich sorge dafür, dass eure Botschaft trotzdem bis in die letzte Reihe kommt. Und der Aufbau richtet sich nach eurem Betrieb, nicht umgekehrt.',
+   'kicker1' => 'Worauf es ankommt', 'h2_1' => 'Eine Versammlung ist kein Konzert',
+   'cards' => [
+     ['icon' => 'mic', 'title' => 'Verstehen statt beschallen',
+      'text' => 'Bei einer Betriebsversammlung geht es oft um Dinge, die die Leute persönlich betreffen: Zahlen, Veränderungen, Zukunft. Da darf nichts an einer scheppernden Anlage hängen bleiben. Ich stelle den Ton ganz auf Sprache ein – klar und unaufgeregt, ohne Hall-Soße.'],
+     ['icon' => 'users', 'title' => 'Auch die leisen Fragen zählen',
+      'text' => 'Die wichtigste Wortmeldung kommt selten vom Podium, sondern aus Reihe zwölf. Mit einem zweiten Funkmikro, das durch die Reihen geht, wird aus Zuhörern ein Gespräch – und niemand muss gegen die Halle anbrüllen, um eine Frage zu stellen.'],
+     ['icon' => 'clock', 'title' => 'Rein, raus, fertig',
+      'text' => 'Eure Halle ist zum Arbeiten da. Ich baue auf, bevor die Versammlung beginnt, und bin wieder draußen, bevor die nächste Schicht loslegt. Wenn es knapp ist, steht die Anlage in einer Stunde.'],
+   ],
+   'kicker2' => 'Leistungen', 'h2_2' => 'Damit könnt ihr rechnen',
+   'features' => [
+     'Beschallung passend zu Halle, Kantine oder Lager',
+     'Funkmikrofon fürs Podium, zweites Mikro für Wortmeldungen',
+     'Headset oder Rednerpult-Mikro nach Wunsch',
+     'Laptop-Anschluss für Präsentationston',
+     'Auf- und Abbau im Zeitfenster eures Betriebs',
+     'Auf Wunsch bleibe ich da und fahre den Ton',
+   ],
+   'pricenote' => 'Termine unter der Woche und tagsüber sind mein Alltag, kein Zuschlag-Fall – genau solche Einsätze sind bei mir günstiger als jede Samstagnacht. Ihr bekommt vorher einen Festpreis.',
+   'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist eure Versammlung?',
+   'form_lead' => 'Schreibt mir Termin, Ort und ungefähre Teilnehmerzahl – ihr bekommt innerhalb von 24 Stunden eine klare Antwort mit Festpreis. Auch kurzfristig lohnt sich das Fragen.',
+   'form_cfg' => ['event_types' => ['Betriebsversammlung'], 'company_label' => 'Firma',
+     'show_guests' => true, 'guests_label' => 'Teilnehmer (ca.)', 'guests_ph' => 'z. B. 120',
+     'location_label' => 'Ort / Halle', 'location_ph' => 'z. B. Werkhalle in Hemer, Kantine …',
+     'msg_label' => 'Worum geht es?', 'msg_ph' => 'z. B. Versammlung 90 Minuten, zwei Redner, Fragen aus der Belegschaft, Beamerton …',
+     'wa_text' => 'Hallo Markus, es geht um unsere Betriebsversammlung: '],
+   'footer_target' => 'technik'],
+
+  ['slug' => 'seminartechnik', 'sort' => 60, 'accent' => '#7ecb8f', 'accent2' => '#a1dbae', 'btn_txt' => '#0c2012',
+   'page_title' => 'Tontechnik für Seminare & Fortbildungen | Lauschgift Veranstaltungstechnik',
+   'meta_desc' => 'Ton für Seminare, Fortbildungen und Tagungen: Headset für die Stimme, Saalmikro für Fragen, Laptop-Ton fürs Video – dezent aufgebaut und zuverlässig. Aus Hemer, stundenweise betreut oder mit Einweisung.',
+   'badge' => 'Für Trainer, Personaler und alle, die einen Raum voller Menschen erreichen wollen',
+   'h1_line1' => 'Sechs Stunden reden ist anstrengend genug.', 'h1_line2' => 'Gegen den Raum anreden muss keiner.',
+   'sub' => 'Ich bin Markus – Veranstaltungstechniker aus Hemer. Seminare und Fortbildungen leben von der Stimme der Person da vorne. Ich sorge mit dezenter Technik dafür, dass diese Stimme den ganzen Tag trägt: im Tagungsraum vom Hotel, im Schulungsraum der Firma oder in der angemieteten Halle.',
+   'kicker1' => 'Worauf es ankommt', 'h2_1' => 'Kleine Technik, großer Unterschied',
+   'cards' => [
+     ['icon' => 'mic', 'title' => 'Die Stimme hält bis zum Schluss',
+      'text' => 'Wer einen ganzen Tag ohne Mikrofon gegen einen Raum anredet, ist um 16 Uhr heiser – und die Teilnehmer sind es leid, sich anzustrengen. Ein unauffälliges Headset nimmt der Stimme die Arbeit ab. Und keine Sorge vor der Technik: Nach fünf Minuten vergisst man, dass es da ist.'],
+     ['icon' => 'chat', 'title' => 'Fragen, die alle hören',
+      'text' => 'Nichts ist zäher als eine Antwort auf eine Frage, die hinten keiner verstanden hat. Ein zweites Funkmikro für den Saal löst das – und hält die Gruppe auch am Nachmittag noch wach, weil jeder Teil des Gesprächs bleibt.'],
+     ['icon' => 'gear', 'title' => 'Technik, die einfach läuft',
+      'text' => 'Laptop-Ton fürs Video, Musik in den Pausen, alles vor Beginn getestet. Ihr könnt mich stundenweise dazubuchen, dann sitze ich hinten und regle – oder ihr übernehmt die Anlage nach einer kurzen Einweisung selbst. Je nachdem, wie viel Ruhe ihr haben wollt.'],
+   ],
+   'kicker2' => 'Leistungen', 'h2_2' => 'Damit könnt ihr planen',
+   'features' => [
+     'Headset oder Funkmikrofon für Referentin oder Referent',
+     'Zweites Mikro für Fragen aus dem Raum',
+     'Beschallung passend zur Raumgröße – dezent aufgebaut',
+     'Laptop-Anschluss für Video- und Präsentationston',
+     'Pausenmusik, wenn gewünscht',
+     'Stundenweise betreut oder Anlage mit Einweisung',
+   ],
+   'pricenote' => 'Seminare liegen naturgemäß unter der Woche und tagsüber – genau die Termine, die ich am günstigsten anbieten kann. Sagt mir Raum, Dauer und Teilnehmerzahl, ihr bekommt einen Festpreis.',
+   'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist euer Seminar?',
+   'form_lead' => 'Kurz eintragen – ihr bekommt innerhalb von 24 Stunden eine klare Antwort. Auch für Seminarreihen mit mehreren Terminen lohnt sich das Fragen, das kalkuliere ich als Paket.',
+   'form_cfg' => ['event_types' => ['Seminar / Fortbildung'], 'company_label' => 'Firma / Institut',
+     'show_guests' => true, 'guests_label' => 'Teilnehmer (ca.)', 'guests_ph' => 'z. B. 40',
+     'location_label' => 'Ort / Raum', 'location_ph' => 'z. B. Tagungsraum im Hotel, Schulungsraum …',
+     'msg_label' => 'Worum geht es?', 'msg_ph' => 'z. B. Ganztages-Fortbildung, eine Trainerin, Videoeinspieler, Fragen aus dem Raum …',
+     'wa_text' => 'Hallo Markus, es geht um Tontechnik für unser Seminar: '],
+   'footer_target' => 'technik'],
+
+  ['slug' => 'messe', 'sort' => 70, 'accent' => '#f0955b', 'accent2' => '#f5b183', 'btn_txt' => '#241105',
+   'page_title' => 'Technik für euren Messestand | Lauschgift Veranstaltungstechnik, Hemer',
+   'meta_desc' => 'Licht und Ton für Messestände: auffallen, ohne zu nerven – Standbeleuchtung, gerichtete Beschallung für Präsentationen, Auf- und Abbau nach Messeplan. Aus Hemer, Messetage sind Werktage.',
+   'badge' => 'Messetage sind Werktage – genau die Termine, die ich mag',
+   'h1_line1' => 'Euer Stand hat drei Sekunden,', 'h1_line2' => 'bis die Leute weitergehen.',
+   'sub' => 'Ich bin Markus von Lauschgift Veranstaltungstechnik. Auf einer Messe entscheidet der erste Eindruck, ob jemand stehen bleibt oder weiterläuft. Ich baue Licht und Ton für euren Stand: hell, wo euer Produkt steht, verständlich, wo gesprochen wird – und alles wieder abgebaut, bevor die Halle schließt.',
+   'kicker1' => 'Worauf es ankommt', 'h2_1' => 'Auffallen, ohne zu nerven',
+   'cards' => [
+     ['icon' => 'light', 'title' => 'Licht zieht Blicke',
+      'text' => 'In einer Messehalle ist alles gleich hell und gleich grau. Gutes Licht auf eurem Produkt und eurer Rückwand ist der günstigste Weg aufzufallen – deutlich günstiger als der größere Stand, den ihr sonst bräuchtet, um genauso gesehen zu werden.'],
+     ['icon' => 'mic', 'title' => 'Reden im Messelärm',
+      'text' => 'Wenn ihr am Stand präsentiert, kämpft ihr gegen tausend Gespräche und die Halle nebenan. Eine kleine, gerichtete Beschallung sorgt dafür, dass man euch an eurem Stand versteht – ohne dass sich der Nachbarstand beim Veranstalter beschwert.'],
+     ['icon' => 'calendar', 'title' => 'Auf- und Abbau nach Messeplan',
+      'text' => 'Aufbau am Vortag im Zeitfenster des Veranstalters, Abbau nach Messeschluss, Nachweise für die Hallenregie, wenn nötig. Ihr kümmert euch um eure Kunden und euer Standpersonal – nicht um Kabel.'],
+   ],
+   'kicker2' => 'Leistungen', 'h2_2' => 'Damit könnt ihr planen',
+   'features' => [
+     'Standbeleuchtung für Produkt, Rückwand und Theke',
+     'Dezente, gerichtete Beschallung für den Stand',
+     'Funkmikrofon für Präsentationen und Vorführungen',
+     'Ton für Monitore und Produktvideos',
+     'Auf- und Abbau nach den Zeitfenstern des Veranstalters',
+     'Betreut während der Messe oder mit Einweisung fürs Standpersonal',
+   ],
+   'pricenote' => 'Messen laufen werktags – für mich die besten Termine im Kalender, und das merkt ihr am Preis. Sagt mir Messe, Standgröße und was ihr vorhabt, ihr bekommt einen Festpreis.',
+   'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist eure Messe?',
+   'form_lead' => 'Schreibt mir Messe, Termin und Standgröße – ihr bekommt innerhalb von 24 Stunden eine klare Antwort mit Preisrahmen.',
+   'form_cfg' => ['event_types' => ['Messe / Ausstellung'], 'company_label' => 'Firma',
+     'location_label' => 'Messe / Halle', 'location_ph' => 'z. B. Messe Dortmund, Halle 4, Stand 12 m² …',
+     'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. drei Messetage, Produktvideo mit Ton, zwei Kurzpräsentationen täglich …',
+     'wa_text' => 'Hallo Markus, es geht um Technik für unseren Messestand: '],
+   'footer_target' => 'technik'],
+
+  ['slug' => 'objektbeleuchtung', 'sort' => 80, 'accent' => '#ffc247', 'accent2' => '#ffd47e', 'btn_txt' => '#241a05',
+   'page_title' => 'Objekt- & Fassadenbeleuchtung | Lauschgift Veranstaltungstechnik, Hemer',
+   'meta_desc' => 'Fassaden, Gärten und Firmengelände stimmungsvoll beleuchten: fürs Jubiläum, den Tag der offenen Tür oder die dunkle Jahreszeit. Outdoor-Scheinwerfer, sichere Kabelwege, steckerfertig – aus Hemer.',
+   'badge' => 'Planbare Aufträge unter der Woche – vom Aufmaß bis zum Abbau',
+   'h1_line1' => 'Nach Sonnenuntergang', 'h1_line2' => 'wird euer Gebäude zur Bühne.',
+   'sub' => 'Ich bin Markus – Lichttechnik gehört bei mir zu jedem Auftrag, und Objektbeleuchtung ist die schönste Form davon: Fassaden, Gärten, Höfe und Eingänge so anstrahlen, dass Gäste schon beim Ankommen merken, dass heute etwas Besonderes ist. Fürs Firmenjubiläum, den Tag der offenen Tür oder die dunkle Jahreszeit.',
+   'kicker1' => 'Worauf es ankommt', 'h2_1' => 'Licht, das man nicht sieht – nur seine Wirkung',
+   'cards' => [
+     ['icon' => 'home', 'title' => 'Die Fassade kann mehr',
+      'text' => 'Tagsüber ist euer Gebäude Zweckbau, abends kann es Eindruck machen: farbige Akzente auf der Fassade, Bäume von unten angestrahlt, der Weg zum Eingang als Linie aus Licht. Das wirkt hochwertig, lange bevor der erste Gast drinnen ist – und auf jedem Foto vom Abend.'],
+     ['icon' => 'shield', 'title' => 'Sauber und sicher aufgebaut',
+      'text' => 'Draußen heißt: Feuchtigkeit, Publikum, Stolperfallen. Ich arbeite mit Outdoor-tauglichen Scheinwerfern, sichere Kabelwege ordentlich und schließe steckerfertig an. Für Arbeiten am Hausstromnetz selbst hole ich einen Elektro-Partnerbetrieb dazu – das gehört sich so, und das sage ich euch auch vorher.'],
+     ['icon' => 'calendar', 'title' => 'Einmalig oder jedes Jahr wieder',
+      'text' => 'Vieles davon wiederholt sich: die Beleuchtung zur Weihnachtszeit, das jährliche Sommerfest, der Tag der offenen Tür. Einmal geplant, wird der Aufbau jedes Jahr schneller – und ab dem zweiten Jahr auch günstiger, weil die Planung dann steht.'],
+   ],
+   'kicker2' => 'Leistungen', 'h2_2' => 'Damit könnt ihr planen',
+   'features' => [
+     'Fassaden- und Gartenbeleuchtung mit Outdoor-Scheinwerfern',
+     'Wege- und Eingangsbeleuchtung für Gäste',
+     'Farbkonzept passend zu Anlass oder Firmenfarben',
+     'Sichere Kabelwege, steckerfertiger Anschluss',
+     'Auf- und Abbau nach Plan, gern unter der Woche',
+     'Wiederkehrende Aufbauten ab dem zweiten Jahr günstiger',
+   ],
+   'pricenote' => 'Ich schaue mir das Objekt vorher an – bei Dämmerung, wenn es sein muss – und ihr bekommt einen Festpreis. Dauerhafte Festinstallationen sind auch möglich, das ist ein Thema für die [Technik-Seite](technik.html).',
+   'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Was soll leuchten?',
+   'form_lead' => 'Beschreibt mir kurz Objekt und Anlass – ihr bekommt innerhalb von 24 Stunden eine ehrliche Einschätzung, was sich lohnt und was es kostet.',
+   'form_cfg' => ['event_types' => ['Objektbeleuchtung'], 'company_label' => 'Firma / Verein',
+     'location_label' => 'Objekt / Adresse', 'location_ph' => 'z. B. Firmengebäude in Hemer, Vereinsheim mit Garten …',
+     'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. Firmenjubiläum im Oktober, Fassade und Einfahrt beleuchten, Firmenfarbe Blau …',
+     'wa_text' => 'Hallo Markus, es geht um Objektbeleuchtung: '],
+   'footer_target' => 'technik'],
+
+  ['slug' => 'instore-dj', 'sort' => 90, 'accent' => '#ff8bc2', 'accent2' => '#ffaed4', 'btn_txt' => '#260d1b',
+   'page_title' => 'Instore-DJ für Store & Kaufhaus | DJ Lauschgift, Hemer',
+   'meta_desc' => 'DJ im Modegeschäft, Store oder Kaufhaus: Sale-Wochenende, Opening, verkaufsoffener Sonntag. Ich spiele für die Kundschaft, die gerade da ist – Deep House, Disco, French House. Kompakt aufgebaut, leise genug für die Kasse.',
+   'badge' => 'Tagsüber, wenn eure Kunden da sind – Sale, Opening, verkaufsoffener Sonntag',
+   'h1_line1' => 'Musik verkauft mit.', 'h1_line2' => 'Playlists nicht.',
+   'sub' => 'Ich bin Markus, DJ seit 23 Jahren – und ich habe oft genug in Modegeschäften und Kaufhäusern aufgelegt, um zu wissen: Ein Laden mit echtem DJ fühlt sich anders an. Die Leute bleiben länger, das Team ist besser drauf, und aus einem Einkauf wird ein Erlebnis. Musikalisch: Deep House, Disco, French House – Sound, der gut klingt, ohne dass jemand schreien muss.',
+   'kicker1' => 'Warum ein echter DJ', 'h2_1' => 'Der Unterschied zur Playlist',
+   'cards' => [
+     ['icon' => 'music', 'title' => 'Ich spiele für die Leute, die gerade da sind',
+      'text' => 'Eine Playlist läuft stur weiter, egal ob gerade Familien mit Kinderwagen durchs Geschäft gehen oder die After-Work-Kundschaft reinkommt. Ich sehe, wer da ist, und passe Musik und Energie an – am Vormittag zurückhaltend, zum Feierabend hin treibender. Das spürt man, auch wenn es keiner benennen kann.'],
+     ['icon' => 'zap', 'title' => 'Ein Grund zu kommen und zu bleiben',
+      'text' => 'Sale-Wochenende, Store-Opening, verkaufsoffener Sonntag, neue Kollektion: Ein DJ macht aus einer Aktion einen Anlass. Und er ist gleich der Content für eure Kanäle mit – die Story mit DJ im Store teilt sich von selbst, da müsst ihr nichts inszenieren.'],
+     ['icon' => 'gear', 'title' => 'Kompakt und leise genug für die Kasse',
+      'text' => 'Mein Setup fürs Geschäft ist klein, sieht ordentlich aus und ist so eingepegelt, dass sich Kundinnen bei der Beratung und an der Kasse normal unterhalten können. Aufgebaut wird vor Ladenöffnung, versteht sich. Und was an Nebenkosten wie GEMA dazukommt, sage ich euch vorher ehrlich.'],
+   ],
+   'kicker2' => 'Leistungen', 'h2_2' => 'Damit könnt ihr planen',
+   'features' => [
+     'DJ-Sets von zwei Stunden bis zum ganzen Verkaufstag',
+     'Kompaktes, sauberes Setup passend zum Ladenbild',
+     'Musik abgestimmt auf Sortiment und Zielgruppe',
+     'Pegel, der Beratung und Kasse nicht stört',
+     'Aufbau vor Ladenöffnung, Abbau nach Ladenschluss',
+     'Ehrliche Ansage vorab zu Nebenkosten wie GEMA',
+   ],
+   'pricenote' => 'Store-Termine sind Tages- und Wochenendgeschäft zu Ladenöffnungszeiten – dafür kalkuliere ich spürbar freundlicher als für eine Samstagnacht. Sagt mir Anlass und Öffnungszeiten, ihr bekommt einen Festpreis.',
+   'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist eure Aktion?',
+   'form_lead' => 'Schreibt mir kurz, was ihr plant – ihr bekommt innerhalb von 24 Stunden eine klare Antwort. Auch für wiederkehrende Termine, etwa jeden ersten Samstag, lohnt sich das Fragen.',
+   'form_cfg' => ['event_types' => ['Instore-DJ / Store-Event'], 'company_label' => 'Geschäft / Marke',
+     'location_label' => 'Store / Adresse', 'location_ph' => 'z. B. Modegeschäft in der Innenstadt von Iserlohn …',
+     'msg_label' => 'Was ihr plant', 'msg_ph' => 'z. B. Sale-Samstag von 11 bis 18 Uhr, junge Zielgruppe, Ecke im Eingangsbereich frei …',
+     'wa_text' => 'Hallo Markus, es geht um einen DJ für unser Geschäft: '],
+   'footer_target' => 'index'],
+
+  ['slug' => 'produktpraesentation', 'sort' => 100, 'accent' => '#59c3e8', 'accent2' => '#84d3ef', 'btn_txt' => '#07202b',
+   'page_title' => 'DJ & Technik für Produktpräsentationen | DJ Lauschgift, Hemer',
+   'meta_desc' => 'Launch-Events, Kundenabende, Showroom-Termine: Musik für den Empfang, Ton für die Präsentation, Licht auf dem Produkt – ein Ansprechpartner statt drei Gewerke. DJ und Veranstaltungstechniker aus Hemer.',
+   'badge' => 'Launch-Events, Kundenabende, Showrooms – gern auch dienstags um 11',
+   'h1_line1' => 'An eurem Produkt hängen Monate Arbeit.', 'h1_line2' => 'Der Auftritt entscheidet in Minuten.',
+   'sub' => 'Ich bin Markus – DJ und Veranstaltungstechniker in einer Person. Bei Produktpräsentationen, Launch-Events und Kundenabenden heißt das: Musik, die den Empfang trägt, Ton, den die Präsentation verdient, und Licht, das euer Produkt zum Mittelpunkt macht. Ein Ansprechpartner statt drei Gewerke, die sich absprechen müssen.',
+   'kicker1' => 'Worauf es ankommt', 'h2_1' => 'Drei Momente, die den Abend tragen',
+   'cards' => [
+     ['icon' => 'zap', 'title' => 'Der Moment der Enthüllung',
+      'text' => 'Ob neues Modell im Autohaus, neue Kollektion im Showroom oder neue Maschine in der Halle: Der Moment, in dem das Tuch fällt, braucht Licht und Musik auf den Punkt. Den proben wir vorher durch – auf die Sekunde, mit festem Zeichen. Dann sitzt er auch, wenn alle Kameras draufhalten.'],
+     ['icon' => 'music', 'title' => 'Empfang mit Haltung',
+      'text' => 'Vor und nach dem offiziellen Teil lege ich auf: housig, dezent, erwachsen. Musik, die Gespräche möglich macht und trotzdem klarstellt, dass hier gerade etwas stattfindet – kein Fahrstuhl-Geplätscher, keine Charts-Beschallung.'],
+     ['icon' => 'mic', 'title' => 'Die Präsentation kommt an',
+      'text' => 'Headset oder Funkmikro für die, die sprechen, Laptop-Ton fürs Video, Pegel im Griff. Eure Geschäftsführung soll souverän dastehen und sich auf ihre Worte konzentrieren können – für alles andere bin ich da, und zwar unauffällig.'],
+   ],
+   'kicker2' => 'Leistungen', 'h2_2' => 'Damit könnt ihr planen',
+   'features' => [
+     'DJ für Empfang, Übergänge und Ausklang',
+     'Ton für Reden, Video und Einspieler',
+     'Licht mit eurem Produkt im Mittelpunkt, gern in Firmenfarben',
+     'Ablauf-Abstimmung mit Marketing oder Agentur',
+     'Diskretes Auftreten vor euren Kunden',
+     'Ein fester Ansprechpartner von Planung bis Abbau',
+   ],
+   'pricenote' => 'Solche Termine liegen fast immer unter der Woche – für mich die besten Termine im Kalender, und das rechnet sich für euch. Nennt mir Anlass und Rahmen, ihr bekommt einen Festpreis.',
+   'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist euer Termin?',
+   'form_lead' => 'Schreibt mir kurz Anlass, Ort und ungefähre Gästezahl – ihr bekommt innerhalb von 24 Stunden eine klare Antwort mit Preisrahmen.',
+   'form_cfg' => ['event_types' => ['Produktpräsentation / Firmenevent'], 'company_label' => 'Firma',
+     'show_guests' => true, 'guests_ph' => 'z. B. 60',
+     'location_label' => 'Ort / Location', 'location_ph' => 'z. B. Autohaus, Showroom, Firmengebäude …',
+     'msg_label' => 'Was ihr plant', 'msg_ph' => 'z. B. Kundenabend mit Enthüllung um 19 Uhr, danach Get-together mit Musik …',
+     'wa_text' => 'Hallo Markus, es geht um unsere Produktpräsentation: '],
+   'footer_target' => 'index'],
+
+  ['slug' => 'tagesparty', 'sort' => 110, 'accent' => '#ff9e7a', 'accent2' => '#ffbca0', 'btn_txt' => '#26120a',
+   'page_title' => 'Tagesparty mit House-Sounds | DJ Lauschgift, Hemer',
+   'meta_desc' => 'Feiern, wenn die Sonne noch scheint: Gartenparty, Sundowner, runder Geburtstag am Nachmittag – mit Deep House, Disco und French House. Um Mitternacht zufrieden im Bett. DJ aus Hemer, Tagestermine günstiger.',
+   'badge' => 'Feiern, wenn die Sonne noch scheint – und um Mitternacht zufrieden im Bett',
+   'h1_line1' => 'Wer sagt eigentlich,', 'h1_line2' => 'dass Partys erst um 22 Uhr anfangen?',
+   'sub' => 'Ich bin Markus, DJ seit 23 Jahren – und ehrlich: Einige der besten Feiern, die ich gespielt habe, liefen nachmittags. Gartenparty ab 14 Uhr, Sundowner auf der Terrasse, runder Geburtstag als langer Nachmittag statt kurzer Nacht. Musikalisch mein Lieblingsrevier: Deep House, Disco, French House – Sound zum Feiern und Unterhalten gleichzeitig.',
+   'kicker1' => 'Die Idee', 'h2_1' => 'Der Nachmittag ist die neue Nacht',
+   'cards' => [
+     ['icon' => 'sun', 'title' => 'Alle können kommen – und alle sind fit',
+      'text' => 'Tagsüber feiern heißt: Die Freunde mit kleinen Kindern sind dabei, die Großeltern auch, und niemand fährt um drei Uhr nachts übermüdet nach Hause. Wenn um Mitternacht Schluss ist, haben trotzdem alle zehn Stunden gefeiert – nur eben die schönen zehn Stunden.'],
+     ['icon' => 'music', 'title' => 'House statt Halligalli',
+      'text' => 'Keine Sorge, das wird keine Technoparty: Deep House, Disco und French House sind Musik, die sofort gute Laune macht und trotzdem Gespräche zulässt. Genau richtig für draußen, für ein Glas in der Sonne – und für eine Tanzfläche, die gegen 17 Uhr ganz von allein entsteht.'],
+     ['icon' => 'users', 'title' => 'Es braucht keinen großen Anlass',
+      'text' => 'Runder Geburtstag, Einweihung, Jubiläum, bestandene Prüfung oder einfach ein guter Sommer: Ein Nachmittag, gute Musik und Leute, die man mag, reichen völlig. Ich bringe Anlage, Sound und ein bisschen Licht für die Stunde nach Sonnenuntergang mit.'],
+   ],
+   'kicker2' => 'Leistungen', 'h2_2' => 'Damit könnt ihr planen',
+   'features' => [
+     'DJ-Set am Nachmittag und frühen Abend',
+     'Kompakte Anlage für Garten, Terrasse, Hof oder Halle',
+     'Lautstärke, die Nachbarn und Gespräche verträgt',
+     'Musikwünsche vorab, wenn ihr mögt',
+     'Licht für die Stunde, in der die Sonne weg ist',
+     'Tagestermine deutlich günstiger als die Samstagnacht',
+   ],
+   'pricenote' => 'Tagestermine kann ich deutlich günstiger anbieten als eine Samstagnacht – diese Stunden gehören sonst niemandem. Wer also immer dachte, ein richtiger DJ sei zu teuer für eine private Feier: Nachmittags stimmt das oft nicht mehr.',
+   'form_kicker' => 'Termin sichern', 'form_h2' => 'Wann wird gefeiert?',
+   'form_lead' => 'Schreibt mir kurz, was ihr euch vorstellt – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort mit Preisrahmen. Auch spontane Termine klappen tagsüber öfter, als man denkt.',
+   'form_cfg' => ['event_types' => ['Tagesparty'], 'show_guests' => true, 'guests_ph' => 'z. B. 40',
+     'location_label' => 'Ort / Location', 'location_ph' => 'z. B. Garten in Hemer, Terrasse, gemietete Scheune …',
+     'msg_label' => 'Was ihr euch vorstellt', 'msg_ph' => 'z. B. 40. Geburtstag, ab 14 Uhr im Garten, entspannt mit Tanzen zum Abend …',
+     'wa_text' => 'Hallo Markus, es geht um eine Tagesparty: '],
+   'footer_target' => 'index'],
+
+  ['slug' => 'technik-check', 'sort' => 120, 'accent' => '#3cc8b4', 'accent2' => '#5fdcc9', 'btn_txt' => '#0a2420',
+   'page_title' => 'Technik-Check für eure Tonanlage | Lauschgift Veranstaltungstechnik',
+   'meta_desc' => 'Die Anlage im Vereinsheim brummt, pfeift oder keiner traut sich ran? Ehrlicher Technik-Check mit schriftlichem Bericht: 149 Euro pauschal, wird bei Folgeauftrag verrechnet. Keine Verkaufsshow – aus Hemer.',
+   'badge' => 'Für Vereinsheime, Gemeindehäuser, Schulen, Kneipen – überall, wo eine Anlage fest hängt',
+   'h1_line1' => 'Eure Anlage brummt seit Jahren?', 'h1_line2' => 'Das muss sie nicht.',
+   'sub' => 'Ich bin Markus von Lauschgift Veranstaltungstechnik. In fast jedem Vereinsheim hängt eine Anlage, die irgendwann mal jemand angeschlossen hat, der längst weggezogen ist. Seitdem: Brummen, Pfeifen und ein Mischpult, an das sich keiner traut. Ich schaue mir das an – gründlich, ehrlich und mit schriftlichem Bericht.',
+   'kicker1' => 'So läuft der Check', 'h2_1' => 'Ehrlich hinschauen statt neu verkaufen',
+   'cards' => [
+     ['icon' => 'search', 'title' => 'Keine Verkaufsshow',
+      'text' => 'Ich verkaufe euch beim Check nichts. Wenn eure Anlage gut ist und nur falsch eingestellt, steht genau das im Bericht – und dann ist nach zwei Stunden Einmessen einfach Ruhe. Neu kaufen empfehle ich nur, wenn wirklich nichts anderes hilft, und auch dann mit Preisspannen statt Fantasiezahlen.'],
+     ['icon' => 'doc', 'title' => 'Ein Bericht, mit dem ihr arbeiten könnt',
+      'text' => 'Ihr bekommt alles schriftlich: was da hängt, was es taugt, was ich direkt einstellen konnte und was sich zu ändern lohnt – nach Prioritäten sortiert. Damit könnt ihr in die Vorstandssitzung gehen und über Fakten entscheiden statt über Gefühle zu diskutieren.'],
+     ['icon' => 'users', 'title' => 'Danach traut sich wieder jemand ran',
+      'text' => 'Zum Check gehört, dass ich der Person, die die Anlage bedient, alles erkläre – beschriftet, fotografiert, mit Spickzettel für den Festabend. Die Angst, etwas kaputt zu machen, ist bei den meisten Anlagen das größte Problem. Die nehme ich mit.'],
+   ],
+   'kicker2' => 'Klartext', 'h2_2' => 'Was der Check kostet und was drinsteckt',
+   'features' => [
+     'Funktionsprüfung aller Komponenten vor Ort',
+     'Einmessen und Neueinstellung, soweit direkt möglich',
+     'Schriftlicher Bericht mit klarer Empfehlung und Prioritäten',
+     'Beschriftung und Spickzettel für die Bedienung',
+     'Vorab-Fragebogen kommt automatisch nach eurer Anfrage',
+     '149 € pauschal je Anlage bzw. Raum, jede weitere 79 € – wird bei Folgeauftrag verrechnet',
+   ],
+   'pricenote' => 'Beauftragt ihr nach dem Check etwas aus dem Bericht, wird der Check komplett verrechnet – ihr riskiert also nichts außer zwei Stunden eurer Zeit. Und wenn alles gut ist, wisst ihr das danach schwarz auf weiß.',
+   'form_kicker' => 'Check anfragen', 'form_h2' => 'Was macht eure Anlage?',
+   'form_lead' => 'Beschreibt kurz, was euch stört – direkt nach dem Absenden bekommt ihr von mir einen kurzen Vorab-Fragebogen per Mail, damit ich zum Termin gezielt vorbereitet komme.',
+   'form_cfg' => ['event_types' => ['Technik-Check bestehende Anlage'], 'company_label' => 'Verein / Einrichtung',
+     'show_date' => false,
+     'location_label' => 'Ort / Gebäude', 'location_ph' => 'z. B. Vereinsheim in Hemer, Gemeindehaus …',
+     'msg_label' => 'Was stört euch?', 'msg_ph' => 'z. B. Brummen sobald das Mischpult an ist, Reden versteht man hinten nicht …',
+     'wa_text' => 'Hallo Markus, es geht um einen Technik-Check unserer Anlage: ',
+     'success_text' => 'Danke! Eure Anfrage ist angekommen – schaut gleich in euer Postfach, dort wartet schon der kurze Vorab-Fragebogen. Ich melde mich innerhalb von 24 Stunden für die Terminabstimmung.'],
+   'footer_target' => 'technik'],
+
+  ['slug' => 'workshops', 'sort' => 130, 'accent' => '#b9a7ff', 'accent2' => '#d0c4ff', 'btn_txt' => '#151030',
+   'page_title' => 'Tontechnik-Workshops | Lauschgift Veranstaltungstechnik, Hemer',
+   'meta_desc' => 'Tontechnik verstehen statt fürchten: Workshops in kleinen Gruppen an echter Technik – für Vereine, Gemeinden und alle, die den Ton machen müssen. Auch bei euch vor Ort an eurer eigenen Anlage.',
+   'badge' => 'Lernen am echten Mischpult – für Vereine, Gemeinden, Schulen und Neugierige',
+   'h1_line1' => 'Eure Anlage kann mehr,', 'h1_line2' => 'als ihr euch traut.',
+   'sub' => 'Ich bin Markus – und wenn ich bei meinen Technik-Checks eines gelernt habe, dann das: Das Problem ist selten die Anlage. Es hat nur nie jemand in Ruhe erklärt, wie sie funktioniert. Genau dafür sind meine Workshops da. Kleine Gruppen, echte Technik zum Anfassen, und dumme Fragen gibt es nicht.',
+   'kicker1' => 'Für wen das ist', 'h2_1' => 'Vom Zufalls-Techniker zum sicheren Gefühl',
+   'cards' => [
+     ['icon' => 'users', 'title' => 'Für alle, die es machen müssen',
+      'text' => 'In jedem Verein gibt es die Person, die den Ton macht, weil sie sich einmal nicht schnell genug weggeduckt hat. Wenn du diese Person bist: Der Workshop ist für dich. Danach weißt du, was die Regler wirklich tun – und hörst, warum es pfeift, bevor es pfeift.'],
+     ['icon' => 'mic', 'title' => 'Üben an echter Technik',
+      'text' => 'Wir arbeiten am richtigen Material, nicht an Folien: Mikrofon anschließen, Pegel einstellen, eine Rückkopplung absichtlich provozieren und wieder wegbekommen. Fehler machen ist hier ausdrücklich Teil des Programms – dafür ist es ein Workshop und keine Vorlesung.'],
+     ['icon' => 'home', 'title' => 'Auf Wunsch bei euch vor Ort',
+      'text' => 'Am meisten bringt der Workshop an der Anlage, mit der ihr nachher wirklich arbeitet. Ich komme mit dem Programm auch zu euch ins Vereinsheim oder Gemeindehaus – dann üben alle an genau den Knöpfen, die sie am Festabend drehen. Ab etwa vier Leuten lohnt sich das.'],
+   ],
+   'kicker2' => 'Im Detail', 'h2_2' => 'So laufen die Workshops',
+   'features' => [
+     'Kleine Gruppen, damit jeder ans Pult kommt',
+     'Offene Termine oder Inhouse bei euch vor Ort',
+     'Echte Technik statt Folien und Theorie',
+     'Von Grundlagen bis Rückkopplung im Griff',
+     'Unterlagen und Spickzettel zum Mitnehmen',
+     'Termine und Anmeldung auf der Technik-Seite',
+   ],
+   'pricenote' => 'Die aktuellen offenen Termine mit freien Plätzen findet ihr auf der [Technik-Seite](technik.html#workshops). Für einen eigenen Termin mit eurem Team schreibt mir einfach unten – dann stimmen wir Inhalt und Ort auf euch ab.',
+   'form_kicker' => 'Anfragen', 'form_h2' => 'Workshop für euer Team?',
+   'form_lead' => 'Schreibt mir kurz, wer ihr seid und was ihr lernen wollt – ihr bekommt innerhalb von 24 Stunden einen Vorschlag mit Termin-Optionen und Preis.',
+   'form_cfg' => ['event_types' => ['Workshop besuchen'], 'company_label' => 'Verein / Einrichtung',
+     'show_date' => false,
+     'location_label' => 'Ort', 'location_ph' => 'z. B. bei euch im Vereinsheim oder bei mir …',
+     'msg_label' => 'Was wollt ihr lernen?', 'msg_ph' => 'z. B. 5 Leute aus dem Verein, Grundlagen Mischpult und Funkmikros, gern an unserer Anlage …',
+     'wa_text' => 'Hallo Markus, es geht um einen Tontechnik-Workshop: '],
+   'footer_target' => 'technik'],
+
+  ];
+}
+
 /* Datenschutzerklärung – eine Quelle für Seed und Migration (v25) */
 function datenschutzText(): string {
   return "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer, Telefon 01523 6439373.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Cookies und lokale Speicherung\nDiese Website verwendet keine Cookies zu Werbe- oder Tracking-Zwecken und bindet keine Dienste ein, die solche Cookies setzen. Ein Cookie-Banner ist deshalb nicht erforderlich. Nur im Kundenportal und im Partner-Bereich wird nach eurer aktiven Anmeldung ein technisch notwendiges Sitzungsmerkmal im Browser gespeichert (Local/Session Storage), damit ihr angemeldet bleibt (§ 25 Abs. 2 TDDDG).\n\n4. Schriftarten\nAlle Schriftarten liegen lokal auf dem Server dieser Website. Beim Seitenaufruf wird keine Verbindung zu Google Fonts oder anderen Drittanbietern aufgebaut.\n\n5. Reichweitenmessung\nZur Verbesserung des Angebots wird anonym gezählt, wie oft die einzelnen Seiten aufgerufen werden (nur Datum, Seitenname und ggf. die Domain der verweisenden Website). Dabei werden weder IP-Adressen noch Cookies oder sonstige Kennungen gespeichert – ein Bezug zu einzelnen Personen ist nicht möglich (Art. 6 Abs. 1 lit. f DSGVO).\n\n6. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n7. Newsletter\nFür den Workshop-Newsletter speichere ich eure E-Mail-Adresse erst nach Bestätigung über den zugesandten Link (Double-Opt-in) auf Grundlage eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Jede Mail enthält einen Abmeldelink; nach der Abmeldung erhaltet ihr keine weiteren Mails. Es wird kein Versanddienstleister eingesetzt – der Versand erfolgt über den eigenen Server.\n\n8. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n9. Digitaler Mietvertrag und Ausweiskopie\nBei der Vermietung von Veranstaltungstechnik könnt ihr den Mietvertrag digital abschließen. Dabei werden eure Unterschrift sowie – mit eurer ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 20 PAuswG) – Fotos der Vorder- und Rückseite eures Personalausweises verarbeitet und in einem zugriffsgeschützten Bereich des eigenen Servers gespeichert. Nicht benötigte Angaben dürft ihr vor dem Fotografieren schwärzen. Die Ausweiskopien dienen ausschließlich der Absicherung des Mietverhältnisses und werden nach vollständiger Rückgabe der Mietsachen gelöscht.\n\n10. Kundenportal\nIm Kundenportal könnt ihr euch mit E-Mail-Adresse und Passwort anmelden, um eure Unterlagen einzusehen und Angaben zu eurer Feier zu pflegen. Das Passwort wird ausschließlich verschlüsselt (als Hash) gespeichert; alle Inhalte liegen auf dem eigenen Server dieser Website (Art. 6 Abs. 1 lit. b DSGVO).\n\n11. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: August 2026.";
@@ -1295,6 +1783,8 @@ SQL);
   $p->exec(docAuditDdl());
   foreach (portalAccountDdl() as $sql) $p->exec($sql);
   foreach (statsNewsletterDdl() as $sql) $p->exec($sql);
+  $p->exec(campaignPagesDdl());
+  seedCampaignPages($p);
   seed($p);
   seedExtraTemplates($p);
   seedServiceProducts($p);
