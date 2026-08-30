@@ -509,7 +509,8 @@ function mdRender(t){
 function renderPacks(list){
   document.getElementById('packGrid').innerHTML=list.map(function(p){
     var feats=(p.features||[]).map(function(f){return '<li>'+esc(f)+'</li>'}).join('');
-    var price=p.price_from?('<div class="price">'+esc(p.price_note||'ab')+' '+euro(p.price_from)+' <small>zzgl. Anfahrt</small></div>'):'';
+    var price=p.price_from?('<div class="price">'+esc(p.price_note||'ab')+' '+euro(p.price_from)+' <small>zzgl. Anfahrt</small></div>')
+      :'<div class="price" style="font-size:14px;color:var(--mut);font-weight:400">Preis richtet sich nach Aufwand &amp; Dauer – im kostenlosen Kennenlerngespräch gibt es ein klares Angebot</div>';
     return '<div class="pack reveal vis"><h3>'+esc(p.title)+'</h3><div class="psub">'+esc(p.subtitle||'')+'</div><ul>'+feats+'</ul>'+price+'</div>';
   }).join('');
 }
@@ -738,7 +739,12 @@ document.getElementById('inqForm').addEventListener('submit',function(ev){
     body:JSON.stringify(data)
   }).then(function(r){
     if(!r.ok)throw new Error('HTTP '+r.status);
-    msg.className='form-msg ok';msg.textContent='Danke! Eure Anfrage ist angekommen – ich melde mich in der Regel innerhalb von 24 Stunden.';
+    var urgentDays=data.event_date?Math.round((new Date(data.event_date)-new Date())/86400000):null;
+    var urgent=urgentDays!=null&&urgentDays>=0&&urgentDays<=10;
+    msg.className='form-msg ok';
+    msg.textContent=urgent
+      ?'Danke! Euer Termin ist ja bald – ich melde mich so schnell wie möglich, meist noch am selben Tag. Wenn es eilig ist, schreibt mir gern zusätzlich per WhatsApp (Kontakt oben).'
+      :'Danke! Eure Anfrage ist angekommen – ich melde mich in der Regel innerhalb von 24 Stunden.';
     f.reset();
     document.getElementById('regOverlayLink').href='portal.html?register=1&email='+encodeURIComponent(data.email)+'&name='+encodeURIComponent(data.name);
     document.getElementById('regOverlay').classList.add('open');

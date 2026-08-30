@@ -1113,15 +1113,19 @@ function reloadWs(){
 function renderDash(){
   var today=new Date().toISOString().slice(0,10);
   document.getElementById('dashDate').textContent=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  /* Anfragen mit sehr nahem Termin (<=10 Tage) im Dashboard hervorheben, damit sie zwischen
+     den anderen nicht untergehen - der Kunde bekommt zwar schon eine angepasste Bestätigung
+     (index.html/technik.html), aber die Priorisierung auf deiner Seite muss trotzdem klappen. */
+  var isUrgent=function(d){if(!d)return false;var days=Math.round((new Date(d)-new Date(today))/86400000);return days>=0&&days<=10};
   var newInq=CACHE.inquiries.filter(function(i){return i.status==='neu'})
-    .map(function(i){return {kind:'inquiry',id:i.id,label:i.name,sub:(i.event_type||'')+(i.event_date?(' · '+dt(i.event_date)):'')}});
+    .map(function(i){return {kind:'inquiry',id:i.id,label:i.name,sub:(i.event_type||'')+(i.event_date?(' · '+dt(i.event_date)):''),urgent:isUrgent(i.event_date)}});
   /* Technik-Mietanfragen aus dem Warenkorb landen direkt als Buchung (status='anfrage'),
      nie in der inquiries-Tabelle - müssen hier separat eingesammelt werden, sonst übersieht
      man sie im Dashboard. */
   var cartInq=CACHE.bookings.filter(function(b){return b.status==='anfrage'&&b.kind==='technik'})
     .map(function(b){return {kind:'booking',id:b.id,label:custName(CACHE.customers.find(function(c){return c.id===b.customer_id})),
-      sub:(b.event_type||'Technik-Miete')+(b.event_date?(' · '+dt(b.event_date)):'')};});
-  newInq=newInq.concat(cartInq);
+      sub:(b.event_type||'Technik-Miete')+(b.event_date?(' · '+dt(b.event_date)):''),urgent:isUrgent(b.event_date)};});
+  newInq=newInq.concat(cartInq).sort(function(a,b){return (b.urgent?1:0)-(a.urgent?1:0)});
   var upcoming=CACHE.bookings.filter(function(b){return b.event_date>=today&&b.status!=='storniert'}).sort(function(a,b){return a.event_date<b.event_date?-1:1});
   var openInv=CACHE.documents.filter(function(d){return d.doc_type!=='angebot'&&['versendet','ueberfaellig'].indexOf(d.status)>=0});
   var openQ=CACHE.documents.filter(function(d){return d.doc_type==='angebot'&&d.status==='versendet'});
@@ -1144,7 +1148,7 @@ function renderDash(){
   }).join('')||'Nichts fällig.';
   document.getElementById('dashInq').innerHTML=newInq.slice(0,6).map(function(i){
     var onclick=i.kind==='booking'?'openBookDetail(\''+i.id+'\')':'viewInq(\''+i.id+'\')';
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="'+onclick+'">'+esc(i.label||'?')+'</a> <span class="mut">'+esc(i.sub||'')+'</span></div>';
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+(i.urgent?'<span class="b red" style="margin-right:6px">bald</span>':'')+'<a onclick="'+onclick+'">'+esc(i.label||'?')+'</a> <span class="mut">'+esc(i.sub||'')+'</span></div>';
   }).join('')||'Keine neuen Anfragen.';
   document.getElementById('dashOpenInv').innerHTML=openInv.slice(0,6).map(function(d){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> <span class="mut">'+esc(custName(d.customers))+' · '+euro(d.total_gross)+(d.due_date?' · fällig '+dt(d.due_date):'')+'</span></div>';
