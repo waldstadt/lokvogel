@@ -265,3 +265,23 @@ alle tagsüber/unter der Woche (= Auslastungsziel):
 - Weihnachtsmarkt-Beschallung (Dauerauftrag November/Dezember)
 - Trauerfeiern (echtes Wochentags-Tagesgeschäft, aber sensibel - nur
   über Mundpropaganda/Bestatter-Kontakte, keine Kampagnenseite)
+
+## Offene Entscheidungen für Markus (Stand QA-Durchlauf)
+
+- **Technik-Check-Preis.** Auf technik.html steht jetzt "149 € zzgl. MwSt.",
+  im Katalog liegt der Artikel als Bruttopreis. Wenn 149 € der Endpreis für
+  Vereine sein soll (die keine Vorsteuer ziehen), muss der Katalogpreis auf
+  125,21 € netto - bei rund 24 € Kosten je Check ist das die entscheidende
+  Zahl. Bitte einmal festlegen.
+- **Workshop-Preise.** Die Kacheln zeigen jetzt "89,00 € p. P. inkl. MwSt.",
+  abgerechnet wird der Betrag als Brutto. Die Datenbankspalte heißt zwar
+  `price_net`, enthält aber den Bruttopreis - fachlich stimmt es, der
+  Spaltenname ist nur historisch.
+- **`data/`-Verzeichnis auf dem Live-Server.** Bitte einmal im Browser
+  prüfen, dass `lauschgift.net/data/` wirklich per `.htaccess` gesperrt ist.
+- **Widerrufs- und Stornoklauseln** rechtlich prüfen lassen, bevor die
+  Kampagnenseiten aktiv beworben werden.
+- **halloween.html und weihnachtsfeier.html** sind noch fest verdrahtet und
+  laufen nicht über das neue Kampagnenseiten-System.
+- **Event-Reviews** (echte Veranstaltungen mit Fotos und Geschichte statt
+  erfundener Beispiele) - Markus' Idee, bewusst zurückgestellt.
