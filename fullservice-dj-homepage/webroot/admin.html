@@ -1494,6 +1494,76 @@ function equipTierStages(eq,days){
 function dayRangeLabel(startDay,count){
   return count===1?('Miettag '+startDay):('Miettage '+startDay+'–'+(startDay+count-1));
 }
+/* Liest die aktuell im Dokument stehende Rabattstaffel einer Gruppe aus (Tage je Stufe aus der
+   Einheit "Stk. (N Tage)" bzw. 1 für "1. Miettag", Prozent aus unit_price/Basispreis) - so muss
+   nichts zusätzlich gespeichert werden, die Stufen stecken schon in den Unterpositionen. */
+function parseGroupStages(items,g){
+  var base=Number(items[g.main].unit_price)||0;
+  return g.subs.map(function(si){
+    var it=items[si],m=(it.unit||'').match(/\((\d+) Tage\)/);
+    return{days:m?Number(m[1]):1,pct:base?Math.round((Number(it.unit_price)/base)*10000)/100:100};
+  });
+}
+/* Schreibt eine (im Editor angepasste) Rabattstaffel zurück in die Unterpositionen der Gruppe -
+   Beschreibung, Menge, Einheit und Einzelpreis jeder Stufe werden aus stages neu berechnet. */
+function applyGroupStages(items,g,stages){
+  var header=items[g.main],base=Number(header.unit_price)||0,menge=Number(header.qty)||1,day=1;
+  g.subs.forEach(function(si,i){
+    var st=stages[i],it=items[si];
+    var isFirst=i===0&&st.days===1;
+    it.description=isFirst?'1. Miettag':dayRangeLabel(day,st.days)+' ('+st.pct+' % von '+euro(base)+')';
+    it.qty=menge*st.days;
+    it.unit=st.days===1?'Stk.':'Stk. ('+st.days+' Tage)';
+    it.unit_price=Math.round(base*st.pct)/100;
+    day+=st.days;
+  });
+}
+function openTierEditor(mainIdx){
+  var g=groupDocItems(curItems).find(function(x){return x.main===mainIdx});if(!g||!g.subs.length)return;
+  var total=docRentalDays(),stages=parseGroupStages(curItems,g);
+  renderTierEditor(mainIdx,stages,total);
+}
+function renderTierEditor(mainIdx,stages,total){
+  var day=1,rows=stages.map(function(st,i){
+    var from=day,last=i===stages.length-1;
+    day+=st.days;
+    var to=last?total:(from+st.days-1);
+    return '<div class="grid3" style="align-items:end;margin-bottom:6px">'+
+    '<div><label>Ab Tag</label><input value="'+from+'" disabled></div>'+
+    '<div><label>Bis Tag'+(last?' (fest = Mietende)':'')+'</label><input type="number" min="'+from+'" max="'+total+'" value="'+to+'" data-tier-to="'+i+'"'+(last?' disabled':' onchange="tierEditorRecalc('+mainIdx+')"')+'></div>'+
+    '<div><label>% vom Tagespreis</label><input type="number" min="0" max="200" step="1" value="'+st.pct+'" data-tier-pct="'+i+'"></div></div>';
+  }).join('');
+  openModal('Rabattstaffel bearbeiten',
+    '<div class="sml mut" style="margin-bottom:10px">Miettage insgesamt: '+total+'. Wenn du „Bis Tag" einer Stufe änderst, beginnt die nächste Stufe automatisch am Folgetag.</div>'+
+    '<div id="tierEditorRows">'+rows+'</div>'+
+    '<div style="margin-top:10px"><button class="btn" onclick="tierEditorApply('+mainIdx+')">Übernehmen</button></div>');
+}
+function tierEditorRecalc(mainIdx){
+  var g=groupDocItems(curItems).find(function(x){return x.main===mainIdx});if(!g)return;
+  var total=docRentalDays(),n=g.subs.length,stages=[],day=1;
+  for(var i=0;i<n;i++){
+    var last=i===n-1;
+    var to=last?total:Math.max(day,Number(v_('[data-tier-to="'+i+'"]'))||day);
+    var pct=Number(v_('[data-tier-pct="'+i+'"]'))||0;
+    stages.push({days:Math.max(1,to-day+1),pct:pct});
+    day=to+1;
+  }
+  renderTierEditor(mainIdx,stages,total);
+}
+function v_(sel){var el=document.querySelector(sel);return el?el.value:''}
+function tierEditorApply(mainIdx){
+  var g=groupDocItems(curItems).find(function(x){return x.main===mainIdx});if(!g)return;
+  var total=docRentalDays(),n=g.subs.length,stages=[],day=1;
+  for(var i=0;i<n;i++){
+    var last=i===n-1;
+    var to=last?total:Math.max(day,Number(v_('[data-tier-to="'+i+'"]'))||day);
+    var pct=Number(v_('[data-tier-pct="'+i+'"]'))||0;
+    stages.push({days:Math.max(1,to-day+1),pct:pct});
+    day=to+1;
+  }
+  applyGroupStages(curItems,g,stages);
+  closeModal();renderItems();toast('Rabattstaffel angepasst ✓');
+}
 /* Baut die Dokumentpositionen für "menge" Stück über "days" Miettage.
    Bei nur einem Miettag: eine ganz normale Einzelposition (keine Staffel nötig).
    Bei mehreren Miettagen: eine Hauptposition (Artikel, Stückzahl, Tagespreis - rein
@@ -2048,7 +2118,9 @@ function renderItems(){
       return '<div style="margin:1px 0 0 22px">'+itemRowHtml(curItems[si],si,mainLabel+'.'+String.fromCharCode(65+k),locked,true)+'</div>';
     }).join('');
     return '<div style="margin-bottom:8px">'+headerRowHtml(it,g.main,mainLabel,locked)+subsHtml+
-      '<div style="margin:2px 0 0 22px;padding:3px 8px;text-align:right;font-size:11px;font-weight:700;color:var(--wh);border-top:1px solid var(--line)">Gesamtsumme der Position: '+euro(groupTotal(curItems,g))+'</div></div>';
+      '<div style="margin:2px 0 0 22px;padding:3px 8px;text-align:right;font-size:11px;display:flex;justify-content:flex-end;align-items:center;gap:10px;border-top:1px solid var(--line)">'+
+      (locked?'':'<a onclick="openTierEditor('+g.main+')" style="font-weight:400">Rabattstaffel bearbeiten</a>')+
+      '<b style="color:var(--wh)">Gesamtsumme der Position: '+euro(groupTotal(curItems,g))+'</b></div></div>';
   }).join('');
   renderTotals();
 }
