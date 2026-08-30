@@ -358,7 +358,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <div class="phead"><div><div class="pt">Produktkatalog</div><div class="ps">Artikel mit Nummern &amp; Kategorien – per „+ Artikel“ blitzschnell ins Angebot. Pakete bündeln mehrere Artikel zu einer Position.</div></div>
       <button class="btn" onclick="openProdModal()">+ Neuer Artikel</button></div>
     <input type="text" id="prodSearch" placeholder="Suchen (Nummer, Name, Kategorie) …" oninput="renderProducts()" style="margin-bottom:12px">
-    <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Name</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis netto</th><th>Typ</th><th>Status</th></tr></thead><tbody id="prodRows"></tbody></table></div>
+    <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Name</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis brutto</th><th>Typ</th><th>Status</th></tr></thead><tbody id="prodRows"></tbody></table></div>
   </div>
 
   <!-- ANGEBOTE -->
@@ -412,7 +412,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       </div>
       <div class="grid4">
         <div><label>Rabatt aufs Gesamtdokument</label><input type="number" step="0.01" id="docDiscVal" value="0"></div>
-        <div><label>Rabatt-Art</label><select id="docDiscType"><option value="pct">%</option><option value="eur">€ (netto)</option></select></div>
+        <div><label>Rabatt-Art</label><select id="docDiscType"><option value="pct">%</option><option value="eur">€ (brutto)</option></select></div>
         <div><label>Pauschal-Gesamtpreis (brutto €) <span class="mut sml" style="text-transform:none;letter-spacing:0">– überschreibt die Positionssumme</span></label><input type="number" step="0.01" id="docTotalOverride" placeholder="leer = aus Positionen berechnet"></div>
         <div></div>
       </div>
@@ -420,7 +420,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('docIntro')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
     </div>
     <div class="card"><h3>Positionen <span style="float:right" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()"> + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()"> + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button> <span id="docTplBtns"></span></span></h3>
-      <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel netto</div><div>Gesamt</div><div></div></div>
+      <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel brutto</div><div>Gesamt</div><div></div></div>
       <div id="docItems"></div>
       <div class="totals" id="docTotals"></div>
     </div>
@@ -1010,7 +1010,7 @@ function openWsModal(id){
     '<div class="grid3"><div><label>Datum *</label><input type="date" id="wDate" value="'+(w.event_date||'')+'"></div>'+
     '<div><label>Beginn</label><input type="time" id="wStart" value="'+(w.start_time||'')+'"></div>'+
     '<div><label>Ende</label><input type="time" id="wEnd" value="'+(w.end_time||'')+'"></div></div>'+
-    '<div class="grid3"><div><label>Preis p. P. netto (€)</label><input type="number" step="0.01" id="wPrice" value="'+(w.price_net!=null?w.price_net:'')+'"></div>'+
+    '<div class="grid3"><div><label>Preis p. P. brutto (€)</label><input type="number" step="0.01" id="wPrice" value="'+(w.price_net!=null?w.price_net:'')+'"></div>'+
     '<div><label>Plätze</label><input type="number" id="wCap" value="'+(w.capacity||8)+'"></div>'+
     '<div><label>Ort</label><input id="wLoc" value="'+esc(w.location||'Lager Hemer, Büttmecker Weg 35c')+'"></div></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="wPub" style="width:auto;margin-right:6px" '+(w.public?'checked':'')+'>Auf der Technik-Seite buchbar anzeigen</label>'+
@@ -1402,7 +1402,7 @@ function openBookDetail(id){
   document.getElementById('bdData').innerHTML=
     row('Anlass',b.event_type)+row('Zeit',[b.start_time,b.end_time].filter(Boolean).join(' – '))+
     row('Location',b.venue_name)+row('Adresse',b.venue_address)+row('Gäste',b.guests)+
-    row('Gage netto',b.fee_net?euro(b.fee_net):'')+row('Notizen',b.notes)+
+    row('Gage brutto',b.fee_net?euro(b.fee_net):'')+row('Notizen',b.notes)+
     (b.customer_notes&&(b.customer_notes.schedule||b.customer_notes.music||b.customer_notes.agreements)
       ?'<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b style="color:var(--acc)">Vom Kunden gepflegt'+(b.customer_notes.updated_at?' ('+dt(b.customer_notes.updated_at)+')':'')+':</b>'+
        row('Programmablauf',b.customer_notes.schedule)+row('Musikwünsche',b.customer_notes.music)+row('Vereinbarungen',b.customer_notes.agreements)+'</div>':'');
@@ -1490,18 +1490,28 @@ function equipTierStages(eq,days){
 function dayRangeLabel(startDay,count){
   return count===1?('Miettag '+startDay):('Miettage '+startDay+'–'+(startDay+count-1));
 }
-/* Baut die Dokumentpositionen (eine je Preisstufe) für "menge" Stück über "days" Miettage.
-   Menge bleibt die tatsächlich gemietete Stückzahl (z.B. "2 Stk."), nicht mit den Tagen
-   multipliziert - der Tage-Anteil steckt im Einzelpreis (Tagesrate × Tage dieser Stufe),
-   damit die Menge für den Kunden der Anzahl gemieteter Artikel entspricht. */
+/* Baut die Dokumentpositionen für "menge" Stück über "days" Miettage.
+   Bei nur einem Miettag: eine ganz normale Einzelposition (keine Staffel nötig).
+   Bei mehreren Miettagen: eine Hauptposition (Artikel, Stückzahl, Tagespreis - rein
+   informativ, zählt nicht zur Summe, siehe lineTotal) plus je Preisstufe eine kleine,
+   eingerückte Unterposition (1.A, 1.B, ...) mit der jeweiligen Rechnung "Menge × Preis".
+   _gid/_pgid verbinden Haupt- und Unterpositionen im Editor unabhängig von ihrer Reihenfolge;
+   beim Speichern wird daraus is_header/group_pos (siehe saveDoc). */
 function equipTierLineItems(eq,days,menge,startPos){
   var stages=equipTierStages(eq,days);
-  return stages.map(function(st,i){
-    var desc=i===0?eq.name+' – 1. Miettag':
-      eq.name+' – '+dayRangeLabel(st.startDay,st.count)+' ('+st.count+' Tag'+(st.count>1?'e':'')+' à '+st.pct+' % von '+euro(Number(eq.day_rate)||0)+')';
-    return{pos:startPos+i,description:desc,note:i===0?(eq.description||''):'',
-      qty:menge,unit:st.count===1?'Stk.':'Stk. ('+st.count+' Tage)',unit_price:st.rate*st.count};
+  if(stages.length<=1){
+    return[{pos:startPos,description:eq.name,note:eq.description||'',
+      qty:menge,unit:'Stk.',unit_price:stages[0].rate}];
+  }
+  var gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  var header={pos:startPos,description:eq.name,note:eq.description||'',
+    qty:menge,unit:'Stk.',unit_price:Number(eq.day_rate)||0,is_header:1,_gid:gid};
+  var subs=stages.map(function(st,i){
+    var desc=i===0?'1. Miettag':dayRangeLabel(st.startDay,st.count)+' ('+st.pct+' % von '+euro(Number(eq.day_rate)||0)+')';
+    return{pos:startPos+1+i,description:desc,note:'',
+      qty:menge,unit:st.count===1?'Stk.':'Stk. ('+st.count+' Tage)',unit_price:st.rate*st.count,_pgid:gid};
   });
+  return[header].concat(subs);
 }
 function eqAvailable(eqId,b,excludeBeId){
   var eq=CACHE.equipment.find(function(e){return e.id===eqId});if(!eq)return 0;
@@ -1523,7 +1533,7 @@ function openBeModal(){
   openModal('Technik zuordnen – '+dt(curBook.event_date),
     '<label>Artikel (Verfügbarkeit im Zeitraum geprüft)</label><select id="beEq">'+opts+'</select>'+
     '<div class="grid2"><div><label>Menge</label><input type="number" id="beQty" value="1" min="1"></div>'+
-    '<div><label>Preis gesamt netto (leer = automatisch)</label><input type="number" id="bePrice" step="0.01" placeholder="auto"></div></div>'+
+    '<div><label>Preis gesamt brutto (leer = automatisch)</label><input type="number" id="bePrice" step="0.01" placeholder="auto"></div></div>'+
     '<label>Notiz</label><input id="beNote">'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveBe()">Zuordnen</button></div>');
 }
@@ -1562,7 +1572,7 @@ function openBookModal(b,presetCust){
     '<div class="grid3"><div><label>Location</label><input id="bVenue" value="'+esc(b.venue_name||'')+'"></div>'+
     '<div><label>Adresse</label><input id="bAddr" value="'+esc(b.venue_address||'')+'"></div>'+
     '<div><label>Gäste</label><input type="number" id="bGuests" value="'+(b.guests||'')+'"></div></div>'+
-    '<label>Gage netto (€, ohne Technik)</label><input type="number" step="0.01" id="bFee" value="'+(b.fee_net||'')+'">'+
+    '<label>Gage brutto (€, ohne Technik)</label><input type="number" step="0.01" id="bFee" value="'+(b.fee_net||'')+'">'+
     '<label>Notizen</label><textarea id="bNotes">'+esc(b.notes||'')+'</textarea>'+edBtn('bNotes')+
     '<div style="margin-top:14px"><button class="btn" onclick="saveBook(\''+(b.id||'')+'\')">Speichern</button>'+
     (b.id?' <button class="btn r" onclick="delBook(\''+b.id+'\')">Löschen</button>':'')+'</div>');
@@ -1617,7 +1627,7 @@ function renderRider(){
     row('Musikwünsche',r.music)+row('No-Gos',r.nogos)+
     row('Entfernung (einfach)',r.distance_km?r.distance_km+' km':'')+
     row('Fahrzeit (einfach)',r.travel_minutes?r.travel_minutes+' Min.':'')+
-    row('Reisekosten',tc?euro(tc)+' netto (wird als Position „Anfahrt“ übernommen)':'')+
+    row('Reisekosten',tc?euro(tc)+' brutto (wird als Position „Anfahrt“ übernommen)':'')+
     '</div>'+(r.notes?'<div style="margin-top:6px">'+row('Sonstiges / Ablauf',r.notes)+'</div>':'');
 }
 function openRiderModal(){
@@ -1644,7 +1654,7 @@ function openRiderModal(){
 }
 function riderKmHint(){
   var km=Number(v('rKm'))||0,min=Number(v('rMin'))||0,rate=travelRate(),free=travelFree();
-  var hint=km?('Reisekosten: <b style="color:var(--wh)">'+euro(travelCost(km))+'</b> netto ('+(travelFreeMode()==='schwelle'?(km>free?'über':'bis zu')+' '+free+' km Freigrenze':(free+' Freikilometer abgezogen'))+', '+(travelRoundtrip()?'Hin- und Rückfahrt':'einfache Strecke')+' × '+euro(rate)+'/km). Fließt automatisch als Position „Anfahrt" in Angebot/Rechnung. Regeln in den Einstellungen.'):'';
+  var hint=km?('Reisekosten: <b style="color:var(--wh)">'+euro(travelCost(km))+'</b> brutto ('+(travelFreeMode()==='schwelle'?(km>free?'über':'bis zu')+' '+free+' km Freigrenze':(free+' Freikilometer abgezogen'))+', '+(travelRoundtrip()?'Hin- und Rückfahrt':'einfache Strecke')+' × '+euro(rate)+'/km). Fließt automatisch als Position „Anfahrt" in Angebot/Rechnung. Regeln in den Einstellungen.'):'';
   var onEnabled=overnightEnabled(),thresh=overnightThresholdType()==='zeit'?min:km,thVal=overnightThresholdValue();
   if(onEnabled&&thresh>=thVal&&thVal>0)hint+=(hint?'<br>':'')+'Ab '+thVal+(overnightThresholdType()==='zeit'?' Min. Fahrzeit':' km Fahrtstrecke')+': automatische Übernachtung ('+euro(overnightPrice())+') wird beim Rechnung/Angebot erstellen ergänzt.';
   document.getElementById('rKmHint').innerHTML=hint;
@@ -1944,50 +1954,109 @@ function unitOptionsHtml(cur){
   if(cur&&list.indexOf(cur)===-1)list.unshift(cur);
   return list.map(function(u){return '<option'+(u===cur?' selected':'')+'>'+esc(u)+'</option>'}).join('');
 }
+/* Gruppiert Haupt-/Unterpositionen (Miettage-Rabattstaffel). Funktioniert sowohl mit
+   frisch im Editor erzeugten Items (_gid/_pgid) als auch mit vom Server geladenen
+   Items (is_header + pos/group_pos) - siehe equipTierLineItems() und saveDoc(). */
+function groupDocItems(items){
+  function hKey(it,i){return it._gid!=null?('g:'+it._gid):('p:'+it.pos)}
+  function pKey(it){return it._pgid!=null?('g:'+it._pgid):(it.group_pos!=null?('p:'+it.group_pos):null)}
+  var headerAt={};
+  items.forEach(function(it,i){if(it.is_header)headerAt[hKey(it,i)]=i});
+  var subsOf={};
+  items.forEach(function(it,i){
+    var pk=pKey(it);
+    if(pk!=null&&headerAt[pk]!=null)(subsOf[pk]=subsOf[pk]||[]).push(i);
+  });
+  var consumed={};
+  Object.keys(subsOf).forEach(function(pk){subsOf[pk].forEach(function(i){consumed[i]=true})});
+  var groups=[];
+  items.forEach(function(it,i){
+    if(consumed[i])return;
+    groups.push({main:i,subs:it.is_header?(subsOf[hKey(it,i)]||[]):[]});
+  });
+  return groups;
+}
+function groupTotal(items,g){return g.subs.reduce(function(s,i){return s+lineTotal(items[i])},lineTotal(items[g.main]))}
+function itemRowHtml(it,i,posLabel,locked,sml){
+  var sum=lineTotal(it);
+  return '<div class="it-row" style="margin-bottom:3px'+(sml?';font-size:12px':'')+'">'+
+  '<div'+(locked||sml?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':(sml?'default':'grab'))+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked||sml?'':'<span style="opacity:.55">⠿</span>')+posLabel+'</div>'+
+  '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
+  '<input type="number" step="0.5" value="'+it.qty+'" oninput="itSet('+i+',\'qty\',this.value)">'+
+  '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
+  '<input type="number" step="0.01" value="'+it.unit_price+'" oninput="itSet('+i+',\'unit_price\',this.value)">'+
+  '<input value="'+euro(sum)+'" disabled class="num">'+
+  (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)">✕</a>')+'</div>'+
+  '<div style="padding-left:42px;padding-right:34px;display:flex;gap:6px">'+
+  '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Erklärung für das Kundenportal (erscheint beim Drüberfahren) – optional" style="font-size:10px;padding:5px 8px;color:var(--gll)">'+
+  '<input type="number" step="0.01" value="'+(it.discount_value||0)+'" oninput="itSet('+i+',\'discount_value\',this.value)" title="Rabatt auf diese Position" style="width:74px;font-size:10px;padding:5px 8px" placeholder="Rabatt">'+
+  '<select onchange="itSet('+i+',\'discount_type\',this.value)" style="width:52px;font-size:10px;padding:5px 4px">'+
+  '<option value="pct"'+(it.discount_type!=='eur'?' selected':'')+'>%</option><option value="eur"'+(it.discount_type==='eur'?' selected':'')+'>€</option></select>'+
+  '</div>';
+}
+function headerRowHtml(it,i,posLabel,locked){
+  return '<div class="it-row" style="margin-bottom:3px">'+
+  '<div style="display:flex;align-items:center;justify-content:center;gap:3px;color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+posLabel+'</div>'+
+  '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
+  '<input value="'+it.qty+' Stk." disabled>'+
+  '<input value="Stückpreis" disabled>'+
+  '<input value="'+euro(it.unit_price)+' /Tag" disabled>'+
+  '<input value="siehe unten" disabled class="num" style="color:var(--gll)">'+
+  (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)" title="Ganze Position (inkl. Rabattstaffel) löschen">✕</a>')+'</div>'+
+  '<div style="padding-left:42px;padding-right:34px">'+
+  '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Erklärung für das Kundenportal (erscheint beim Drüberfahren) – optional" style="font-size:10px;padding:5px 8px;color:var(--gll);width:100%">'+
+  '</div>';
+}
 function renderItems(){
   var locked=docLockedJs(curDoc);
-  document.getElementById('docItems').innerHTML=curItems.map(function(it,i){
-    var sum=lineTotal(it);
-    return '<div style="margin-bottom:10px"'+(locked?'':' ondragover="itDragOver(event)" ondrop="itDrop('+i+',event)"')+'><div class="it-row" style="margin-bottom:3px">'+
-    '<div'+(locked?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':'grab')+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked?'':'<span style="opacity:.55">⠿</span>')+(i+1)+'</div>'+
-    '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
-    '<input type="number" step="0.5" value="'+it.qty+'" oninput="itSet('+i+',\'qty\',this.value)">'+
-    '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
-    '<input type="number" step="0.01" value="'+it.unit_price+'" oninput="itSet('+i+',\'unit_price\',this.value)">'+
-    '<input value="'+euro(sum)+'" disabled class="num">'+
-    (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)">✕</a>')+'</div>'+
-    '<div style="padding-left:42px;padding-right:34px;display:flex;gap:6px">'+
-    '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Erklärung für das Kundenportal (erscheint beim Drüberfahren) – optional" style="font-size:10px;padding:5px 8px;color:var(--gll)">'+
-    '<input type="number" step="0.01" value="'+(it.discount_value||0)+'" oninput="itSet('+i+',\'discount_value\',this.value)" title="Rabatt auf diese Position" style="width:74px;font-size:10px;padding:5px 8px" placeholder="Rabatt">'+
-    '<select onchange="itSet('+i+',\'discount_type\',this.value)" style="width:52px;font-size:10px;padding:5px 4px">'+
-    '<option value="pct"'+(it.discount_type!=='eur'?' selected':'')+'>%</option><option value="eur"'+(it.discount_type==='eur'?' selected':'')+'>€</option></select>'+
-    '</div></div>';
+  var groups=groupDocItems(curItems);
+  document.getElementById('docItems').innerHTML=groups.map(function(g,gi){
+    var it=curItems[g.main],mainLabel=String(gi+1);
+    if(!g.subs.length){
+      return '<div style="margin-bottom:10px"'+(locked?'':' ondragover="itDragOver(event)" ondrop="itDrop('+g.main+',event)"')+'>'+itemRowHtml(it,g.main,mainLabel,locked,false)+'</div>';
+    }
+    var subsHtml=g.subs.map(function(si,k){
+      return '<div style="margin:4px 0 0 30px;opacity:.92">'+itemRowHtml(curItems[si],si,mainLabel+'.'+String.fromCharCode(65+k),locked,true)+'</div>';
+    }).join('');
+    return '<div style="margin-bottom:10px">'+headerRowHtml(it,g.main,mainLabel,locked)+subsHtml+
+      '<div style="margin:4px 0 0 30px;padding:6px 10px;text-align:right;font-size:12px;font-weight:700;color:var(--wh);border-top:1px solid var(--line)">Gesamtsumme der Position: '+euro(groupTotal(curItems,g))+'</div></div>';
   }).join('');
   renderTotals();
 }
 function itSet(i,k,val){curItems[i][k]=(k==='qty'||k==='unit_price'||k==='discount_value')?Number(val)||0:val;if(k!=='note')renderTotals()}
 function lineTotal(it){
+  if(it.is_header)return 0; /* reine Kopfzeile (Artikel/Stückzahl/Tagespreis) - Summe steckt in den Unterpositionen */
   var g=(Number(it.qty)||0)*(Number(it.unit_price)||0);
   var d=Number(it.discount_value)||0;
   if(!d)return g;
   return it.discount_type==='eur'?Math.max(0,g-d):g*(1-Math.min(100,d)/100);
 }
-function itDel(i){curItems.splice(i,1);renderItems()}
+function itDel(i){
+  var it=curItems[i];
+  if(it.is_header){
+    var g=groupDocItems(curItems).find(function(g){return g.main===i});
+    var idx=[i].concat(g?g.subs:[]).sort(function(a,b){return b-a});
+    idx.forEach(function(j){curItems.splice(j,1)});
+  } else curItems.splice(i,1);
+  renderItems();
+}
 var itDragIdx=null;
 function itDragStart(i,ev){itDragIdx=i;ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',String(i))}catch(e){}}
 function itDragOver(ev){if(itDragIdx!==null)ev.preventDefault()}
 function itDrop(i,ev){ev.preventDefault();if(itDragIdx===null||itDragIdx===i){itDragIdx=null;return}
   var m=curItems.splice(itDragIdx,1)[0];curItems.splice(i,0,m);itDragIdx=null;renderItems()}
 function addItemRow(){curItems.push({pos:curItems.length+1,description:'',qty:1,unit:'Stk.',unit_price:0});renderItems()}
+/* Positionspreise (unit_price) sind brutto - Markus pflegt und nennt Kunden immer den Preis
+   inkl. USt. Netto wird daraus abgeleitet, nicht umgekehrt draufgerechnet. */
 function docCalc(){
   var sub=curItems.reduce(function(s,it){return s+lineTotal(it)},0);
   var dv=Number(v('docDiscVal'))||0,dtp=v('docDiscType')||'pct';
   var disc=dv?(dtp==='eur'?Math.min(sub,dv):sub*Math.min(100,dv)/100):0;
-  var net=sub-disc;
+  var gross=sub-disc;
   var rate=Number(document.getElementById('docTax').value)||0;
-  var tax=net*rate/100,gross=net+tax;
+  var net=rate?gross/(1+rate/100):gross,tax=gross-net;
   var override=v('docTotalOverride')!==''?Number(v('docTotalOverride')):null;
-  if(override!=null){gross=override;net=gross/(1+rate/100);tax=gross-net;}
+  if(override!=null){gross=override;net=rate?gross/(1+rate/100):gross;tax=gross-net;}
   var dep=Number(document.getElementById('docDep').value)||0;
   return {sub:sub,disc:disc,discVal:dv,discType:dtp,net:net,tax:tax,gross:gross,rate:rate,dep:dep,override:override};
 }
@@ -1995,7 +2064,7 @@ function renderTotals(){
   var c=docCalc(),t=document.getElementById('docType').value;
   var html='';
   if(c.override!=null){
-    html+='Pauschal-Gesamtpreis: <b>'+euro(c.gross)+'</b> brutto (Positionssumme wäre '+euro(c.sub)+' netto) &nbsp;·&nbsp; enthaltene USt. '+c.rate+' %: '+euro(c.tax)+'<br>';
+    html+='Pauschal-Gesamtpreis: <b>'+euro(c.gross)+'</b> brutto (Positionssumme wäre '+euro(c.sub)+' brutto) &nbsp;·&nbsp; enthaltene USt. '+c.rate+' %: '+euro(c.tax)+'<br>';
   } else {
     if(c.disc)html+='Zwischensumme: '+euro(c.sub)+' &nbsp;·&nbsp; Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+': −'+euro(c.disc)+'<br>';
     html+='Netto: '+euro(c.net)+' &nbsp;·&nbsp; USt. '+c.rate+' %: '+euro(c.tax)+' &nbsp;·&nbsp; Brutto: <b>'+euro(c.gross)+'</b>';
@@ -2033,9 +2102,18 @@ function saveDoc(){
   p.then(function(rows){
     var d=rows[0];curDoc.id=d.id;curDoc.number=d.number;curDoc.status=d.status;curDoc.doc_type=d.doc_type;
     return api('document_items?document_id=eq.'+d.id,{method:'DELETE'}).then(function(){
-      var items=curItems.filter(function(it){return it.description}).map(function(it,i){
+      var filtered=curItems.filter(function(it){return it.description});
+      /* Gruppenschlüssel: frisch erzeugte Items tragen _gid/_pgid (siehe equipTierLineItems);
+         aus der DB geladene, unveränderte Items werden über ihr altes pos/group_pos verknüpft. */
+      function hKey(it){return it._gid!=null?('g:'+it._gid):('p:'+it.pos)}
+      function pKey(it){return it._pgid!=null?('g:'+it._pgid):(it.group_pos!=null?('p:'+it.group_pos):null)}
+      var gidPos={};
+      filtered.forEach(function(it,i){if(it.is_header)gidPos[hKey(it)]=i+1});
+      var items=filtered.map(function(it,i){
+        var pk=pKey(it);
         return {document_id:d.id,pos:i+1,description:it.description,note:it.note||null,qty:it.qty,unit:it.unit,unit_price:it.unit_price,
-          discount_value:it.discount_value||0,discount_type:it.discount_type||'pct'}});
+          discount_value:it.discount_value||0,discount_type:it.discount_type||'pct',
+          is_header:it.is_header?1:0,group_pos:pk!=null?(gidPos[pk]!=null?gidPos[pk]:null):null}});
       return items.length?api('document_items',{method:'POST',body:items}):null;
     });
   }).then(function(){
@@ -2047,8 +2125,8 @@ function saveDoc(){
 
 function askAbschlag(total,label,cb){
   openModal('Abschlagsrechnung – Höhe festlegen',
-    '<div class="sml mut" style="margin-bottom:10px">Gesamtwert der Leistung: <b style="color:var(--wh)">'+euro(total)+' netto</b></div>'+
-    '<div class="grid2"><div><label>Art</label><select id="abType"><option value="pct">Prozent vom Gesamtwert</option><option value="eur">Pauschalbetrag (€ netto)</option></select></div>'+
+    '<div class="sml mut" style="margin-bottom:10px">Gesamtwert der Leistung: <b style="color:var(--wh)">'+euro(total)+' brutto</b></div>'+
+    '<div class="grid2"><div><label>Art</label><select id="abType"><option value="pct">Prozent vom Gesamtwert</option><option value="eur">Pauschalbetrag (€ brutto)</option></select></div>'+
     '<div><label>Wert</label><input type="number" step="0.01" id="abVal" value="50"></div></div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="confirmAbschlag('+total+',\''+esc(label).replace(/'/g,"\\'")+'\')">Übernehmen</button></div>');
   window._abCb=cb;
@@ -2056,7 +2134,7 @@ function askAbschlag(total,label,cb){
 function confirmAbschlag(total,label){
   var t=v('abType'),val=Number(v('abVal'))||0;
   var amount=t==='pct'?Math.round(total*val)/100:val;amount=t==='pct'?Math.round(total*val/100*100)/100:val;
-  var desc=t==='pct'?('Abschlagszahlung ('+val+' % von '+euro(total)+' netto) für '+label):('Abschlagszahlung (pauschal) für '+label);
+  var desc=t==='pct'?('Abschlagszahlung ('+val+' % von '+euro(total)+' brutto) für '+label):('Abschlagszahlung (pauschal) für '+label);
   closeModal();
   if(window._abCb)window._abCb(amount,desc);
 }
@@ -2134,7 +2212,7 @@ function openStornoModal(){
   var today=new Date().toISOString().slice(0,10);
   openModal('Storno abwickeln – '+esc(b.title||b.event_type||'Auftrag'),
     '<div class="grid2"><div><label>Eingang der Absage</label><input type="date" id="stEingang" value="'+today+'" onchange="stornoRecalc()"></div>'+
-    '<div><label>Vereinbarte Vergütung netto (€)</label><input type="number" step="0.01" id="stBase" value="'+bookingBaseNet(b)+'" oninput="stornoRecalc()"></div></div>'+
+    '<div><label>Vereinbarte Vergütung brutto (€)</label><input type="number" step="0.01" id="stBase" value="'+bookingBaseNet(b)+'" oninput="stornoRecalc()"></div></div>'+
     '<div class="sml mut" id="stInfo" style="margin:4px 0 10px"></div>'+
     '<label>Abwicklung</label><select id="stMode" onchange="stornoMode()">'+
     '<option value="staffel">Storno-Staffel berechnen (gemäß AGB § 5)</option>'+
@@ -2152,7 +2230,7 @@ function openStornoModal(){
     '<label>Beschreibung sonstige Kosten</label><input id="stKSonstTxt" placeholder="z. B. bereits gekauftes Verbrauchsmaterial"></div>'+
     '<div id="grpErsatz" style="display:none"><div class="grid2">'+
     '<div><label>Neuer Termin</label><input type="date" id="stNeu"></div>'+
-    '<div><label>Umbuchungspauschale netto (€) – Vorschlag: 50 % des Staffelbetrags</label><input type="number" step="0.01" id="stUmb"></div></div>'+
+    '<div><label>Umbuchungspauschale brutto (€) – Vorschlag: 50 % des Staffelbetrags</label><input type="number" step="0.01" id="stUmb"></div></div>'+
     '<div class="sml mut" style="margin-bottom:6px">Faustregel: Fällt der neue Termin auf einen schwach nachgefragten Slot (Mo–Do, tagsüber, Nebensaison), kannst du die Pauschale senken oder erlassen – er blockiert kaum anderes Geschäft. Ein Samstag in der Hauptsaison blockiert dagegen einen vollen Buchungsplatz: Pauschale eher halten. Bei 0 € wird keine Rechnung erzeugt, sofern auch keine Kosten anfallen.</div></div>'+
     '<label style="margin-top:8px"><input type="checkbox" id="stMark" style="width:auto;margin-right:6px" checked>Ursprüngliche Buchung auf „storniert“ setzen</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="runStorno()">Abwickeln</button></div>');
@@ -2184,7 +2262,7 @@ function runStorno(){
       title:(b.title||b.event_type||'Auftrag')+' (Ersatztermin)',event_date:neu,
       start_time:b.start_time,end_time:b.end_time,venue_name:b.venue_name,venue_address:b.venue_address,
       guests:b.guests,fee_net:b.fee_net,notes:'Umbuchung – ursprünglicher Termin: '+dt(b.event_date)}}).then(function(r){return r[0]});
-    jobs.push(stornoNote('Absage vom '+dt(v('stEingang'))+' ('+days+' Tage vorher). Umbuchung auf Ersatztermin '+dt(v('stNeu'))+' vereinbart; Umbuchungspauschale: '+euro(Number(v('stUmb'))||0)+' netto.'));
+    jobs.push(stornoNote('Absage vom '+dt(v('stEingang'))+' ('+days+' Tage vorher). Umbuchung auf Ersatztermin '+dt(v('stNeu'))+' vereinbart; Umbuchungspauschale: '+euro(Number(v('stUmb'))||0)+' brutto.'));
   }
 
   /* Rechnungspositionen zusammenstellen */
@@ -2196,7 +2274,7 @@ function runStorno(){
       'Da der Termin damit '+days+' Tage vorher frei wurde und so kurzfristig in der Regel nicht neu belegt werden kann, '+
       'berechnen wir gemäß unserer AGB (§ 5, Storno-Staffel) eine Ausfallvergütung von '+pct+' % der vereinbarten Vergütung. '+
       'Ersparte Aufwendungen ziehen wir selbstverständlich ab – die Zusammensetzung seht ihr unten.';
-    items.push({description:'Ausfallvergütung bei Stornierung ('+pct+' % von '+euro(base)+' netto)',
+    items.push({description:'Ausfallvergütung bei Stornierung ('+pct+' % von '+euro(base)+' brutto)',
       note:'Gemäß AGB § 5: Absage '+days+' Tage vor dem Termin. Der Termin war fest reserviert und kann so kurzfristig in der Regel nicht neu vergeben werden.',
       qty:1,unit:'pausch.',unit_price:fee});
     if(fahrt>0)items.push({description:'abzüglich ersparte Fahrtkosten',note:'Da die Anfahrt entfällt, ziehen wir die kalkulierten Fahrtkosten vollständig ab.',qty:1,unit:'pausch.',unit_price:-fahrt});
@@ -2339,9 +2417,9 @@ function printMietvertrag(rc){
   '<div style="margin-bottom:14px"><b>Mietzeitraum:</b> '+dt(b.event_date)+(b.end_date?' bis '+dt(b.end_date):'')+' ('+days+' Miettag'+(days>1?'e':'')+', 1 Miettag = 24 Stunden ab Übergabe)'+
   (b.venue_name?'<br><b>Einsatzort:</b> '+esc(b.venue_name):'')+'</div>'+
   '<table style="width:100%;border-collapse:collapse;margin-bottom:6px"><thead><tr style="background:#f2f2f2">'+
-  '<th style="padding:7px;text-align:left">Pos</th><th style="padding:7px;text-align:left">Mietgegenstand</th><th style="padding:7px;text-align:right">Menge</th><th style="padding:7px;text-align:right">Mietpreis netto</th></tr></thead>'+
-  '<tbody>'+rows+'</tbody><tfoot><tr><td colspan="3" style="padding:7px;text-align:right;font-weight:700">Gesamtmiete netto</td><td style="padding:7px;text-align:right;font-weight:700">'+euro(total)+'</td></tr></tfoot></table>'+
-  '<p style="color:#555;margin-bottom:16px">zzgl. gesetzlicher Umsatzsteuer, sofern ausgewiesen. Abrechnung gemäß zugehörigem Angebot bzw. Rechnung.</p>'+
+  '<th style="padding:7px;text-align:left">Pos</th><th style="padding:7px;text-align:left">Mietgegenstand</th><th style="padding:7px;text-align:right">Menge</th><th style="padding:7px;text-align:right">Mietpreis brutto</th></tr></thead>'+
+  '<tbody>'+rows+'</tbody><tfoot><tr><td colspan="3" style="padding:7px;text-align:right;font-weight:700">Gesamtmiete brutto</td><td style="padding:7px;text-align:right;font-weight:700">'+euro(total)+'</td></tr></tfoot></table>'+
+  '<p style="color:#555;margin-bottom:16px">inkl. gesetzlicher Umsatzsteuer, sofern ausgewiesen. Abrechnung gemäß zugehörigem Angebot bzw. Rechnung.</p>'+
   '<div style="white-space:pre-wrap;margin-bottom:26px">'+esc(terms)+'</div>'+
   '<div style="display:flex;gap:40px;margin-top:36px;align-items:flex-end">'+
   '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift Vermieter</div></div>'+
@@ -2407,21 +2485,48 @@ function purgeIdFiles(){
 }
 
 /* ===== Druck / PDF ===== */
+/* Baut die Positionszeilen für Druck/PDF - Haupt-/Unterpositionen (Miettage-Rabattstaffel)
+   werden dabei als Kopfzeile + kleine, eingerückte Unterzeilen (1.A, 1.B, ...) samt
+   Zwischensumme dargestellt, damit die Berechnung für den Kunden nachvollziehbar bleibt. */
+function docRowsHtml(items,f){
+  var filtered=items.filter(function(it){return it.description});
+  var groups=groupDocItems(filtered);
+  return groups.map(function(g,gi){
+    var it=filtered[g.main],label=String(gi+1);
+    if(!g.subs.length){
+      var rab=Number(it.discount_value)?'<div style="font-size:10px;color:#666">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):it.discount_value+' %')+'</div>':'';
+      return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+label+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+it.qty+' '+esc(it.unit||'')+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(it.unit_price*f)+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(lineTotal(it)*f)+'</td></tr>';
+    }
+    var head='<tr><td style="padding:6px;border-bottom:1px solid #eee;font-weight:700">'+label+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #eee;font-weight:700">'+esc(it.description)+
+      '<div style="font-size:10px;color:#666;font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
+      '<td style="padding:6px;border-bottom:1px solid #eee"></td><td style="padding:6px;border-bottom:1px solid #eee"></td><td style="padding:6px;border-bottom:1px solid #eee"></td></tr>';
+    var subs=g.subs.map(function(si,k){
+      var sit=filtered[si];
+      var rab=Number(sit.discount_value)?'<div style="font-size:9px;color:#888">Rabatt: −'+(sit.discount_type==='eur'?euro(sit.discount_value*f):sit.discount_value+' %')+'</div>':'';
+      return '<tr style="font-size:10.5px;color:#444"><td style="padding:3px 6px 3px 18px;border-bottom:1px solid #eee">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
+      '<td style="padding:3px 6px;border-bottom:1px solid #eee">'+esc(sit.description)+rab+'</td>'+
+      '<td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:right">'+sit.qty+' '+esc(sit.unit||'')+'</td>'+
+      '<td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:right">'+euro(sit.unit_price*f)+'</td>'+
+      '<td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:right">'+euro(lineTotal(sit)*f)+'</td></tr>';
+    }).join('');
+    var foot='<tr><td></td><td colspan="3" style="padding:4px 6px;text-align:right;font-weight:700;border-bottom:1px solid #ddd">Gesamtsumme der Position</td>'+
+      '<td style="padding:4px 6px;text-align:right;font-weight:700;border-bottom:1px solid #ddd">'+euro(groupTotal(filtered,g)*f)+'</td></tr>';
+    return head+subs+foot;
+  }).join('');
+}
 function printDoc(){
   var d=curDoc,c=docCalc(),comp=S.company||{};
   var cust=CACHE.customers.find(function(x){return x.id===v('docCust')})||{};
   var type=v('docType');
   var small=Number(document.getElementById('docTax').value)===0&&comp.small_business;
   var brutto=docModeVal()==='brutto'&&!small;
-  var f=brutto?1+c.rate/100:1;
-  var rows=curItems.filter(function(it){return it.description}).map(function(it,i){
-    var rab=Number(it.discount_value)?'<div style="font-size:10px;color:#666">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):it.discount_value+' %')+'</div>':'';
-    return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+(i+1)+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+it.qty+' '+esc(it.unit||'')+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(it.unit_price*f)+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(lineTotal(it)*f)+'</td></tr>';
-  }).join('');
+  var f=brutto?1:(c.rate?1/(1+c.rate/100):1);
+  var rows=docRowsHtml(curItems,f);
   var totals='';
   if(c.disc)totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Zwischensumme</td><td style="text-align:right;padding:6px">'+euro(c.sub*f)+'</td></tr>'+
     '<tr><td colspan="4" style="text-align:right;padding:6px">Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+'</td><td style="text-align:right;padding:6px">−'+euro(c.disc*f)+'</td></tr>';
@@ -4137,7 +4242,7 @@ function openProdModal(id){
     '<label>Art</label><select id="pKind"><option value="artikel"'+(p.kind!=='dienstleistung'?' selected':'')+'>Artikel</option><option value="dienstleistung"'+(p.kind==='dienstleistung'?' selected':'')+'>Dienstleistung</option></select>'+
     '<label>Beschreibung (erscheint als Erklärung im Kundenportal)</label><textarea id="pDesc">'+esc(p.description||'')+'</textarea>'+edBtn('pDesc')+
     '<div class="grid2"><div><label>Einheit</label><select id="pUnit">'+unitOptionsHtml(p.unit||'Stk.')+'</select></div>'+
-    '<div><label>Preis netto (€) – bei Sets leer = Summe der Bestandteile</label><input type="number" step="0.01" id="pPrice" value="'+(p.price_net!=null?p.price_net:'')+'"></div></div>'+
+    '<div><label>Preis brutto (€) – bei Sets leer = Summe der Bestandteile</label><input type="number" step="0.01" id="pPrice" value="'+(p.price_net!=null?p.price_net:'')+'"></div></div>'+
     '<label>Set-Bestandteile (eine Zeile je Artikelnummer: Artikelnummer | Menge) – zieht auch aus dem Technikkatalog, leer = normaler Artikel</label>'+
     '<textarea id="pBundle" style="min-height:70px;font-size:11px" placeholder="DJ-100 | 1&#10;TON-200 | 1">'+esc(bundleLines)+'</textarea>'+
     '<label>Passt dazu (Artikelnummer) <span class="mut sml" style="text-transform:none;letter-spacing:0">– wird automatisch mit ins Angebot/die Rechnung übernommen, wenn dieser Artikel eingefügt wird (z. B. Kabel zu Lautsprecher)</span></label>'+
@@ -4246,7 +4351,7 @@ function openTplPicker(){
 }
 function applyTpl(id){
   var t=(CACHE.quoteTpls||[]).find(function(x){return x.id===id});if(!t)return;
-  curItems=(t.items||[]).map(function(it,i){return{pos:i+1,description:it.description,note:it.note||'',qty:it.qty,unit:it.unit,unit_price:it.unit_price}});
+  curItems=(t.items||[]).map(function(it,i){return{pos:i+1,description:it.description,note:it.note||'',qty:it.qty,unit:it.unit,unit_price:it.unit_price,is_header:it.is_header||0,group_pos:it.group_pos!=null?it.group_pos:null}});
   if(t.intro_text)document.getElementById('docIntro').value=t.intro_text;
   if(t.outro_text)document.getElementById('docOutro').value=t.outro_text;
   closeModal();renderItems();toast('Vorlage „'+t.name+'" geladen ✓ – jetzt für den Kunden anpassen');
@@ -4256,7 +4361,7 @@ function saveAsTpl(){
   var name=prompt('Name der Vorlage (z. B. „Hochzeit Standard"):');
   if(!name)return;
   var body={name:name,intro_text:v('docIntro')||'',outro_text:v('docOutro')||'',
-    items:curItems.map(function(it,i){return{pos:i+1,description:it.description,note:it.note||'',qty:it.qty,unit:it.unit,unit_price:it.unit_price}}),
+    items:curItems.map(function(it,i){return{pos:i+1,description:it.description,note:it.note||'',qty:it.qty,unit:it.unit,unit_price:it.unit_price,is_header:it.is_header||0,group_pos:it.group_pos!=null?it.group_pos:null}}),
     sort:(CACHE.quoteTpls||[]).length};
   api('quote_templates',{method:'POST',body:body}).then(function(){toast('Vorlage „'+name+'" gespeichert ✓');reloadTpls()}).catch(function(e){toast(e.message,1)});
 }
@@ -4347,7 +4452,7 @@ function openUpModal(id){
   var u=id?(CACHE.upsells||[]).find(function(x){return x.id===id}):{};u=u||{};
   openModal(id?'Extra bearbeiten':'Neues Extra',
     '<div class="grid2"><div><label>Titel *</label><input id="uTitle" value="'+esc(u.title||'')+'"></div>'+
-    '<div><label>Preis netto (€)</label><input type="number" step="0.01" id="uPrice" value="'+(u.price_net||0)+'"></div></div>'+
+    '<div><label>Preis brutto (€)</label><input type="number" step="0.01" id="uPrice" value="'+(u.price_net||0)+'"></div></div>'+
     '<label>Beschreibung (sieht der Kunde)</label><textarea id="uDesc">'+esc(u.description||'')+'</textarea>'+edBtn('uDesc')+
     '<div class="grid2"><div><label>Passt zu (nur intern)</label><input id="uOcc" value="'+esc(u.occasions||'')+'" placeholder="Hochzeit, Firmenfeier …"></div>'+
     '<div><label>Sortierung</label><input type="number" id="uSort" value="'+(u.sort||0)+'"></div></div>'+

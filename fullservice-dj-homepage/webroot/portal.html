@@ -129,25 +129,67 @@ function submitPlz(){
 }
 var TYPE_NAME={angebot:'Angebot',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'};
 function lineTotal(it){
+  if(it.is_header)return 0; /* reine Kopfzeile (Artikel/Stückzahl/Tagespreis) - Summe steckt in den Unterpositionen */
   var g=(Number(it.qty)||0)*(Number(it.unit_price)||0);
   var dd=Number(it.discount_value)||0;
   if(!dd)return g;
   return it.discount_type==='eur'?Math.max(0,g-dd):g*(1-Math.min(100,dd)/100);
 }
+/* Gruppiert Haupt-/Unterpositionen (Miettage-Rabattstaffel) anhand von is_header/group_pos -
+   siehe admin.html equipTierLineItems()/saveDoc() für die Erzeugung. */
+function groupDocItems(items){
+  var headerAt={};
+  items.forEach(function(it,i){if(it.is_header)headerAt[it.pos]=i});
+  var subsOf={};
+  items.forEach(function(it,i){
+    if(it.group_pos!=null&&headerAt[it.group_pos]!=null)(subsOf[it.group_pos]=subsOf[it.group_pos]||[]).push(i);
+  });
+  var consumed={};
+  Object.keys(subsOf).forEach(function(gp){subsOf[gp].forEach(function(i){consumed[i]=true})});
+  var groups=[];
+  items.forEach(function(it,i){
+    if(consumed[i])return;
+    groups.push({main:i,subs:it.is_header?(subsOf[it.pos]||[]):[]});
+  });
+  return groups;
+}
+function groupTotal(items,g){return g.subs.reduce(function(s,i){return s+lineTotal(items[i])},lineTotal(items[g.main]))}
+function docRowsHtml(items,f){
+  var groups=groupDocItems(items);
+  return groups.map(function(g,gi){
+    var it=items[g.main],label=String(gi+1);
+    if(!g.subs.length){
+      var info=it.note?'<span class="info">i</span><span class="tip">'+esc(it.note)+'</span>':'';
+      var rab=Number(it.discount_value)?'<div style="font-size:11px;color:var(--grn)">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):Number(it.discount_value)+' %')+'</div>':'';
+      return '<tr><td class="num">'+label+'</td>'+
+        '<td class="pos-desc" onclick="this.classList.toggle(\'open\')">'+esc(it.description)+info+rab+'</td>'+
+        '<td class="num">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
+        '<td class="num">'+euro(lineTotal(it)*f)+'</td></tr>';
+    }
+    var head='<tr><td class="num" style="font-weight:700">'+label+'</td>'+
+      '<td style="font-weight:700">'+esc(it.description)+
+      '<div style="font-size:11px;color:var(--mut2);font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
+      '<td class="num"></td><td class="num"></td></tr>';
+    var subs=g.subs.map(function(si,k){
+      var sit=items[si];
+      var info=sit.note?'<span class="info">i</span><span class="tip">'+esc(sit.note)+'</span>':'';
+      return '<tr style="font-size:12.5px;color:var(--mut)"><td class="num">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
+        '<td class="pos-desc" style="padding-left:18px" onclick="this.classList.toggle(\'open\')">'+esc(sit.description)+info+'</td>'+
+        '<td class="num">'+Number(sit.qty)+' '+esc(sit.unit||'')+'</td>'+
+        '<td class="num">'+euro(lineTotal(sit)*f)+'</td></tr>';
+    }).join('');
+    var foot='<tr><td></td><td colspan="2" style="text-align:right;font-weight:700">Gesamtsumme der Position</td>'+
+      '<td class="num" style="font-weight:700">'+euro(groupTotal(items,g)*f)+'</td></tr>';
+    return head+subs+foot;
+  }).join('');
+}
 function renderOffer(){
   var d=DOC.doc,items=DOC.items;
   var brutto=d.price_mode==='brutto'&&!d.is_small_business;
-  var f=brutto?1+Number(d.tax_rate)/100:1;
+  var f=brutto?1:(Number(d.tax_rate)?1/(1+Number(d.tax_rate)/100):1);
   document.getElementById('foot').innerHTML=esc(DOC.company.name||'DJ Lauschgift')+' · '+esc(DOC.company.owner||'')+
     (DOC.company.phone?' · '+esc(DOC.company.phone):'');
-  var rows=items.map(function(it,i){
-    var info=it.note?'<span class="info">i</span><span class="tip">'+esc(it.note)+'</span>':'';
-    var rab=Number(it.discount_value)?'<div style="font-size:11px;color:var(--grn)">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):Number(it.discount_value)+' %')+'</div>':'';
-    return '<tr><td class="num">'+(i+1)+'</td>'+
-      '<td class="pos-desc" onclick="this.classList.toggle(\'open\')">'+esc(it.description)+info+rab+'</td>'+
-      '<td class="num">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
-      '<td class="num">'+euro(lineTotal(it)*f)+'</td></tr>';
-  }).join('');
+  var rows=docRowsHtml(items,f);
   var totals='';
   var sub=items.reduce(function(s,it){return s+lineTotal(it)},0);
   var dv=Number(d.discount_value)||0;
@@ -182,7 +224,7 @@ function renderOffer(){
       '<p class="sub">Falls ihr noch überlegt: Diese Extras werden oft dazugebucht. Klickt an, was euch interessiert – ich sage euch, was es für euren Termin kostet.</p>'+
       '<div class="ups">'+DOC.upsells.map(function(u){
         return '<div class="up" id="up-'+u.id+'"><h4>'+esc(u.title)+'</h4><p>'+esc(u.description||'')+'</p>'+
-        '<div class="upp">+ '+euro(u.price_net)+' <small style="font-weight:400;color:var(--mut2)">zzgl. USt.</small></div>'+
+        '<div class="upp">+ '+euro(u.price_net)+' <small style="font-weight:400;color:var(--mut2)">inkl. USt.</small></div>'+
         '<button class="btn g" onclick="askUpsell(\''+u.id+'\',this)">Interessiert mich</button></div>';
       }).join('')+'</div></div>':'')+
     (d.outro_text?'<div class="card"><p style="white-space:pre-wrap" class="sub">'+esc(d.outro_text)+'</p></div>':'')+
@@ -288,23 +330,47 @@ function sendAction(kind,msg,phone,cb){
 
 function askUpsell(id,btn){
   var u=(DOC.upsells||[]).find(function(x){return x.id===id});if(!u)return;
-  sendAction('comment','Interesse an Extra: '+u.title+' (+ '+euro(u.price_net)+' netto)',null,function(){
+  sendAction('comment','Interesse an Extra: '+u.title+' (+ '+euro(u.price_net)+' brutto)',null,function(){
     btn.textContent='✓ Angefragt – ich melde mich!';btn.disabled=true;
     document.getElementById('up-'+id).classList.add('asked');
   });
 }
+/* Wie docRowsHtml(), aber für die statische PDF-Ansicht: Erklärung steht direkt unter der
+   Position statt in einem Hover-Tooltip. */
+function docRowsHtmlPrint(items,f){
+  var groups=groupDocItems(items);
+  return groups.map(function(g,gi){
+    var it=items[g.main],label=String(gi+1);
+    if(!g.subs.length){
+      var rab=Number(it.discount_value)?'<div style="font-size:10px;color:#666">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):Number(it.discount_value)+' %')+'</div>':'';
+      return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+label+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+
+      (it.note?'<div style="font-size:10px;color:#666;margin-top:2px">'+esc(it.note)+'</div>':'')+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+euro(lineTotal(it)*f)+'</td></tr>';
+    }
+    var head='<tr><td style="padding:6px;border-bottom:1px solid #eee;font-weight:700">'+label+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #eee;font-weight:700">'+esc(it.description)+
+      '<div style="font-size:10px;color:#666;font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
+      '<td style="padding:6px;border-bottom:1px solid #eee"></td><td style="padding:6px;border-bottom:1px solid #eee"></td></tr>';
+    var subs=g.subs.map(function(si,k){
+      var sit=items[si];
+      return '<tr style="font-size:10.5px;color:#444"><td style="padding:3px 6px 3px 18px;border-bottom:1px solid #eee">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
+      '<td style="padding:3px 6px;border-bottom:1px solid #eee">'+esc(sit.description)+
+      (sit.note?'<div style="font-size:9px;color:#888;margin-top:2px">'+esc(sit.note)+'</div>':'')+'</td>'+
+      '<td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">'+Number(sit.qty)+' '+esc(sit.unit||'')+'</td>'+
+      '<td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">'+euro(lineTotal(sit)*f)+'</td></tr>';
+    }).join('');
+    var foot='<tr><td></td><td colspan="2" style="padding:4px 6px;text-align:right;font-weight:700;border-bottom:1px solid #ddd">Gesamtsumme der Position</td>'+
+      '<td style="padding:4px 6px;text-align:right;font-weight:700;border-bottom:1px solid #ddd">'+euro(groupTotal(items,g)*f)+'</td></tr>';
+    return head+subs+foot;
+  }).join('');
+}
 function downloadPdf(){
   var d=DOC.doc,c=DOC.company;
   var brutto=d.price_mode==='brutto'&&!d.is_small_business;
-  var f=brutto?1+Number(d.tax_rate)/100:1;
-  var rows=DOC.items.map(function(it,i){
-    var rab=Number(it.discount_value)?'<div style="font-size:10px;color:#666">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):Number(it.discount_value)+' %')+'</div>':'';
-    return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+(i+1)+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+
-    (it.note?'<div style="font-size:10px;color:#666;margin-top:2px">'+esc(it.note)+'</div>':'')+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
-    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+euro(lineTotal(it)*f)+'</td></tr>';
-  }).join('');
+  var f=brutto?1:(Number(d.tax_rate)?1/(1+Number(d.tax_rate)/100):1);
+  var rows=docRowsHtmlPrint(DOC.items,f);
   var sub=DOC.items.reduce(function(s,it){return s+lineTotal(it)},0);
   var dv=Number(d.discount_value)||0;
   var disc=dv?(d.discount_type==='eur'?Math.min(sub,dv):sub*Math.min(100,dv)/100):0;
@@ -331,7 +397,7 @@ function downloadPdf(){
   (d.valid_until?'<br>Gültig bis: '+dt(d.valid_until):'')+(d.due_date?'<br>Zahlbar bis: '+dt(d.due_date):'')+'</div></div>'+
   (d.intro_text?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
   '<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2">'+
-  '<th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Leistung</th><th style="padding:6px;text-align:right">Menge</th><th style="padding:6px;text-align:right">Gesamt netto</th></tr></thead>'+
+  '<th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Leistung</th><th style="padding:6px;text-align:right">Menge</th><th style="padding:6px;text-align:right">Gesamt'+(brutto?' brutto':' netto')+'</th></tr></thead>'+
   '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>'+
   (d.is_small_business?'<p style="color:#555;margin-bottom:12px">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>':'')+
   (d.outro_text?'<p style="margin-bottom:20px;white-space:pre-wrap">'+esc(d.outro_text)+'</p>':'')+

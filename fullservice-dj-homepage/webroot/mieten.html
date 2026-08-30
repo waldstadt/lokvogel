@@ -582,12 +582,13 @@ function sfetch(path){
 sfetch('equipment?select=*&public=eq.true&rentable=eq.true&status=eq.aktiv&order=sort').then(function(r){if(r.length){EQ=r;renderCatChips();renderRent()}}).catch(function(){});
 sfetch('equipment?select=*').then(function(r){r.forEach(function(e){EQ_ALL[e.id]=e})}).catch(function(){});
 
-/* Privatkunde (Standard) sieht Preise inkl. MwSt., Firmenkunde kann auf netto umschalten.
-   Reine Anzeigesache – die tatsächliche Abrechnung beim Absenden rechnet der Server verbindlich
-   in netto (wie gehabt). */
+/* Die hinterlegten Tagespreise sind bereits brutto (inkl. MwSt.) - das sieht der
+   Privatkunde (Standard) direkt. Firmenkunde kann auf netto umschalten, dafür wird
+   heruntergerechnet statt hochgerechnet. Reine Anzeigesache – das eigentliche Angebot
+   entsteht erst im Backoffice. */
 var PRICE_MODE=localStorage.getItem('lg_price_mode')||'brutto';
 var TAX_RATE=19,SMALL_BUSINESS=false;
-function priceFactor(){return(PRICE_MODE==='brutto'&&!SMALL_BUSINESS)?1+TAX_RATE/100:1}
+function priceFactor(){return(PRICE_MODE==='netto'&&!SMALL_BUSINESS&&TAX_RATE)?1/(1+TAX_RATE/100):1}
 function setPriceMode(m){
   PRICE_MODE=m;localStorage.setItem('lg_price_mode',m);
   updatePriceToggleUI();renderRent();renderSets();renderCart();

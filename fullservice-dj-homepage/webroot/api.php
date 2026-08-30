@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 58;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 59;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -512,6 +512,15 @@ function upgrade(PDO $p): void {
     foreach ([
       "alter table documents add column rental_from text",
       "alter table documents add column rental_to text",
+    ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+  }
+  if ($v < 59) {
+    /* Haupt-/Unterpositionen bei Miettage-Rabattstaffeln: is_header markiert die
+       informative Kopfzeile (Artikel, Stückzahl, Stückpreis - zählt nicht zur Summe),
+       group_pos verlinkt die Rabattstaffel-Unterzeilen (1.A, 1.B, ...) auf deren pos. */
+    foreach ([
+      "alter table document_items add column is_header integer default 0",
+      "alter table document_items add column group_pos integer",
     ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   }
   if ($v < 50) {
@@ -1120,7 +1129,7 @@ create table forms (id text primary key, token text unique not null, title text 
 create table document_items (id text primary key,
   document_id text not null references documents(id) on delete cascade,
   pos integer default 1, description text not null, note text, qty real default 1, unit text, unit_price real default 0,
-  discount_value real default 0, discount_type text default 'pct');
+  discount_value real default 0, discount_type text default 'pct', is_header integer default 0, group_pos integer);
 SQL);
   $p->exec(rentalContractsDdl());
   $p->exec(friendsDdl());
@@ -1831,8 +1840,10 @@ function workshopInvoice(PDO $p, string $signupId): array {
 
     $small = !empty($comp['small_business']);
     $rate = $small ? 0.0 : (float)($defs['tax_rate'] ?? 19);
-    $net = round($price * $seats, 2);
-    $tax = round($net * $rate / 100, 2);
+    /* w_price ist brutto (inkl. USt.) hinterlegt - netto wird heruntergerechnet, nicht draufgeschlagen. */
+    $gross = round($price * $seats, 2);
+    $net = $rate ? round($gross / (1 + $rate / 100), 2) : $gross;
+    $tax = round($gross - $net, 2);
     $payDays = (int)($defs['payment_days'] ?? 14);
     $due = gmdate('Y-m-d', time() + $payDays * 86400);
     if ($s['w_date'] && $s['w_date'] > gmdate('Y-m-d') && $s['w_date'] < $due) $due = $s['w_date'];
@@ -1844,7 +1855,7 @@ function workshopInvoice(PDO $p, string $signupId): array {
       ->execute([$docId, $token, 'rechnung', $number, $cid, 'entwurf', gmdate('Y-m-d'), $due,
         $rate, $small ? 1 : 0,
         'vielen Dank für deine Anmeldung zum Workshop „' . $s['w_title'] . '“. Mit Zahlungseingang ist dein Platz verbindlich reserviert.',
-        (string)($defs['invoice_outro'] ?? ''), $net, $tax, $net + $tax, now()]);
+        (string)($defs['invoice_outro'] ?? ''), $net, $tax, $gross, now()]);
     $p->prepare('insert into document_items (id, document_id, pos, description, qty, unit, unit_price)
         values (?,?,?,?,?,?,?)')
       ->execute([uuid(), $docId, 1, 'Workshop: ' . $dTitle . ' – Teilnahme', $seats, $seats > 1 ? 'Plätze' : 'Platz', $price]);
@@ -1860,7 +1871,7 @@ function workshopInvoice(PDO $p, string $signupId): array {
   $portal = baseUrl() . '/portal.html?a=' . $token;
   $bodyTxt = "Hallo " . ($parts[0] ?? $s['name']) . ",\n\n" .
     "danke für deine Anmeldung zum Workshop „" . $s['w_title'] . "“ am " . $s['w_date'] . "!\n\n" .
-    "Hier ist deine Rechnung $number (" . number_format($net + $tax, 2, ',', '.') . " €):\n$portal\n" .
+    "Hier ist deine Rechnung $number (" . number_format($gross, 2, ',', '.') . " €):\n$portal\n" .
     "Login: deine Postleitzahl ($custZip). Dort kannst du die Rechnung ansehen und als PDF speichern.\n\n" .
     "Mit Zahlungseingang ist dein Platz verbindlich reserviert. Zahlbar bis $due per Überweisung – die Bankverbindung steht auf der Rechnung.\n\n" .
     "Bis bald im Workshop!\n" . ($comp['owner'] ?? '') . "\n" . ($comp['name'] ?? '') .
@@ -1872,7 +1883,7 @@ function workshopInvoice(PDO $p, string $signupId): array {
       values (?,?,?,?,?,?,?,?)')
     ->execute([uuid(), $cid, $mailed ? 'email' : 'note', 'out',
       'Workshop-Rechnung ' . $number . ($mailed ? ' automatisch versendet' : ' erstellt (Mailversand fehlgeschlagen – bitte manuell senden)'),
-      'Workshop: ' . $dTitle . ' · ' . $seats . ' Platz/Plätze · ' . number_format($net + $tax, 2, ',', '.') . " €\nPortal-Link: $portal", now(), now()]);
+      'Workshop: ' . $dTitle . ' · ' . $seats . ' Platz/Plätze · ' . number_format($gross, 2, ',', '.') . " €\nPortal-Link: $portal", now(), now()]);
   return ['ok' => true, 'number' => $number, 'mailed' => $mailed, 'portal' => $portal];
 }
 
@@ -2234,7 +2245,7 @@ function handlePortal(string $path, string $method, $body): never {
   }
   if (preg_match('#^portal/offer/([a-f0-9]+)$#', $path, $m) && $method === 'GET') {
     $d = portalDoc($m[1], (string)($_GET['plz'] ?? ''));
-    $it = $p->prepare('select pos, description, note, qty, unit, unit_price, discount_value, discount_type from document_items where document_id = ? order by pos');
+    $it = $p->prepare('select pos, description, note, qty, unit, unit_price, discount_value, discount_type, is_header, group_pos from document_items where document_id = ? order by pos');
     $it->execute([$d['id']]);
     $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
     $ups = [];
