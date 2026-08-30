@@ -2488,14 +2488,20 @@ function docCalc(){
      herumschleppen - sonst weicht die gedruckte Summe von der gespeicherten ab und in der
      Buchhaltung landen Beträge wie 100,005 €. */
   var r2=function(x){return Math.round(x*100)/100};
-  var sub=r2(curItems.reduce(function(s,it){return s+r2(lineTotal(it))},0));
+  /* Genau die Zeilenbeträge summieren, die auch im Beleg stehen (printedLineTotal). Die
+     Miettage-Staffel erzeugt Einzelpreise mit halben Cent (50 % von 89,95 €); würde die
+     Summe aus denen gebildet, liefe sie am gedruckten Beleg vorbei und die Differenz tauchte
+     als Phantom-Rabattzeile wieder auf. */
+  var sub=r2(curItems.reduce(function(s,it){return s+printedLineTotal(it,1)},0));
   var dv=Number(v('docDiscVal'))||0,dtp=v('docDiscType')||'pct';
   var disc=dv?(dtp==='eur'?Math.min(sub,r2(dv)):r2(sub*Math.min(100,dv)/100)):0;
   var gross=r2(sub-disc);
   var rate=Number(document.getElementById('docTax').value)||0;
-  var net=rate?gross/(1+rate/100):gross,tax=gross-net;
   var override=v('docTotalOverride')!==''?r2(Number(v('docTotalOverride'))):null;
-  if(override!=null){gross=override;net=rate?gross/(1+rate/100):gross;tax=gross-net;}
+  if(override!=null)gross=override;
+  /* Netto auf Cent runden und die USt. als Differenz bilden - so ergeben die gespeicherten
+     Werte zusammen exakt den Gesamtbetrag statt krummer Zahlen wie 2153,6890756303. */
+  var net=rate?r2(gross/(1+rate/100)):gross,tax=r2(gross-net);
   var dep=Number(document.getElementById('docDep').value)||0;
   return {sub:sub,disc:disc,discVal:dv,discType:dtp,net:net,tax:tax,gross:gross,rate:rate,dep:dep,override:override};
 }
@@ -2790,7 +2796,7 @@ function docToInvoice(type){
      samt Rabatten gerechnet, damit nie versehentlich 0 € als Basis dient. */
   var srcGross=Number(src.total_override)||Number(src.total_gross)||0;
   if(!srcGross){
-    var roh=items.reduce(function(s2,it){return s2+lineTotal(it)},0);
+    var roh=Math.round(items.reduce(function(s2,it){return s2+printedLineTotal(it,1)},0)*100)/100;
     var dv=Number(src.discount_value)||0;
     srcGross=src.discount_type==='eur'?Math.max(0,roh-dv):Math.round(roh*(1-dv/100)*100)/100;
   }
@@ -3026,12 +3032,12 @@ function docRowsHtml(items,f){
       return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+label+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+it.qty+' '+esc(it.unit||'')+'</td>'+
-      '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(it.unit_price*f)+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(printedUnit(it,f))+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(printedLineTotal(it,f))+'</td></tr>';
     }
     var head='<tr><td style="padding:5px 6px 1px;font-weight:700">'+label+'</td>'+
       '<td style="padding:5px 6px 1px;font-weight:700">'+esc(it.description)+
-      '<div style="font-size:9px;color:#666;font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
+      '<div style="font-size:9px;color:#666;font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(printedUnit(it,f))+' / Tag</div></td>'+
       '<td style="padding:5px 6px 1px"></td><td style="padding:5px 6px 1px"></td><td style="padding:5px 6px 1px"></td></tr>';
     var subs=g.subs.map(function(si,k){
       var sit=filtered[si];
@@ -3039,7 +3045,7 @@ function docRowsHtml(items,f){
       return '<tr style="font-size:9px;color:#555"><td style="padding:0 6px 0 18px">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
       '<td style="padding:0 6px">'+esc(sit.description)+rab+'</td>'+
       '<td style="padding:0 6px;text-align:right">'+subMenge(sit)+' '+esc(sit.unit||'')+'</td>'+
-      '<td style="padding:0 6px;text-align:right">'+euro(sit.unit_price*f)+'</td>'+
+      '<td style="padding:0 6px;text-align:right">'+euro(printedUnit(sit,f))+'</td>'+
       '<td style="padding:0 6px;text-align:right">'+euro(printedLineTotal(sit,f))+'</td></tr>';
     }).join('');
     var foot='<tr><td></td><td colspan="3" style="padding:2px 6px 5px;text-align:right;font-weight:700;border-bottom:1px solid #ddd;font-size:10.5px">Gesamtsumme der Position</td>'+
@@ -3054,9 +3060,10 @@ function docRowsHtml(items,f){
 /* Zeilenbetrag so, wie er im Beleg steht: in der Nettoansicht wird der Einzelpreis gerundet
    gedruckt, also muss auch der Zeilenbetrag aus diesem gerundeten Einzelpreis entstehen -
    sonst geht "Menge × Einzelpreis" auf dem Papier nicht auf. Brutto (f = 1) ändert sich nichts. */
+function printedUnit(it,f){return Math.round((Number(it.unit_price)||0)*f*100)/100}
 function printedLineTotal(it,f){
   if(it.is_header)return 0;
-  var ep=Math.round((Number(it.unit_price)||0)*f*100)/100;
+  var ep=printedUnit(it,f);
   var sum=(Number(it.qty)||0)*ep;
   var d=Number(it.discount_value)||0;
   if(d)sum=it.discount_type==='eur'?Math.max(0,sum-Math.round(d*f*100)/100):sum*(1-Math.min(100,d)/100);
