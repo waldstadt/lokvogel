@@ -1087,6 +1087,7 @@ function autoInquiryPlanner(PDO $p, array $row): void {
         $row['phone'] ?? null, 'Homepage', now(), now()]);
   }
   $p->prepare('update inquiries set customer_id = ? where id = ?')->execute([$custId, $row['id']]);
+  if (($row['event_type'] ?? '') === 'Technik-Check bestehende Anlage') autoTechCheckInvite($p, $custId, $row);
   if (empty($row['event_date'])) return;
   $guests = is_numeric($row['guests'] ?? null) ? (int)$row['guests'] : null;
   $basics = array_filter([
@@ -1102,6 +1103,29 @@ function autoInquiryPlanner(PDO $p, array $row): void {
       trim(($row['event_type'] ?: 'Anfrage') . ' ' . $row['name']), $row['event_date'],
       $row['location'] ?? null, $row['location'] ?? null, $guests,
       json_encode(['basics' => $basics], JSON_UNESCAPED_UNICODE), now(), now()]);
+}
+
+/* Verschickt bei einer Technik-Check-Anfrage automatisch den Vorab-Fragebogen als
+   ausgefüllten Formular-Link per Mail - kein manueller Admin-Klick nötig. Schlägt eine
+   Teil-Aktion fehl (z. B. keine Firmen-Mail hinterlegt), bleibt der Kunde/die Anfrage
+   trotzdem angelegt; der Aufruf erfolgt daher immer in einem eigenen try/catch. */
+function autoTechCheckInvite(PDO $p, string $custId, array $row): void {
+  if (empty($row['email'])) return;
+  $tpl = $p->prepare('select * from form_templates where name = ? limit 1');
+  $tpl->execute(['Technik-Check – Vorab-Fragen']);
+  $t = $tpl->fetch();
+  if (!$t) return;
+  $token = bin2hex(random_bytes(24));
+  $p->prepare('insert into forms (id, token, title, intro, fields, status, inquiry_id, customer_id, created_at)
+      values (?,?,?,?,?,?,?,?,?)')
+    ->execute([uuid(), $token, $t['name'], $t['intro'], $t['fields'], 'offen', $row['id'], $custId, now()]);
+  $link = baseUrl() . '/portal.html?f=' . $token;
+  $vn = trim((string)$row['name']) !== '' ? (preg_split('/\s+/', trim((string)$row['name']), 2)[0] ?? $row['name']) : 'zusammen';
+  sendMailSafe($row['email'], 'Kurzer Vorab-Fragebogen zu eurem Technik-Check',
+    "Hallo $vn,\n\n" .
+    "schön, dass ihr euren Technik-Check angefragt habt! Damit ich beim Termin direkt gezielt loslegen kann, " .
+    "beantwortet mir vorab kurz ein paar Fragen zu eurer Anlage - dauert keine 5 Minuten:\n\n$link\n\n" .
+    "Ich melde mich in Kürze bei euch, um einen Termin abzustimmen.\n\nBis bald!\nMarkus");
 }
 
 /* Markus duzt auf der ganzen Seite durchgehend - die Angebots-/Rechnungs-Standardtexte
