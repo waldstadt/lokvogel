@@ -502,6 +502,7 @@ function renderRental(){
     '<div style="flex:1;min-width:200px"><div class="kicker">Mieter</div>'+esc(d.customer.name)+'<br>'+esc(d.customer.street||'')+'<br>'+esc(d.customer.zip_city||'')+'</div></div>'+
     (d.items.length?('<table class="items"><thead><tr><th>Pos</th><th>Mietgegenstand</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead><tbody>'+rows+
       '</tbody></table><div style="text-align:right;margin:8px 0 4px"><b>Gesamt: '+euro(total)+' netto</b></div>'):'')+
+    (d.deposit_amount?('<div style="text-align:right;margin:0 0 4px">Vereinbarte Kaution: <b>'+euro(d.deposit_amount)+'</b> · wird bei vollständiger, unbeschädigter Rückgabe erstattet</div>'):'')+
     '<details style="margin:14px 0"><summary style="cursor:pointer;font-weight:600">Vertragsbedingungen anzeigen</summary>'+
     '<div class="sub" style="white-space:pre-wrap;margin-top:10px;font-size:13px">'+esc(d.terms)+'</div></details></div>'+
 

@@ -957,7 +957,8 @@ function loadAll(){
     api('equipment_set_items?select=*'),
     api('calendar_blocks?select=*&order=start_date'),
     api('quote_templates?select=*&order=sort'),
-    api('event_plan_changes?select=*&order=created_at.desc')
+    api('event_plan_changes?select=*&order=created_at.desc'),
+    api('rental_contracts?select=*')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -968,7 +969,7 @@ function loadAll(){
     CACHE.reviews=r[16]||[];CACHE.products=r[17]||[];CACHE.partners=r[18]||[];
     CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
     CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];CACHE.blocks=r[23]||[];
-    CACHE.quoteTpls=r[24]||[];CACHE.planChanges=r[25]||[];
+    CACHE.quoteTpls=r[24]||[];CACHE.planChanges=r[25]||[];CACHE.rentalContracts=r[26]||[];
     applyBrand();
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
@@ -1181,7 +1182,7 @@ function renderDash(){
     '<button class="btn sm" style="float:right" onclick="composeReviewMail(\''+b.id+'\')">Danke &amp; Bewertung</button></div>';
   }).join('')||'Alle vergangenen Feiern sind angeschrieben.';
   document.getElementById('dashMissing').innerHTML=computeMissingInfo().map(function(m){
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="showPage(\''+m.pg+'\')">'+esc(m.text)+'</a></div>';
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="'+(m.onclick||('showPage(\''+m.pg+'\')'))+'">'+esc(m.text)+'</a></div>';
   }).join('')||'Alles vollständig – nichts offen.';
 }
 /* Prüft Firmendaten & Rechtstexte auf fehlende/unbestätigte Angaben und liefert
@@ -1192,6 +1193,11 @@ function computeMissingInfo(){
   if(!comp.tax_id&&!comp.vat_id)issues.push({text:'Steuernummer/USt-IdNr. fehlt (Einstellungen → Firmendaten)',pg:'set'});
   if(!comp.iban)issues.push({text:'IBAN fehlt (Einstellungen → Bankverbindung)',pg:'set'});
   if(!legal.reviewed)issues.push({text:'Rechtstexte (Impressum/Datenschutz/AGB) sind noch nicht als geprüft markiert',pg:'cms'});
+  (CACHE.rentalContracts||[]).filter(function(rc){return rc.status!=='unterschrieben'&&!rc.deposit_amount}).forEach(function(rc){
+    var bk=CACHE.bookings.find(function(b){return b.id===rc.booking_id});
+    issues.push({text:'Kaution für Mietvertrag'+(bk?(' · '+esc(custName(bk.customers))+' · '+dt(bk.event_date)):'')+' noch nicht festgelegt',
+      pg:null,onclick:bk?('openBookDetail(\''+bk.id+'\')'):null});
+  });
   return issues;
 }
 function openEventDoc(evId,docId){
@@ -2765,6 +2771,8 @@ function printLieferschein(d,list){
 }
 function printMietvertrag(rc){
   var b=curBook,snap=rc&&rc.snapshot?rc.snapshot:null;
+  if(!rc)rc=(CACHE.rentalContracts||[]).find(function(x){return x.booking_id===b.id});
+  var deposit=snap&&snap.deposit_amount!=null?snap.deposit_amount:(rc?rc.deposit_amount:null);
   var list=snap?snap.items:bookEquipList(b);
   if(!list.length){toast('Keine Technik zugeordnet – der Mietvertrag listet die Mietsachen aus dem Auftrag.',1);return}
   var comp=S.company||{},cust=CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
@@ -2792,6 +2800,7 @@ function printMietvertrag(rc){
   '<th style="padding:7px;text-align:left">Pos</th><th style="padding:7px;text-align:left">Mietgegenstand</th><th style="padding:7px;text-align:right">Menge</th><th style="padding:7px;text-align:right">Mietpreis brutto</th></tr></thead>'+
   '<tbody>'+rows+'</tbody><tfoot><tr><td colspan="3" style="padding:7px;text-align:right;font-weight:700">Gesamtmiete brutto</td><td style="padding:7px;text-align:right;font-weight:700">'+euro(total)+'</td></tr></tfoot></table>'+
   '<p style="color:#555;margin-bottom:16px">inkl. gesetzlicher Umsatzsteuer, sofern ausgewiesen. Abrechnung gemäß zugehörigem Angebot bzw. Rechnung.</p>'+
+  (deposit?'<p style="margin-bottom:16px"><b>Vereinbarte Kaution:</b> '+euro(deposit)+' – wird bei vollständiger, unbeschädigter Rückgabe erstattet.</p>':'')+
   '<div style="white-space:pre-wrap;margin-bottom:26px">'+esc(terms)+'</div>'+
   '<div style="display:flex;gap:40px;margin-top:36px;align-items:flex-end">'+
   '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift Vermieter</div></div>'+
@@ -2814,13 +2823,20 @@ function openDigitalRental(){
     if(rows&&rows.length)return rows[0];
     var t=hexToken()+hexToken().slice(0,16);
     return api('rental_contracts',{method:'POST',prefer:'return=representation',
-      body:{booking_id:b.id,token:t,status:'offen'}}).then(function(r){return r[0]});
+      body:{booking_id:b.id,token:t,status:'offen'}}).then(function(r){
+        CACHE.rentalContracts=(CACHE.rentalContracts||[]).concat(r[0]);renderDash();return r[0];
+      });
   }).then(showRentalModal).catch(function(e){toast(e.message,1)});
 }
 function showRentalModal(rc){
   window._mvRc=rc;
   var url=portalUrl('mv',rc.token);
   var html='<div class="sml mut" style="margin-bottom:10px">Der Kunde öffnet den Link auf Smartphone oder Tablet, fotografiert seinen Ausweis (Vorder- und Rückseite) und unterschreibt direkt auf dem Display – geht auch vor Ort auf deinem iPad. Login: seine Postleitzahl.</div>';
+  if(rc.status!=='unterschrieben'){
+    html+='<label for="rcDeposit">Vereinbarte Kaution (brutto €, optional)</label>'+
+    '<input type="number" id="rcDeposit" step="0.01" min="0" value="'+(rc.deposit_amount||'')+'" onchange="saveRentalDeposit(this.value)">'+
+    '<div class="mut sml" style="margin-top:4px">Wird dem Kunden im Mietvertrag angezeigt und bei der Rückgabe erstattet. Ohne Eintrag steht im Vertrag keine Zahl – erinnert dich das Dashboard, solange offen.</div>';
+  }
   if(rc.status==='unterschrieben'){
     html+='<div style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px"> <b>Unterschrieben</b>am '+dt(rc.signed_at)+'von '+esc(rc.signed_name)+'</div>'+
     '<img src="'+rc.signature+'" alt="Unterschrift" style="background:#fff;border-radius:8px;max-width:100%;max-height:110px;display:block;margin-bottom:12px">'+
@@ -2838,6 +2854,15 @@ function showRentalModal(rc){
     '<div class="mut sml" style="margin-top:10px">Status: noch nicht unterschrieben. Sobald der Kunde abschließt, erscheint hier Unterschrift + Ausweiskopie, und in der Kunden-Timeline landet ein Eintrag.</div>';
   }
   openModal('Digitaler Mietvertrag – '+dt(curBook.event_date),html);
+}
+function saveRentalDeposit(val){
+  var rc=window._mvRc,amount=val===''?null:Number(val);
+  api('rental_contracts?id=eq.'+rc.id,{method:'PATCH',body:{deposit_amount:amount}}).then(function(){
+    rc.deposit_amount=amount;
+    var cached=(CACHE.rentalContracts||[]).find(function(x){return x.id===rc.id});
+    if(cached)cached.deposit_amount=amount;
+    renderDash();toast('Kaution gespeichert ✓');
+  }).catch(function(e){toast(e.message,1)});
 }
 function viewIdFile(name){
   fetch('api.php/idfile/'+name,{headers:{Authorization:'Bearer '+TOKEN}})

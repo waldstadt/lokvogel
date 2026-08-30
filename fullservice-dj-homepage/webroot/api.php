@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 62;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 63;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -539,6 +539,9 @@ function upgrade(PDO $p): void {
       status text default 'offen', created_at text, reviewed_at text)"); } catch (PDOException $e) {}
   }
   if ($v < 62) legalComplianceUpdate($p);
+  if ($v < 63) {
+    try { $p->exec("alter table rental_contracts add column deposit_amount real"); } catch (PDOException $e) {}
+  }
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -1169,6 +1172,7 @@ function rentalContractsDdl(): string {
     booking_id text not null references bookings(id) on delete cascade,
     token text unique, status text default 'offen', snapshot text,
     signed_name text, signature text, id_front text, id_back text,
+    deposit_amount real,
     signed_at text, created_at text)";
 }
 
@@ -2559,6 +2563,7 @@ function handlePortal(string $path, string $method, $body): never {
         'days' => rentalDays($r)],
       'items' => rentalItems($p, $r),
       'terms' => (string)($terms['text'] ?? ''),
+      'deposit_amount' => $r['deposit_amount'] !== null ? (float)$r['deposit_amount'] : null,
     ]);
   }
   if (preg_match('#^portal/rental/([a-f0-9]+)/sign$#', $path, $m) && $method === 'POST') {
@@ -2581,7 +2586,8 @@ function handlePortal(string $path, string $method, $body): never {
     $terms = json_decode($p->query("select value from settings where key='rental_contract'")->fetchColumn() ?: '{}', true);
     $snapshot = json_encode(['items' => rentalItems($p, $r), 'days' => rentalDays($r),
       'event_date' => $r['event_date'], 'end_date' => $r['end_date'],
-      'terms' => (string)($terms['text'] ?? '')], JSON_UNESCAPED_UNICODE);
+      'terms' => (string)($terms['text'] ?? ''),
+      'deposit_amount' => $r['deposit_amount'] !== null ? (float)$r['deposit_amount'] : null], JSON_UNESCAPED_UNICODE);
     $p->prepare("update rental_contracts set status='unterschrieben', signed_name=?, signature=?,
         id_front=?, id_back=?, signed_at=?, snapshot=? where id=?")
       ->execute([$name, (string)$body['signature'], $ff, $fb, now(), $snapshot, $r['id']]);
