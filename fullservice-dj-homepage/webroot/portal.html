@@ -488,8 +488,24 @@ function submitMvPlz(){
 function renderRental(){
   var d=MVDATA,b=d.booking,total=d.items.reduce(function(s,it){return s+it.price},0);
   if(d.status==='unterschrieben'){
+    /* Der Kunde muss seine Ausfertigung behalten können: Mietsachen, Zeitraum, Summe,
+       Kaution und Bedingungen bleiben abrufbar und ausdruckbar. */
+    var rowsU=d.items.map(function(it,i){
+      return '<tr><td>'+(i+1)+'</td><td>'+esc(it.name)+'</td><td class="num">'+it.qty+'</td><td class="num">'+euro(it.price)+'</td></tr>';
+    }).join('');
     app('<div class="card"><h1>Vielen Dank!</h1><p class="sub" style="margin-top:8px">Der Mietvertrag wurde am '+
-      dt(d.signed_at)+' digital unterschrieben von <b>'+esc(d.signed_name)+'</b>. Ihr müsst nichts weiter tun – bis bald bei der Übergabe!</p></div>');
+      dt(d.signed_at)+' digital unterschrieben von <b>'+esc(d.signed_name)+'</b>. Ihr müsst nichts weiter tun – bis bald bei der Übergabe!</p>'+
+      '<div style="margin-top:10px"><button class="btn" onclick="window.print()">Vertrag drucken oder als PDF sichern</button></div></div>'+
+      '<div class="card"><div class="kicker">'+esc(d.company.name||'')+'</div><h2>Eure Ausfertigung</h2>'+
+      '<p class="sub" style="margin-top:6px">'+esc(b.title||'Vermietung')+' · Mietzeitraum: <b>'+dt(b.event_date)+(b.end_date?' bis '+dt(b.end_date):'')+'</b> ('+b.days+' Miettag'+(b.days>1?'e':'')+')</p>'+
+      '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:14px 0">'+
+      '<div style="flex:1;min-width:200px"><div class="kicker">Vermieter</div>'+esc(d.company.name||'')+'<br>'+esc(d.company.owner||'')+'<br>'+esc(d.company.street||'')+'<br>'+esc(d.company.zip_city||'')+'</div>'+
+      '<div style="flex:1;min-width:200px"><div class="kicker">Mieter</div>'+esc(d.customer.name)+'<br>'+esc(d.customer.street||'')+'<br>'+esc(d.customer.zip_city||'')+'</div></div>'+
+      (d.items.length?('<table class="items"><thead><tr><th>Pos</th><th>Mietgegenstand</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead><tbody>'+rowsU+
+        '</tbody></table><div style="text-align:right;margin:8px 0 4px"><b>Gesamt: '+euro(total)+' inkl. MwSt.</b></div>'):'')+
+      (d.deposit_amount?('<div style="text-align:right;margin:0 0 4px">Vereinbarte Kaution: <b>'+euro(d.deposit_amount)+'</b> · wird bei vollständiger, unbeschädigter Rückgabe erstattet</div>'):'')+
+      '<details style="margin:14px 0"><summary style="cursor:pointer;font-weight:600">Vertragsbedingungen anzeigen</summary>'+
+      '<div class="sub" style="white-space:pre-wrap;margin-top:10px;font-size:13px">'+esc(d.terms)+'</div></details></div>');
     return;
   }
   var rows=d.items.map(function(it,i){
@@ -501,7 +517,7 @@ function renderRental(){
     '<div style="flex:1;min-width:200px"><div class="kicker">Vermieter</div>'+esc(d.company.name||'')+'<br>'+esc(d.company.owner||'')+'<br>'+esc(d.company.street||'')+'<br>'+esc(d.company.zip_city||'')+'</div>'+
     '<div style="flex:1;min-width:200px"><div class="kicker">Mieter</div>'+esc(d.customer.name)+'<br>'+esc(d.customer.street||'')+'<br>'+esc(d.customer.zip_city||'')+'</div></div>'+
     (d.items.length?('<table class="items"><thead><tr><th>Pos</th><th>Mietgegenstand</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead><tbody>'+rows+
-      '</tbody></table><div style="text-align:right;margin:8px 0 4px"><b>Gesamt: '+euro(total)+' netto</b></div>'):'')+
+      '</tbody></table><div style="text-align:right;margin:8px 0 4px"><b>Gesamt: '+euro(total)+' inkl. MwSt.</b></div>'):'')+
     (d.deposit_amount?('<div style="text-align:right;margin:0 0 4px">Vereinbarte Kaution: <b>'+euro(d.deposit_amount)+'</b> · wird bei vollständiger, unbeschädigter Rückgabe erstattet</div>'):'')+
     '<details style="margin:14px 0"><summary style="cursor:pointer;font-weight:600">Vertragsbedingungen anzeigen</summary>'+
     '<div class="sub" style="white-space:pre-wrap;margin-top:10px;font-size:13px">'+esc(d.terms)+'</div></details></div>'+
@@ -634,8 +650,15 @@ function doRegister(){
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
       if(res.s>=400)throw new Error(res.j.error||'Registrierung fehlgeschlagen.');
+      /* Gab es zu der Adresse schon einen Vorgang, kommt kein Token, sondern ein
+         Bestätigungslink per Mail - so kommt niemand Fremdes an bestehende Unterlagen. */
+      if(res.j.pending){
+        m.style.display='block';m.className='msg ok';
+        m.textContent=res.j.message||'Ich habe dir einen Bestätigungslink geschickt – bitte schau in dein Postfach.';
+        return;
+      }
       CTOK=res.j.token;localStorage.setItem('cust_tok',CTOK);REGISTER=null;loadAccount();
-    }).catch(function(e){m.style.display='block';m.textContent=e.message});
+    }).catch(function(e){m.style.display='block';m.className='msg err';m.textContent=e.message});
 }
 function doLogin(){
   fetch(API+'/portal/account/login',{method:'POST',headers:{'Content-Type':'application/json'},

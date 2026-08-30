@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 66;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 67;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -551,6 +551,7 @@ function upgrade(PDO $p): void {
   }
   if ($v < 65) { try { campaignBackgroundMusicUpdate($p); } catch (PDOException $e) {} }
   if ($v < 66) seedExtraTemplates($p);   // neue Absage-Vorlagen nachziehen (idempotent per Name)
+  if ($v < 67) { try { campaignTechCheckPriceUpdate($p); } catch (PDOException $e) {} }
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -1117,11 +1118,31 @@ function autoInquiryPlanner(PDO $p, array $row): void {
   $custId = $st->fetchColumn();
   if (!$custId) {
     [$vorname, $nachname] = splitPersonName((string)$row['name']);
+    /* Vereine, Gemeinden und Schulen sind die Kernzielgruppe der Technik-Seite - als
+       "privat" mit zerlegtem Namen ("Schuetzenverein" / "Testdorf") wären sie im
+       Backoffice falsch einsortiert und in Anschreiben falsch angeredet. */
+    $istOrg = (bool)preg_match('/\b(verein|e\.?\s?v\.?|gemeinde|kirchengemeinde|schule|gymnasium|stadt|firma|gmbh|ug|ag|kg|ohg|verband|club|stiftung|freiwillige feuerwehr|feuerwehr)\b/iu', (string)$row['name']);
     $custId = uuid();
-    $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, phone, source, created_at, updated_at)
-      values (?,?,?,?,?,?,?,?,?,?)')
-      ->execute([$custId, 'privat', 'lead', $vorname ?: $row['name'], $nachname, $email,
-        $row['phone'] ?? null, 'Homepage', now(), now()]);
+    $p->prepare('insert into customers (id, kind, status, first_name, last_name, company, email, phone, source, created_at, updated_at)
+      values (?,?,?,?,?,?,?,?,?,?,?)')
+      ->execute([$custId, $istOrg ? 'firma' : 'privat', 'lead',
+        $istOrg ? '' : ($vorname ?: $row['name']), $istOrg ? '' : $nachname,
+        $istOrg ? mb_substr(trim((string)$row['name']), 0, 160) : null,
+        $email, $row['phone'] ?? null, 'Homepage', now(), now()]);
+  }
+  /* Den Anfragetext als Timeline-Eintrag sichern - sonst steht er nur in der
+     Anfragen-Liste und fehlt später im Kundendatensatz (der manuelle Weg über
+     "In CRM übernehmen" legt diesen Eintrag ebenfalls an). */
+  if (trim((string)($row['message'] ?? '')) !== '' || !empty($row['event_type'])) {
+    $inhalt = trim(
+      ($row['event_type'] ? 'Anlass: ' . $row['event_type'] . "\n" : '') .
+      ($row['event_date'] ? 'Termin: ' . $row['event_date'] . "\n" : '') .
+      ($row['location'] ? 'Ort: ' . $row['location'] . "\n" : '') .
+      ($row['guests'] ? 'Gäste: ' . $row['guests'] . "\n" : '') .
+      "\n" . (string)($row['message'] ?? ''));
+    $p->prepare('insert into communications (id,customer_id,channel,direction,subject,content,occurred_at,created_at)
+      values (?,?,?,?,?,?,?,?)')
+      ->execute([uuid(), $custId, 'note', 'in', 'Anfrage über die Website', $inhalt, now(), now()]);
   }
   $p->prepare('update inquiries set customer_id = ? where id = ?')->execute([$custId, $row['id']]);
   if (($row['event_type'] ?? '') === 'Technik-Check bestehende Anlage') autoTechCheckInvite($p, $custId, $row);
@@ -1633,7 +1654,7 @@ function campaignPageRows(): array {
 
   ['slug' => 'technik-check', 'sort' => 120, 'accent' => '#3cc8b4', 'accent2' => '#5fdcc9', 'btn_txt' => '#0a2420',
    'page_title' => 'Technik-Check für eure Tonanlage | Lauschgift Veranstaltungstechnik',
-   'meta_desc' => 'Die Anlage im Vereinsheim brummt, pfeift oder keiner traut sich ran? Ehrlicher Technik-Check mit schriftlichem Bericht: 149 Euro pauschal, wird bei Folgeauftrag verrechnet. Keine Verkaufsshow – aus Hemer.',
+   'meta_desc' => 'Die Anlage im Vereinsheim brummt, pfeift oder keiner traut sich ran? Ehrlicher Technik-Check mit schriftlichem Bericht: 149 Euro zzgl. MwSt., wird bei Folgeauftrag verrechnet. Keine Verkaufsshow – aus Hemer.',
    'badge' => 'Für Vereinsheime, Gemeindehäuser, Schulen, Kneipen – überall, wo eine Anlage fest hängt',
    'h1_line1' => 'Eure Anlage brummt seit Jahren?', 'h1_line2' => 'Das muss sie nicht.',
    'sub' => 'Ich bin Markus von Lauschgift Veranstaltungstechnik. In fast jedem Vereinsheim hängt eine Anlage, die irgendwann mal jemand angeschlossen hat, der längst weggezogen ist. Seitdem: Brummen, Pfeifen und ein Mischpult, an das sich keiner traut. Ich schaue mir das an – gründlich, ehrlich und mit schriftlichem Bericht.',
@@ -1653,7 +1674,7 @@ function campaignPageRows(): array {
      'Schriftlicher Bericht mit klarer Empfehlung und Prioritäten',
      'Beschriftung und Spickzettel für die Bedienung',
      'Vorab-Fragebogen kommt automatisch nach eurer Anfrage',
-     '149 € pauschal je Anlage bzw. Raum, jede weitere 79 € – wird bei Folgeauftrag verrechnet',
+     '149 € zzgl. MwSt. je Anlage bzw. Raum, jede weitere 79 € – wird bei Folgeauftrag verrechnet',
    ],
    'pricenote' => 'Beauftragt ihr nach dem Check etwas aus dem Bericht, wird der Check komplett verrechnet – ihr riskiert also nichts außer zwei Stunden eurer Zeit. Und wenn alles gut ist, wisst ihr das danach schwarz auf weiß.',
    'form_kicker' => 'Check anfragen', 'form_h2' => 'Was macht eure Anlage?',
@@ -1731,6 +1752,32 @@ function campaignBackgroundMusicUpdate(PDO $p): void {
     unset($c);
     if ($changed) $upd->execute([json_encode($cards, JSON_UNESCAPED_UNICODE), now(), $row['id']]);
   }
+}
+
+/* v67: Der Technik-Check wird auf den Seiten als "149 € pauschal" beworben, im
+   Produktkatalog sind 149 € aber ein NETTO-Preis (brutto 177,31 €). Für Vereine,
+   Gemeinden und Schulen ohne Vorsteuerabzug ist das ein echter Preisunterschied,
+   deshalb steht jetzt überall "zzgl. MwSt." dabei. Ersetzt nur den unveränderten
+   Ausgangstext - eigene Formulierungen bleiben stehen. */
+function campaignTechCheckPriceUpdate(PDO $p): void {
+  $sel = $p->prepare('select id, features, meta_desc from campaign_pages where slug = ?');
+  $sel->execute(['technik-check']);
+  $row = $sel->fetch();
+  if (!$row) return;
+  $alt = '149 € pauschal je Anlage bzw. Raum, jede weitere 79 € – wird bei Folgeauftrag verrechnet';
+  $neu = '149 € zzgl. MwSt. je Anlage bzw. Raum, jede weitere 79 € – wird bei Folgeauftrag verrechnet';
+  $feats = json_decode((string)$row['features'], true);
+  $changed = false;
+  if (is_array($feats)) {
+    foreach ($feats as &$f) if ($f === $alt) { $f = $neu; $changed = true; }
+    unset($f);
+  }
+  $desc = (string)$row['meta_desc'];
+  $descNeu = str_replace('149 Euro pauschal, wird bei Folgeauftrag verrechnet',
+    '149 Euro zzgl. MwSt., wird bei Folgeauftrag verrechnet', $desc);
+  if ($changed || $descNeu !== $desc)
+    $p->prepare('update campaign_pages set features = ?, meta_desc = ?, updated_at = ? where id = ?')
+      ->execute([json_encode($feats, JSON_UNESCAPED_UNICODE), $descNeu, now(), $row['id']]);
 }
 
 /* Datenschutzerklärung – eine Quelle für Seed und Migration (v25) */
@@ -2408,11 +2455,33 @@ function portalDoc(string $token, string $plz): array {
   $st->execute([$token]);
   $d = $st->fetch();
   if (!$d) fail('Dieses Angebot wurde nicht gefunden oder der Link ist abgelaufen.', 404);
+  if (trim((string)$d['zip']) === '')
+    fail('Zu diesem Vorgang ist bei mir noch keine Postleitzahl hinterlegt – deshalb kann ich den Zugang nicht prüfen. Melde dich kurz bei mir (01523 6439373), dann schalte ich dich frei.', 409);
   if (trim($plz) === '' || trim($plz) !== trim((string)$d['zip'])) {
+    plzBremse($token, true);
     usleep(500000);
     out(['need' => 'plz'], 401);
   }
+  plzBremse($token, false);
   return $d;
+}
+
+/* Bremse gegen das Durchprobieren von Postleitzahlen: zählt Fehlversuche je Vorgang
+   in einer kleinen Datei (keine IP-Speicherung). Nach 10 Fehlversuchen ist der Zugang
+   15 Minuten gesperrt - fünfstellige PLZ wären sonst durchprobierbar. */
+function plzBremse(string $token, bool $fehler): void {
+  $dir = DATA_DIR . '/plz';
+  if (!is_dir($dir)) @mkdir($dir, 0755, true);
+  $file = $dir . '/' . substr(hash('sha256', $token), 0, 32) . '.json';
+  $st = is_file($file) ? (json_decode((string)@file_get_contents($file), true) ?: []) : [];
+  $n = (int)($st['n'] ?? 0); $bis = (int)($st['bis'] ?? 0);
+  if ($bis > time()) {
+    usleep(500000);
+    fail('Zu viele Fehlversuche. Bitte in etwa 15 Minuten erneut versuchen – oder ruf mich einfach an: 01523 6439373.', 429);
+  }
+  if (!$fehler) { @unlink($file); return; }
+  $n++;
+  @file_put_contents($file, json_encode(['n' => $n, 'bis' => $n >= 10 ? time() + 900 : 0]));
 }
 
 function portalRental(string $token, string $plz): array {
@@ -2425,10 +2494,16 @@ function portalRental(string $token, string $plz): array {
   $st->execute([$token]);
   $r = $st->fetch();
   if (!$r) fail('Dieser Mietvertrag wurde nicht gefunden oder der Link ist abgelaufen.', 404);
+  /* Ohne hinterlegte PLZ könnte der Kunde sich nie einloggen - dann lieber sagen,
+     woran es liegt, statt ihn endlos "falsche PLZ" probieren zu lassen. */
+  if (trim((string)$r['zip']) === '')
+    fail('Zu diesem Vorgang ist bei mir noch keine Postleitzahl hinterlegt – deshalb kann ich den Zugang nicht prüfen. Melde dich kurz bei mir (01523 6439373), dann schalte ich dich frei.', 409);
   if (trim($plz) === '' || trim($plz) !== trim((string)$r['zip'])) {
+    plzBremse($token, true);
     usleep(500000);
     out(['need' => 'plz'], 401);
   }
+  plzBremse($token, false);
   return $r;
 }
 /* Abholung/Rückgabe (event_date/end_date) sind der Verleihzeitraum für die Verfügbarkeitsprüfung -
@@ -2833,14 +2908,27 @@ function handlePortal(string $path, string $method, $body): never {
     $st->execute([$email]);
     $existing = $st->fetch();
     if ($existing && $existing['portal_hash'] !== null) fail('Für diese E-Mail existiert bereits ein Konto – bitte einloggen.', 409);
-    $parts = preg_split('/\s+/', $name, 2);
-    $first = $parts[0]; $last = $parts[1] ?? '';
+    [$first, $last] = splitPersonName($name);
     $phone = mb_substr(trim((string)($body['phone'] ?? '')), 0, 60);
     $hash = password_hash($pass, PASSWORD_DEFAULT);
     if ($existing) {
-      $custId = $existing['id'];
-      $p->prepare('update customers set first_name=?, last_name=?, phone=?, portal_hash=?, updated_at=? where id=?')
-        ->execute([$first, $last, $phone, $hash, now(), $custId]);
+      /* SICHERHEIT: Zu dieser Adresse gibt es bereits einen Kundendatensatz (aus einer
+         Anfrage oder von Markus angelegt) - dort hängen Angebote, Rechnungen, Verträge
+         und der Veranstaltungsplaner dran. Wer die Adresse kennt, darf sich hier NICHT
+         einfach Zugang verschaffen. Stattdessen geht ein Bestätigungslink an genau die
+         Adresse; erst wer den anklickt, setzt sein Passwort (portal/account/set_password).
+         Vorhandene Stammdaten werden dabei nicht überschrieben - eine gepflegte
+         Telefonnummer darf nicht durch ein leeres Formularfeld verloren gehen. */
+      $inv = bin2hex(random_bytes(24));
+      $p->prepare('update customers set portal_invite = ?, portal_invite_expires = ?, updated_at = ? where id = ?')
+        ->execute([$inv, time() + 2 * 86400, now(), $existing['id']]);
+      sendMailSafe($email, 'Dein Zugang zum Kundenkonto',
+        "Hallo,\n\ndu möchtest dir ein Kundenkonto bei DJ Lauschgift anlegen – zu deiner E-Mail-Adresse gibt es bei mir schon einen Vorgang.\n\n" .
+        "Damit niemand Fremdes an deine Unterlagen kommt, bestätige den Zugang bitte über diesen Link (48 Stunden gültig) und vergib dort dein Passwort:\n" .
+        baseUrl() . "/portal.html?einladung=$inv\n\n" .
+        "Warst du das nicht? Dann ignoriere diese Mail einfach – ohne den Link passiert nichts.\n\nViele Grüße\nMarkus");
+      out(['pending' => true,
+        'message' => 'Fast geschafft: Zu deiner Adresse gibt es schon einen Vorgang bei mir. Ich habe dir gerade einen Bestätigungslink geschickt – damit legst du dein Passwort fest und kommst direkt rein.'], 202);
     } else {
       $custId = uuid();
       $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, phone, portal_hash, source, created_at, updated_at)
@@ -2962,9 +3050,19 @@ function handlePortal(string $path, string $method, $body): never {
          Pfad muss ein Skalar sein. Ohne diese Prüfung könnte ein falscher Werttyp (z.B. ein
          String statt eines Arrays) unbemerkt in event_plan landen und fmtPlaylists()/
          fmtTimetable() beim Rendern crashen lassen (admin.html wie portal.html). */
+      $verworfen = 0;
       $isArrayField = in_array($fieldPath, ['music.playlists', 'timetable'], true);
       if ($isArrayField) {
         if (!is_array($value)) fail('Ungültiger Wert für dieses Feld.');
+        /* Obergrenze für die Anzahl der Einträge: Ohne sie kann eine einzige Eingabe
+           mit zehntausenden Zeilen die Datenbank aufblähen und das Backoffice-Dashboard
+           unbenutzbar machen (jede Zeile wird dort angezeigt). */
+        $maxItems = $fieldPath === 'timetable' ? 100 : 20;
+        if (count($value) > $maxItems)
+          fail($fieldPath === 'timetable'
+            ? 'Der Ablaufplan darf höchstens 100 Punkte haben – so viele passen selbst in die längste Feier nicht.'
+            : 'Bitte höchstens 20 Playlist-Links.');
+        $eingereicht = count($value);
         if ($fieldPath === 'music.playlists') {
           /* url landet später ungeprüft in einem href-Attribut (admin.html/portal.html
              fmtPlaylists) - ohne Schema-Prüfung könnte ein "javascript:"-Link gespeichert
@@ -2976,6 +3074,9 @@ function handlePortal(string $path, string $method, $body): never {
             return ['label' => is_string($it['label'] ?? null) ? mb_substr($it['label'], 0, 120) : 'Playlist',
               'url' => $url];
           }, $value)));
+          /* Verworfene Zeilen (kein https) zählen und dem Kunden melden - sonst denkt
+             er, alle Links seien angekommen. */
+          $verworfen = $eingereicht - count($value);
         } else {
           $value = array_values(array_filter(array_map(function ($it) {
             if (!is_array($it) || !isset($it['label'])) return null;
@@ -2999,13 +3100,15 @@ function handlePortal(string $path, string $method, $body): never {
         $p->prepare('insert into event_plan_changes (id, booking_id, field_path, field_label, old_value, new_value, status, created_at, reviewed_at)
           values (?,?,?,?,?,?,?,?,?)')
           ->execute([uuid(), $b['id'], $fieldPath, $fieldLabel, null, $newEncoded, 'uebernommen', now(), now()]);
-        out(['ok' => true, 'applied' => true], 201);
+        out(['ok' => true, 'applied' => true,
+          'hinweis' => $verworfen ? "$verworfen Playlist-Link(s) konnte ich nicht übernehmen – sie müssen mit https:// beginnen." : null], 201);
       }
       $currentEncoded = is_scalar($current) || $current === null ? (string)$current : json_encode($current, JSON_UNESCAPED_UNICODE);
       $p->prepare('insert into event_plan_changes (id, booking_id, field_path, field_label, old_value, new_value, status, created_at)
         values (?,?,?,?,?,?,?,?)')
         ->execute([uuid(), $b['id'], $fieldPath, $fieldLabel, $currentEncoded, $newEncoded, 'offen', now()]);
-      out(['ok' => true, 'applied' => false], 201);
+      out(['ok' => true, 'applied' => false,
+        'hinweis' => $verworfen ? "$verworfen Playlist-Link(s) konnte ich nicht übernehmen – sie müssen mit https:// beginnen." : null], 201);
     }
     if ($path === 'portal/account/upload' && $method === 'POST') {
       $raw = file_get_contents('php://input');
@@ -3083,7 +3186,22 @@ function handlePortal(string $path, string $method, $body): never {
     if (!in_array($kind, ['accept','decline','comment','callback','bande'])) fail('Unbekannte Aktion.');
     $msg = mb_substr(trim((string)($body['message'] ?? '')), 0, 4000);
     $phone = mb_substr(trim((string)($body['phone'] ?? '')), 0, 60);
-    if ($kind === 'callback' && $phone === '') fail('Bitte eine Rückrufnummer angeben.');
+    if ($kind === 'callback') {
+      /* Ohne erkennbare Nummer kann Markus nicht zurückrufen - dann lieber gleich nachfragen. */
+      if ($phone === '') fail('Bitte eine Rückrufnummer angeben.');
+      if (strlen(preg_replace('/\D/', '', $phone)) < 6)
+        fail('Diese Nummer sieht nicht vollständig aus – bitte mit Vorwahl angeben, damit ich zurückrufen kann.');
+    }
+    /* Annehmen/Ablehnen gibt es nur beim Angebot. Eine Rechnung ist keine Entscheidung,
+       die der Kunde trifft - und sie ist ab "versendet" auch buchhalterisch festgeschrieben. */
+    if (in_array($kind, ['accept','decline'], true)) {
+      if (($d['doc_type'] ?? '') !== 'angebot')
+        fail('Das ist eine Rechnung – die kann man nicht annehmen oder ablehnen. Bei Fragen dazu schreib mir einfach über „Frage stellen“.', 409);
+      /* Eine getroffene Entscheidung bleibt stehen: Sonst ließe sich eine Ablehnung
+         später wieder in eine Annahme (samt neuer Unterschrift) verwandeln. */
+      if (in_array($d['status'] ?? '', ['angenommen','abgelehnt','bezahlt'], true))
+        fail('Zu diesem Angebot liegt schon eine Rückmeldung vor. Wenn sich etwas geändert hat, schreib mir kurz – wir klären das persönlich.', 409);
+    }
     if ($kind === 'accept' && $d['status'] !== 'storniert') {
       $accName = mb_substr(trim((string)($body['name'] ?? '')), 0, 120);
       $sigRaw = (string)($body['signature'] ?? '');
@@ -3116,6 +3234,10 @@ function handlePortal(string $path, string $method, $body): never {
       $answers = $body['answers'] ?? null;
       if (!is_array($answers)) fail('Antworten fehlen.');
       $answers = array_map(fn($a) => mb_substr(trim((string)$a), 0, 4000), $answers);
+      /* Ein komplett leer abgeschickter Bogen würde den Link unwiderruflich verbrauchen -
+         der Kunde könnte nichts mehr nachtragen und Markus hätte nur Striche. */
+      if (!array_filter($answers, fn($a) => $a !== ''))
+        fail('Bitte fülle wenigstens eine Frage aus – sonst hilft mir der Bogen leider nicht weiter.');
       $p->prepare("update forms set answers=?, status='beantwortet', submitted_at=? where id=?")
         ->execute([json_encode($answers, JSON_UNESCAPED_UNICODE), now(), $f['id']]);
       if ($f['customer_id']) {
@@ -3135,16 +3257,23 @@ function handlePortal(string $path, string $method, $body): never {
     $r = portalRental($m[1], (string)($_GET['plz'] ?? ''));
     $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
     $terms = json_decode($p->query("select value from settings where key='rental_contract'")->fetchColumn() ?: '{}', true);
+    /* Ist der Vertrag unterschrieben, zählt der Snapshot von damals - der Kunde muss
+       genau das wiedersehen, was er unterschrieben hat, auch wenn sich Mietsachen oder
+       Bedingungen inzwischen geändert haben. */
+    $snap = $r['status'] === 'unterschrieben' && !empty($r['snapshot'])
+      ? (json_decode((string)$r['snapshot'], true) ?: null) : null;
     out([
       'status' => $r['status'], 'signed_at' => $r['signed_at'], 'signed_name' => $r['signed_name'],
       'customer' => ['name' => trim($r['company'] ?: trim($r['first_name'].' '.$r['last_name'])),
         'street' => $r['street'], 'zip_city' => trim($r['zip'].' '.$r['city'])],
       'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city'])),
-      'booking' => ['title' => $r['title'], 'event_date' => $r['event_date'], 'end_date' => $r['end_date'],
-        'days' => rentalDays($r)],
-      'items' => rentalItems($p, $r),
-      'terms' => (string)($terms['text'] ?? ''),
-      'deposit_amount' => $r['deposit_amount'] !== null ? (float)$r['deposit_amount'] : null,
+      'booking' => ['title' => $r['title'],
+        'event_date' => $snap['event_date'] ?? $r['event_date'], 'end_date' => $snap['end_date'] ?? $r['end_date'],
+        'days' => $snap['days'] ?? rentalDays($r)],
+      'items' => $snap['items'] ?? rentalItems($p, $r),
+      'terms' => $snap['terms'] ?? (string)($terms['text'] ?? ''),
+      'deposit_amount' => $snap ? ($snap['deposit_amount'] ?? null)
+        : ($r['deposit_amount'] !== null ? (float)$r['deposit_amount'] : null),
     ]);
   }
   if (preg_match('#^portal/rental/([a-f0-9]+)/sign$#', $path, $m) && $method === 'POST') {
@@ -3282,6 +3411,12 @@ function handlePortal(string $path, string $method, $body): never {
     $from = (string)($body['from'] ?? ''); $to = (string)($body['to'] ?? '');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) fail('Zeitraum fehlt.');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) $to = $from;
+    /* Umgedrehter Zeitraum ist doppelt gefährlich: Die Verfügbarkeitsprüfung sucht mit
+       "event_date <= bis and end_date >= von" - eine Buchung mit vertauschten Daten wird
+       dabei NIE gefunden, das Gerät gilt also weiter als frei und kann doppelt vermietet
+       werden. Deshalb hier hart abweisen. */
+    if ($to < $from) fail('Das Rückgabedatum liegt vor der Abholung – bitte den Zeitraum prüfen.');
+    if ($from < gmdate('Y-m-d')) fail('Der Zeitraum liegt in der Vergangenheit – bitte ein Abholdatum ab heute wählen.');
     $cart = is_array($body['items'] ?? null) ? $body['items'] : [];
     if (!$cart) fail('Der Warenkorb ist leer.');
     /* Partnerpreis gilt schon ab dem Antrag (vorläufig) für DJ-/Band-/Musiker-Partner,
@@ -3358,7 +3493,7 @@ function handlePortal(string $path, string $method, $body): never {
     notifyOwner('Neue Miet-Anfrage: ' . $custName,
       "Zeitraum: $from" . ($to !== $from ? " bis $to" : '') . "\n\n" .
       implode("\n", array_map(fn($l) => '- ' . $l['name'] . ' × ' . $l['qty'] . ' = ' . number_format($l['price'], 2, ',', '.') . ' €', $lines)) .
-      "\n\nGesamt (netto): " . number_format($total, 2, ',', '.') . " €" . ($isPartner ? "\n(Partnerpreis angewendet" . (($partnerInfo['provisional'] ?? false) ? ', Partner noch nicht final freigeschaltet' : '') . ')' : ''));
+      "\n\nGesamt (inkl. MwSt.): " . number_format($total, 2, ',', '.') . " €" . ($isPartner ? "\n(Partnerpreis angewendet" . (($partnerInfo['provisional'] ?? false) ? ', Partner noch nicht final freigeschaltet' : '') . ')' : ''));
     out(['ok' => true, 'booking_id' => $bookingId, 'items' => $lines, 'total' => round($total, 2),
       'partner' => $isPartner, 'partner_provisional' => $isPartner ? ($partnerInfo['provisional'] ?? false) : false], 201);
   }
@@ -3434,7 +3569,9 @@ function handlePortal(string $path, string $method, $body): never {
       ($ok && $m[1] === 'confirm' ? 'Zu den Workshop-Terminen →' : 'Zur Technik-Seite →') . '</a></div></body></html>';
     exit;
   }
-  fail('Unbekannter Portal-Endpunkt.', 404);
+  /* Kaputte/abgeschnittene Links aus Mailprogrammen landen hier - der Besucher darf
+     keine Entwickler-Formulierung sehen, sondern braucht einen Ausweg. */
+  fail('Dieser Link stimmt so nicht. Bitte kopiere ihn noch einmal komplett aus meiner E-Mail – oder melde dich kurz bei mir: 01523 6439373.', 404);
 }
 
 /* ---------- Upload ---------- */

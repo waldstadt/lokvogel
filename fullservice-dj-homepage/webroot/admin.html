@@ -2720,25 +2720,79 @@ function runStorno(){
   }).catch(function(e){toast(e.message,1)});
 }
 
+/* Positionen 1:1 übernehmen - INKLUSIVE Rabatte und Kopfzeilen. Ohne discount_value/
+   discount_type stünde in der Rechnung ein höherer Betrag als im angenommenen Angebot. */
+function copyItems(items){
+  return items.map(function(it){return {pos:it.pos,description:it.description,note:it.note,
+    qty:it.qty,unit:it.unit,unit_price:it.unit_price,
+    discount_value:it.discount_value,discount_type:it.discount_type,
+    is_header:it.is_header,group_pos:it.group_pos}});
+}
 function docToInvoice(type){
   var src=curDoc,items=curItems.slice();
+  /* Der verbindliche Endbetrag des Angebots: Pauschalpreis schlägt die Summe, sonst
+     Positionssummen abzüglich Gesamtrabatt. Genau das hat der Kunde angenommen. */
+  /* Basis für den Abschlag: der verbindliche Endbetrag. Pauschalpreis schlägt alles,
+     sonst die gespeicherte Bruttosumme - und falls die (noch) fehlt, aus den Positionen
+     samt Rabatten gerechnet, damit nie versehentlich 0 € als Basis dient. */
+  var srcGross=Number(src.total_override)||Number(src.total_gross)||0;
+  if(!srcGross){
+    var roh=items.reduce(function(s2,it){return s2+lineTotal(it)},0);
+    var dv=Number(src.discount_value)||0;
+    srcGross=src.discount_type==='eur'?Math.max(0,roh-dv):Math.round(roh*(1-dv/100)*100)/100;
+  }
   openDocEditor(null,type);
   setTimeout(function(){
     document.getElementById('docCust').value=src.customer_id;refreshBookOpts();
     document.getElementById('docBook').value=src.booking_id||'';
+    /* Herkunft festhalten: Über parent_id findet die Schlussrechnung später das
+       ursprüngliche Angebot auch dann, wenn keine Buchung verknüpft ist. */
+    curDoc.parent_id=src.id;
     if(type==='abschlag'){
-      var total=items.reduce(function(s,it){return s+lineTotal(it)},0);
       curItems=[];renderItems();
-      askAbschlag(total,'Auftrag gemäß '+docTypeName(src.doc_type)+' '+src.number,function(amount,desc){
+      askAbschlag(srcGross,'Auftrag gemäß '+docTypeName(src.doc_type)+' '+src.number,function(amount,desc){
         curItems=[{pos:1,description:desc,note:'Nach Zahlungseingang ist der Termin verbindlich reserviert. Der Restbetrag folgt mit der Schlussrechnung.',qty:1,unit:'pausch.',unit_price:amount}];
         renderItems();
       });
     }else if(type==='schluss'){
-      curItems=items.map(function(it){return {pos:it.pos,description:it.description,qty:it.qty,unit:it.unit,unit_price:it.unit_price}});
-      var paidDeps=CACHE.documents.filter(function(d){return d.doc_type==='abschlag'&&d.status==='bezahlt'&&(d.booking_id&&d.booking_id===src.booking_id||d.parent_id===src.id)});
-      document.getElementById('docDep').value=paidDeps.reduce(function(s,d){return s+Number(d.total_gross)},0)||Number(src.total_gross)||0;
+      /* Aus einer Abschlagsrechnung darf nicht deren eigene Position übernommen werden -
+         sonst steht in der Schlussrechnung nur der Abschlag, der sich mit dem Abzug auf
+         0 € aufhebt. Dann lieber die Positionen des zugrunde liegenden Angebots holen. */
+      var basis=items,basisDoc=src;
+      if(src.doc_type==='abschlag'){
+        /* Zuerst über die festgehaltene Herkunft, sonst über die Buchung suchen. */
+        var ang=CACHE.documents.find(function(d){return d.id===src.parent_id&&d.doc_type==='angebot'})
+          ||CACHE.documents.filter(function(d){return d.doc_type==='angebot'&&d.booking_id&&d.booking_id===src.booking_id})
+            .sort(function(a,b){return (b.created_at||'')<(a.created_at||'')?-1:1})[0];
+        if(ang){basisDoc=ang;basis=null;}
+        else toast('Kein zugehöriges Angebot gefunden – bitte die Positionen der Schlussrechnung prüfen.',1);
+      }
+      var fertig=function(list,doc){
+        curItems=copyItems(list);
+        document.getElementById('docDiscVal').value=doc.discount_value||0;
+        if(doc.discount_type)document.getElementById('docDiscType').value=doc.discount_type;
+        document.getElementById('docTotalOverride').value=doc.total_override||'';
+        /* Alle bezahlten Abschläge zu diesem Vorgang abziehen - erkannt über Buchung
+           oder über die Herkunft (parent_id), sonst bliebe der Abzug bei 0. */
+        var paidDeps=CACHE.documents.filter(function(d){
+          if(d.doc_type!=='abschlag'||d.status!=='bezahlt')return false;
+          if(d.id===src.id)return true;
+          if(src.booking_id&&d.booking_id===src.booking_id)return true;
+          return d.parent_id&&d.parent_id===basisDoc.id;
+        });
+        document.getElementById('docDep').value=paidDeps.reduce(function(s,d){return s+Number(d.total_gross)},0)||0;
+        renderItems();
+      };
+      if(basis)fertig(basis,basisDoc);
+      else api('document_items?document_id=eq.'+basisDoc.id+'&order=pos')
+        .then(function(r){fertig(r||[],basisDoc)})
+        .catch(function(){fertig(items,src)});
     }else{
-      curItems=items.map(function(it){return {pos:it.pos,description:it.description,qty:it.qty,unit:it.unit,unit_price:it.unit_price}});
+      curItems=copyItems(items);
+      /* Gesamtrabatt und Pauschalpreis mit übernehmen */
+      document.getElementById('docDiscVal').value=src.discount_value||0;
+      if(src.discount_type)document.getElementById('docDiscType').value=src.discount_type;
+      document.getElementById('docTotalOverride').value=src.total_override||'';
     }
     renderItems();
   },80);
@@ -2821,8 +2875,8 @@ function printMietvertrag(rc){
   '<div style="margin-bottom:14px"><b>Mietzeitraum:</b> '+dt(b.event_date)+(b.end_date?' bis '+dt(b.end_date):'')+' ('+days+' Miettag'+(days>1?'e':'')+', 1 Miettag = 24 Stunden ab Übergabe)'+
   (b.venue_name?'<br><b>Einsatzort:</b> '+esc(b.venue_name):'')+'</div>'+
   '<table style="width:100%;border-collapse:collapse;margin-bottom:6px"><thead><tr style="background:#f2f2f2">'+
-  '<th style="padding:7px;text-align:left">Pos</th><th style="padding:7px;text-align:left">Mietgegenstand</th><th style="padding:7px;text-align:right">Menge</th><th style="padding:7px;text-align:right">Mietpreis brutto</th></tr></thead>'+
-  '<tbody>'+rows+'</tbody><tfoot><tr><td colspan="3" style="padding:7px;text-align:right;font-weight:700">Gesamtmiete brutto</td><td style="padding:7px;text-align:right;font-weight:700">'+euro(total)+'</td></tr></tfoot></table>'+
+  '<th style="padding:7px;text-align:left">Pos</th><th style="padding:7px;text-align:left">Mietgegenstand</th><th style="padding:7px;text-align:right">Menge</th><th style="padding:7px;text-align:right">Mietpreis inkl. MwSt.</th></tr></thead>'+
+  '<tbody>'+rows+'</tbody><tfoot><tr><td colspan="3" style="padding:7px;text-align:right;font-weight:700">Gesamtmiete inkl. MwSt.</td><td style="padding:7px;text-align:right;font-weight:700">'+euro(total)+'</td></tr></tfoot></table>'+
   '<p style="color:#555;margin-bottom:16px">inkl. gesetzlicher Umsatzsteuer, sofern ausgewiesen. Abrechnung gemäß zugehörigem Angebot bzw. Rechnung.</p>'+
   (deposit?'<p style="margin-bottom:16px"><b>Vereinbarte Kaution:</b> '+euro(deposit)+' – wird bei vollständiger, unbeschädigter Rückgabe erstattet.</p>':'')+
   '<div style="white-space:pre-wrap;margin-bottom:26px">'+esc(terms)+'</div>'+
@@ -4037,7 +4091,10 @@ var TC_FUNK=['Alles funktioniert','Funktioniert mit Einschränkungen','Teilweise
 var TC_STAND=['Aktueller Stand der Technik','Solide, gebrauchstauglich','Veraltet, aber nutzbar','Technisch überholt'];
 var TC_POT=['hoch','mittel','gering'];
 var TC_EMPF=['Neu einstellen genügt','Gezielt ergänzen','Neu einstellen + ergänzen','Mittelfristig ersetzen','Neuanschaffung empfohlen'];
-function tcSel(id,opts,val){return '<select id="'+id+'">'+opts.map(function(o){return '<option'+(o===val?' selected':'')+'>'+o+'</option>'}).join('')+'</select>'}
+/* Leerer Startwert ist hier wichtig: Sonst wählt der Browser die erste Option vor und
+   ein nie ausgefülltes Protokoll ergäbe einen Bericht mit Befunden, die es nie gab. */
+function tcSel(id,opts,val){return '<select id="'+id+'"><option value=""'+(val?'':' selected')+'>– bitte wählen –</option>'+
+  opts.map(function(o){return '<option'+(o===val?' selected':'')+'>'+o+'</option>'}).join('')+'</select>'}
 function openTechCheck(){
   var t=(curCust&&curCust.tech_check)||{};
   openModal('Technik-Check – '+esc(custName(curCust)),
@@ -4111,7 +4168,8 @@ function tcDelPhoto(i){
 function saveTechCheck(){
   var t={date:v('tcDate'),where:v('tcWhere'),use:v('tcUse'),problems:v('tcProb'),wishes:v('tcWish'),
     budget:v('tcBudget'),
-    func:v('tcFunc'),stand:v('tcStand'),sound:v('tcSound')?Number(v('tcSound')):null,
+    func:v('tcFunc'),stand:v('tcStand'),
+    sound:v('tcSound')?Math.max(1,Math.min(10,Math.round(Number(v('tcSound'))||0))):null,
     tune:v('tcTune'),add:v('tcAdd'),findings:v('tcFind'),photos:TC_PHOTOS.slice(),
     recommendation:v('tcEmpf'),reasoning:v('tcWhy'),personal:v('tcPersonal'),steps:v('tcSteps')};
   api('customers?id=eq.'+curCust.id,{method:'PATCH',body:{tech_check:t}}).then(function(){
@@ -4120,15 +4178,25 @@ function saveTechCheck(){
 }
 function printTechCheck(){
   var t=(curCust&&curCust.tech_check)||{},comp=S.company||{},c=curCust;
+  /* Ohne Bewertung kein Kundenbericht: Sonst geht ein bezahltes Dokument raus, in dem
+     Befunde stehen, die nie erhoben wurden. */
+  if(!t.func&&!t.recommendation&&!t.findings){
+    toast('Bitte erst das Protokoll ausfüllen – mindestens Funktionsstatus oder Empfehlung.',1);
+    return;
+  }
   var pr=function(l,val){return val?'<tr><td style="padding:6px 12px 6px 0;color:#777;white-space:nowrap;vertical-align:top;width:190px">'+l+'</td><td style="padding:6px 0">'+esc(String(val)).replace(/\n/g,'<br>')+'</td></tr>':''};
-  var scale=t.sound?('<b>'+t.sound+' / 10</b> '+''.repeat(t.sound)+''.repeat(10-t.sound)):'';
+  /* Wert absichern: Ein Wert ausserhalb 1-10 liess repeat() mit negativer Zahl den
+     ganzen Druck still fehlschlagen (Invalid count value). */
+  var snd=Math.max(0,Math.min(10,Math.round(Number(t.sound)||0)));
+  var scale=snd?('<b>'+snd+' / 10</b> <span style="letter-spacing:2px">'+'\u25CF'.repeat(snd)+'\u25CB'.repeat(10-snd)+'</span>'):'';
   /* Fotos zuerst laden (geschützter Abruf), dann drucken */
   var pics=t.photos||[];
   Promise.all(pics.map(function(n){
     return fetch('api.php/checkpic/get/'+n,{headers:{Authorization:'Bearer '+TOKEN}})
       .then(function(r){return r.ok?r.blob():null}).then(function(b){return b?URL.createObjectURL(b):null})
       .catch(function(){return null});
-  })).then(function(urls){renderTechCheckPrint(t,comp,c,pr,scale,urls.filter(Boolean))});
+  })).then(function(urls){renderTechCheckPrint(t,comp,c,pr,scale,urls.filter(Boolean))})
+  .catch(function(e){toast('Bericht konnte nicht erstellt werden: '+e.message,1)});
 }
 function renderTechCheckPrint(t,comp,c,pr,scale,picUrls){
   var picHtml=picUrls.length?('<div style="font-weight:700;margin:16px 0 6px">Fotodokumentation</div>'+
@@ -5103,6 +5171,12 @@ function openModal(title,html){
 }
 function closeModal(){document.getElementById('modalBg').classList.remove('v')}
 document.getElementById('modalBg').addEventListener('click',function(e){if(e.target===this)closeModal()});
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape')return;
+  var bg2=document.getElementById('modalBg2');
+  if(bg2&&bg2.classList.contains('v')){closeModal2();return}   /* erst das obere Fenster */
+  if(document.getElementById('modalBg').classList.contains('v'))closeModal();
+});
 function v(id){var el=document.getElementById(id);return el?el.value.trim():''}
 
 /* ===== Zweites Overlay (liegt über offenen Modals – für Medien-Pool & Text-Editor) ===== */
