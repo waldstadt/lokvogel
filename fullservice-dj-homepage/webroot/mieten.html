@@ -54,7 +54,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86
 }
 
 .cats{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
-.cat-chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mut);border:1px solid var(--line);border-radius:3px;padding:8px 15px;cursor:pointer;transition:border-color .2s,color .2s,background .2s;background:transparent}
+.cat-chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mut);border:1px solid var(--line);border-radius:3px;padding:8px 15px;cursor:pointer;transition:border-color .2s,color .2s,background .2s;background:transparent;font-family:inherit;margin:0}
 .cat-chip:hover{border-color:var(--acc);color:var(--txt)}
 .cat-chip.active{border-color:var(--acc);color:#0c1513;background:var(--acc)}
 .cat-chip svg{width:14px;height:14px}
@@ -107,6 +107,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,18,19,.86
 .rent .cart-warn{font-size:11px;color:#e0a0a0;margin-top:8px}
 
 input,select,textarea{width:100%;padding:13px 15px;background:var(--bg);border:1px solid var(--line);color:var(--txt);font:inherit;font-size:15px;outline:0;margin-bottom:18px;border-radius:4px;transition:border-color .2s}
+::placeholder{color:var(--mut)}
 input:focus,select:focus,textarea:focus{border-color:var(--acc)}
 label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:0 0 6px;font-weight:600}
 
@@ -237,8 +238,8 @@ footer a:hover{color:var(--acc)}
     <p class="lead" id="rentText">Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung.</p>
 
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:26px">
-      <div><label>Von</label><input type="date" id="avFrom" style="margin:0;width:auto"></div>
-      <div><label>Bis</label><input type="date" id="avTo" style="margin:0;width:auto"></div>
+      <div><label for="avFrom">Von</label><input type="date" id="avFrom" style="margin:0;width:auto"></div>
+      <div><label for="avTo">Bis</label><input type="date" id="avTo" style="margin:0;width:auto"></div>
       <button class="btn g" onclick="checkAvail()">Verfügbarkeit prüfen</button>
       <span class="sub" id="partnerBadge" style="font-size:13px;color:var(--mut)"></span>
     </div>
@@ -262,7 +263,7 @@ footer a:hover{color:var(--acc)}
       <span class="wm" style="font-size:15px">lauschgift<i>.</i><small>Veranstaltungstechnik</small></span>
     </a>
     <div>© <span id="year"></span> Markus Jankowski · Hemer &nbsp;·&nbsp; <a href="technik.html">Zur Technik-Seite</a></div>
-    <div><a onclick="openLegal('impressum')">Impressum</a> &nbsp;·&nbsp; <a onclick="openLegal('datenschutz')">Datenschutz</a> &nbsp;·&nbsp; <a onclick="openLegal('agb')">AGB</a> &nbsp;·&nbsp; <a onclick="openLegal('widerrufsformular')">Widerrufsformular</a></div>
+    <div><a href="#" onclick="openLegal('impressum');return false">Impressum</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('datenschutz');return false">Datenschutz</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('agb');return false">AGB</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('widerrufsformular');return false">Widerrufsformular</a></div>
   </div>
 </footer>
 
@@ -301,7 +302,7 @@ footer a:hover{color:var(--acc)}
     <span id="cartTotalLabel">Gesamt (für den gewählten Zeitraum)</span><b id="cartTotal" style="font-size:19px"></b>
   </div>
   <div id="cartAuth" style="margin-top:18px"></div>
-  <p class="mut" style="font-size:12px;line-height:1.6;margin-top:14px">Das hier ist erst eine unverbindliche Anfrage, keine Zahlungspflicht. Bei der Übergabe gibt's eine kurze Einweisung, für Beschädigung/Verlust haftet ihr wie üblich beim Verleih – Details dazu in den <a onclick="openLegal('agb')" style="cursor:pointer">AGB</a>, die Höhe einer eventuellen Kaution steht spätestens im Angebot.</p>
+  <p class="mut" style="font-size:12px;line-height:1.6;margin-top:14px">Das hier ist erst eine unverbindliche Anfrage, keine Zahlungspflicht. Bei der Übergabe gibt's eine kurze Einweisung, für Beschädigung/Verlust haftet ihr wie üblich beim Verleih – Details dazu in den <a href="#" onclick="openLegal('agb');return false">AGB</a>, die Höhe einer eventuellen Kaution steht spätestens im Angebot.</p>
   <div class="msg" id="cartMsg" style="margin-top:14px"></div>
   <div style="margin-top:14px" id="cartSubmitWrap"><button class="btn" id="cartSubmitBtn" onclick="submitCart()" style="width:100%">Anfrage abschicken</button></div>
 </div>
@@ -385,7 +386,7 @@ function renderCatChips(){
   if(SETS.length)cats.push('Sets'); /* Sets ist eine Kategorie wie jede andere - alphabetisch einsortiert, nicht fest angepinnt */
   cats.sort();
   document.getElementById('catChips').innerHTML=['Alle'].concat(cats).map(function(c){
-    return '<span class="cat-chip'+(c===CUR_CAT?' active':'')+'" onclick="setCat(\''+jsq(c)+'\')">'+(c!=='Alle'?catIcon(c):'')+esc(c)+'</span>';
+    return '<button type="button" class="cat-chip'+(c===CUR_CAT?' active':'')+'" onclick="setCat(\''+jsq(c)+'\')">'+(c!=='Alle'?catIcon(c):'')+esc(c)+'</button>';
   }).join('');
 }
 function setCat(c){CUR_CAT=c;renderCatChips();renderRent()}
@@ -456,7 +457,7 @@ function rentCard(e){
       '<button class="btn small'+(st.inCart?' ghost':'')+'" onclick="addToCart(\''+jsq(e.id)+'\')">'+(st.inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>';
   }
   addon+=setHint;
-  var open=e.id?' clickable" onclick="openProductModal(\''+jsq(e.id)+'\')"':'"';
+  var open=e.id?' clickable" tabindex="0" role="button" onclick="openProductModal(\''+jsq(e.id)+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openProductModal(\''+jsq(e.id)+'\')}"':'"';
   return '<div class="rent reveal vis'+(st.gone?' unavail':'')+open+'><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
     (e.category?'<div class="rc">'+esc(e.category)+'</div>':'')+
     '<h4>'+esc(e.name)+'</h4><p>'+esc(e.description||'')+'</p>'+
@@ -663,7 +664,7 @@ function setCard(s){
   var rate=setDayRate(s);
   var price=rate?euro(rate*priceFactor())+' <small>/ Miettag</small>':'Preis auf Anfrage';
   var inCart=CART.some(function(c){return c.type==='set'&&c.set_id===s.id});
-  return '<div class="rent reveal vis clickable" onclick="openSetProductModal(\''+jsq(s.id)+'\')">'+setImageArea(s)+'<div class="rb">'+
+  return '<div class="rent reveal vis clickable" tabindex="0" role="button" onclick="openSetProductModal(\''+jsq(s.id)+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openSetProductModal(\''+jsq(s.id)+'\')}">'+setImageArea(s)+'<div class="rb">'+
     '<div class="rc">SET</div>'+
     '<h4>'+esc(s.name)+'</h4><p>'+esc(s.description||'')+'</p>'+
     (contains?'<div class="addon">Enthält: '+esc(contains)+'</div>':'')+
@@ -732,8 +733,10 @@ function renderTcBadge(){
   var badge=document.getElementById('tcCount');
   badge.textContent=n;badge.style.display=n>0?'inline-block':'none';
 }
-function openTourcase(){document.getElementById('tcPanel').classList.add('open');document.getElementById('tcBackdrop').classList.add('open')}
-function closeTourcase(){document.getElementById('tcPanel').classList.remove('open');document.getElementById('tcBackdrop').classList.remove('open')}
+function openTourcase(){document.getElementById('tcPanel').classList.add('open');document.getElementById('tcBackdrop').classList.add('open');
+  var closeBtn=document.querySelector('#tcPanel .tc-close');if(closeBtn)closeBtn.focus();}
+function closeTourcase(){document.getElementById('tcPanel').classList.remove('open');document.getElementById('tcBackdrop').classList.remove('open');
+  var btn=document.getElementById('tcBtn');if(btn)btn.focus();}
 function toggleTourcase(){document.getElementById('tcPanel').classList.contains('open')?closeTourcase():openTourcase()}
 var _toastT;
 function toast(txt){
@@ -835,9 +838,9 @@ function renderAuthForm(){
   var el=document.getElementById('cartAuth');
   var reg=el.dataset.mode==='register';
   el.innerHTML='<div style="font-size:13px;color:var(--mut);margin-bottom:10px">'+(reg?'Neu hier? Kurz registrieren, dann geht die Anfrage direkt raus.':'Schon Kunde? Einloggen und Anfrage abschicken.')+'</div>'+
-    (reg?'<label>Name *</label><input id="authName">':'')+
-    '<label>E-Mail *</label><input id="authEmail" type="email">'+
-    '<label>Passwort *</label><input id="authPass" type="password">'+
+    (reg?'<label for="authName">Name *</label><input id="authName">':'')+
+    '<label for="authEmail">E-Mail *</label><input id="authEmail" type="email">'+
+    '<label for="authPass">Passwort *</label><input id="authPass" type="password">'+
     (reg?('<label style="margin-top:8px"><input type="checkbox" id="authPartner" style="width:auto;margin-right:6px" onchange="document.getElementById(\'authPartnerKind\').style.display=this.checked?\'block\':\'none\'">Ich bin DJ/Band/Musiker:in und möchte Partner-Konditionen</label>'+
       '<select id="authPartnerKind" style="display:none;margin-top:8px"><option value="dj">DJ</option><option value="band">Band</option><option value="musiker">Musiker:in</option></select>'):'')+
     '<div class="sml" style="margin-top:6px"><a onclick="toggleAuthMode()">'+(reg?'Schon ein Konto? Einloggen':'Noch kein Konto? Registrieren')+'</a></div>';

@@ -166,6 +166,7 @@ form label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppe
 form .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:560px){form .row{grid-template-columns:1fr}}
 input,select,textarea{width:100%;padding:13px 15px;background:var(--card);border:1px solid var(--line);color:var(--txt);font:inherit;font-size:15px;outline:0;margin-bottom:18px;border-radius:4px;transition:border-color .2s}
+::placeholder{color:var(--mut)}
 input:focus,select:focus,textarea:focus{border-color:var(--acc)}
 textarea{min-height:130px;resize:vertical}
 .form-msg{padding:14px 16px;font-size:14px;margin-bottom:18px;display:none;border:1px solid;border-radius:4px}
@@ -369,24 +370,24 @@ footer a:hover{color:var(--acc)}
       <form id="inqForm" class="reveal">
         <div class="form-msg" id="formMsg"></div>
         <div class="row">
-          <div><label>Name *</label><input type="text" name="name" required></div>
-          <div><label>E-Mail *</label><input type="email" name="email" required></div>
+          <div><label for="inqName">Name *</label><input type="text" id="inqName" name="name" required></div>
+          <div><label for="inqEmail">E-Mail *</label><input type="email" id="inqEmail" name="email" required></div>
         </div>
         <div class="row">
-          <div><label>Telefon</label><input type="tel" name="phone"></div>
-          <div><label>Datum der Feier <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label><input type="date" name="event_date">
+          <div><label for="inqPhone">Telefon</label><input type="tel" id="inqPhone" name="phone"></div>
+          <div><label for="inqDate">Datum der Feier <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label><input type="date" id="inqDate" name="event_date">
             <div style="font-size:12px;margin-top:5px;color:var(--mut2)">Steht noch nicht fest? Einfach leer lassen – wir finden das zusammen heraus.</div></div>
         </div>
         <div class="row">
-          <div><label>Anlass</label>
+          <div><label for="inqEventType">Anlass</label>
             <select name="event_type" id="inqEventType" onchange="inqMsgPlaceholder()">
               <option>Hochzeit</option><option>Geburtstag</option><option>Firmenfeier</option>
               <option>Technik mieten</option><option>Sonstiges</option>
             </select>
           </div>
-          <div><label>Location / Ort</label><input type="text" name="location" placeholder="z. B. Hemer oder Location-Name"></div>
+          <div><label for="inqLocation">Location / Ort</label><input type="text" id="inqLocation" name="location" placeholder="z. B. Hemer oder Location-Name"></div>
         </div>
-        <label>Eure Nachricht</label>
+        <label for="inqMsg">Eure Nachricht</label>
         <textarea name="message" id="inqMsg" placeholder="Erzählt kurz von eurer Feier: Gästezahl, Uhrzeiten, Musikrichtung …"></textarea>
         <button class="btn" type="submit" id="sendBtn">Anfrage senden</button>
       </form>
@@ -401,7 +402,7 @@ footer a:hover{color:var(--acc)}
       <span class="wm" style="font-size:16px">lauschgift<i>.</i></span>
     </a>
     <div>© <span id="year"></span> Markus Jankowski · Hemer</div>
-    <div><a onclick="openLegal('impressum')">Impressum</a> &nbsp;·&nbsp; <a onclick="openLegal('datenschutz')">Datenschutz</a> &nbsp;·&nbsp; <a onclick="openLegal('agb')">AGB</a> &nbsp;·&nbsp; <a onclick="openLegal('widerrufsformular')">Widerrufsformular</a></div>
+    <div><a href="#" onclick="openLegal('impressum');return false">Impressum</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('datenschutz');return false">Datenschutz</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('agb');return false">AGB</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('widerrufsformular');return false">Widerrufsformular</a></div>
   </div>
 </footer>
 
@@ -616,7 +617,7 @@ function applyContent(rows){
       }else galSel=galAll.slice(0,galMax);
     }
     document.getElementById('galGrid').innerHTML=galSel.map(function(src){
-      return '<img src="'+esc(src)+'" alt="" loading="lazy" onerror="this.remove();galCleanup()">';
+      return '<img src="'+esc(src)+'" alt="Impression von einer Feier mit DJ Lauschgift" loading="lazy" onerror="this.remove();galCleanup()">';
     }).join('');
     showSection('galerie');
   }

@@ -28,6 +28,7 @@ h1{font-size:clamp(24px,5vw,32px);margin-bottom:6px}
 .sub{color:var(--mut);font-size:14px}
 label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:14px 0 6px;font-weight:600}
 input,select,textarea{width:100%;padding:12px 14px;background:var(--bg);border:1px solid var(--line);color:var(--txt);font:inherit;font-size:15px;outline:0;border-radius:4px}
+::placeholder{color:var(--mut)}
 input:focus,select:focus,textarea:focus{border-color:var(--acc)}
 textarea{min-height:100px;resize:vertical}
 .btn{display:inline-block;background:var(--acc);color:#16110f;padding:13px 26px;font-size:13px;font-weight:600;letter-spacing:.03em;border:none;border-radius:4px;cursor:pointer;font-family:'Space Grotesk',sans-serif;transition:background .2s}
@@ -121,7 +122,7 @@ function renderPlzGate(){
   app('<div class="card"><div class="kicker">Euer Angebot</div><h1>Kurze Sicherheitsfrage</h1>'+
     '<p class="sub">Zum Schutz eurer Daten: Gebt bitte die Postleitzahl eurer Rechnungsadresse ein.</p>'+
     '<div class="msg err" id="gateMsg" style="display:'+(PLZ?'block':'none')+'">Die Postleitzahl passt leider nicht – bitte erneut versuchen.</div>'+
-    '<label>Postleitzahl</label><input id="plzIn" inputmode="numeric" maxlength="10" placeholder="z. B. 58675">'+
+    '<label for="plzIn">Postleitzahl</label><input id="plzIn" inputmode="numeric" maxlength="10" placeholder="z. B. 58675">'+
     '<div style="margin-top:16px"><button class="btn" onclick="submitPlz()">Angebot öffnen</button></div></div>');
   var inp=document.getElementById('plzIn');
   inp.focus();
@@ -253,7 +254,7 @@ function renderOffer(){
     (decided?
       '<p class="sub">'+(d.status==='angenommen'?'Ich melde mich zeitnah bei euch mit den nächsten Schritten. Wenn euch noch etwas einfällt, schreibt mir hier:':'Ihr habt Fragen oder wollt doch nochmal sprechen? Schreibt mir gerne:')+'</p>'+
       '<div class="msg" id="aMsg"></div>'+
-      '<label>Nachricht</label><textarea id="cmt"></textarea>'+
+      '<label for="cmt">Nachricht</label><textarea id="cmt"></textarea>'+
       '<div class="actions" style="margin-top:12px"><button class="btn g" onclick="act(\'comment\')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Nachricht senden</button></div>'
       :
       '<h3 style="margin-bottom:6px">Wie möchtet ihr weitermachen?</h3>'+
@@ -266,18 +267,18 @@ function renderOffer(){
       '<button class="btn g" onclick="toggle(\'declBox\')">Eher nicht …</button></div>'+
       '<div id="accBox" class="hidden"><h3 style="font-size:16px;margin:8px 0 4px">Verbindlich beauftragen</h3>'+
       '<p class="sub" style="font-size:13px">Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an – danach ist euer Termin fest reserviert und ihr bekommt eine Bestätigung.</p>'+
-      '<label>Vor- und Nachname</label><input id="accName" autocomplete="name">'+
+      '<label for="accName">Vor- und Nachname</label><input id="accName" autocomplete="name">'+
       '<label>Unterschrift (mit Finger oder Maus)</label>'+
       '<canvas id="accSig" style="width:100%;height:150px;background:#fff;border-radius:4px;touch-action:none;cursor:crosshair"></canvas>'+
       '<div style="margin-top:6px"><a onclick="accClear()" style="cursor:pointer;font-size:13px">↺ Feld leeren</a></div>'+
       '<div style="margin-top:12px"><button class="btn green" onclick="doAccept()">✓ Jetzt verbindlich annehmen</button></div></div>'+
-      '<div id="cmtBox" class="hidden"><label>Eure Frage oder Anmerkung</label><textarea id="cmt"></textarea>'+
+      '<div id="cmtBox" class="hidden"><label for="cmt">Eure Frage oder Anmerkung</label><textarea id="cmt"></textarea>'+
       '<div style="margin-top:10px"><button class="btn" onclick="act(\'comment\')">Senden</button></div></div>'+
-      '<div id="cbBox" class="hidden"><label>Telefonnummer & wann ihr gut erreichbar seid</label><input id="cbPhone" placeholder="z. B. 0171 1234567, abends ab 18 Uhr">'+
+      '<div id="cbBox" class="hidden"><label for="cbPhone">Telefonnummer & wann ihr gut erreichbar seid</label><input id="cbPhone" placeholder="z. B. 0171 1234567, abends ab 18 Uhr">'+
       '<div style="margin-top:10px"><button class="btn" onclick="act(\'callback\')">Rückruf anfordern</button></div></div>'+
       '<div id="declBox" class="hidden">'+
-      '<label>Mögt ihr kurz sagen, woran es liegt? (optional)</label><textarea id="declMsg" placeholder="z. B. Budget, anderer Stil, Termin geändert …" style="min-height:70px"></textarea>'+
-      '<div class="chk"><input type="checkbox" id="bandeOpt"><span><b style="color:var(--txt)">Trotzdem einen richtig guten DJ finden – kostenlos.</b> Ich wähle persönlich bis zu fünf passende Kollegen aus meinem Partner-Netzwerk aus, die zu eurer Feier und eurem Budget passen – die Vorschläge bekommt ihr direkt von mir. Mit dem Haken willigt ihr ein, dass ich eure Eckdaten dafür an meine Partner-Agentur (DJ Bande, Münster) weitergebe.</span></div>'+
+      '<label for="declMsg">Mögt ihr kurz sagen, woran es liegt? (optional)</label><textarea id="declMsg" placeholder="z. B. Budget, anderer Stil, Termin geändert …" style="min-height:70px"></textarea>'+
+      '<label class="chk"><input type="checkbox" id="bandeOpt"><span><b style="color:var(--txt)">Trotzdem einen richtig guten DJ finden – kostenlos.</b> Ich wähle persönlich bis zu fünf passende Kollegen aus meinem Partner-Netzwerk aus, die zu eurer Feier und eurem Budget passen – die Vorschläge bekommt ihr direkt von mir. Mit dem Haken willigt ihr ein, dass ich eure Eckdaten dafür an meine Partner-Agentur (DJ Bande, Münster) weitergebe.</span></label>'+
       '<div style="margin-top:10px"><button class="btn" onclick="decline()">Absagen'+' &amp; ggf. Vorschläge erhalten</button></div></div>'
     )+'</div>');
 }
@@ -435,11 +436,11 @@ function renderForm(){
   if(FDEF.done){app('<div class="card"><h1>Danke euch!</h1><p class="sub" style="margin-top:8px">Dieser Fragebogen wurde bereits beantwortet – ich melde mich zeitnah bei euch.</p></div>');return}
   var fields=(FDEF.fields||[]).map(function(f,i){
     var t=f.type||'text';
-    if(t==='textarea')return '<label>'+esc(f.label)+'</label><textarea data-i="'+i+'"></textarea>';
-    if(t==='select')return '<label>'+esc(f.label)+'</label><select data-i="'+i+'"><option value="">– bitte wählen –</option>'+
+    if(t==='textarea')return '<label for="qf'+i+'">'+esc(f.label)+'</label><textarea id="qf'+i+'" data-i="'+i+'"></textarea>';
+    if(t==='select')return '<label for="qf'+i+'">'+esc(f.label)+'</label><select id="qf'+i+'" data-i="'+i+'"><option value="">– bitte wählen –</option>'+
       (f.options||[]).map(function(o){return '<option>'+esc(o)+'</option>'}).join('')+'</select>';
-    if(t==='checkbox')return '<div class="chk"><input type="checkbox" data-i="'+i+'"><span>'+esc(f.label)+'</span></div>';
-    return '<label>'+esc(f.label)+'</label><input type="text" data-i="'+i+'">';
+    if(t==='checkbox')return '<label class="chk"><input type="checkbox" data-i="'+i+'"><span>'+esc(f.label)+'</span></label>';
+    return '<label for="qf'+i+'">'+esc(f.label)+'</label><input type="text" id="qf'+i+'" data-i="'+i+'">';
   }).join('');
   app('<div class="card"><div class="kicker">Ein paar Fragen</div><h1>'+esc(FDEF.title)+'</h1>'+
     (FDEF.intro?'<p class="sub" style="margin-top:8px">'+esc(FDEF.intro)+'</p>':'')+
@@ -474,7 +475,7 @@ function renderMvGate(){
   app('<div class="card"><div class="kicker">Euer Mietvertrag</div><h1>Kurze Sicherheitsfrage</h1>'+
     '<p class="sub">Zum Schutz eurer Daten: Gebt bitte die Postleitzahl eurer Rechnungsadresse ein.</p>'+
     '<div class="msg err" id="gateMsg" style="display:'+(PLZ?'block':'none')+'">Die Postleitzahl passt leider nicht – bitte erneut versuchen.</div>'+
-    '<label>Postleitzahl</label><input id="plzIn" inputmode="numeric" maxlength="10" placeholder="z. B. 58675">'+
+    '<label for="plzIn">Postleitzahl</label><input id="plzIn" inputmode="numeric" maxlength="10" placeholder="z. B. 58675">'+
     '<div style="margin-top:16px"><button class="btn" onclick="submitMvPlz()">Mietvertrag öffnen</button></div></div>');
   var inp=document.getElementById('plzIn');inp.focus();
   inp.addEventListener('keydown',function(e){if(e.key==='Enter')submitMvPlz()});
@@ -507,8 +508,8 @@ function renderRental(){
     '<div class="card"><h2>1 · Ausweis fotografieren</h2>'+
     '<p class="sub" style="margin-top:6px">Zur Absicherung der Vermietung brauche ich einmalig eine Kopie eures Personalausweises – Vorder- und Rückseite. Einfach mit der Kamera abfotografieren. Ihr dürft alles schwärzen oder abkleben, was nicht benötigt wird (z. B. Zugangsnummer, Ausweisnummer) – lesbar bleiben müssen Name, Anschrift und Foto.</p>'+
     '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px">'+
-    '<div style="flex:1;min-width:180px"><label>Vorderseite</label><input type="file" accept="image/*" capture="environment" onchange="mvPhoto(this,\'front\')"><img id="pvFront" style="display:none;max-width:100%;border-radius:3px;margin-top:8px"></div>'+
-    '<div style="flex:1;min-width:180px"><label>Rückseite</label><input type="file" accept="image/*" capture="environment" onchange="mvPhoto(this,\'back\')"><img id="pvBack" style="display:none;max-width:100%;border-radius:3px;margin-top:8px"></div></div></div>'+
+    '<div style="flex:1;min-width:180px"><label for="mvFront">Vorderseite</label><input type="file" id="mvFront" accept="image/*" capture="environment" onchange="mvPhoto(this,\'front\')"><img id="pvFront" style="display:none;max-width:100%;border-radius:3px;margin-top:8px"></div>'+
+    '<div style="flex:1;min-width:180px"><label for="mvBack">Rückseite</label><input type="file" id="mvBack" accept="image/*" capture="environment" onchange="mvPhoto(this,\'back\')"><img id="pvBack" style="display:none;max-width:100%;border-radius:3px;margin-top:8px"></div></div></div>'+
 
     '<div class="card"><h2>2 · Unterschreiben</h2>'+
     '<p class="sub" style="margin-top:6px">Mit dem Finger oder Stift direkt hier im Feld unterschreiben – auf dem Smartphone am besten quer halten.</p>'+
@@ -580,8 +581,8 @@ function renderSetPw(){
   app('<div class="card"><div class="kicker">Dein Kunden-Backoffice</div><h1>Passwort festlegen</h1>'+
     '<p class="sub">Einmal ein Passwort setzen – danach kommst du jederzeit mit E-Mail und Passwort an alle Unterlagen.</p>'+
     '<div class="msg err" id="spMsg" style="display:none"></div>'+
-    '<label>Passwort (min. 8 Zeichen)</label><input type="password" id="spPw1">'+
-    '<label>Passwort wiederholen</label><input type="password" id="spPw2">'+
+    '<label for="spPw1">Passwort (min. 8 Zeichen)</label><input type="password" id="spPw1">'+
+    '<label for="spPw2">Passwort wiederholen</label><input type="password" id="spPw2">'+
     '<div style="margin-top:16px"><button class="btn" onclick="doSetPw()">Zugang aktivieren</button></div></div>');
 }
 function doSetPw(){
@@ -604,22 +605,22 @@ function renderLogin(msg){
   app('<div class="card"><div class="kicker">Dein Kunden-Backoffice</div><h1>Anmelden</h1>'+
     '<p class="sub">Alle Unterlagen an einem Ort: Angebote, Rechnungen, Verträge – plus Programmablauf, Musikwünsche und Fotos eurer Location.</p>'+
     '<div class="msg err" id="liMsg" style="display:'+(msg?'block':'none')+'">'+esc(msg||'')+'</div>'+
-    '<label>E-Mail</label><input type="email" id="liMail" autocomplete="email">'+
-    '<label>Passwort</label><input type="password" id="liPw" autocomplete="current-password">'+
+    '<label for="liMail">E-Mail</label><input type="email" id="liMail" autocomplete="email">'+
+    '<label for="liPw">Passwort</label><input type="password" id="liPw" autocomplete="current-password">'+
     '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="doLogin()">Anmelden</button>'+
-    '<a onclick="doForgot()" style="cursor:pointer;font-size:13px">Passwort vergessen?</a></div>'+
-    '<p class="sub" style="margin-top:18px;font-size:13px">Noch keinen Zugang? <a onclick="REGISTER=1;renderRegister()" style="cursor:pointer">Kostenlos registrieren</a> oder den persönlichen Einladungslink von mir nutzen.</p></div>');
+    '<a href="#" onclick="doForgot();return false" style="font-size:13px">Passwort vergessen?</a></div>'+
+    '<p class="sub" style="margin-top:18px;font-size:13px">Noch keinen Zugang? <a href="#" onclick="REGISTER=1;renderRegister();return false">Kostenlos registrieren</a> oder den persönlichen Einladungslink von mir nutzen.</p></div>');
   document.getElementById('liPw').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
 }
 function renderRegister(msg){
   app('<div class="card"><div class="kicker">Kostenloses Kundenkonto</div><h1>Registrieren</h1>'+
     '<p class="sub">Alle Unterlagen an einem Ort und du kannst Details zu eurer Feier direkt selbst eintragen – kostenlos, jederzeit kündbar.</p>'+
     '<div class="msg err" id="liMsg" style="display:'+(msg?'block':'none')+'">'+esc(msg||'')+'</div>'+
-    '<label>Name</label><input id="reName" value="'+esc(PREFILL_NAME)+'" autocomplete="name">'+
-    '<label>E-Mail</label><input type="email" id="reMail" value="'+esc(PREFILL_EMAIL)+'" autocomplete="email">'+
-    '<label>Passwort (mind. 8 Zeichen)</label><input type="password" id="rePw" autocomplete="new-password">'+
+    '<label for="reName">Name</label><input id="reName" value="'+esc(PREFILL_NAME)+'" autocomplete="name">'+
+    '<label for="reMail">E-Mail</label><input type="email" id="reMail" value="'+esc(PREFILL_EMAIL)+'" autocomplete="email">'+
+    '<label for="rePw">Passwort (mind. 8 Zeichen)</label><input type="password" id="rePw" autocomplete="new-password">'+
     '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="doRegister()">Konto anlegen</button>'+
-    '<a onclick="REGISTER=null;renderLogin()" style="cursor:pointer;font-size:13px">Ich habe schon ein Konto</a></div></div>');
+    '<a href="#" onclick="REGISTER=null;renderLogin();return false" style="font-size:13px">Ich habe schon ein Konto</a></div></div>');
   document.getElementById('rePw').addEventListener('keydown',function(e){if(e.key==='Enter')doRegister()});
 }
 function doRegister(){
@@ -776,9 +777,9 @@ function renderAccount(){
     return planCard(b,i)+
     '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">'+esc(b.title||'Termin')+' <span style="color:var(--mut);font-size:13px;font-weight:400">· '+dt(b.event_date)+'</span></h2>'+
     '<p class="sub" style="font-size:13px;margin:6px 0 4px">Hier könnt ihr alles pflegen, was ich für euren Termin wissen soll – ich sehe Änderungen sofort.</p>'+
-    '<label>Programmablauf (Zeiten, Reden, Programmpunkte)</label><textarea id="nS'+i+'" style="min-height:80px" placeholder="z. B. 18:00 Empfang · 19:00 Essen · 20:30 Rede Chef · 21:00 Party …">'+esc(n.schedule||'')+'</textarea>'+
-    '<label>Musikwünsche &amp; No-Gos</label><textarea id="nM'+i+'" style="min-height:80px" placeholder="Wünsche, Lieblingslieder, was auf keinen Fall laufen darf …">'+esc(n.music||'')+'</textarea>'+
-    '<label>Vereinbarungen &amp; Sonstiges</label><textarea id="nA'+i+'" style="min-height:60px" placeholder="Was wir besprochen haben, Ansprechpartner vor Ort, Besonderheiten …">'+esc(n.agreements||'')+'</textarea>'+
+    '<label for="nS'+i+'">Programmablauf (Zeiten, Reden, Programmpunkte)</label><textarea id="nS'+i+'" style="min-height:80px" placeholder="z. B. 18:00 Empfang · 19:00 Essen · 20:30 Rede Chef · 21:00 Party …">'+esc(n.schedule||'')+'</textarea>'+
+    '<label for="nM'+i+'">Musikwünsche &amp; No-Gos</label><textarea id="nM'+i+'" style="min-height:80px" placeholder="Wünsche, Lieblingslieder, was auf keinen Fall laufen darf …">'+esc(n.music||'')+'</textarea>'+
+    '<label for="nA'+i+'">Vereinbarungen &amp; Sonstiges</label><textarea id="nA'+i+'" style="min-height:60px" placeholder="Was wir besprochen haben, Ansprechpartner vor Ort, Besonderheiten …">'+esc(n.agreements||'')+'</textarea>'+
     '<div style="margin-top:12px;display:flex;gap:12px;align-items:center"><button class="btn" onclick="saveNotes('+i+')">Speichern</button><span id="nOk'+i+'" style="color:#9fd49f;font-size:13px;display:none">Gespeichert ✓</span></div></div>';
   }).join('');
   var files=(me.files||[]).map(function(f){
