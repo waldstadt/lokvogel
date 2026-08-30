@@ -2357,10 +2357,15 @@ function handlePortal(string $path, string $method, $body): never {
       if ($isArrayField) {
         if (!is_array($value)) fail('Ungültiger Wert für dieses Feld.');
         if ($fieldPath === 'music.playlists') {
+          /* url landet später ungeprüft in einem href-Attribut (admin.html/portal.html
+             fmtPlaylists) - ohne Schema-Prüfung könnte ein "javascript:"-Link gespeichert
+             werden, der beim Anklicken im (privilegierten) Admin-Kontext ausgeführt wird. */
           $value = array_values(array_filter(array_map(function ($it) {
             if (!is_array($it) || empty($it['url']) || !is_string($it['url'])) return null;
+            $url = mb_substr((string)$it['url'], 0, 500);
+            if (!preg_match('#^https://#i', $url)) return null;
             return ['label' => is_string($it['label'] ?? null) ? mb_substr($it['label'], 0, 120) : 'Playlist',
-              'url' => mb_substr((string)$it['url'], 0, 500)];
+              'url' => $url];
           }, $value)));
         } else {
           $value = array_values(array_filter(array_map(function ($it) {
