@@ -1508,12 +1508,13 @@ function parseGroupStages(items,g){
    Beschreibung, Menge, Einheit und Einzelpreis jeder Stufe werden aus stages neu berechnet. */
 function applyGroupStages(items,g,stages){
   var header=items[g.main],base=Number(header.unit_price)||0,menge=Number(header.qty)||1,day=1;
+  var unitLabel=(header.unit||'Stk.').replace(/\s*\(.*\)$/,'');
   g.subs.forEach(function(si,i){
     var st=stages[i],it=items[si];
     var isFirst=i===0&&st.days===1;
     it.description=isFirst?'1. Miettag':dayRangeLabel(day,st.days)+' ('+st.pct+' % von '+euro(base)+')';
     it.qty=menge*st.days;
-    it.unit=st.days===1?'Stk.':'Stk. ('+st.days+' Tage)';
+    it.unit=st.days===1?unitLabel:unitLabel+' ('+st.days+' Tage)';
     it.unit_price=Math.round(base*st.pct)/100;
     day+=st.days;
   });
@@ -1571,24 +1572,55 @@ function tierEditorApply(mainIdx){
    eingerückte Unterposition (1.A, 1.B, ...) mit der jeweiligen Rechnung "Menge × Preis".
    _gid/_pgid verbinden Haupt- und Unterpositionen im Editor unabhängig von ihrer Reihenfolge;
    beim Speichern wird daraus is_header/group_pos (siehe saveDoc). */
-function equipTierLineItems(eq,days,menge,startPos){
+function equipTierLineItems(eq,days,menge,startPos,unitLabel){
+  unitLabel=unitLabel||'Stk.';
   var stages=equipTierStages(eq,days);
   if(stages.length<=1){
     return[{pos:startPos,description:eq.name,note:eq.description||'',
-      qty:menge,unit:'Stk.',unit_price:stages[0].rate}];
+      qty:menge,unit:unitLabel,unit_price:stages[0].rate}];
   }
   var gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
   var header={pos:startPos,description:eq.name,note:eq.description||'',
-    qty:menge,unit:'Stk.',unit_price:Number(eq.day_rate)||0,is_header:1,_gid:gid};
+    qty:menge,unit:unitLabel,unit_price:Number(eq.day_rate)||0,is_header:1,_gid:gid};
   var subs=stages.map(function(st,i){
     var desc=i===0?'1. Miettag':dayRangeLabel(st.startDay,st.count)+' ('+st.pct+' % von '+euro(Number(eq.day_rate)||0)+')';
     /* Einzel brutto ist immer der echte rabattierte Stückpreis für einen Tag dieser Stufe
        (nicht mit den Tagen dieser Stufe multipliziert) - die Tage stecken stattdessen in der
        Menge (Stückzahl × Tage dieser Stufe) bzw. in der Einheit "Stk. (N Tage)". */
     return{pos:startPos+1+i,description:desc,note:'',
-      qty:menge*st.count,unit:st.count===1?'Stk.':'Stk. ('+st.count+' Tage)',unit_price:st.rate,_pgid:gid};
+      qty:menge*st.count,unit:st.count===1?unitLabel:unitLabel+' ('+st.count+' Tage)',unit_price:st.rate,_pgid:gid};
   });
   return[header].concat(subs);
+}
+/* Baut Dokumentpositionen für einen Katalogeintrag (Technikartikel, Produkt oder Set) - die
+   Miettage-Rabattstaffel greift nur bei den Einheiten Stk./Set (Geräte, die man mehrere Tage
+   behält); bei Kilometer, Liter oder pausch. gibt es keine Tagesstaffel, eine Position bleibt
+   einmalig. dayRate/pctOverrides kommen bei einem Technikartikel vom Artikel selbst, bei einem
+   Produkt/Set gibt es keine Sonderprozente - dort gilt immer die globale Standardstaffel. */
+function catalogLineItems(name,note,unit,dayRate,menge,days,startPos,pctOverrides){
+  unit=unit||'Stk.';
+  var tierable=unit==='Stk.'||unit==='Set';
+  if(!tierable||days<=1){
+    return[{pos:startPos,description:name,note:note||'',qty:menge,unit:unit,unit_price:dayRate}];
+  }
+  var pseudo=Object.assign({name:name,description:note,day_rate:dayRate},pctOverrides||{});
+  return equipTierLineItems(pseudo,days,menge,startPos,unit);
+}
+/* Day-1-Preis (ohne Rabattstaffel) eines Katalogeintrags - für die Set-Basisrate gebraucht. */
+function catalogDay1Rate(identifier){
+  identifier=(identifier||'').trim();if(!identifier)return 0;
+  var idU=identifier.toUpperCase();
+  var prod=(CACHE.products||[]).find(function(x){return x.sku===idU});
+  if(prod)return prodPrice(prod);
+  var eq=(CACHE.equipment||[]).find(function(x){return(x.sku&&x.sku.toUpperCase()===idU)||x.name.toLowerCase()===identifier.toLowerCase()});
+  if(eq)return Number(eq.day_rate)||0;
+  return 0;
+}
+/* Tagespreis eines Sets: fester Preis, falls hinterlegt, sonst Summe der Day-1-Preise der
+   Bestandteile - die Rabattstaffel wird danach fürs Set als Ganzes berechnet (nicht je Artikel). */
+function setBaseDayRate(p){
+  if(p.price_net!=null)return Number(p.price_net);
+  return (p.bundle||[]).reduce(function(s,c){return s+catalogDay1Rate(c.sku)*(Number(c.qty)||1)},0);
 }
 function eqAvailable(eqId,b,excludeBeId){
   var eq=CACHE.equipment.find(function(e){return e.id===eqId});if(!eq)return 0;
@@ -2245,13 +2277,26 @@ function createDocFromBooking(type){
   setTimeout(function(){
     document.getElementById('docCust').value=b.customer_id;refreshBookOpts();
     document.getElementById('docBook').value=b.id;
+    /* Miettage aus der Buchung übernehmen, damit die Rabattstaffel-Positionen unten und die
+       "Mietzeitraum"-Zeile im gedruckten Dokument zusammenpassen - auch wenn danach noch
+       weitere Technikpositionen manuell ergänzt werden. */
+    if(b.kind==='technik'||b.kind==='dj_technik'){
+      document.getElementById('docRentFrom').value=b.event_date||'';
+      document.getElementById('docRentTo').value=(b.end_date&&b.end_date>b.event_date)?b.end_date:'';
+    }
     curItems=[];
     var label=(b.title||b.event_type||'Veranstaltung')+' am '+dt(b.event_date);
     if(b.kind!=='technik')curItems.push({pos:1,description:'DJ-Leistung: '+label+(b.start_time?' ('+b.start_time.slice(0,5)+(b.end_time?'–'+b.end_time.slice(0,5):'')+' Uhr)':''),qty:1,unit:'pausch.',unit_price:Number(b.fee_net)||0});
     CACHE.be.filter(function(x){return x.booking_id===b.id}).forEach(function(x){
       var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};
-      var price=x.price_override!=null?Number(x.price_override):rentPrice(eq,b)*x.qty;
-      curItems.push({pos:curItems.length+1,description:'Technik-Miete: '+(eq.name||'?')+' ('+rentDays(b)+' Miettag'+(rentDays(b)>1?'e':'')+')',qty:x.qty,unit:'Stk.',unit_price:x.qty?price/x.qty:price});
+      var days=rentDays(b);
+      if(x.price_override!=null){
+        /* Manuell überschriebener Pauschalpreis - keine bekannte Tagesrate, bleibt eine Zeile. */
+        curItems.push({pos:curItems.length+1,description:'Technik-Miete: '+(eq.name||'?')+' ('+days+' Miettag'+(days>1?'e':'')+')',
+          qty:x.qty,unit:'Stk.',unit_price:x.qty?Number(x.price_override)/x.qty:Number(x.price_override)});
+      }else{
+        equipTierLineItems(Object.assign({},eq,{name:'Technik-Miete: '+(eq.name||'?')}),days,x.qty,curItems.length+1).forEach(function(it){curItems.push(it)});
+      }
     });
     var rd=riderOf(b),tc=rd.distance_km?travelCost(rd.distance_km):0;
     if(tc>0)curItems.push({pos:curItems.length+1,description:'Anfahrt ('+rd.distance_km+' km einfache Strecke)',
@@ -2263,7 +2308,7 @@ function createDocFromBooking(type){
         note:'Automatisch ergänzt ab '+overnightThresholdValue()+(overnightThresholdType()==='zeit'?' Min. Fahrzeit':' km Fahrtstrecke')+' – bei Bedarf entfernen oder eine zweite Übernachtung ergänzen.',
         qty:1,unit:'pausch.',unit_price:overnightPrice()});
     if(!curItems.length)curItems=[{pos:1,description:label,qty:1,unit:'pausch.',unit_price:0}];
-    renderItems();
+    renderItems();renderRentalHint();
     if(type==='abschlag'){
       var total=curItems.reduce(function(s,it){return s+lineTotal(it)},0);
       askAbschlag(total,label,function(amount,desc){
@@ -4420,21 +4465,24 @@ function insertProduct(key){
   }
   var p=(CACHE.products||[]).find(function(x){return x.id===(key.indexOf('p:')===0?key.slice(2):key)});if(!p)return;
   var note=p.description||'';
-  if((p.bundle||[]).length){
+  var isBundle=(p.bundle||[]).length>0;
+  if(isBundle){
     var comps=p.bundle.map(function(c){
       var it=catalogFind(c.sku);
       return (c.qty>1?c.qty+'× ':'')+(it?it.name:c.sku);
     }).join(', ');
     note=(note?note+' ':'')+'Enthalten: '+comps+'.';
   }
-  curItems.push({pos:curItems.length+1,description:p.name,note:note,
-    qty:1,unit:p.unit||'Stk.',unit_price:prodPrice(p)});
-  var msg='„'+p.name+'" eingefügt ✓';
+  var days=docRentalDays(),unit=p.unit||'Stk.',tierable=unit==='Stk.'||unit==='Set';
+  var baseRate=isBundle?setBaseDayRate(p):prodPrice(p);
+  /* Bei Stk./Set-Artikeln (auch Sets - dann fürs Set als Ganzes, nicht je Einzelartikel) greift
+     die gleiche Miettage-Rabattstaffel wie bei Technikartikeln; km/Liter/pausch. bleiben einmalig. */
+  catalogLineItems(p.name,note,unit,baseRate,1,days,curItems.length+1).forEach(function(it){curItems.push(it)});
+  var msg='„'+p.name+'" eingefügt'+(tierable&&days>1?' ('+days+' Miettage – Rabattstaffel als eigene Positionen)':'')+' ✓';
   if(p.addon_sku){
     var addon=(CACHE.products||[]).find(function(x){return x.sku===p.addon_sku});
     if(addon){
-      curItems.push({pos:curItems.length+1,description:addon.name,note:addon.description||'',
-        qty:1,unit:addon.unit||'Stk.',unit_price:prodPrice(addon)});
+      catalogLineItems(addon.name,addon.description||'',addon.unit||'Stk.',prodPrice(addon),1,days,curItems.length+1).forEach(function(it){curItems.push(it)});
       msg+=' (inkl. „'+addon.name+'" – passt automatisch dazu, bei Bedarf entfernen)';
     }
   }
