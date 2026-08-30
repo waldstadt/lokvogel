@@ -775,11 +775,14 @@ function addToCart(id,qtyId){
      eine Fantasiesumme und die Absage kommt erst beim Absenden. */
   var frei=(!e.on_request&&AVAIL[id]&&AVAIL[id].available!=null)?Number(AVAIL[id].available):null;
   /* Ohne gewählten Zeitraum kennen wir die freie Stückzahl nicht - dann wenigstens auf den
-     Gesamtbestand bzw. eine plausible Obergrenze deckeln, damit im Korb keine Fantasiesumme steht. */
-  if(frei==null){
-    var max=(AVAIL[id]&&AVAIL[id].total!=null)?Number(AVAIL[id].total):99;
+     Gesamtbestand deckeln (steht im öffentlichen Katalog), damit im Korb keine Fantasiesumme
+     steht. Nur wenn selbst der unbekannt ist, greift eine grobe Obergrenze. */
+  if(frei==null&&!e.on_request){
+    var bestand=(AVAIL[id]&&AVAIL[id].total!=null)?Number(AVAIL[id].total)
+               :(e.qty_total!=null?Number(e.qty_total):null);
+    var max=(bestand!=null&&bestand>0)?bestand:99;
     if(qty>max){
-      toast(max<99?('Davon habe ich insgesamt '+max+' Stück – Menge angepasst.')
+      toast(bestand!=null&&bestand>0?('Davon habe ich insgesamt '+max+' Stück – Menge angepasst.')
                   :'So große Stückzahlen klären wir besser direkt – ruf mich kurz an.');
       qty=Math.max(mq,Math.floor(max/mq)*mq);
     }

@@ -3043,6 +3043,16 @@ function docRowsHtml(items,f){
     return head+subs+foot;
   }).join('');
 }
+/* Summe der Beträge, die im Beleg tatsächlich gedruckt stehen (also je Position auf Cent
+   gerundet). In der Nettoansicht weicht sie um Cent-Beträge von der exakt gerechneten
+   Summe ab - gedruckt werden muss die, die der Kunde nachrechnen kann. */
+function docPrintedSum(items,f){
+  var filtered=items.filter(function(it){return it.description});
+  return groupDocItems(filtered).reduce(function(s,g){
+    var betrag=g.subs.length?groupTotal(filtered,g):lineTotal(filtered[g.main]);
+    return s+Math.round(betrag*f*100)/100;
+  },0);
+}
 function printDoc(){
   var d=curDoc,c=docCalc(),comp=S.company||{};
   var cust=CACHE.customers.find(function(x){return x.id===v('docCust')})||{};
@@ -3052,16 +3062,20 @@ function printDoc(){
   var f=brutto?1:(c.rate?1/(1+c.rate/100):1);
   var rows=docRowsHtml(curItems,f);
   var totals='';
+  /* Intern wird exakt gerechnet, gedruckt wird auf Cent gerundet. Wer den Beleg nachrechnet,
+     rechnet aber mit den gedruckten Zahlen - deshalb wird der Abzug hier als Differenz der
+     gerundeten Werte ausgewiesen, sonst fehlt in der Nettoansicht ein Cent. */
+  var r2=function(x){return Math.round(x*100)/100};
+  var dSub=r2(docPrintedSum(curItems,f)),dEnd=r2(brutto?c.gross:c.net),dAbzug=r2(dSub-dEnd);
   /* Bei einem Pauschal-Gesamtpreis darf nicht der eingetragene Rabatt aufgeführt werden -
      der Beleg ginge sonst nicht auf (Positionssumme − Rabatt ≠ Gesamtbetrag). Stattdessen
      wird die komplette Differenz zur Pauschale als ein Nachlass ausgewiesen. */
   if(c.override!=null){
-    var nachlass=c.sub-c.gross;
-    if(Math.round(nachlass*100)!==0)
-      totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Positionssumme</td><td style="text-align:right;padding:6px">'+euro(c.sub*f)+'</td></tr>'+
-      '<tr><td colspan="4" style="text-align:right;padding:6px">'+(nachlass>0?'Nachlass':'Zuschlag')+' auf den vereinbarten Festpreis</td><td style="text-align:right;padding:6px">'+(nachlass>0?'−':'+')+euro(Math.abs(nachlass)*f)+'</td></tr>';
-  }else if(c.disc)totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Zwischensumme</td><td style="text-align:right;padding:6px">'+euro(c.sub*f)+'</td></tr>'+
-    '<tr><td colspan="4" style="text-align:right;padding:6px">Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+'</td><td style="text-align:right;padding:6px">−'+euro(c.disc*f)+'</td></tr>';
+    if(dAbzug!==0)
+      totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Positionssumme</td><td style="text-align:right;padding:6px">'+euro(dSub)+'</td></tr>'+
+      '<tr><td colspan="4" style="text-align:right;padding:6px">'+(dAbzug>0?'Nachlass':'Zuschlag')+' auf den vereinbarten Festpreis</td><td style="text-align:right;padding:6px">'+(dAbzug>0?'−':'+')+euro(Math.abs(dAbzug))+'</td></tr>';
+  }else if(c.disc)totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Zwischensumme</td><td style="text-align:right;padding:6px">'+euro(dSub)+'</td></tr>'+
+    '<tr><td colspan="4" style="text-align:right;padding:6px">Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+'</td><td style="text-align:right;padding:6px">−'+euro(dAbzug)+'</td></tr>';
   if(brutto){
     totals+='<tr><td colspan="4" style="text-align:right;padding:6px;font-weight:700">Gesamtbetrag</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(c.gross)+'</td></tr>'+
       '<tr><td colspan="4" style="text-align:right;padding:6px;color:#666">darin enthaltene USt. '+c.rate+' %</td><td style="text-align:right;padding:6px;color:#666">'+euro(c.tax)+'</td></tr>';
