@@ -93,6 +93,7 @@ footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
 var API='api.php';
 var qs=new URLSearchParams(location.search);
 var OFFER=qs.get('a'),FORM=qs.get('f'),MV=qs.get('mv'),INVITE=qs.get('einladung');
+var REGISTER=qs.get('register'),PREFILL_EMAIL=qs.get('email')||'',PREFILL_NAME=qs.get('name')||'';
 var PLZ=sessionStorage.getItem('portal_plz')||'';
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
 function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
@@ -599,6 +600,7 @@ function doSetPw(){
     }).catch(function(e){err(e.message)});
 }
 function renderLogin(msg){
+  if(REGISTER){renderRegister(msg);return}
   app('<div class="card"><div class="kicker">Dein Kunden-Backoffice</div><h1>Anmelden</h1>'+
     '<p class="sub">Alle Unterlagen an einem Ort: Angebote, Rechnungen, Verträge – plus Programmablauf, Musikwünsche und Fotos eurer Location.</p>'+
     '<div class="msg err" id="liMsg" style="display:'+(msg?'block':'none')+'">'+esc(msg||'')+'</div>'+
@@ -606,8 +608,32 @@ function renderLogin(msg){
     '<label>Passwort</label><input type="password" id="liPw" autocomplete="current-password">'+
     '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="doLogin()">Anmelden</button>'+
     '<a onclick="doForgot()" style="cursor:pointer;font-size:13px">Passwort vergessen?</a></div>'+
-    '<p class="sub" style="margin-top:18px;font-size:13px">Noch keinen Zugang? Den persönlichen Einladungslink bekommst du direkt von mir.</p></div>');
+    '<p class="sub" style="margin-top:18px;font-size:13px">Noch keinen Zugang? <a onclick="REGISTER=1;renderRegister()" style="cursor:pointer">Kostenlos registrieren</a> oder den persönlichen Einladungslink von mir nutzen.</p></div>');
   document.getElementById('liPw').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
+}
+function renderRegister(msg){
+  app('<div class="card"><div class="kicker">Kostenloses Kundenkonto</div><h1>Registrieren</h1>'+
+    '<p class="sub">Alle Unterlagen an einem Ort und du kannst Details zu eurer Feier direkt selbst eintragen – kostenlos, jederzeit kündbar.</p>'+
+    '<div class="msg err" id="liMsg" style="display:'+(msg?'block':'none')+'">'+esc(msg||'')+'</div>'+
+    '<label>Name</label><input id="reName" value="'+esc(PREFILL_NAME)+'" autocomplete="name">'+
+    '<label>E-Mail</label><input type="email" id="reMail" value="'+esc(PREFILL_EMAIL)+'" autocomplete="email">'+
+    '<label>Passwort (mind. 8 Zeichen)</label><input type="password" id="rePw" autocomplete="new-password">'+
+    '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="doRegister()">Konto anlegen</button>'+
+    '<a onclick="REGISTER=null;renderLogin()" style="cursor:pointer;font-size:13px">Ich habe schon ein Konto</a></div></div>');
+  document.getElementById('rePw').addEventListener('keydown',function(e){if(e.key==='Enter')doRegister()});
+}
+function doRegister(){
+  var name=document.getElementById('reName').value.trim(),email=document.getElementById('reMail').value.trim(),pw=document.getElementById('rePw').value;
+  var m=document.getElementById('liMsg');
+  if(!name||!email){m.style.display='block';m.textContent='Bitte Name und E-Mail angeben.';return}
+  if(pw.length<8){m.style.display='block';m.textContent='Das Passwort braucht mindestens 8 Zeichen.';return}
+  fetch(API+'/portal/account/register',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name,email:email,password:pw})})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s>=400)throw new Error(res.j.error||'Registrierung fehlgeschlagen.');
+      CTOK=res.j.token;localStorage.setItem('cust_tok',CTOK);REGISTER=null;loadAccount();
+    }).catch(function(e){m.style.display='block';m.textContent=e.message});
 }
 function doLogin(){
   fetch(API+'/portal/account/login',{method:'POST',headers:{'Content-Type':'application/json'},
