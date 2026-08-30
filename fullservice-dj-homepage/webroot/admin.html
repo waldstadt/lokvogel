@@ -190,6 +190,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 /* Druckansicht */
 #printArea{display:none}
 @media print{
+  html,body{background:#fff!important}
   body>*{display:none!important}
   #printArea{display:block!important;background:#fff;color:#111;font-family:'Inter',sans-serif}
 }
@@ -4341,13 +4342,13 @@ function insertProduct(key){
     }).join(', ');
     note=(note?note+' ':'')+'Enthalten: '+comps+'.';
   }
-  curItems.push({pos:curItems.length+1,description:(p.sku?p.sku+' – ':'')+p.name,note:note,
+  curItems.push({pos:curItems.length+1,description:p.name,note:note,
     qty:1,unit:p.unit||'Stk.',unit_price:prodPrice(p)});
   var msg='„'+p.name+'" eingefügt ✓';
   if(p.addon_sku){
     var addon=(CACHE.products||[]).find(function(x){return x.sku===p.addon_sku});
     if(addon){
-      curItems.push({pos:curItems.length+1,description:(addon.sku?addon.sku+' – ':'')+addon.name,note:addon.description||'',
+      curItems.push({pos:curItems.length+1,description:addon.name,note:addon.description||'',
         qty:1,unit:addon.unit||'Stk.',unit_price:prodPrice(addon)});
       msg+=' (inkl. „'+addon.name+'" – passt automatisch dazu, bei Bedarf entfernen)';
     }
