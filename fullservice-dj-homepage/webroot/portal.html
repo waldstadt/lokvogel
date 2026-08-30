@@ -636,6 +636,102 @@ function loadAccount(){
     ME=me;renderAccount();
   }).catch(function(){renderLogin('Verbindungsfehler – bitte später erneut versuchen.')});
 }
+/* ===== Veranstaltungsplaner =====
+   Leere Felder darf der Kunde direkt speichern, bereits gesetzte nur als Änderung vorschlagen
+   (siehe plan-suggest in api.php - Server entscheidet endgültig, das hier ist nur die Anzeige-
+   Logik dafür). PLAN_STATE hält je Zeile Buchungs-ID/Feldpfad/Label/Art, damit die onclick-
+   Handler nicht mit escapten Werten hantieren müssen. */
+var PLAN_STATE={};
+function fmtPlaylists(list){
+  if(!list||!list.length)return '';
+  return list.map(function(pl){return '<a href="'+esc(pl.url)+'" target="_blank" rel="noopener">'+esc(pl.label||pl.url)+'</a>'}).join('<br>');
+}
+function parsePlaylists(text){
+  return (text||'').split('\n').map(function(l){return l.trim()}).filter(Boolean).map(function(l){
+    var m=l.split('|');
+    if(m.length>1)return {label:m[0].trim(),url:m.slice(1).join('|').trim()};
+    return {label:'Playlist',url:l};
+  });
+}
+function playlistsToText(list){return (list||[]).map(function(pl){return (pl.label&&pl.label!=='Playlist'?pl.label+' | ':'')+pl.url}).join('\n')}
+function fmtTimetable(list){
+  if(!list||!list.length)return '';
+  return '<table>'+list.map(function(t){return '<tr><td style="padding:2px 10px 2px 0;color:var(--mut);white-space:nowrap">'+esc(t.time||'')+'</td><td>'+esc(t.label||'')+'</td></tr>'}).join('')+'</table>';
+}
+function parseTimetable(text){
+  return (text||'').split('\n').map(function(l){return l.trim()}).filter(Boolean).map(function(l){
+    var m=l.match(/^(\d{1,2}[:.]\d{2})\s+(.*)$/);
+    return m?{time:m[1].replace('.',':'),label:m[2]}:{time:'',label:l};
+  });
+}
+function timetableToText(list){return (list||[]).map(function(t){return (t.time?t.time+' ':'')+t.label}).join('\n')}
+function planRow(bookingId,key,path,label,cfg){
+  cfg=cfg||{};
+  PLAN_STATE[key]={bookingId:bookingId,path:path,label:label,kind:cfg.kind||'text'};
+  var display=cfg.displayHtml!=null?cfg.displayHtml:esc(String(cfg.val!=null?cfg.val:''));
+  var editVal=cfg.editVal!=null?cfg.editVal:(cfg.val!=null?cfg.val:'');
+  var box=cfg.multiline?('<textarea id="in_'+key+'" style="min-height:'+(cfg.rows||70)+'px">'+esc(editVal)+'</textarea>')
+    :('<input id="in_'+key+'" value="'+esc(editVal)+'">');
+  if(cfg.locked){
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>'+esc(label)+':</b> '+(cfg.empty?'<span class="sub">–</span>':display)+'</div>';
+  }
+  if(cfg.empty){
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><label style="margin:4px 0 2px">'+esc(label)+'</label>'+box+
+      '<div style="margin-top:4px"><button class="btn" style="padding:6px 12px" onclick="planSubmit(\''+key+'\')">Speichern</button> <span id="ok_'+key+'" style="color:#9fd49f;font-size:13px;display:none">Gespeichert ✓</span></div></div>';
+  }
+  return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>'+esc(label)+':</b> '+display+
+    ' <a onclick="planToggle(\''+key+'\')" style="cursor:pointer;font-size:13px">Änderung vorschlagen</a>'+
+    '<div id="ed_'+key+'" hidden style="margin-top:4px">'+box+
+    '<div style="margin-top:4px"><button class="btn" style="padding:6px 12px" onclick="planSubmit(\''+key+'\')">Vorschlag senden</button> <span id="ok_'+key+'" style="color:#9fd49f;font-size:13px;display:none">Vorschlag gesendet ✓</span></div></div></div>';
+}
+function planToggle(key){var el=document.getElementById('ed_'+key);el.hidden=!el.hidden}
+function planSubmit(key){
+  var st=PLAN_STATE[key];if(!st)return;
+  var raw=document.getElementById('in_'+key).value;
+  var val=raw;
+  if(st.kind==='playlists')val=parsePlaylists(raw);
+  else if(st.kind==='timetable')val=parseTimetable(raw);
+  cfetch('portal/account/booking/'+st.bookingId+'/plan-suggest',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({field_path:st.path,field_label:st.label,value:val})})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s>=400){alert(res.j.error||'Das hat nicht geklappt – bitte später erneut versuchen.');return}
+      var ok=document.getElementById('ok_'+key);if(ok)ok.style.display='';
+      setTimeout(function(){loadAccount()},1200);
+    }).catch(function(){alert('Verbindungsfehler – bitte später erneut versuchen.')});
+}
+function planCard(b,i){
+  var pl=b.event_plan||{},bas=pl.basics||{},inv=pl.invoice||{},mus=pl.music||{},locked=!!b.plan_locked;
+  var k=function(s){return 'p'+i+'_'+s};
+  var rows=
+    planRow(b.id,k('partner'),'basics.partner_name','Partner/in',{val:bas.partner_name,empty:!bas.partner_name,locked:locked})+
+    planRow(b.id,k('occasion'),'basics.occasion','Anlass',{val:bas.occasion,empty:!bas.occasion,locked:locked})+
+    planRow(b.id,k('venue'),'basics.venue_name','Location',{val:bas.venue_name,empty:!bas.venue_name,locked:locked})+
+    planRow(b.id,k('addr'),'basics.venue_address','Adresse',{val:bas.venue_address,empty:!bas.venue_address,locked:locked})+
+    planRow(b.id,k('guests'),'basics.guest_count','Gästezahl',{val:bas.guest_count,empty:bas.guest_count==null,locked:locked})+
+    planRow(b.id,k('arrival'),'basics.arrival_time','Ankunft Gäste',{val:bas.arrival_time,empty:!bas.arrival_time,locked:locked})+
+    planRow(b.id,k('vcontact'),'basics.venue_contact_name','Ansprechpartner Location',{val:bas.venue_contact_name,empty:!bas.venue_contact_name,locked:locked})+
+    planRow(b.id,k('vphone'),'basics.venue_contact_phone','Telefon Location',{val:bas.venue_contact_phone,empty:!bas.venue_contact_phone,locked:locked})+
+    planRow(b.id,k('setup'),'basics.setup_from','Aufbau ab',{val:bas.setup_from,empty:!bas.setup_from,locked:locked})+
+    planRow(b.id,k('teardown'),'basics.teardown_until','Abbau bis',{val:bas.teardown_until,empty:!bas.teardown_until,locked:locked})+
+    planRow(b.id,k('invcompany'),'invoice.company','Firma (Rechnung)',{val:inv.company,empty:!inv.company,locked:locked})+
+    planRow(b.id,k('invname'),'invoice.name','Name (Rechnung)',{val:inv.name,empty:!inv.name,locked:locked})+
+    planRow(b.id,k('invstreet'),'invoice.street','Straße',{val:inv.street,empty:!inv.street,locked:locked})+
+    planRow(b.id,k('invzip'),'invoice.zip_city','PLZ Ort',{val:inv.zip_city,empty:!inv.zip_city,locked:locked})+
+    planRow(b.id,k('musts'),'music.musts','Musik-Musts',{val:mus.musts,empty:!mus.musts,locked:locked})+
+    planRow(b.id,k('nogos'),'music.nogos','No-Gos',{val:mus.nogos,empty:!mus.nogos,locked:locked})+
+    planRow(b.id,k('playlists'),'music.playlists','Spotify-Playlists',{
+      empty:!(mus.playlists&&mus.playlists.length),locked:locked,multiline:true,rows:60,kind:'playlists',
+      displayHtml:fmtPlaylists(mus.playlists),editVal:playlistsToText(mus.playlists)})+
+    planRow(b.id,k('timetable'),'timetable','Ablaufplan',{
+      empty:!(pl.timetable&&pl.timetable.length),locked:locked,multiline:true,rows:90,kind:'timetable',
+      displayHtml:fmtTimetable(pl.timetable),editVal:timetableToText(pl.timetable)})+
+    planRow(b.id,k('freitext'),'freitext','Freitext',{val:pl.freitext,empty:!pl.freitext,locked:locked,multiline:true,rows:70});
+  return '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">Veranstaltungsplaner <span style="color:var(--mut);font-size:13px;font-weight:400">· '+esc(b.title||'Termin')+'</span></h2>'+
+    '<p class="sub" style="font-size:13px;margin:6px 0 10px">Du musst hier nichts ausfüllen – ich kümmere mich sonst darum und melde mich, wenn ich Fragen habe. Es hilft aber, Missverständnisse zu vermeiden, wenn du schon einträgst, was du weißt.</p>'+
+    (locked?'<p class="msg err" style="display:block;font-size:13px">Der Ablaufplan ist jetzt final – Änderungswünsche bitte direkt mit mir klären.</p>':'')+
+    rows+'</div>';
+}
 function renderAccount(){
   var me=ME;
   var docs=me.documents.map(function(d){
@@ -651,7 +747,8 @@ function renderAccount(){
   }).join('');
   var books=me.bookings.map(function(b,i){
     var n=b.notes||{};
-    return '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">'+esc(b.title||'Termin')+' <span style="color:var(--mut);font-size:13px;font-weight:400">· '+dt(b.event_date)+'</span></h2>'+
+    return planCard(b,i)+
+    '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">'+esc(b.title||'Termin')+' <span style="color:var(--mut);font-size:13px;font-weight:400">· '+dt(b.event_date)+'</span></h2>'+
     '<p class="sub" style="font-size:13px;margin:6px 0 4px">Hier könnt ihr alles pflegen, was ich für euren Termin wissen soll – ich sehe Änderungen sofort.</p>'+
     '<label>Programmablauf (Zeiten, Reden, Programmpunkte)</label><textarea id="nS'+i+'" style="min-height:80px" placeholder="z. B. 18:00 Empfang · 19:00 Essen · 20:30 Rede Chef · 21:00 Party …">'+esc(n.schedule||'')+'</textarea>'+
     '<label>Musikwünsche &amp; No-Gos</label><textarea id="nM'+i+'" style="min-height:80px" placeholder="Wünsche, Lieblingslieder, was auf keinen Fall laufen darf …">'+esc(n.music||'')+'</textarea>'+

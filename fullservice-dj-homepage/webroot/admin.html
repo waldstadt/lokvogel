@@ -259,6 +259,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <div class="card"><h3>Neue Anfragen</h3><div id="dashInq" class="sml mut">–</div></div>
       <div class="card"><h3>Offene Rechnungen</h3><div id="dashOpenInv" class="sml mut">–</div></div>
       <div class="card"><h3>Portal-Aktivität <span class="mut sml" style="font-weight:400">(Kundenreaktionen auf Angebote)</span></h3><div id="dashPortal" class="sml mut">–</div></div>
+      <div class="card"><h3>Planer-Vorschläge <span class="mut sml" style="font-weight:400">(Änderungen vom Kunden zur Bestätigung)</span></h3><div id="dashPlan" class="sml mut">–</div></div>
       <div class="card"><h3>Beantwortete Fragebögen</h3><div id="dashForms" class="sml mut">–</div></div>
       <div class="card"><h3>Bewertung anfragen <span class="mut sml" style="font-weight:400">(Feiern ohne Bewertungs-Mail)</span></h3><div id="dashReviews" class="sml mut">–</div></div>
       <div class="card"><h3>Fehlende / unbestätigte Angaben</h3><div id="dashMissing" class="sml mut">–</div></div>
@@ -336,6 +337,9 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <div class="card"><h3>Technik für diesen Auftrag <button class="btn sm" style="float:right" onclick="openBeModal()">+ Technik</button></h3>
         <div id="bdEquip" class="sml mut">Keine Technik zugeordnet.</div></div>
     </div>
+    <div class="card"><h3>Veranstaltungsplaner <span style="float:right"><button class="btn g sm" onclick="printEventPlan()">Handout drucken</button> <button class="btn sm" onclick="openPlanModal()">Bearbeiten</button></span></h3>
+      <div id="bdPlan" class="sml mut">–</div>
+      <div id="bdPlanChanges" class="sml" style="margin-top:10px"></div></div>
     <div class="card"><h3>Rider / Einsatzblatt <span style="float:right"><button class="btn g sm" onclick="printRider()">Drucken</button> <button class="btn sm" onclick="openRiderModal()">Bearbeiten</button></span></h3>
       <div id="bdRider" class="sml mut">–</div></div>
     <div class="card"><h3>Dokumente zu diesem Auftrag</h3><div id="bdDocs" class="sml mut">–</div></div>
@@ -948,7 +952,8 @@ function loadAll(){
     api('equipment_sets?select=*&order=sort'),
     api('equipment_set_items?select=*'),
     api('calendar_blocks?select=*&order=start_date'),
-    api('quote_templates?select=*&order=sort')
+    api('quote_templates?select=*&order=sort'),
+    api('event_plan_changes?select=*&order=created_at.desc')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -959,7 +964,7 @@ function loadAll(){
     CACHE.reviews=r[16]||[];CACHE.products=r[17]||[];CACHE.partners=r[18]||[];
     CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
     CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];CACHE.blocks=r[23]||[];
-    CACHE.quoteTpls=r[24]||[];
+    CACHE.quoteTpls=r[24]||[];CACHE.planChanges=r[25]||[];
     applyBrand();
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
@@ -1150,6 +1155,12 @@ function renderDash(){
       (e.message?'<div class="mut sml" style="white-space:pre-wrap">„'+esc(e.message.slice(0,140))+'“</div>':'')+
       (e.phone?'<div class="mut sml"> '+esc(e.phone)+'</div>':'')+'</div>';
   }).join('')||'Keine neuen Reaktionen.';
+  var openPlan=(CACHE.planChanges||[]).filter(function(c){return c.status==='offen'});
+  document.getElementById('dashPlan').innerHTML=openPlan.slice(0,8).map(function(c){
+    var bk=CACHE.bookings.find(function(x){return x.id===c.booking_id});
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+c.booking_id+'\')">'+esc(c.field_label||c.field_path)+'</a> <span class="mut">'+(bk?esc(custName(bk.customers))+' · '+dt(bk.event_date):'')+'</span>'+
+      '<div class="mut sml">„'+esc(String(c.old_value||'–'))+'" → „'+esc(String(c.new_value||''))+'"</div></div>';
+  }).join('')||'Keine offenen Vorschläge.';
   var answered=(CACHE.forms||[]).filter(function(f){return f.status==='beantwortet'});
   document.getElementById('dashForms').innerHTML=answered.slice(0,5).map(function(f){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="viewFormAnswers(\''+f.id+'\')">'+esc(f.title)+'</a> <span class="mut">'+dtt(f.submitted_at)+'</span></div>';
@@ -1429,7 +1440,7 @@ function openBookDetail(id){
     (b.customer_notes&&(b.customer_notes.schedule||b.customer_notes.music||b.customer_notes.agreements)
       ?'<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b style="color:var(--acc)">Vom Kunden gepflegt'+(b.customer_notes.updated_at?' ('+dt(b.customer_notes.updated_at)+')':'')+':</b>'+
        row('Programmablauf',b.customer_notes.schedule)+row('Musikwünsche',b.customer_notes.music)+row('Vereinbarungen',b.customer_notes.agreements)+'</div>':'');
-  renderBe();renderRider();
+  renderBe();renderRider();renderPlan();
   var docs=CACHE.documents.filter(function(d){return d.booking_id===id});
   document.getElementById('bdDocs').innerHTML=docs.map(function(d){
     return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+euro(d.total_gross)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
@@ -1839,6 +1850,174 @@ function printRider(){
   pr('Sonstiges / Ablauf',r.notes)+
   '</table>'+
   '<div style="margin-top:24px;color:#777;border-top:1px solid #ddd;padding-top:10px">'+esc(comp.name||'')+(comp.phone?' · '+esc(comp.phone):'')+'</div></div>';
+  window.print();
+}
+
+/* ===== Veranstaltungsplaner =====
+   event_plan ist der mit dem Kunden geteilte Teil (nach Registrierung sieht der Kunde ihn
+   komplett und kann Änderungen vorschlagen), event_plan_internal bleibt immer admin-only.
+   Leere Felder darf der Kunde direkt ausfüllen, bereits gesetzte nur per Vorschlag ändern -
+   siehe plan-suggest in api.php. Markus selbst editiert hier immer direkt. */
+function planOf(b){return (b&&b.event_plan&&typeof b.event_plan==='object')?b.event_plan:{}}
+function planInternalOf(b){return (b&&b.event_plan_internal&&typeof b.event_plan_internal==='object')?b.event_plan_internal:{}}
+function planGet(obj,path){return path.split('.').reduce(function(o,k){return o&&o[k]!=null?o[k]:undefined},obj)}
+function planSet(obj,path,val){
+  var parts=path.split('.'),cur=obj;
+  for(var i=0;i<parts.length-1;i++){if(typeof cur[parts[i]]!=='object'||cur[parts[i]]==null)cur[parts[i]]={};cur=cur[parts[i]]}
+  cur[parts[parts.length-1]]=val;
+}
+function fmtPlaylists(list){
+  if(!list||!list.length)return '';
+  return list.map(function(pl){return '<a href="'+esc(pl.url)+'" target="_blank" rel="noopener">'+esc(pl.label||pl.url)+'</a>'}).join('<br>');
+}
+function parsePlaylists(text){
+  return (text||'').split('\n').map(function(l){return l.trim()}).filter(Boolean).map(function(l){
+    var m=l.split('|');
+    if(m.length>1)return {label:m[0].trim(),url:m.slice(1).join('|').trim()};
+    return {label:'Playlist',url:l};
+  });
+}
+function playlistsToText(list){return (list||[]).map(function(pl){return (pl.label&&pl.label!=='Playlist'?pl.label+' | ':'')+pl.url}).join('\n')}
+function fmtTimetable(list){
+  if(!list||!list.length)return '';
+  return '<table>'+list.map(function(t){return '<tr><td style="padding:2px 10px 2px 0;color:var(--mut);white-space:nowrap">'+esc(t.time||'')+'</td><td>'+esc(t.label||'')+'</td></tr>'}).join('')+'</table>';
+}
+function parseTimetable(text){
+  return (text||'').split('\n').map(function(l){return l.trim()}).filter(Boolean).map(function(l){
+    var m=l.match(/^(\d{1,2}[:.]\d{2})\s+(.*)$/);
+    return m?{time:m[1].replace('.',':'),label:m[2]}:{time:'',label:l};
+  });
+}
+function timetableToText(list){return (list||[]).map(function(t){return (t.time?t.time+' ':'')+t.label}).join('\n')}
+function renderPlan(){
+  var b=curBook,pl=planOf(b),bas=pl.basics||{},inv=pl.invoice||{},mus=pl.music||{};
+  var filled=Object.keys(pl).length>0;
+  var html=filled?'<div class="grid2" style="gap:0 24px">'+
+    row('Partner/in',bas.partner_name)+row('Anlass',bas.occasion)+
+    row('Location',bas.venue_name)+row('Adresse',bas.venue_address)+
+    row('Gäste',bas.guest_count)+row('Ankunft Gäste',bas.arrival_time)+
+    row('Ansprechpartner Location',[bas.venue_contact_name,bas.venue_contact_phone].filter(Boolean).join(' · '))+
+    row('Aufbau ab',bas.setup_from)+row('Abbau bis',bas.teardown_until)+
+    row('Rechnungsadresse',[inv.company,inv.name,inv.street,inv.zip_city].filter(Boolean).join(', '))+
+    row('Musik-Musts',mus.musts)+row('No-Gos',mus.nogos)+
+    '</div>'+
+    (mus.playlists&&mus.playlists.length?'<div style="margin-top:6px">'+row('Playlists',fmtPlaylists(mus.playlists))+'</div>':'')+
+    (pl.timetable&&pl.timetable.length?'<div style="margin-top:6px"><b>Ablaufplan</b>'+fmtTimetable(pl.timetable)+'</div>':'')+
+    (pl.freitext?'<div style="margin-top:6px">'+row('Freitext',pl.freitext)+'</div>':'')
+    :'Noch kein Planer ausgefüllt – mit „Bearbeiten" alles Wichtige erfassen, das sonst mühsam am Telefon herausgefunden werden müsste.';
+  document.getElementById('bdPlan').innerHTML=html;
+  renderPlanChanges();
+}
+function renderPlanChanges(){
+  var list=(CACHE.planChanges||[]).filter(function(c){return c.booking_id===curBook.id});
+  var open=list.filter(function(c){return c.status==='offen'});
+  var log=list.filter(function(c){return c.status!=='offen'}).slice(0,8);
+  var el=document.getElementById('bdPlanChanges');
+  if(!list.length){el.innerHTML='';return}
+  var html='';
+  if(open.length)html+='<div style="border-top:1px solid var(--line);padding-top:8px"><b style="color:var(--acc)">Offene Vorschläge vom Kunden</b>'+
+    open.map(function(c){return '<div style="padding:4px 0;display:flex;justify-content:space-between;gap:10px;align-items:center">'+
+      '<span>'+esc(c.field_label||c.field_path)+': „'+esc(String(c.old_value||'–'))+'" → „'+esc(String(c.new_value||''))+'"</span>'+
+      '<span><a onclick="applyPlanChange(\''+c.id+'\')">Übernehmen</a> &nbsp;<a onclick="rejectPlanChange(\''+c.id+'\')" style="color:var(--mut)">Verwerfen</a></span></div>';
+    }).join('')+'</div>';
+  if(log.length)html+='<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px;color:var(--mut)"><b>Verlauf</b>'+
+    log.map(function(c){return '<div style="padding:2px 0">'+esc(c.field_label||c.field_path)+': „'+esc(String(c.new_value||''))+'" – '+
+      (c.status==='uebernommen'?'vom Kunden direkt eingetragen':'abgelehnt')+(c.created_at?' · '+dtt(c.created_at):'')+'</div>';
+    }).join('')+'</div>';
+  el.innerHTML=html;
+}
+function applyPlanChange(id){
+  var c=(CACHE.planChanges||[]).find(function(x){return x.id===id});if(!c)return;
+  var pl=planOf(curBook);
+  var val=c.new_value;
+  try{val=JSON.parse(c.new_value)}catch(e){}
+  planSet(pl,c.field_path,val);
+  Promise.all([
+    api('bookings?id=eq.'+curBook.id,{method:'PATCH',body:{event_plan:pl}}),
+    api('event_plan_changes?id=eq.'+id,{method:'PATCH',body:{status:'uebernommen',reviewed_at:new Date().toISOString()}})
+  ]).then(function(){curBook.event_plan=pl;toast('Übernommen ✓');loadAll()}).catch(function(e){toast(e.message,1)});
+}
+function rejectPlanChange(id){
+  api('event_plan_changes?id=eq.'+id,{method:'PATCH',body:{status:'abgelehnt',reviewed_at:new Date().toISOString()}})
+    .then(function(){toast('Verworfen');loadAll()}).catch(function(e){toast(e.message,1)});
+}
+function openPlanModal(){
+  var b=curBook,pl=planOf(b),ip=planInternalOf(b),bas=pl.basics||{},inv=pl.invoice||{},mus=pl.music||{};
+  openModal('Veranstaltungsplaner – '+dt(b.event_date),
+    '<h4 style="margin:0 0 6px">Grunddaten</h4>'+
+    '<div class="grid2"><div><label>Partner/in (Name)</label><input id="pPartner" value="'+esc(bas.partner_name||'')+'"></div>'+
+    '<div><label>Anlass</label><input id="pOccasion" value="'+esc(bas.occasion||'')+'"></div></div>'+
+    '<div class="grid2"><div><label>Location</label><input id="pVenue" value="'+esc(bas.venue_name||'')+'"></div>'+
+    '<div><label>Adresse</label><input id="pAddr" value="'+esc(bas.venue_address||'')+'"></div></div>'+
+    '<div class="grid3"><div><label>Gästezahl</label><input type="number" id="pGuests" value="'+(bas.guest_count!=null?bas.guest_count:'')+'"></div>'+
+    '<div><label>Ankunft Gäste</label><input type="time" id="pArrival" value="'+(bas.arrival_time||'')+'"></div>'+
+    '<div><label>Aufbau ab</label><input type="time" id="pSetup" value="'+(bas.setup_from||'')+'"></div></div>'+
+    '<div class="grid2"><div><label>Ansprechpartner Location</label><input id="pVenueContact" value="'+esc(bas.venue_contact_name||'')+'"></div>'+
+    '<div><label>Telefon Location</label><input id="pVenuePhone" value="'+esc(bas.venue_contact_phone||'')+'"></div></div>'+
+    '<div><label>Abbau bis</label><input type="time" id="pTeardown" value="'+(bas.teardown_until||'')+'" style="max-width:160px"></div>'+
+    '<h4 style="margin:14px 0 6px">Rechnungsadresse</h4>'+
+    '<div class="grid2"><div><label>Firma</label><input id="pInvCompany" value="'+esc(inv.company||'')+'"></div>'+
+    '<div><label>Name</label><input id="pInvName" value="'+esc(inv.name||'')+'"></div></div>'+
+    '<div class="grid2"><div><label>Straße</label><input id="pInvStreet" value="'+esc(inv.street||'')+'"></div>'+
+    '<div><label>PLZ Ort</label><input id="pInvZip" value="'+esc(inv.zip_city||'')+'"></div></div>'+
+    '<h4 style="margin:14px 0 6px">Musik &amp; Playlist</h4>'+
+    '<div class="grid2"><div><label>Musik-Musts</label><input id="pMusts" value="'+esc(mus.musts||'')+'"></div>'+
+    '<div><label>No-Gos</label><input id="pNogos" value="'+esc(mus.nogos||'')+'"></div></div>'+
+    '<label>Spotify-Playlist-Links (eine pro Zeile, optional "Label | Link")</label><textarea id="pPlaylists" style="min-height:60px">'+esc(playlistsToText(mus.playlists))+'</textarea>'+
+    '<h4 style="margin:14px 0 6px">Ablaufplan</h4>'+
+    '<label>Eine Zeile pro Programmpunkt, Format "HH:MM Text" (Uhrzeit optional)</label><textarea id="pTimetable" style="min-height:80px">'+esc(timetableToText(pl.timetable))+'</textarea>'+
+    '<h4 style="margin:14px 0 6px">Freitext</h4>'+
+    '<textarea id="pFreitext">'+esc(pl.freitext||'')+'</textarea>'+edBtn('pFreitext')+
+    '<h4 style="margin:14px 0 6px;color:var(--mut)">Intern (der Kunde sieht das nie)</h4>'+
+    '<label>Technik-Zuordnung</label><input id="pTechAssign" value="'+esc(ip.technik_assignment||'')+'">'+
+    '<label>Handover-Notizen für Vertretung</label><textarea id="pHandover">'+esc(ip.handover_notes||'')+'</textarea>'+edBtn('pHandover')+
+    '<div style="margin-top:14px"><button class="btn" onclick="savePlan()">Speichern</button></div>');
+}
+function savePlan(){
+  var pl={
+    basics:{partner_name:v('pPartner')||null,occasion:v('pOccasion')||null,venue_name:v('pVenue')||null,
+      venue_address:v('pAddr')||null,guest_count:v('pGuests')?Number(v('pGuests')):null,arrival_time:v('pArrival')||null,
+      venue_contact_name:v('pVenueContact')||null,venue_contact_phone:v('pVenuePhone')||null,
+      setup_from:v('pSetup')||null,teardown_until:v('pTeardown')||null},
+    invoice:{company:v('pInvCompany')||null,name:v('pInvName')||null,street:v('pInvStreet')||null,zip_city:v('pInvZip')||null},
+    music:{musts:v('pMusts')||null,nogos:v('pNogos')||null,playlists:parsePlaylists(v('pPlaylists'))},
+    timetable:parseTimetable(v('pTimetable')),
+    freitext:v('pFreitext')||''
+  };
+  var ip={technik_assignment:v('pTechAssign')||null,handover_notes:v('pHandover')||null};
+  api('bookings?id=eq.'+curBook.id,{method:'PATCH',body:{event_plan:pl,event_plan_internal:ip}}).then(function(){
+    Object.assign(curBook,{event_plan:pl,event_plan_internal:ip});closeModal();toast('Planer gespeichert ✓');openBookDetail(curBook.id);
+  }).catch(function(e){toast(e.message,1)});
+}
+function printEventPlan(){
+  var b=curBook,pl=planOf(b),ip=planInternalOf(b),bas=pl.basics||{},inv=pl.invoice||{},mus=pl.music||{},cust=b.customers||CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
+  var pr=function(l,val){return val?'<tr><td style="padding:6px 10px 6px 0;color:#777;white-space:nowrap;vertical-align:top">'+l+'</td><td style="padding:6px 0">'+esc(String(val))+'</td></tr>':''};
+  var tech=CACHE.be.filter(function(x){return x.booking_id===b.id}).map(function(x){
+    var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};return x.qty+'× '+(eq.name||'?');
+  }).join(', ');
+  document.getElementById('printArea').innerHTML=
+  '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
+  '<div style="font-size:18px;font-weight:700">Veranstaltungsplaner – Handout</div>'+
+  '<div style="color:#777;margin-bottom:4px">Für den Notfall gedacht: falls ein Kollege einspringen muss, steht hier alles Wichtige zu diesem Job.</div>'+
+  '<div style="color:#777;margin-bottom:16px">'+esc(b.title||b.event_type||'Auftrag')+' · '+dt(b.event_date)+'</div>'+
+  '<table style="width:100%;border-collapse:collapse">'+
+  pr('Kunde',custName(cust)+(cust.phone?' · '+cust.phone:''))+
+  pr('Partner/in',bas.partner_name)+pr('Anlass',bas.occasion)+
+  pr('Location',bas.venue_name)+pr('Adresse',bas.venue_address)+
+  pr('Gäste',bas.guest_count)+pr('Ankunft Gäste',bas.arrival_time)+
+  pr('Ansprechpartner Location',[bas.venue_contact_name,bas.venue_contact_phone].filter(Boolean).join(' · '))+
+  pr('Aufbau ab',bas.setup_from)+pr('Abbau bis',bas.teardown_until)+
+  pr('Rechnungsadresse',[inv.company,inv.name,inv.street,inv.zip_city].filter(Boolean).join(', '))+
+  pr('Musik-Musts',mus.musts)+pr('No-Gos',mus.nogos)+
+  pr('Playlists',(mus.playlists||[]).map(function(pl2){return pl2.url}).join(', '))+
+  pr('Technik',tech)+
+  pr('Freitext',pl.freitext)+
+  '</table>'+
+  ((pl.timetable||[]).length?'<div style="margin-top:16px;font-weight:700">Ablaufplan</div><table style="width:100%;border-collapse:collapse">'+
+    pl.timetable.map(function(t){return '<tr><td style="padding:4px 10px 4px 0;color:#777;white-space:nowrap">'+esc(t.time||'')+'</td><td style="padding:4px 0">'+esc(t.label||'')+'</td></tr>'}).join('')+'</table>':'')+
+  (ip.technik_assignment||ip.handover_notes?'<div style="margin-top:16px;font-weight:700">Intern</div><table style="width:100%;border-collapse:collapse">'+
+    pr('Technik-Zuordnung',ip.technik_assignment)+pr('Handover-Notizen',ip.handover_notes)+'</table>':'')+
+  '</div>';
   window.print();
 }
 

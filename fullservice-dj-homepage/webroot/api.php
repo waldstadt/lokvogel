@@ -1011,6 +1011,28 @@ function renameEquipmentCategories(PDO $p): void {
    existiert - dieselbe Zuordnungslogik wie bei portal/account/register, damit eine spätere
    Registrierung mit derselben Adresse automatisch an denselben Datensatz andockt. Ohne Termin
    wird keine Buchung angelegt (analog zur bisherigen manuellen inqToCust()-Übernahme). */
+/* Liest/schreibt einen Wert per Punkt-Pfad (z.B. "basics.venue_name") in einem verschachtelten
+   Array - genutzt für den Veranstaltungsplaner, dessen event_plan-Struktur frei bleibt (kein
+   festes Schema), damit plan-suggest jedes Feld darin ansprechen kann. */
+function planPathGet(array $data, string $path) {
+  $cur = $data;
+  foreach (explode('.', $path) as $k) {
+    if (!is_array($cur) || !array_key_exists($k, $cur)) return null;
+    $cur = $cur[$k];
+  }
+  return $cur;
+}
+function planPathSet(array &$data, string $path, $value): void {
+  $keys = explode('.', $path);
+  $last = array_pop($keys);
+  $cur = &$data;
+  foreach ($keys as $k) {
+    if (!isset($cur[$k]) || !is_array($cur[$k])) $cur[$k] = [];
+    $cur = &$cur[$k];
+  }
+  $cur[$last] = $value;
+}
+
 function autoInquiryPlanner(PDO $p, array $row): void {
   if (empty($row['email'])) return;
   $email = mb_substr(strtolower(trim((string)$row['email'])), 0, 160);
@@ -2220,12 +2242,19 @@ function handlePortal(string $path, string $method, $body): never {
     $me = custAuth();
     if (!$me) fail('Bitte einloggen.', 401);
     if ($path === 'portal/account/me' && $method === 'GET') {
-      $bk = $p->prepare("select id, title, event_type, event_date, end_date, status, kind, customer_notes
+      $planLockDays = (int)((json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true)['plan_lock_days'] ?? 3));
+      $bk = $p->prepare("select id, title, event_type, event_date, end_date, status, kind, customer_notes, event_plan
         from bookings where customer_id = ? and status != 'storniert' order by event_date desc");
       $bk->execute([$me['id']]);
-      $bookings = array_map(fn($b) => ['id' => $b['id'], 'title' => $b['title'] ?: $b['event_type'],
+      $bookings = array_map(function ($b) use ($planLockDays) {
+        $daysUntil = (int)floor((strtotime($b['event_date']) - strtotime(date('Y-m-d'))) / 86400);
+        $locked = $daysUntil <= $planLockDays;
+        return ['id' => $b['id'], 'title' => $b['title'] ?: $b['event_type'],
         'event_date' => $b['event_date'], 'end_date' => $b['end_date'], 'status' => $b['status'], 'kind' => $b['kind'],
-        'notes' => json_decode((string)($b['customer_notes'] ?? ''), true) ?: (object)[]], $bk->fetchAll());
+        'notes' => json_decode((string)($b['customer_notes'] ?? ''), true) ?: (object)[],
+        'event_plan' => json_decode((string)($b['event_plan'] ?? ''), true) ?: (object)[],
+        'plan_locked' => $locked];
+      }, $bk->fetchAll());
       $dq = $p->prepare("select id, share_token, doc_type, number, status, doc_date, total_gross
         from documents where customer_id = ? and status != 'entwurf' order by doc_date desc, created_at desc");
       $dq->execute([$me['id']]);
@@ -2266,6 +2295,38 @@ function handlePortal(string $path, string $method, $body): never {
         ->execute([uuid(), $me['id'], $m[1], 'note', 'in', 'Kunde hat Termindetails aktualisiert',
           'Termin ' . ($b['title'] ?: $b['event_type']) . ' am ' . $b['event_date'] . ' – Programmablauf/Musikwünsche/Vereinbarungen im Portal gepflegt.', now(), now()]);
       out(['ok' => true], 201);
+    }
+    if (preg_match('#^portal/account/booking/([a-f0-9-]{30,40})/plan-suggest$#', $path, $m) && $method === 'POST') {
+      $chk = $p->prepare('select id, title, event_type, event_date, event_plan from bookings where id = ? and customer_id = ?');
+      $chk->execute([$m[1], $me['id']]);
+      $b = $chk->fetch();
+      if (!$b) fail('Termin nicht gefunden.', 404);
+      $planLockDays = (int)((json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true)['plan_lock_days'] ?? 3));
+      $daysUntil = (int)floor((strtotime($b['event_date']) - strtotime(date('Y-m-d'))) / 86400);
+      if ($daysUntil <= $planLockDays)
+        fail('Der Ablaufplan ist jetzt final - Änderungswünsche bitte direkt klären.', 403);
+      $fieldPath = (string)($body['field_path'] ?? '');
+      if (!preg_match('/^[a-z_]+(\.[a-z_]+)*$/', $fieldPath)) fail('Ungültiges Feld.');
+      $fieldLabel = mb_substr(trim((string)($body['field_label'] ?? $fieldPath)), 0, 120);
+      $value = $body['value'] ?? null;
+      $plan = json_decode((string)($b['event_plan'] ?? ''), true) ?: [];
+      $current = planPathGet($plan, $fieldPath);
+      $isEmpty = $current === null || $current === '' || (is_array($current) && count($current) === 0);
+      $newEncoded = is_scalar($value) || $value === null ? (string)$value : json_encode($value, JSON_UNESCAPED_UNICODE);
+      if ($isEmpty) {
+        planPathSet($plan, $fieldPath, $value);
+        $p->prepare('update bookings set event_plan = ? where id = ?')
+          ->execute([json_encode($plan, JSON_UNESCAPED_UNICODE), $b['id']]);
+        $p->prepare('insert into event_plan_changes (id, booking_id, field_path, field_label, old_value, new_value, status, created_at, reviewed_at)
+          values (?,?,?,?,?,?,?,?,?)')
+          ->execute([uuid(), $b['id'], $fieldPath, $fieldLabel, null, $newEncoded, 'uebernommen', now(), now()]);
+        out(['ok' => true, 'applied' => true], 201);
+      }
+      $currentEncoded = is_scalar($current) || $current === null ? (string)$current : json_encode($current, JSON_UNESCAPED_UNICODE);
+      $p->prepare('insert into event_plan_changes (id, booking_id, field_path, field_label, old_value, new_value, status, created_at)
+        values (?,?,?,?,?,?,?,?)')
+        ->execute([uuid(), $b['id'], $fieldPath, $fieldLabel, $currentEncoded, $newEncoded, 'offen', now()]);
+      out(['ok' => true, 'applied' => false], 201);
     }
     if ($path === 'portal/account/upload' && $method === 'POST') {
       $raw = file_get_contents('php://input');
