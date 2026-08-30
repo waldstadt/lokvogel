@@ -726,6 +726,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
             <div><label>Angebot gültig (Tage)</label><input type="number" id="sValidDays"></div>
           </div>
           <div class="grid2">
+            <div><label>Veranstaltungsplaner: Sperrfrist vor Termin (Tage)</label><input type="number" id="sPlanLock"></div>
+            <div></div>
+          </div>
+          <div class="grid2">
             <div><label>USt.-Satz Standard (%)</label><input type="number" step="0.1" id="sTaxRate"></div>
             <div><label>Partner-Rabatt Technik-Miete (%)</label><input type="number" id="sPartnerPct"></div>
           </div>
@@ -4370,6 +4374,7 @@ function renderSet(){
   document.getElementById('sINext').value=(n.rechnung&&n.rechnung.next)||1;
   document.getElementById('sPayDays').value=d.payment_days!=null?d.payment_days:14;
   document.getElementById('sValidDays').value=d.quote_valid_days!=null?d.quote_valid_days:30;
+  document.getElementById('sPlanLock').value=d.plan_lock_days!=null?d.plan_lock_days:3;
   document.getElementById('sRental').value=(S.rental_contract&&S.rental_contract.text)||'';
 }
 function saveRental(){
@@ -4401,6 +4406,7 @@ function saveCompany(){
 function saveNumbering(){
   var n={angebot:{prefix:v('sQPre'),next:Number(v('sQNext'))||1},rechnung:{prefix:v('sIPre'),next:Number(v('sINext'))||1},year_in_number:true};
   var d=S.defaults||{};d.payment_days=Number(v('sPayDays'))||14;d.quote_valid_days=Number(v('sValidDays'))||30;
+  d.plan_lock_days=Number(v('sPlanLock'))||0;
   d.tax_rate=Number(v('sTaxRate'))||19;d.partner_discount_pct=Number(v('sPartnerPct'))||20;
   d.tier_week_pct=Number(v('sTierWeek'))||0;d.tier_2week_pct=Number(v('sTier2Week'))||0;d.tier_month_pct=Number(v('sTierMonth'))||0;
   d.travel_rate_km=Number(v('sKmRate'))||0;d.travel_free_km=Number(v('sKmFree'))||0;
