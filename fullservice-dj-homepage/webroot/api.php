@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 64;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 65;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -549,6 +549,7 @@ function upgrade(PDO $p): void {
     try { $p->exec(campaignPagesDdl()); } catch (PDOException $e) {}
     try { seedCampaignPages($p); } catch (PDOException $e) {}
   }
+  if ($v < 65) { try { campaignBackgroundMusicUpdate($p); } catch (PDOException $e) {} }
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -1239,7 +1240,7 @@ function campaignPageRows(): array {
      ['icon' => 'chat', 'title' => 'Wir lernen uns vorher kennen',
       'text' => 'Bevor ihr euch festlegt, telefonieren wir oder treffen uns. Ich will wissen, wie ihr feiern wollt, welche Musik euch etwas bedeutet – und was auf gar keinen Fall laufen darf. Danach wisst ihr, ob es zwischen uns passt. Erst dann gibt es ein Angebot.'],
      ['icon' => 'music', 'title' => 'Ich lese den Raum',
-      'text' => 'Auf einer Hochzeit sitzen drei Generationen an einem Tisch, und alle sollen einen schönen Abend haben. Ich ziehe kein Programm durch, sondern schaue, was gerade passiert: beim Essen dezent, später die Klassiker, und wenn die Tanzfläche läuft, bleibe ich dran. Wünsche eurer Gäste nehme ich den ganzen Abend an.'],
+      'text' => 'Auf einer Hochzeit sitzen drei Generationen an einem Tisch, und alle sollen einen schönen Abend haben. Ich ziehe kein Programm durch, sondern schaue, was gerade passiert: zum Sektempfang lockere Hintergrundmusik von Dire Straits über Motown bis House, beim Essen dezent, später die Klassiker – und wenn die Tanzfläche läuft, bleibe ich dran. Wünsche eurer Gäste nehme ich den ganzen Abend an.'],
      ['icon' => 'shield', 'title' => 'Es gibt immer einen Plan B',
       'text' => 'Die wichtige Technik habe ich doppelt dabei. Und sollte ich selbst mal ausfallen, lasse ich euch nicht hängen: Dann schlage ich euch persönlich Kollegen aus meinem Netzwerk vor, die ich kenne und denen ich eure Feier anvertrauen würde. Das steht übrigens auch so in meinen AGB, nicht nur hier.'],
    ],
@@ -1340,7 +1341,7 @@ function campaignPageRows(): array {
      ['icon' => 'cloud', 'title' => 'Draußen ist nicht drinnen',
       'text' => 'Auf der Wiese gibt es keine Steckdose alle fünf Meter, und das Wetter fragt nicht nach eurem Termin. Deshalb kläre ich Stromversorgung und Stellplatz vorher mit euch – am Telefon oder direkt vor Ort. Dann steht die Anlage sicher und trocken, auch wenn ein Schauer durchzieht.'],
      ['icon' => 'music', 'title' => 'Der Nachmittag gehört dem Grill',
-      'text' => 'Um 15 Uhr will niemand Partybeschallung. Ich fange leise an, die Ansprache der Geschäftsführung versteht jeder bis zum letzten Stehtisch, und wenn es dämmert, ziehe ich langsam an – bis von ganz allein getanzt wird. Das funktioniert besser, als um 20 Uhr das Licht auszuknipsen und auf Party zu schalten.'],
+      'text' => 'Um 15 Uhr will niemand Partybeschallung. Ich fange locker an – Motown, Funk, auch mal Dire Straits zum Bier –, die Ansprache der Geschäftsführung versteht jeder bis zum letzten Stehtisch, und wenn es dämmert, ziehe ich langsam Richtung House und Party an, bis von ganz allein getanzt wird. Das funktioniert besser, als um 20 Uhr das Licht auszuknipsen.'],
      ['icon' => 'home', 'title' => 'Die Nachbarn feiern nicht mit',
       'text' => 'Open Air hört eben nicht am Zaun auf. Lautstärke und Ruhezeiten sprechen wir vorher ab, und ich richte die Anlage so aus, dass die Stimmung bei euch bleibt statt beim Nachbarn im Schlafzimmer. So gibt es am Montag keine unangenehmen Anrufe.'],
    ],
@@ -1540,7 +1541,7 @@ function campaignPageRows(): array {
      ['icon' => 'zap', 'title' => 'Der Moment der Enthüllung',
       'text' => 'Ob neues Modell im Autohaus, neue Kollektion im Showroom oder neue Maschine in der Halle: Der Moment, in dem das Tuch fällt, braucht Licht und Musik auf den Punkt. Den proben wir vorher durch – auf die Sekunde, mit festem Zeichen. Dann sitzt er auch, wenn alle Kameras draufhalten.'],
      ['icon' => 'music', 'title' => 'Empfang mit Haltung',
-      'text' => 'Vor und nach dem offiziellen Teil lege ich auf: housig, dezent, erwachsen. Musik, die Gespräche möglich macht und trotzdem klarstellt, dass hier gerade etwas stattfindet – kein Fahrstuhl-Geplätscher, keine Charts-Beschallung.'],
+      'text' => 'Vor und nach dem offiziellen Teil lege ich auf: dezent und erwachsen, je nach Publikum von Motown und Funk bis zu ruhigem House. Musik, die Gespräche möglich macht und trotzdem klarstellt, dass hier gerade etwas stattfindet – kein Fahrstuhl-Geplätscher, keine Charts-Beschallung.'],
      ['icon' => 'mic', 'title' => 'Die Präsentation kommt an',
       'text' => 'Headset oder Funkmikro für die, die sprechen, Laptop-Ton fürs Video, Pegel im Griff. Eure Geschäftsführung soll souverän dastehen und sich auf ihre Worte konzentrieren können – für alles andere bin ich da, und zwar unauffällig.'],
    ],
@@ -1666,6 +1667,36 @@ function campaignPageRows(): array {
    'footer_target' => 'technik'],
 
   ];
+}
+
+/* v65: Markus' Bandbreite bei Hintergrundmusik (Dire Straits, Motown, Funk bis House)
+   in die Empfangs-Passagen dreier Aktionsseiten einweben. Ersetzt Karten-Texte NUR,
+   wenn sie noch exakt dem v64-Seed entsprechen - eigene Änderungen bleiben unberührt. */
+function campaignBackgroundMusicUpdate(PDO $p): void {
+  $swaps = [
+    'hochzeit' => [
+      'Auf einer Hochzeit sitzen drei Generationen an einem Tisch, und alle sollen einen schönen Abend haben. Ich ziehe kein Programm durch, sondern schaue, was gerade passiert: beim Essen dezent, später die Klassiker, und wenn die Tanzfläche läuft, bleibe ich dran. Wünsche eurer Gäste nehme ich den ganzen Abend an.',
+      'Auf einer Hochzeit sitzen drei Generationen an einem Tisch, und alle sollen einen schönen Abend haben. Ich ziehe kein Programm durch, sondern schaue, was gerade passiert: zum Sektempfang lockere Hintergrundmusik von Dire Straits über Motown bis House, beim Essen dezent, später die Klassiker – und wenn die Tanzfläche läuft, bleibe ich dran. Wünsche eurer Gäste nehme ich den ganzen Abend an.'],
+    'firmensommerfest' => [
+      'Um 15 Uhr will niemand Partybeschallung. Ich fange leise an, die Ansprache der Geschäftsführung versteht jeder bis zum letzten Stehtisch, und wenn es dämmert, ziehe ich langsam an – bis von ganz allein getanzt wird. Das funktioniert besser, als um 20 Uhr das Licht auszuknipsen und auf Party zu schalten.',
+      'Um 15 Uhr will niemand Partybeschallung. Ich fange locker an – Motown, Funk, auch mal Dire Straits zum Bier –, die Ansprache der Geschäftsführung versteht jeder bis zum letzten Stehtisch, und wenn es dämmert, ziehe ich langsam Richtung House und Party an, bis von ganz allein getanzt wird. Das funktioniert besser, als um 20 Uhr das Licht auszuknipsen.'],
+    'produktpraesentation' => [
+      'Vor und nach dem offiziellen Teil lege ich auf: housig, dezent, erwachsen. Musik, die Gespräche möglich macht und trotzdem klarstellt, dass hier gerade etwas stattfindet – kein Fahrstuhl-Geplätscher, keine Charts-Beschallung.',
+      'Vor und nach dem offiziellen Teil lege ich auf: dezent und erwachsen, je nach Publikum von Motown und Funk bis zu ruhigem House. Musik, die Gespräche möglich macht und trotzdem klarstellt, dass hier gerade etwas stattfindet – kein Fahrstuhl-Geplätscher, keine Charts-Beschallung.'],
+  ];
+  $sel = $p->prepare('select id, cards from campaign_pages where slug = ?');
+  $upd = $p->prepare('update campaign_pages set cards = ?, updated_at = ? where id = ?');
+  foreach ($swaps as $slug => [$old, $new]) {
+    $sel->execute([$slug]);
+    $row = $sel->fetch();
+    if (!$row) continue;
+    $cards = json_decode((string)$row['cards'], true);
+    if (!is_array($cards)) continue;
+    $changed = false;
+    foreach ($cards as &$c) if (($c['text'] ?? '') === $old) { $c['text'] = $new; $changed = true; }
+    unset($c);
+    if ($changed) $upd->execute([json_encode($cards, JSON_UNESCAPED_UNICODE), now(), $row['id']]);
+  }
 }
 
 /* Datenschutzerklärung – eine Quelle für Seed und Migration (v25) */
