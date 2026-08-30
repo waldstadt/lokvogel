@@ -2498,6 +2498,9 @@ function plzBremse(string $token, bool $fehler): void {
     usleep(500000);
     fail('Zu viele Fehlversuche. Bitte in etwa 15 Minuten erneut versuchen – oder ruf mich einfach an: 01523 6439373.', 429);
   }
+  /* Ist die Sperre abgelaufen, wieder bei null anfangen - sonst löst schon der nächste
+     Fehlversuch sofort die nächsten 15 Minuten aus. */
+  if ($bis && $bis <= time()) $n = 0;
   if (!$fehler) { @unlink($file); return; }
   $n++;
   @file_put_contents($file, json_encode(['n' => $n, 'bis' => $n >= 10 ? time() + 900 : 0]));
@@ -2938,16 +2941,27 @@ function handlePortal(string $path, string $method, $body): never {
          Adresse; erst wer den anklickt, setzt sein Passwort (portal/account/set_password).
          Vorhandene Stammdaten werden dabei nicht überschrieben - eine gepflegte
          Telefonnummer darf nicht durch ein leeres Formularfeld verloren gehen. */
+      /* Bremse: Ohne sie könnte jemand beliebig viele Mails an eine fremde Adresse
+         auslösen und dabei jedes Mal einen zuvor verschickten gültigen Link entwerten. */
+      if (!empty($existing['portal_invite_expires']) && (int)$existing['portal_invite_expires'] > time() + 2 * 86400 - 900)
+        out(['pending' => true,
+          'message' => 'Ich habe dir eben schon einen Bestätigungslink geschickt – schau bitte in dein Postfach (auch im Spam-Ordner).'], 202);
       $inv = bin2hex(random_bytes(24));
       $p->prepare('update customers set portal_invite = ?, portal_invite_expires = ?, updated_at = ? where id = ?')
         ->execute([$inv, time() + 2 * 86400, now(), $existing['id']]);
-      sendMailSafe($email, 'Dein Zugang zum Kundenkonto',
+      $mailed = sendMailSafe($email, 'Dein Zugang zum Kundenkonto',
         "Hallo,\n\ndu möchtest dir ein Kundenkonto bei DJ Lauschgift anlegen – zu deiner E-Mail-Adresse gibt es bei mir schon einen Vorgang.\n\n" .
         "Damit niemand Fremdes an deine Unterlagen kommt, bestätige den Zugang bitte über diesen Link (48 Stunden gültig) und vergib dort dein Passwort:\n" .
         baseUrl() . "/portal.html?einladung=$inv\n\n" .
         "Warst du das nicht? Dann ignoriere diese Mail einfach – ohne den Link passiert nichts.\n\nViele Grüße\nMarkus");
+      /* Kommt die Mail nicht raus, wartet der Kunde sonst vergeblich - Markus soll das sehen. */
+      if (!$mailed)
+        notifyOwner('Bestätigungsmail fürs Kundenkonto konnte nicht versendet werden',
+          "Adresse: $email\nBitte den Zugang manuell klären.");
       out(['pending' => true,
-        'message' => 'Fast geschafft: Zu deiner Adresse gibt es schon einen Vorgang bei mir. Ich habe dir gerade einen Bestätigungslink geschickt – damit legst du dein Passwort fest und kommst direkt rein.'], 202);
+        'message' => $mailed
+          ? 'Fast geschafft: Zu deiner Adresse gibt es schon einen Vorgang bei mir. Ich habe dir gerade einen Bestätigungslink geschickt – damit legst du dein Passwort fest und kommst direkt rein.'
+          : 'Zu deiner Adresse gibt es schon einen Vorgang bei mir. Die Bestätigungsmail konnte ich gerade nicht verschicken – melde dich kurz unter 01523 6439373, dann schalte ich dich frei.'], 202);
     } else {
       $custId = uuid();
       $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, phone, portal_hash, source, created_at, updated_at)
@@ -2984,7 +2998,9 @@ function handlePortal(string $path, string $method, $body): never {
     $st = $p->prepare('select * from customers where lower(email) = ? and portal_hash is not null');
     $st->execute([$email]);
     $c = $st->fetch();
-    if ($c) {
+    /* Gleiche Bremse wie bei der Registrierung: kein Mail-Bombardement auf fremde
+       Adressen, und ein eben verschickter gültiger Link wird nicht sofort entwertet. */
+    if ($c && !(!empty($c['portal_invite_expires']) && (int)$c['portal_invite_expires'] > time() + 2 * 86400 - 900)) {
       $inv = bin2hex(random_bytes(24));
       $p->prepare('update customers set portal_invite = ?, portal_invite_expires = ? where id = ?')
         ->execute([$inv, time() + 2 * 86400, $c['id']]);
@@ -3057,6 +3073,14 @@ function handlePortal(string $path, string $method, $body): never {
       $chk->execute([$m[1], $me['id']]);
       $b = $chk->fetch();
       if (!$b) fail('Termin nicht gefunden.', 404);
+      /* Bremse gegen Dauerfeuer: Die Grenze je Eingabe verhindert riesige Einzelwerte,
+         aber ohne Obergrenze für die Anzahl der Änderungen könnte jemand die Datenbank
+         trotzdem mit tausenden Einträgen fluten. 60 Änderungen pro Stunde reichen für
+         jede echte Planung. */
+      $rl = $p->prepare('select count(*) from event_plan_changes where booking_id = ? and created_at > ?');
+      $rl->execute([$b['id'], gmdate('Y-m-d\TH:i:s\Z', time() - 3600)]);
+      if ((int)$rl->fetchColumn() >= 60)
+        fail('Das waren gerade sehr viele Änderungen auf einmal. Nimm dir kurz Zeit und trag den Rest später ein – oder ruf mich an, dann machen wir es zusammen.', 429);
       $planLockDays = (int)((json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true)['plan_lock_days'] ?? 3));
       $daysUntil = (int)floor((strtotime($b['event_date']) - strtotime(date('Y-m-d'))) / 86400);
       if ($daysUntil <= $planLockDays)

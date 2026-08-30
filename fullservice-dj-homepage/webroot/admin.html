@@ -80,6 +80,9 @@ textarea{min-height:70px;resize:vertical}
   .modal-bg{padding:52px 8px 16px}
   .modal{padding:16px}
 }
+/* Kundeninhalte (Planer, Notizen, Nachrichten) können sehr lange Wörter enthalten -
+   ohne Umbruchregel zieht ein einziger Wert die ganze Oberfläche in die Breite. */
+.card,.sml,td{overflow-wrap:anywhere}
 .card{background:var(--cd);border:1px solid var(--bdr);padding:18px;margin-bottom:16px}
 .card h3{border-bottom:1px solid var(--bdr);padding-bottom:8px;margin-bottom:12px;font-size:13px}
 /* Inhalte & Einstellungen: eine ruhige Spalte mit Gruppen-Überschriften und zuklappbaren Karten */

@@ -117,7 +117,7 @@ function loadOffer(){
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
       if(res.s===401){renderPlzGate();return}
-      if(res.s!==200){app('<div class="card"><h2>Link nicht gefunden</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte prüft den Link oder meldet euch direkt bei mir.')+'</p></div>');return}
+      if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte prüft den Link oder meldet euch direkt bei mir.')+'</p></div>');return}
       DOC=res.j;renderOffer();
     }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
 }
@@ -222,7 +222,10 @@ function renderOffer(){
     if(!d.is_small_business)totals+='<tr class="totals"><td colspan="3" class="num">USt. '+Number(d.tax_rate)+' %</td><td class="num">'+euro(d.total_tax)+'</td></tr>';
     totals+='<tr class="totals"><td colspan="3" class="num"><b>Gesamt</b></td><td class="num grand">'+euro(d.total_gross)+'</td></tr>';
   }
-  var decided=['angenommen','abgelehnt','bezahlt','storniert'].indexOf(d.status)>=0;
+  /* Nur ein Angebot wird angenommen oder abgelehnt. Bei einer Rechnung gehört dorthin
+     kein "unverbindlich"-Text und kein Unterschriftsfeld, sondern nur der Nachrichtenweg. */
+  var istAngebot=d.doc_type==='angebot';
+  var decided=!istAngebot||['angenommen','abgelehnt','bezahlt','storniert'].indexOf(d.status)>=0;
   var statusLine=d.status==='angenommen'?'<span class="status-b">✓ Angenommen – danke euch!</span>':
     (d.status==='abgelehnt'?'<span class="status-b" style="border-color:var(--mut2);color:var(--mut)">Abgelehnt</span>':'');
   app(
@@ -255,7 +258,8 @@ function renderOffer(){
     })()+
     '<div class="card" id="actionCard">'+
     (decided?
-      '<p class="sub">'+(d.status==='angenommen'?'Ich melde mich zeitnah bei euch mit den nächsten Schritten. Wenn euch noch etwas einfällt, schreibt mir hier:':'Ihr habt Fragen oder wollt doch nochmal sprechen? Schreibt mir gerne:')+'</p>'+
+      '<p class="sub">'+(!istAngebot?'Fragen zur Rechnung? Schreibt mir einfach hier, ich melde mich:'
+        :(d.status==='angenommen'?'Ich melde mich zeitnah bei euch mit den nächsten Schritten. Wenn euch noch etwas einfällt, schreibt mir hier:':'Ihr habt Fragen oder wollt doch nochmal sprechen? Schreibt mir gerne:'))+'</p>'+
       '<div class="msg" id="aMsg"></div>'+
       '<label for="cmt">Nachricht</label><textarea id="cmt"></textarea>'+
       '<div class="actions" style="margin-top:12px"><button class="btn g" onclick="act(\'comment\')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Nachricht senden</button></div>'
@@ -316,8 +320,14 @@ function doAccept(){
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({plz:PLZ,action:'accept',message:'',phone:'',name:name,
       signature:document.getElementById('accSig').toDataURL('image/png')})
-  }).then(function(r){if(!r.ok)throw new Error();loadOffer()})
-    .catch(function(){showMsg('aMsg','err','Senden fehlgeschlagen – bitte erneut versuchen.')});
+  /* Die Erklärung des Servers durchreichen: Sonst sieht der Kunde bei jeder Absage nur
+     "Senden fehlgeschlagen" und erfährt nie, woran es lag. */
+  }).then(function(r){
+    if(r.ok){loadOffer();return}
+    return r.json().catch(function(){return null}).then(function(j){
+      throw new Error((j&&j.error)||'Senden fehlgeschlagen – bitte erneut versuchen.');
+    });
+  }).catch(function(e){showMsg('aMsg','err',e.message||'Senden fehlgeschlagen – bitte erneut versuchen.')});
 }
 function decline(){
   var opt=document.getElementById('bandeOpt').checked;
@@ -341,9 +351,11 @@ function sendAction(kind,msg,phone,cb){
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({plz:PLZ,action:kind,message:msg||'',phone:phone||''})
   }).then(function(r){
-    if(!r.ok)throw new Error();
-    if(cb)cb();
-  }).catch(function(){showMsg('aMsg','err','Senden fehlgeschlagen – bitte erneut versuchen oder ruft mich direkt an.')});
+    if(r.ok){if(cb)cb();return}
+    return r.json().catch(function(){return null}).then(function(j){
+      throw new Error((j&&j.error)||'Senden fehlgeschlagen – bitte erneut versuchen oder ruft mich direkt an.');
+    });
+  }).catch(function(e){showMsg('aMsg','err',e.message||'Senden fehlgeschlagen – bitte erneut versuchen oder ruft mich direkt an.')});
 }
 
 function askUpsell(id,btn){
@@ -431,7 +443,7 @@ var FDEF=null;
 function loadForm(){
   fetch(API+'/portal/form/'+FORM).then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
-      if(res.s!==200){app('<div class="card"><h2>Link nicht gefunden</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'')+'</p></div>');return}
+      if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte meldet euch kurz bei mir: 01523 6439373.')+'</p></div>');return}
       FDEF=res.j;renderForm();
     });
 }
@@ -470,7 +482,7 @@ function loadRental(){
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
       if(res.s===401){renderMvGate();return}
-      if(res.s!==200){app('<div class="card"><h2>Link nicht gefunden</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte prüft den Link oder meldet euch direkt bei mir.')+'</p></div>');return}
+      if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte prüft den Link oder meldet euch direkt bei mir.')+'</p></div>');return}
       MVDATA=res.j;renderRental();
     }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
 }
@@ -750,8 +762,14 @@ function planSubmit(key){
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
       if(res.s>=400){alert(res.j.error||'Das hat nicht geklappt – bitte später erneut versuchen.');return}
-      var ok=document.getElementById('ok_'+key);if(ok)ok.style.display='';
-      setTimeout(function(){loadAccount()},1200);
+      var ok=document.getElementById('ok_'+key);
+      if(ok){
+        /* Hat der Server Zeilen verworfen (z.B. Links ohne https), gehört das dem Kunden
+           gesagt - sonst denkt er, alles sei angekommen. */
+        if(res.j.hinweis){ok.textContent=res.j.hinweis;ok.style.color='var(--acc)'}
+        ok.style.display='';
+      }
+      setTimeout(function(){loadAccount()},res.j.hinweis?4000:1200);
     }).catch(function(){alert('Verbindungsfehler – bitte später erneut versuchen.')});
 }
 function planCard(b,i){
