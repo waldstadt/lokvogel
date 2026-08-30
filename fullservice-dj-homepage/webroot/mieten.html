@@ -315,7 +315,7 @@ navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{
 
 /* maximumFractionDigits muss mit: Ohne die Angabe rundet der Browser auf 3 Stellen,
    und die Netto-Umrechnung ergab Beträge wie "294,118 €". */
-function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0,maximumFractionDigits:2})+' €'}
+function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 /* Sicher als JS-String-Literal in Inline-onclick="fn('…')" – siehe admin.html */
 function jsq(s){return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'))}
@@ -718,6 +718,15 @@ Promise.all([
 ]).then(function(r){SETS=r[0]||[];SET_ITEMS=r[1]||[];renderCatChips();renderRent()}).catch(function(){});
 
 var AV_LOADING=false;
+/* Verfügbarkeit auch ohne Klick auf "Verfügbarkeit prüfen" laden, sobald ein Zeitraum
+   feststeht - sonst greift die Mengen-Deckelung im Tourcase nicht und im Korb landen
+   Fantasiemengen, die erst beim Absenden abgewiesen werden. */
+['avFrom','avTo'].forEach(function(id){
+  var el=document.getElementById(id);
+  if(el)el.addEventListener('change',function(){
+    if(document.getElementById('avFrom').value)checkAvail();
+  });
+});
 function checkAvail(){
   var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
   if(!from)return;
@@ -765,6 +774,16 @@ function addToCart(id,qtyId){
   /* Obergrenze: Mehr als verfügbar darf gar nicht erst in den Korb - sonst steht dort
      eine Fantasiesumme und die Absage kommt erst beim Absenden. */
   var frei=(!e.on_request&&AVAIL[id]&&AVAIL[id].available!=null)?Number(AVAIL[id].available):null;
+  /* Ohne gewählten Zeitraum kennen wir die freie Stückzahl nicht - dann wenigstens auf den
+     Gesamtbestand bzw. eine plausible Obergrenze deckeln, damit im Korb keine Fantasiesumme steht. */
+  if(frei==null){
+    var max=(AVAIL[id]&&AVAIL[id].total!=null)?Number(AVAIL[id].total):99;
+    if(qty>max){
+      toast(max<99?('Davon habe ich insgesamt '+max+' Stück – Menge angepasst.')
+                  :'So große Stückzahlen klären wir besser direkt – ruf mich kurz an.');
+      qty=Math.max(mq,Math.floor(max/mq)*mq);
+    }
+  }
   if(frei!=null&&qty>frei){
     qty=Math.max(mq,Math.floor(frei/mq)*mq);
     if(qty>frei||qty<mq){toast('Am Wunschtermin sind davon nur '+frei+' Stück frei.');return}

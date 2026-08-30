@@ -2318,6 +2318,16 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
          später im Backoffice weiterverarbeitet werden (Defense-in-Depth gegen Attribut-Ausbruch). */
       if (!empty($row['email']) && !filter_var($row['email'], FILTER_VALIDATE_EMAIL))
         fail('Bitte eine gültige E-Mail-Adresse angeben.', 400);
+      /* Doppelklick / mehrfach abgeschicktes Formular: dieselbe Anfrage innerhalb von zehn
+         Minuten nicht noch einmal ablegen, sonst steht sie zwei- oder dreimal in der Liste.
+         Antwort bleibt freundlich 201 - für den Absender hat es ja geklappt. */
+      if (!empty($row['email'])) {
+        $dup = $p->prepare("select 1 from inquiries where lower(email) = ? and coalesce(message,'') = ?
+          and coalesce(event_date,'') = ? and created_at > ? limit 1");
+        $dup->execute([strtolower(trim((string)$row['email'])), (string)($row['message'] ?? ''),
+          (string)($row['event_date'] ?? ''), gmdate('Y-m-d\TH:i:s\Z', time() - 600)]);
+        if ($dup->fetchColumn()) out(['ok' => true], 201);
+      }
       $row['id'] = uuid(); $row['status'] = 'neu'; $row['created_at'] = now();
       $cols = array_keys($row);
       $p->prepare("insert into inquiries (" . implode(',', $cols) . ") values (" .
@@ -2964,9 +2974,16 @@ function handlePortal(string $path, string $method, $body): never {
           : 'Zu deiner Adresse gibt es schon einen Vorgang bei mir. Die Bestätigungsmail konnte ich gerade nicht verschicken – melde dich kurz unter 01523 6439373, dann schalte ich dich frei.'], 202);
     } else {
       $custId = uuid();
-      $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, phone, portal_hash, source, created_at, updated_at)
-        values (?,?,?,?,?,?,?,?,?,?,?)')
-        ->execute([$custId, 'privat', 'kunde', $first, $last, mb_substr($email,0,160), $phone, $hash, 'mietpark', now(), now()]);
+      /* Anschrift gleich mitnehmen: Ohne PLZ lässt sich später kein Mietvertrag erzeugen
+         (die PLZ ist zugleich der Login für die Vertragsansicht) und auf Rechnungen fehlt
+         die Adresse. Pflicht ist sie hier nicht - wer nur Unterlagen ansehen will, braucht sie nicht. */
+      $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, phone, street, zip, city, portal_hash, source, created_at, updated_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([$custId, 'privat', 'kunde', $first, $last, mb_substr($email,0,160), $phone,
+          mb_substr(trim((string)($body['street'] ?? '')), 0, 120),
+          mb_substr(trim((string)($body['zip'] ?? '')), 0, 10),
+          mb_substr(trim((string)($body['city'] ?? '')), 0, 80),
+          $hash, 'mietpark', now(), now()]);
     }
     if (!empty($body['partner_interest'])) {
       $kind = in_array($body['partner_kind'] ?? '', ['dj','band','musiker']) ? $body['partner_kind'] : 'dj';

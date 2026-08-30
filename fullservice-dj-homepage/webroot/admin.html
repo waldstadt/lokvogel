@@ -272,7 +272,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 
   <!-- ANFRAGEN -->
   <div class="pg" id="pg-inq">
-    <div class="pt">Anfragen</div><div class="ps">Eingegangen über das Homepage-Formular</div>
+    <div class="pt">Anfragen</div><div class="ps" id="inqSub">Eingegangen über das Homepage-Formular</div>
     <div class="tbl-wrap card"><table><thead><tr><th>Datum</th><th>Name</th><th>Anlass</th><th>Event-Datum</th><th>Status</th><th></th></tr></thead><tbody id="inqRows"></tbody></table></div>
   </div>
 
@@ -1229,6 +1229,11 @@ function markFollowDone(id){api('communications?id=eq.'+id,{method:'PATCH',body:
 /* ===== Anfragen ===== */
 var INQ_BADGE={neu:'gold',in_bearbeitung:'blue',erledigt:'green',archiviert:'grey'};
 function renderInq(){
+  /* Die Zahl im Menü zählt nur die neuen Anfragen, die Liste zeigt alle - ohne diese
+     Zeile wirkt das wie ein Zählfehler. */
+  var alle=(CACHE.inquiries||[]).length,neu=(CACHE.inquiries||[]).filter(function(i){return i.status==='neu'}).length;
+  var sub=document.getElementById('inqSub');
+  if(sub)sub.textContent=alle?('Eingegangen über das Homepage-Formular · '+neu+' neu von '+alle+' insgesamt'):'Eingegangen über das Homepage-Formular';
   document.getElementById('inqRows').innerHTML=applySort((CACHE.inquiries||[]).slice(),'inquiries').map(function(i){
     /* Dringend (Termin <= 10 Tage) und Terminkonflikt direkt in der Liste zeigen -
        wer über die Liste arbeitet, sieht das sonst nur auf dem Dashboard. */
@@ -2530,7 +2535,10 @@ function saveDoc(){
       return nn.commit().then(function(){return rows})});
   }
   p.then(function(rows){
-    var d=rows[0];curDoc.id=d.id;curDoc.number=d.number;curDoc.status=d.status;curDoc.doc_type=d.doc_type;
+    /* Komplette gespeicherte Zeile übernehmen, nicht nur id/number/status: sonst stehen
+       discount_value, total_override & Co. in curDoc noch auf den Startwerten und
+       "→ Rechnung" direkt nach dem Speichern verliert die Rabatte. */
+    var d=rows[0];Object.keys(d).forEach(function(k){curDoc[k]=d[k]});
     return api('document_items?document_id=eq.'+d.id,{method:'DELETE'}).then(function(){
       var filtered=curItems.filter(function(it){return it.description});
       /* Gruppenschlüssel: frisch erzeugte Items tragen _gid/_pgid (siehe equipTierLineItems);
@@ -3044,7 +3052,15 @@ function printDoc(){
   var f=brutto?1:(c.rate?1/(1+c.rate/100):1);
   var rows=docRowsHtml(curItems,f);
   var totals='';
-  if(c.disc)totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Zwischensumme</td><td style="text-align:right;padding:6px">'+euro(c.sub*f)+'</td></tr>'+
+  /* Bei einem Pauschal-Gesamtpreis darf nicht der eingetragene Rabatt aufgeführt werden -
+     der Beleg ginge sonst nicht auf (Positionssumme − Rabatt ≠ Gesamtbetrag). Stattdessen
+     wird die komplette Differenz zur Pauschale als ein Nachlass ausgewiesen. */
+  if(c.override!=null){
+    var nachlass=c.sub-c.gross;
+    if(Math.round(nachlass*100)!==0)
+      totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Positionssumme</td><td style="text-align:right;padding:6px">'+euro(c.sub*f)+'</td></tr>'+
+      '<tr><td colspan="4" style="text-align:right;padding:6px">'+(nachlass>0?'Nachlass':'Zuschlag')+' auf den vereinbarten Festpreis</td><td style="text-align:right;padding:6px">'+(nachlass>0?'−':'+')+euro(Math.abs(nachlass)*f)+'</td></tr>';
+  }else if(c.disc)totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Zwischensumme</td><td style="text-align:right;padding:6px">'+euro(c.sub*f)+'</td></tr>'+
     '<tr><td colspan="4" style="text-align:right;padding:6px">Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+'</td><td style="text-align:right;padding:6px">−'+euro(c.disc*f)+'</td></tr>';
   if(brutto){
     totals+='<tr><td colspan="4" style="text-align:right;padding:6px;font-weight:700">Gesamtbetrag</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(c.gross)+'</td></tr>'+

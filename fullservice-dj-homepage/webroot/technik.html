@@ -624,7 +624,7 @@ function loadWorkshops(){
         '<h4 style="font-size:16px;margin-bottom:6px'+(w.image_url?'':';font-weight:800')+'">'+esc(w.title)+'</h4>'+
         (w.description?'<p style="font-size:13px;color:var(--mut);margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(w.description)+'</p>':'')+
         '<div style="font-size:13px;color:var(--mut);margin-bottom:12px">'+(w.location?esc(w.location)+' · ':'')+
-        (w.price_net!=null?euro2(w.price_net)+' p. P. · ':'')+
+        (w.price_net!=null?euro2(w.price_net)+' p. P. inkl. MwSt. · ':'')+
         (full?'<b style="color:var(--mut2)">ausgebucht</b>':'<b style="color:var(--acc)">'+(w.free===1?'Noch 1 Platz frei':w.free+' Plätze frei')+'</b>')+'</div>'+
         '<button class="btn ghost small" onclick="openWsDetail('+i+')">Mehr dazu</button>'+
         '</div>';
@@ -663,7 +663,7 @@ function openWsDetail(i){
     (w.description?'<p style="font-size:14px;color:var(--mut);margin-bottom:10px">'+esc(w.description)+'</p>':'')+
     (w.long_description?'<div style="font-size:14px;color:var(--mut);margin-bottom:10px;line-height:1.7">'+mdRender(w.long_description)+'</div>':'')+
     '<div style="font-size:14px;color:var(--mut)">'+(w.location?esc(w.location)+' · ':'')+
-    (w.price_net!=null?euro2(w.price_net)+' p. P. · ':'')+
+    (w.price_net!=null?euro2(w.price_net)+' p. P. inkl. MwSt. · ':'')+
     (full?'<b style="color:var(--mut2)">ausgebucht</b>':'<b style="color:var(--acc)">'+(w.free===1?'Noch 1 Platz frei':w.free+' Plätze frei')+'</b>')+'</div>';
   document.getElementById('wsDetailAction').innerHTML=full
     ?'<button class="btn ghost small" onclick="closeWsDetail();openWsForm('+i+',true)">Auf die Warteliste</button>'

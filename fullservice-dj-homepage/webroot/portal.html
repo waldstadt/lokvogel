@@ -650,18 +650,25 @@ function renderRegister(msg){
     '<div class="msg err" id="liMsg" style="display:'+(msg?'block':'none')+'">'+esc(msg||'')+'</div>'+
     '<label for="reName">Name</label><input id="reName" value="'+esc(PREFILL_NAME)+'" autocomplete="name">'+
     '<label for="reMail">E-Mail</label><input type="email" id="reMail" value="'+esc(PREFILL_EMAIL)+'" autocomplete="email">'+
-    '<label for="rePw">Passwort (mind. 8 Zeichen)</label><input type="password" id="rePw" autocomplete="new-password">'+
+    '<label for="rePhone">Telefon <span class="mut" style="font-weight:400">(freiwillig)</span></label><input id="rePhone" autocomplete="tel">'+
+    '<label for="reStreet">Straße und Hausnummer <span class="mut" style="font-weight:400">(freiwillig)</span></label><input id="reStreet" autocomplete="street-address">'+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1 1 110px"><label for="reZip">PLZ</label><input id="reZip" inputmode="numeric" autocomplete="postal-code"></div>'+
+    '<div style="flex:2 1 180px"><label for="reCity">Ort</label><input id="reCity" autocomplete="address-level2"></div></div>'+
+    '<p class="sub" style="font-size:12.5px;margin:6px 0 0">Die Anschrift brauche ich nur, wenn du Technik mietest oder eine Rechnung bekommst. Du kannst sie auch später im Konto nachtragen.</p>'+
+    '<label for="rePw" style="margin-top:14px">Passwort (mind. 8 Zeichen)</label><input type="password" id="rePw" autocomplete="new-password">'+
     '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="doRegister()">Konto anlegen</button>'+
     '<a href="#" onclick="REGISTER=null;renderLogin();return false" style="font-size:13px">Ich habe schon ein Konto</a></div></div>');
   document.getElementById('rePw').addEventListener('keydown',function(e){if(e.key==='Enter')doRegister()});
 }
+function val(id){var el=document.getElementById(id);return el?el.value.trim():''}
 function doRegister(){
   var name=document.getElementById('reName').value.trim(),email=document.getElementById('reMail').value.trim(),pw=document.getElementById('rePw').value;
   var m=document.getElementById('liMsg');
   if(!name||!email){m.style.display='block';m.textContent='Bitte Name und E-Mail angeben.';return}
   if(pw.length<8){m.style.display='block';m.textContent='Das Passwort braucht mindestens 8 Zeichen.';return}
   fetch(API+'/portal/account/register',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name:name,email:email,password:pw})})
+    body:JSON.stringify({name:name,email:email,password:pw,
+      phone:val('rePhone'),street:val('reStreet'),zip:val('reZip'),city:val('reCity')})})
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
       if(res.s>=400)throw new Error(res.j.error||'Registrierung fehlgeschlagen.');
@@ -819,9 +826,14 @@ function renderAccount(){
   }).join('');
   var books=me.bookings.map(function(b,i){
     var n=b.notes||{};
+    /* Das alte Freitext-Feld fragt dasselbe ab wie der Veranstaltungsplaner darüber
+       (Ablaufplan, Musikwünsche, Sonstiges). Zwei Kästen mit denselben Fragen verwirren -
+       deshalb erscheint dieser Kasten nur noch, wenn dort schon etwas drinsteht. */
+    var hatNotizen=!!(n.schedule||n.music||n.agreements);
+    if(!hatNotizen)return planCard(b,i);
     return planCard(b,i)+
-    '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">'+esc(b.title||'Termin')+' <span style="color:var(--mut);font-size:13px;font-weight:400">· '+dt(b.event_date)+'</span></h2>'+
-    '<p class="sub" style="font-size:13px;margin:6px 0 4px">Hier könnt ihr alles pflegen, was ich für euren Termin wissen soll – ich sehe Änderungen sofort.</p>'+
+    '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">Ältere Notizen <span style="color:var(--mut);font-size:13px;font-weight:400">· '+esc(b.title||'Termin')+'</span></h2>'+
+    '<p class="sub" style="font-size:13px;margin:6px 0 4px">Das hast du eingetragen, bevor es den Planer gab. Ich lese beides – du kannst es hier stehen lassen oder oben in den Planer übertragen.</p>'+
     '<label for="nS'+i+'">Programmablauf (Zeiten, Reden, Programmpunkte)</label><textarea id="nS'+i+'" style="min-height:80px" placeholder="z. B. 18:00 Empfang · 19:00 Essen · 20:30 Rede Chef · 21:00 Party …">'+esc(n.schedule||'')+'</textarea>'+
     '<label for="nM'+i+'">Musikwünsche &amp; No-Gos</label><textarea id="nM'+i+'" style="min-height:80px" placeholder="Wünsche, Lieblingslieder, was auf keinen Fall laufen darf …">'+esc(n.music||'')+'</textarea>'+
     '<label for="nA'+i+'">Vereinbarungen &amp; Sonstiges</label><textarea id="nA'+i+'" style="min-height:60px" placeholder="Was wir besprochen haben, Ansprechpartner vor Ort, Besonderheiten …">'+esc(n.agreements||'')+'</textarea>'+
@@ -889,10 +901,19 @@ function delFile(id){
   cfetch('portal/account/file/'+id,{method:'DELETE'}).then(function(){loadAccount()});
 }
 
+/* Ein abgeschnittener Link (z.B. "portal.html?a=" ohne Kennung) landete bisher wortlos
+   auf der Anmeldemaske - der Kunde sucht dann den Fehler bei sich. */
+var LEER=['a','f','mv','einladung'].filter(function(k){return qs.has(k)&&!qs.get(k)});
 if(OFFER)loadOffer();
 else if(FORM)loadForm();
 else if(MV)loadRental();
 else if(INVITE)renderSetPw();
+else if(LEER.length)
+  app('<div class="card"><h1>Der Link ist unvollständig</h1>'+
+    '<p class="sub">Da fehlt das Stück hinter dem Gleichheitszeichen – beim Kopieren aus einer E-Mail geht das leicht verloren. '+
+    'Kopier den Link bitte noch einmal komplett, oder melde dich kurz bei mir: '+
+    '<a href="tel:+4915236439373">01523 6439373</a>.</p>'+
+    '<p class="sub" style="margin-top:14px">Du hast ein Kundenkonto? <a href="portal.html">Hier geht es zur Anmeldung.</a></p></div>');
 else if(CTOK)loadAccount();
 else renderLogin();
 </script>
