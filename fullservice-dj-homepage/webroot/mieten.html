@@ -250,12 +250,7 @@ footer a:hover{color:var(--acc)}
 
     <div class="cats" id="catChips"></div>
 
-    <div id="setSection" style="display:none;margin-top:40px">
-      <h3 style="font-size:19px;margin-bottom:14px">Sets – gleich alles zusammen</h3>
-      <div class="rent-grid" id="setGrid"></div>
-    </div>
-    <h3 style="font-size:19px;margin-top:40px;margin-bottom:4px" id="singleItemsHead">Einzelne Artikel</h3>
-    <div class="rent-grid" id="rentGrid"></div>
+    <div class="rent-grid" id="rentGrid" style="margin-top:24px"></div>
     <p class="rent-note" id="priceNote">Alle Preise inkl. MwSt. Ab 1 Woche, 2 Wochen und 1 Monat gelten automatisch günstigere Tagessätze – die Staffel-Gesamtsumme seht ihr live im Tourcase.</p>
   </div>
 </section>
@@ -327,14 +322,11 @@ var CAT_ICONS={
   'Mischpult':'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
   'DJ-Controller':'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>',
   'Licht':'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
-  'Piano':'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
-  'Rigging':'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  'Instrumente':'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
   'Mikrofon':'<path d="M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/>',
-  'Signal':'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
-  'Stativ':'<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
   'Zubehör':'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
   'Lautsprecher':'<rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="14" r="4"/><line x1="12" y1="6" x2="12.01" y2="6"/>',
-  'Effekt':'<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
+  'Nebel/Haze':'<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
   'Video':'<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'
 };
 var CAT_ICON_DEFAULT='<line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>';
@@ -389,6 +381,7 @@ function priceLabel(dayRate,pp){
 function renderCatChips(){
   var cats=[];
   EQ.forEach(function(e){if(e.category&&cats.indexOf(e.category)===-1)cats.push(e.category)});
+  if(SETS.length)cats.push('Sets'); /* Sets ist eine Kategorie wie jede andere - alphabetisch einsortiert, nicht fest angepinnt */
   cats.sort();
   document.getElementById('catChips').innerHTML=['Alle'].concat(cats).map(function(c){
     return '<span class="cat-chip'+(c===CUR_CAT?' active':'')+'" onclick="setCat(\''+jsq(c)+'\')">'+(c!=='Alle'?catIcon(c):'')+esc(c)+'</span>';
@@ -548,8 +541,9 @@ function setsWith(e){
 }
 function scrollToSet(id){
   closeProductModal();
-  var sec=document.getElementById('setSection');
-  if(sec){sec.style.display='block';sec.scrollIntoView({behavior:'smooth',block:'start'});}
+  setCat('Sets');
+  var grid=document.getElementById('rentGrid');
+  if(grid)grid.scrollIntoView({behavior:'smooth',block:'start'});
   var card=document.getElementById('qty-set-'+id);
   if(card){var box=card.closest('.rent');if(box){box.style.transition='box-shadow .3s';box.style.boxShadow='0 0 0 2px var(--acc)';setTimeout(function(){box.style.boxShadow=''},1800);}}
 }
@@ -558,15 +552,20 @@ function renderRent(){
   document.getElementById('partnerBadge').innerHTML=PARTNER?('Partnerpreise aktiv für <b style="color:var(--txt)">'+esc(PARTNER.name)+'</b>'):'';
   var html;
   if(CUR_CAT==='Alle'){
-    /* Gesamtansicht nach Kategorien gruppiert, damit die Liste scanbar bleibt */
+    /* Gesamtansicht nach Kategorien gruppiert, damit die Liste scanbar bleibt - Sets als eigene
+       Gruppe wie jede andere Kategorie, nicht mehr fest oben angepinnt. */
     var cats=[];
     EQ.forEach(function(e){var c=e.category||'Sonstiges';if(cats.indexOf(c)===-1)cats.push(c)});
+    if(SETS.length)cats.push('Sets');
     cats.sort();
     if(cats.indexOf('Sonstiges')>-1){cats.splice(cats.indexOf('Sonstiges'),1);cats.push('Sonstiges')}
     html=cats.map(function(c){
+      if(c==='Sets')return '<div class="cat-head">Sets<span>'+SETS.length+' Set'+(SETS.length>1?'s':'')+'</span></div>'+SETS.map(setCard).join('');
       var items=EQ.filter(function(e){return (e.category||'Sonstiges')===c}).sort(byName);
       return '<div class="cat-head">'+esc(c)+'<span>'+items.length+' Artikel</span></div>'+items.map(rentCard).join('');
     }).join('');
+  } else if(CUR_CAT==='Sets'){
+    html=SETS.map(setCard).join('');
   } else {
     html=EQ.filter(function(e){return e.category===CUR_CAT}).sort(byName).map(rentCard).join('');
   }
@@ -591,7 +590,7 @@ var TAX_RATE=19,SMALL_BUSINESS=false;
 function priceFactor(){return(PRICE_MODE==='netto'&&!SMALL_BUSINESS&&TAX_RATE)?1/(1+TAX_RATE/100):1}
 function setPriceMode(m){
   PRICE_MODE=m;localStorage.setItem('lg_price_mode',m);
-  updatePriceToggleUI();renderRent();renderSets();renderCart();
+  updatePriceToggleUI();renderRent();renderCart();
 }
 function updatePriceToggleUI(){
   var b=document.getElementById('ptBrutto'),n=document.getElementById('ptNetto');
@@ -605,7 +604,7 @@ fetch(API+'/public/tax-info').then(function(r){return r.json()}).then(function(j
   TAX_RATE=Number(j.tax_rate)||19;SMALL_BUSINESS=!!j.small_business;
   var wrap=document.getElementById('priceToggleWrap');
   if(wrap)wrap.style.display=SMALL_BUSINESS?'none':'flex';
-  updatePriceToggleUI();renderRent();renderSets();renderCart();
+  updatePriceToggleUI();renderRent();renderCart();
 }).catch(function(){});
 
 /* ---- Sets: mehrere Artikel als ein buchbares Paket ---- */
@@ -655,26 +654,23 @@ function setImageAreaModal(s){
     return '<div style="background-image:url(\''+esc(u)+'\')"></div>';
   }).join('')+'</div>';
 }
-function renderSets(){
-  var box=document.getElementById('setSection');
-  if(!SETS.length){box.style.display='none';return}
-  box.style.display='block';
-  document.getElementById('setGrid').innerHTML=SETS.map(function(s){
-    var items=setItemsOf(s);
-    var contains=items.map(function(it){return (it.qty>1?it.qty+'× ':'')+it.e.name}).join(', ');
-    var rate=setDayRate(s);
-    var price=rate?euro(rate*priceFactor())+' <small>/ Miettag</small>':'Preis auf Anfrage';
-    var inCart=CART.some(function(c){return c.type==='set'&&c.set_id===s.id});
-    return '<div class="rent reveal vis clickable" onclick="openSetProductModal(\''+jsq(s.id)+'\')">'+setImageArea(s)+'<div class="rb">'+
-      '<div class="rc">SET</div>'+
-      '<h4>'+esc(s.name)+'</h4><p>'+esc(s.description||'')+'</p>'+
-      (contains?'<div class="addon">Enthält: '+esc(contains)+'</div>':'')+
-      '<div class="rp">'+price+'</div>'+
-      '<div onclick="event.stopPropagation()" style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
-      '<input type="number" min="1" value="1" id="qty-set-'+s.id+'" style="margin:0;width:60px;padding:8px">'+
-      '<button class="btn small'+(inCart?' ghost':'')+'" onclick="addSetToCart(\''+jsq(s.id)+'\')">'+(inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>'+
-      '</div></div>';
-  }).join('');
+/* Set-Kachel - gleiche Optik wie eine Artikel-Kachel (rentCard), Sets sind eine ganz normale
+   Kategorie ("Sets") und stehen nicht mehr fest über den anderen Kategorien. */
+function setCard(s){
+  var items=setItemsOf(s);
+  var contains=items.map(function(it){return (it.qty>1?it.qty+'× ':'')+it.e.name}).join(', ');
+  var rate=setDayRate(s);
+  var price=rate?euro(rate*priceFactor())+' <small>/ Miettag</small>':'Preis auf Anfrage';
+  var inCart=CART.some(function(c){return c.type==='set'&&c.set_id===s.id});
+  return '<div class="rent reveal vis clickable" onclick="openSetProductModal(\''+jsq(s.id)+'\')">'+setImageArea(s)+'<div class="rb">'+
+    '<div class="rc">SET</div>'+
+    '<h4>'+esc(s.name)+'</h4><p>'+esc(s.description||'')+'</p>'+
+    (contains?'<div class="addon">Enthält: '+esc(contains)+'</div>':'')+
+    '<div class="rp">'+price+'</div>'+
+    '<div onclick="event.stopPropagation()" style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
+    '<input type="number" min="1" value="1" id="qty-set-'+s.id+'" style="margin:0;width:60px;padding:8px">'+
+    '<button class="btn small'+(inCart?' ghost':'')+'" onclick="addSetToCart(\''+jsq(s.id)+'\')">'+(inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>'+
+    '</div></div>';
 }
 /* ---- Set-Produktfenster: volle Beschreibung + Artikelinfos aller enthaltenen Geräte ---- */
 function findSet(id){return SETS.find(function(x){return String(x.id)===String(id)})}
@@ -715,7 +711,7 @@ function renderSetProductModal(){
 Promise.all([
   sfetch('equipment_sets?select=*&public=eq.true&order=sort'),
   sfetch('equipment_set_items?select=*')
-]).then(function(r){SETS=r[0]||[];SET_ITEMS=r[1]||[];renderSets()}).catch(function(){});
+]).then(function(r){SETS=r[0]||[];SET_ITEMS=r[1]||[];renderCatChips();renderRent()}).catch(function(){});
 
 var AV_LOADING=false;
 function checkAvail(){
@@ -775,9 +771,9 @@ function addSetToCart(setId,qtyId){
   if(existing)existing.qty=qty;else CART.push({type:'set',set_id:setId,qty:qty});
   saveCart();
   if(document.getElementById('prodBg').style.display==='block')closeProductModal();
-  renderSets();renderCart();openTourcase();
+  renderRent();renderCart();openTourcase();
 }
-function removeFromCart(idx){CART.splice(idx,1);saveCart();renderRent();renderSets()}
+function removeFromCart(idx){CART.splice(idx,1);saveCart();renderRent()}
 function renderCart(){
   var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
   var days=from?rentalDaysClient(from,to):1;
@@ -890,7 +886,7 @@ function submitCart(){
         m.style.display='block';
         if(res.s>=400){m.className='msg err';m.textContent=res.j.error||'Anfrage fehlgeschlagen – bitte später erneut versuchen.';return}
         m.className='msg ok';m.textContent='Danke! Eure Anfrage ist eingegangen – ihr bekommt in der Regel innerhalb von 24 Stunden eine Antwort mit Verfügbarkeit und Preis.';
-        CART=[];saveCart();renderRent();renderSets();
+        CART=[];saveCart();renderRent();
       });
   }).catch(function(){document.getElementById('cartSubmitBtn').disabled=false});
 }

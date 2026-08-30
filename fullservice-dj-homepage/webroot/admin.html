@@ -3012,7 +3012,7 @@ function openEqModal(id){
   var e=id?CACHE.equipment.find(function(x){return x.id===id}):{};e=e||{};
   openModal(id?'Artikel bearbeiten':'Neuer Artikel',
     '<div class="grid3"><div><label>Name *</label><input id="eName" value="'+esc(e.name||'')+'"></div>'+
-    '<div><label>Kategorie</label><input id="eCat" value="'+esc(e.category||'')+'" placeholder="PA, Licht, Effekt …"></div>'+
+    '<div><label>Kategorie</label><input id="eCat" value="'+esc(e.category||'')+'" placeholder="Lautsprecher, Licht, Nebel/Haze …"></div>'+
     '<div><label>Artikelnummer</label><input id="eSku" value="'+esc(e.sku||'')+'"></div></div>'+
     '<label>Beschreibung (Homepage)</label><textarea id="eDesc">'+esc(e.description||'')+'</textarea>'+edBtn('eDesc')+
     '<div class="grid4"><div><label>€ / Miettag</label><input type="number" step="0.01" id="eRate" value="'+(e.day_rate||0)+'">'+

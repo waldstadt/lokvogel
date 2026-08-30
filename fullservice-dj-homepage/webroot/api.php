@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 59;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 60;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -523,6 +523,7 @@ function upgrade(PDO $p): void {
       "alter table document_items add column group_pos integer",
     ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   }
+  if ($v < 60) renameEquipmentCategories($p);
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -723,13 +724,13 @@ function seedEquipmentCatalog(PDO $p): void {
     ['573744', 'Mischpult', 'Allen & Heath CQ20B',
      'Ultrakompakter Bluetooth-Digitalmixer, 96 kHz Signalverarbeitung, Steuerung per App (CQ-MixPad/CQ4You) über integrierten Dualband-Router (2,4/5 GHz). 16 Mikrofon/Line-Vorverstärker (8× XLR + 8× XLR/TRS-Kombibuchse), 2× Stereo-Line-Eingang. Ausgänge: 2× XLR Main, 1× Stereo-Line, 6× Monitor (XLR), 1× Kopfhörer. USB-Soundkarte 24×24, SD-Aufnahme/Wiedergabe, Bluetooth-Stereo-Wiedergabe. Maße (BxHxT) 372×153×133 mm, Gewicht 2,6 kg. Optionales Rackmount-Kit separat erhältlich (Art. 573745).',
      85.0, 'https://www.thomann.de/de/allen_heath_cq20b.htm'],
-    ['568064', 'Piano', 'Yamaha P-225 B',
+    ['568064', 'Instrumente', 'Yamaha P-225 B',
      'Stagepiano mit 88 Tasten Graded Hammer Compact (GHC), gewichtet. Klangerzeugung Yamaha CFX VRM Lite mit Key-Off-Samples, 192-stimmig polyphon, 24 Instrument-Presets. Integrierte Lautsprecher 2×7 Watt, Bluetooth-Audio-Wiedergabe über die internen Lautsprecher. Inkl. Sustain-Pedal (M-Audio SP-2), Netzteil und Notenhalter. Maße 1.326×129×272 mm (BxHxT), Gewicht 11,5 kg.',
      35.0, 'https://www.thomann.de/de/yamaha_p_225_b.htm'],
     ['625358', 'DJ-Controller', 'Rane One MKII',
      'B-Stock, professioneller motorisierter DJ-Controller. 7,2" motorisierte Plattenteller, 29 interne Hardwareeffekte, dedizierte Stems Control, High/Low-Pass Filter + 3-Band-EQ, 8 Performance-Pads pro Deck. Eingänge: 2× Line/Phono, 2× Mikrofon (TRS/XLR); Ausgänge: 2× XLR Main, 2× XLR Booth, Kopfhörer. Serato DJ Pro enthalten. Maße 647×345×124 mm, Gewicht 10,68 kg.',
      60.0, 'https://www.thomann.de/de/rane_one_mkii.htm'],
-    ['617135', 'Rigging', 'Gravity WB 123 T B',
+    ['617135', 'Zubehör', 'Gravity WB 123 T B',
      'Quadratischer Standfuß für 3× M20-Distanzrohre, Aufnahme für Traversen-Systeme F21–F24 und F31–F34. Maximallast 50 kg, pulverbeschichteter Stahl, Abmessungen (HxBxT) 15×563×563 mm, Gewicht 14 kg.',
      15.0, null],
     ['454369', 'Licht', 'Eurolite QuickDMX USB Wireless Mini-DMX-Transceiver',
@@ -744,16 +745,16 @@ function seedEquipmentCatalog(PDO $p): void {
     // Rechnung 84734246 – Lokvogel-Bestand (own_rig): normalerweise im eigenen Setup im Einsatz,
     // bei Bedarf aber auch für größere Vermiet-/DJ-Aufträge verfügbar
     ['160142', 'Mikrofon', 'Audix D6', 'Spezialmikrofon für Bass Drum (auch E-Bass geeignet), dynamisches Großmembran-Mikrofon, Nierencharakteristik, Frequenzgang 30–15.000 Hz, max. SPL sehr hoch (bassdrumtauglich), Gewicht 254 g.', 25.0, 'https://www.thomann.de/de/audix_d6_bassdrummikro.htm', 1, true],
-    ['479553', 'Signal', 'IMG Stageline FGA-202', '2-Kanal-Line-Übertrager zur Reduktion von Signalstörungen/Brummschleifen. 2 Eingänge (XLR/6,3-mm-Kombibuchse, 600 Ω), 2 galvanisch getrennte XLR-Ausgänge mit Groundlift-Schalter. Frequenzbereich 20–20.000 Hz, Maße 125×55×75 mm, Gewicht 650 g.', 10.0, 'https://www.thomann.de/de/img_stageline_fga_202.htm', 1, true],
+    ['479553', 'Mischpult', 'IMG Stageline FGA-202', '2-Kanal-Line-Übertrager zur Reduktion von Signalstörungen/Brummschleifen. 2 Eingänge (XLR/6,3-mm-Kombibuchse, 600 Ω), 2 galvanisch getrennte XLR-Ausgänge mit Groundlift-Schalter. Frequenzbereich 20–20.000 Hz, Maße 125×55×75 mm, Gewicht 650 g.', 10.0, 'https://www.thomann.de/de/img_stageline_fga_202.htm', 1, true],
     ['436138', 'Mikrofon', 'the t.bone BD 500 Beta', 'Kondensator-Grenzflächenmikrofon (halbe Niere) für Bass-Drum oder Piano/Sprache, schaltbarer Frequenzgang, 30–20.000 Hz, robustes Metallgehäuse, 3/8"-Gewinde, Gewicht 480 g.', 15.0, 'https://www.thomann.de/de/the_t.bone_bd_500_beta.htm', 1, true],
     ['129171', 'Mikrofon', 'Sennheiser E609 Silver', 'Dynamisches Instrumentenmikrofon (Superniere) für E-Gitarre, Percussion, Bläser, Drums. Frequenzgang 40–15.000 Hz, Gewicht 140 g. Inkl. MZQ-100-Klemme und Tasche.', 15.0, 'https://www.thomann.de/de/sennheiser_e609_evolution.htm', 1, true],
     ['326853', 'Mikrofon', 'Rode M5 MP', 'Stereo-Set Kleinmembran-Kondensatormikrofone (matched pair), Nierencharakteristik, Frequenzbereich 20 Hz–20 kHz, max. 140 dB SPL, benötigt Phantomspeisung 24/48 V, Metallgehäuse.', 20.0, 'https://www.thomann.de/de/rode_m5_mp.htm', 2, true],
-    ['395760', 'Stativ', 'Gravity MS 3122 HDB', 'Kurzes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), Höhe 320 mm, Zinkdruckguss-Sockel, Gewicht 2,8 kg.', 8.0, 'https://www.thomann.de/de/gravity_ms_3122_hdb_microphone_stand.htm', 2, true],
-    ['426274', 'Stativ', 'Gravity MS 4322 HDB', 'Extra schweres, langes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), höhenverstellbar 1030–1690 mm, Gewicht 4,26 kg.', 9.0, 'https://www.thomann.de/de/gravity_ms_4322_hdb_microphone_stand.htm', 2, true],
-    ['370954', 'Stativ', 'Gravity MS 4322 B', 'Langes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), höhenverstellbar 1030–1690 mm, Gewicht 2,7 kg.', 8.0, 'https://www.thomann.de/de/gravity_ms_4322_b_microphone_stand.htm', 2, true],
-    ['370937', 'Stativ', 'Gravity MS 4222 B', 'Kurzes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), höhenverstellbar 510–740 mm, Gewicht 2,2 kg.', 7.0, 'https://www.thomann.de/de/gravity_ms_4222_b_microphone_stand.htm', 1, true],
+    ['395760', 'Zubehör', 'Gravity MS 3122 HDB', 'Kurzes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), Höhe 320 mm, Zinkdruckguss-Sockel, Gewicht 2,8 kg.', 8.0, 'https://www.thomann.de/de/gravity_ms_3122_hdb_microphone_stand.htm', 2, true],
+    ['426274', 'Zubehör', 'Gravity MS 4322 HDB', 'Extra schweres, langes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), höhenverstellbar 1030–1690 mm, Gewicht 4,26 kg.', 9.0, 'https://www.thomann.de/de/gravity_ms_4322_hdb_microphone_stand.htm', 2, true],
+    ['370954', 'Zubehör', 'Gravity MS 4322 B', 'Langes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), höhenverstellbar 1030–1690 mm, Gewicht 2,7 kg.', 8.0, 'https://www.thomann.de/de/gravity_ms_4322_b_microphone_stand.htm', 2, true],
+    ['370937', 'Zubehör', 'Gravity MS 4222 B', 'Kurzes Dreibein-Mikrofonstativ, ausziehbarer Galgen (max. 880 mm), höhenverstellbar 510–740 mm, Gewicht 2,2 kg.', 7.0, 'https://www.thomann.de/de/gravity_ms_4222_b_microphone_stand.htm', 1, true],
     ['435574', 'Zubehör', 'Gravity MS CAB CL 01', 'Cab-Clamp-Mikrofonhalterung für Gitarrenboxen, schwenkbarer Arm, justierbare Klemmen (Klemmbereich 300–400 mm), Gewindeanschluss 3/8", Gewicht 0,6 kg.', 6.0, 'https://www.thomann.de/de/gravity_ms_cab_cl_01.htm', 2, true],
-    ['160358', 'Signal', 'Behringer DI20 Ultra-DI', 'Aktive 2-Kanal-DI-Box, XLR-Out, -20/40 dB PAD (bis 3000 W), Batterie (9 V) oder Phantomspeisung (15–52 V), Groundlift, auch als 1-auf-2-Splitter nutzbar, Gewicht 0,65 kg.', 8.0, 'https://www.thomann.de/de/behringer_di20_di_box.htm', 1, true],
+    ['160358', 'Mischpult', 'Behringer DI20 Ultra-DI', 'Aktive 2-Kanal-DI-Box, XLR-Out, -20/40 dB PAD (bis 3000 W), Batterie (9 V) oder Phantomspeisung (15–52 V), Groundlift, auch als 1-auf-2-Splitter nutzbar, Gewicht 0,65 kg.', 8.0, 'https://www.thomann.de/de/behringer_di20_di_box.htm', 1, true],
     // Ohne Rechnung von Markus durchgegeben – ebenfalls Lokvogel-Bestand
     ['MANUAL-PLAUDIO-B215', 'Lautsprecher', 'PL Audio B215 Aktiv', 'Aktiver 2×15"-Subwoofer (Bus) mit eingebauter 3-Kanal-Endstufe: 2.500 W im Bassbereich + 2×800 W für den Betrieb von Topteilen. Eingebauter DSP mit 80 Presets, Faital-Chassis, Pascal-Endstufen. Kombiniert Sub + Endstufe für die angeschlossenen Topteile in einem Gerät.', 60.0, 'https://pl-audio.de/en/products/speaker/subwoofer/b-215-sub/', 2, true],
     ['MANUAL-SEEBURG-A3', 'Lautsprecher', 'Seeburg Acoustic Line A3', 'Passives Mittelhochton-Topteil, 2×8" Neodym-Tieftöner + 1" Hochtontreiber. Belastbarkeit 500 W AES / 1500 W Peak, 4 Ω, max. SPL 132 dB. Frequenzbereich 80 Hz–20 kHz, Abstrahlwinkel 90°×60° (drehbar). Anschluss 2× Speakon NL4MP, 35-mm-Stativhalterung. Maße 59×25×25 cm, Gewicht 12,5 kg.', 35.0, 'https://www.thomann.de/de/seeburg_acoustic_line_a3.htm', 2, true],
@@ -767,9 +768,9 @@ function seedEquipmentCatalog(PDO $p): void {
     ['MANUAL-APELABS-MAXIV2-CREME45', 'Licht', 'Ape Labs Maxi V2+ (Creme, 45°)', 'Akku-Uplight, RGBWW-LED, IP65, ca. 14 Std. Akkulaufzeit, Steuerung per App/Fernbedienung/Wireless-DMX, Edelstahlgehäuse. 45°-Abstrahloptik, Farbe Creme. Genaue Thomann-Setbezeichnung noch zu prüfen (Link deshalb leer gelassen).', 20.0, null, 6],
     ['MANUAL-SENNHEISER-E835', 'Mikrofon', 'Sennheiser e835', 'Dynamisches Gesangsmikrofon, Nierencharakteristik, Frequenzgang 40 Hz–16 kHz mit Präsenzanhebung 3–10 kHz für druckvollen, präsenten Klang. Menge laut Markus noch unklar, vorerst mit 1 angelegt.', 8.0, 'https://www.thomann.de/de/sennheiser_e835.htm'],
     ['MANUAL-SENNHEISER-EWDP835', 'Mikrofon', 'Sennheiser EW-DP 835 Set', 'Digitales UHF-Funkmikrofon-Set: Handsender mit dynamischer e835-Niere-Kapsel, magnetisches Empfänger-Stacking, Akkulaufzeit Sender ca. 12 Std. / Empfänger ca. 7 Std. Frequenzband noch mit Markus abzustimmen. Menge vorerst mit 1 angelegt.', 25.0, 'https://www.thomann.de/de/sennheiser_ew_dp_835_set_r1_6.htm'],
-    ['MANUAL-STAIRVILLE-AF40', 'Effekt', 'Stairville AF-40', 'Kompakte Nebelmaschine mit DMX-Schnittstelle, Nebelausstoß ca. 85 m³/min, Leistung 370 W, Tank 0,25 l, Gewicht 2,1 kg. Wie bei allen Nebelmaschinen: 1 Liter Fluid inklusive, Mehrverbrauch wird über „Nebelfluid-Nachfüllung" nachberechnet. Menge vorerst mit 1 angelegt.', 25.0, 'https://www.thomann.de/de/stairville_af_40_dmx_mini_fog_machine.htm'],
-    ['MANUAL-EUROLITE-NH20', 'Effekt', 'Eurolite NH-20 Tour Fazer', 'DMX-Dunstnebelmaschine (Hazer) im Flightcase, Tank 1,7 l, Verbrauch ca. 2,2 ml/min, Aufheizzeit ca. 1,5 Min., Wurfweite ca. 2 m. Steuerung DMX, Stand-alone, QuickDMX/W-DMX/CRMX über USB. Menge vorerst mit 1 angelegt.', 35.0, 'https://www.thomann.de/de/eurolite_nh_20_tour_fazer.htm'],
-    ['MANUAL-ADJ-ENTOURFAZE', 'Effekt', 'ADJ Entour Faze', 'Fazer/Hazer mit 450-W-Heizelement, Nebelausstoß ca. 113 m³/min, Verbrauch ca. 4,5 ml/min, Aufheizzeit ca. 45 Sek. Tank 3 l, verwendet normale Wasser-Nebelfluid. Steuerung über Menütasten/Bar-Display, Trigger-Schalter, optional DMX oder mitgeliefertes Kabel-Fernbedienung. Maße 414×202×303 mm, Gewicht 4,5 kg. Menge vorerst mit 1 angelegt.', 30.0, 'https://www.thomann.de/de/adj_entour_faze.htm'],
+    ['MANUAL-STAIRVILLE-AF40', 'Nebel/Haze', 'Stairville AF-40', 'Kompakte Nebelmaschine mit DMX-Schnittstelle, Nebelausstoß ca. 85 m³/min, Leistung 370 W, Tank 0,25 l, Gewicht 2,1 kg. Wie bei allen Nebelmaschinen: 1 Liter Fluid inklusive, Mehrverbrauch wird über „Nebelfluid-Nachfüllung" nachberechnet. Menge vorerst mit 1 angelegt.', 25.0, 'https://www.thomann.de/de/stairville_af_40_dmx_mini_fog_machine.htm'],
+    ['MANUAL-EUROLITE-NH20', 'Nebel/Haze', 'Eurolite NH-20 Tour Fazer', 'DMX-Dunstnebelmaschine (Hazer) im Flightcase, Tank 1,7 l, Verbrauch ca. 2,2 ml/min, Aufheizzeit ca. 1,5 Min., Wurfweite ca. 2 m. Steuerung DMX, Stand-alone, QuickDMX/W-DMX/CRMX über USB. Menge vorerst mit 1 angelegt.', 35.0, 'https://www.thomann.de/de/eurolite_nh_20_tour_fazer.htm'],
+    ['MANUAL-ADJ-ENTOURFAZE', 'Nebel/Haze', 'ADJ Entour Faze', 'Fazer/Hazer mit 450-W-Heizelement, Nebelausstoß ca. 113 m³/min, Verbrauch ca. 4,5 ml/min, Aufheizzeit ca. 45 Sek. Tank 3 l, verwendet normale Wasser-Nebelfluid. Steuerung über Menütasten/Bar-Display, Trigger-Schalter, optional DMX oder mitgeliefertes Kabel-Fernbedienung. Maße 414×202×303 mm, Gewicht 4,5 kg. Menge vorerst mit 1 angelegt.', 30.0, 'https://www.thomann.de/de/adj_entour_faze.htm'],
     ['MANUAL-APELABS-MARVELFLOOD', 'Licht', 'Ape Labs Marvel Flood', 'Akku-Flutlicht, 9 Pixel-LEDs à 18 W, Dual-Drive-Technologie (flimmerfrei), IP64. Akkulaufzeit ca. 2 Std. bei 100 % / ca. 8 Std. bei 75 % Helligkeit. Steuerung per App/Fernbedienung/Wireless-DMX (Reichweite ca. 1200 m, automatischer Signal-Repeater von Lampe zu Lampe) oder klassisch per DMX-Kabel im Dauerbetrieb. Maße 28,5×26,5×8,0 cm, Gewicht 3,7 kg.', 25.0, 'https://www.thomann.de/de/ape_labs_marvel_flood.htm', 2],
     // Preis von Markus fest vorgegeben (Index 8 = day_rate), daher keine reine Empfehlung
     ['MANUAL-JBL-PARTYBOX', 'Lautsprecher', 'JBL PartyBox 100 / 110', 'Mobiler Akku-Partylautsprecher mit Lichteffekten, 160 W, bis zu 12 Std. Akkulaufzeit, Bluetooth und AUX/USB, Mikrofon-/Gitarreneingang, spritzwassergeschützt (110er: IPX4). Maße ca. 29,5×57×30 cm, Gewicht ca. 11 kg. Bestand gemischt aus PartyBox 100 und 110 – praktisch baugleich in Klang und Bedienung.', 25.0, 'https://www.thomann.de/de/jbl_partybox_110.htm', 3, false, 25.0],
@@ -977,6 +978,17 @@ function reAddCorePositions(PDO $p): void {
       values (?,?,?,?,?,?,?,?,?,?,?,?)")
       ->execute([uuid(), $sku, 0, $cat, $n, $d, $u, $kind, $pr, '[]', 1, now()]);
   }
+}
+
+/* Technikkategorien neu zugeschnitten: Piano -> Instrumente, Rigging/Stativ -> Zubehör
+   (zusammengelegt), Signal -> Mischpult (zusammengelegt), Effekt -> Nebel/Haze. Nur die
+   Kategorie-Beschriftung ändert sich, die Artikel selbst bleiben unverändert. Idempotent
+   (wirkt nur auf Artikel, die noch die alte Kategorie tragen). */
+function renameEquipmentCategories(PDO $p): void {
+  $map = ['Piano' => 'Instrumente', 'Rigging' => 'Zubehör', 'Stativ' => 'Zubehör',
+    'Signal' => 'Mischpult', 'Effekt' => 'Nebel/Haze'];
+  $st = $p->prepare('update equipment set category = ? where category = ?');
+  foreach ($map as $old => $new) $st->execute([$new, $old]);
 }
 
 /* Markus duzt auf der ganzen Seite durchgehend - die Angebots-/Rechnungs-Standardtexte
@@ -1204,7 +1216,7 @@ function seed(PDO $p): void {
   foreach ($packs as [$s,$t,$sub,$f])
     $ins('packages', ['sort'=>$s,'title'=>$t,'subtitle'=>$sub,'features'=>$f,'public'=>1]);
 
-  $ins('equipment', ['sort'=>1,'name'=>'Nebelmaschine klein','slug'=>'nebelmaschine-klein','category'=>'Effekt',
+  $ins('equipment', ['sort'=>1,'name'=>'Nebelmaschine klein','slug'=>'nebelmaschine-klein','category'=>'Nebel/Haze',
     'description'=>'Kompakte Nebelmaschine inkl. Fluid – ideal für Partykeller und kleine Räume.','day_rate'=>25,'qty_total'=>1]);
 
   /* Echte Kundenstimmen (Original-Zitate von der bisherigen Website) */
