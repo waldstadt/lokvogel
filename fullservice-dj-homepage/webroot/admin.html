@@ -171,7 +171,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .cal-legend .l-priv i{border-color:#b08fd8;background:rgba(176,143,216,.14)}
 
 /* Items-Editor */
-.it-row{display:grid;grid-template-columns:36px 1fr 70px 60px 90px 90px 28px;gap:6px;align-items:center;margin-bottom:6px}
+.it-row{display:grid;grid-template-columns:36px 1fr 70px 100px 90px 90px 28px;gap:6px;align-items:center;margin-bottom:6px}
 .it-row input{padding:6px 8px;font-size:11px}
 .it-head{font-size:9px;color:var(--gl);text-transform:uppercase}
 .totals{margin-top:12px;text-align:right;font-size:12px}
@@ -1425,8 +1425,14 @@ function rentDays(b){
   if(!b.end_date||b.end_date<=b.event_date)return 1;
   return Math.round((new Date(b.end_date)-new Date(b.event_date))/86400000)+1;
 }
-function rentPrice(eq,b){
-  var days=rentDays(b),base=Number(eq.day_rate)||0,defs=(S.defaults||{});
+function rentPrice(eq,b){return equipTieredPrice(eq,rentDays(b))}
+/* Tagesstaffel-Preis für EINEN Artikel über N Miettage (Tag 1 voller Preis, Folgetage
+   gestaffelt nach Artikel- bzw. globalen Standardwerten). Wird sowohl für Technik
+   zugeordnet zu Buchungen (rentPrice) als auch beim manuellen Einfügen eines
+   Technikartikels ins Angebot/die Rechnung (insertProduct) genutzt. */
+function equipTieredPrice(eq,days){
+  var base=Number(eq.day_rate)||0,defs=(S.defaults||{});
+  days=Math.max(1,Number(days)||1);
   var followupPct=Number(eq.followup_pct!=null?eq.followup_pct:50);
   var weekPct=Number(eq.tier_week_pct!=null?eq.tier_week_pct:(defs.tier_week_pct!=null?defs.tier_week_pct:30));
   var twoWeekPct=Number(eq.tier_2week_pct!=null?eq.tier_2week_pct:(defs.tier_2week_pct!=null?defs.tier_2week_pct:20));
@@ -1872,6 +1878,12 @@ function setDocStatus(st){
 }
 function refreshDocs(){api('documents?select=*,customers(*)&order=created_at.desc').then(function(r){CACHE.documents=r||[];renderQuotes();renderInv();renderDash()})}
 
+var UNIT_OPTIONS=['Stk.','Set','Tag','Tage','Std.','Kilometer','Liter','pausch.'];
+function unitOptionsHtml(cur){
+  var list=UNIT_OPTIONS.slice();
+  if(cur&&list.indexOf(cur)===-1)list.unshift(cur);
+  return list.map(function(u){return '<option'+(u===cur?' selected':'')+'>'+esc(u)+'</option>'}).join('');
+}
 function renderItems(){
   var locked=docLockedJs(curDoc);
   document.getElementById('docItems').innerHTML=curItems.map(function(it,i){
@@ -1880,7 +1892,7 @@ function renderItems(){
     '<div'+(locked?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':'grab')+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked?'':'<span style="opacity:.55">⠿</span>')+(i+1)+'</div>'+
     '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
     '<input type="number" step="0.5" value="'+it.qty+'" oninput="itSet('+i+',\'qty\',this.value)">'+
-    '<input value="'+esc(it.unit||'Stk.')+'" oninput="itSet('+i+',\'unit\',this.value)">'+
+    '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
     '<input type="number" step="0.01" value="'+it.unit_price+'" oninput="itSet('+i+',\'unit_price\',this.value)">'+
     '<input value="'+euro(sum)+'" disabled class="num">'+
     (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)">✕</a>')+'</div>'+
@@ -4062,7 +4074,7 @@ function openProdModal(id){
     '<label>Name *</label><input id="pName" value="'+esc(p.name||'')+'">'+
     '<label>Art</label><select id="pKind"><option value="artikel"'+(p.kind!=='dienstleistung'?' selected':'')+'>Artikel</option><option value="dienstleistung"'+(p.kind==='dienstleistung'?' selected':'')+'>Dienstleistung</option></select>'+
     '<label>Beschreibung (erscheint als Erklärung im Kundenportal)</label><textarea id="pDesc">'+esc(p.description||'')+'</textarea>'+edBtn('pDesc')+
-    '<div class="grid2"><div><label>Einheit</label><input id="pUnit" value="'+esc(p.unit||'Stk.')+'"></div>'+
+    '<div class="grid2"><div><label>Einheit</label><select id="pUnit">'+unitOptionsHtml(p.unit||'Stk.')+'</select></div>'+
     '<div><label>Preis netto (€) – bei Sets leer = Summe der Bestandteile</label><input type="number" step="0.01" id="pPrice" value="'+(p.price_net!=null?p.price_net:'')+'"></div></div>'+
     '<label>Set-Bestandteile (eine Zeile je Artikelnummer: Artikelnummer | Menge) – zieht auch aus dem Technikkatalog, leer = normaler Artikel</label>'+
     '<textarea id="pBundle" style="min-height:70px;font-size:11px" placeholder="DJ-100 | 1&#10;TON-200 | 1">'+esc(bundleLines)+'</textarea>'+
@@ -4125,9 +4137,15 @@ function renderPicker(){
 function insertProduct(key){
   if(key.indexOf('e:')===0){
     var eq=(CACHE.equipment||[]).find(function(x){return x.id===key.slice(2)});if(!eq)return;
+    var linkedBooking=curDoc&&curDoc.booking_id?(CACHE.bookings||[]).find(function(b){return b.id===curDoc.booking_id}):null;
+    var defDays=linkedBooking?rentDays(linkedBooking):1;
+    var menge=Number(prompt('Menge (Stückzahl)?',String(eq.min_qty||1)))||1;
+    var tage=Number(prompt('Für wie viele Miettage?',String(defDays)))||1;
+    var price=equipTieredPrice(eq,tage);
     curItems.push({pos:curItems.length+1,description:eq.name,note:eq.description||'',
-      qty:1,unit:'Tag',unit_price:Number(eq.day_rate)||0});
-    closeModal();renderItems();toast('„'+eq.name+'" eingefügt ✓');
+      qty:menge,unit:tage>1?'Stk. ('+tage+' Tage)':'Stk.',unit_price:price});
+    closeModal();renderItems();
+    toast('„'+eq.name+'" eingefügt ('+menge+' Stk.'+(tage>1?', '+tage+' Tage gestaffelt':'')+') ✓');
     return;
   }
   var p=(CACHE.products||[]).find(function(x){return x.id===(key.indexOf('p:')===0?key.slice(2):key)});if(!p)return;

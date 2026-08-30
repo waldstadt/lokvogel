@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 56;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 57;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -507,6 +507,7 @@ function upgrade(PDO $p): void {
   if ($v < 54) mergeOldCatalogPdf($p);
   if ($v < 55) removePlaceholderProducts($p);
   if ($v < 56) reAddCorePositions($p);
+  if ($v < 57) fixSieToDuTexts($p);
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -963,6 +964,35 @@ function reAddCorePositions(PDO $p): void {
   }
 }
 
+/* Markus duzt auf der ganzen Seite durchgehend - die Angebots-/Rechnungs-Standardtexte
+   und die Firmenfeier-Mailvorlage waren versehentlich noch im Sie-Ton. Ersetzt die
+   Texte NUR, wenn sie noch exakt dem alten Sie-Standard entsprechen (eigene Anpassungen
+   von Markus bleiben unangetastet). */
+function fixSieToDuTexts(PDO $p): void {
+  $cfg = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
+  $changed = false;
+  if (($cfg['quote_intro'] ?? null) === 'vielen Dank für Ihre Anfrage. Gerne biete ich Ihnen an:') {
+    $cfg['quote_intro'] = 'vielen Dank für eure Anfrage. Gerne biete ich euch an:'; $changed = true;
+  }
+  if (($cfg['invoice_outro'] ?? null) === 'Bitte überweisen Sie den Betrag unter Angabe der Rechnungsnummer auf das unten genannte Konto.') {
+    $cfg['invoice_outro'] = 'Bitte überweist den Betrag unter Angabe der Rechnungsnummer auf das unten genannte Konto.'; $changed = true;
+  }
+  if ($changed) {
+    $p->prepare("update settings set value=?, updated_at=? where key='defaults'")
+      ->execute([json_encode($cfg, JSON_UNESCAPED_UNICODE), now()]);
+  }
+  $old = ['subject' => 'Ihre Veranstaltung am {datum} – Rückmeldung von DJ Lauschgift',
+    'body' => "Guten Tag {name},\n\nvielen Dank für Ihre Anfrage zu Ihrer Firmenveranstaltung am {datum}.\n\nDer Termin ist bei mir aktuell noch verfügbar. Gerne stimme ich mich kurz mit Ihnen (oder Ihrer Eventplanung) zum Ablauf ab – vom dezenten Empfang über Ton für Redebeiträge bis zum Partyprogramm. Auf dieser Basis erhalten Sie ein transparentes Angebot mit klar ausgewiesenen Posten für Dauer und Technik.\n\nFür Veranstaltungen unter der Woche oder tagsüber kalkuliere ich übrigens spürbar günstiger.\n\nWann darf ich Sie am besten anrufen?\n\nMit freundlichen Grüßen\nMarkus Jankowski – DJ Lauschgift\n\nPS: Stimmen bisheriger Kunden finden Sie hier: {bewertungen}"];
+  $st = $p->prepare("select id from email_templates where subject=? and body=?");
+  $st->execute([$old['subject'], $old['body']]);
+  $id = $st->fetchColumn();
+  if ($id) {
+    $new = ['subject' => 'Deine Veranstaltung am {datum} – Rückmeldung von DJ Lauschgift',
+      'body' => "Hallo {name},\n\nvielen Dank für deine Anfrage zu eurer Firmenveranstaltung am {datum}.\n\nDer Termin ist bei mir aktuell noch verfügbar. Gerne stimme ich mich kurz mit dir (oder eurer Eventplanung) zum Ablauf ab – vom dezenten Empfang über Ton für Redebeiträge bis zum Partyprogramm. Auf dieser Basis bekommst du ein transparentes Angebot mit klar ausgewiesenen Posten für Dauer und Technik.\n\nFür Veranstaltungen unter der Woche oder tagsüber kalkuliere ich übrigens spürbar günstiger.\n\nWann darf ich dich am besten anrufen?\n\nViele Grüße\nMarkus Jankowski – DJ Lauschgift\n\nPS: Stimmen bisheriger Kunden findest du hier: {bewertungen}"];
+    $p->prepare("update email_templates set subject=?, body=? where id=?")->execute([$new['subject'], $new['body'], $id]);
+  }
+}
+
 function friendsDdl(): string {
   return "create table if not exists friends (id text primary key, sort integer default 0,
     name text not null, category text, description text, website text,
@@ -1116,7 +1146,7 @@ function seed(PDO $p): void {
     ['company', '{"name":"DJ Lauschgift","owner":"Markus Jankowski","street":"Büttmecker Weg 35c","zip_city":"58675 Hemer","phone":"01523 6439373","email":"lauschgiftmarkus@gmail.com","website":"https://lauschgift.net","tax_id":"","vat_id":"","iban":"","bic":"","bank":"","small_business":false}'],
     ['numbering', '{"angebot":{"prefix":"AN-","next":1},"rechnung":{"prefix":"RE-","next":1},"lieferschein":{"prefix":"LS-","next":1},"year_in_number":true}'],
     ['rental_contract', json_encode(['text' => rentalContractDefault()], JSON_UNESCAPED_UNICODE)],
-    ['defaults', '{"tax_rate":19,"payment_days":14,"quote_valid_days":30,"quote_intro":"vielen Dank für Ihre Anfrage. Gerne biete ich Ihnen an:","invoice_outro":"Bitte überweisen Sie den Betrag unter Angabe der Rechnungsnummer auf das unten genannte Konto."}'],
+    ['defaults', '{"tax_rate":19,"payment_days":14,"quote_valid_days":30,"quote_intro":"vielen Dank für eure Anfrage. Gerne biete ich euch an:","invoice_outro":"Bitte überweist den Betrag unter Angabe der Rechnungsnummer auf das unten genannte Konto."}'],
   ] as [$k, $v]) $p->prepare('insert into settings (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
 
   foreach ([
@@ -1236,21 +1266,21 @@ Viele Grüße
 Markus Jankowski – DJ Lauschgift
 
 PS: Was andere über ihre Feier mit mir sagen, lest ihr hier: {bewertungen}"],
-    [3, 'Firmenfeier – Erstantwort', 'Ihre Veranstaltung am {datum} – Rückmeldung von DJ Lauschgift',
-"Guten Tag {name},
+    [3, 'Firmenfeier – Erstantwort', 'Deine Veranstaltung am {datum} – Rückmeldung von DJ Lauschgift',
+"Hallo {name},
 
-vielen Dank für Ihre Anfrage zu Ihrer Firmenveranstaltung am {datum}.
+vielen Dank für deine Anfrage zu eurer Firmenveranstaltung am {datum}.
 
-Der Termin ist bei mir aktuell noch verfügbar. Gerne stimme ich mich kurz mit Ihnen (oder Ihrer Eventplanung) zum Ablauf ab – vom dezenten Empfang über Ton für Redebeiträge bis zum Partyprogramm. Auf dieser Basis erhalten Sie ein transparentes Angebot mit klar ausgewiesenen Posten für Dauer und Technik.
+Der Termin ist bei mir aktuell noch verfügbar. Gerne stimme ich mich kurz mit dir (oder eurer Eventplanung) zum Ablauf ab – vom dezenten Empfang über Ton für Redebeiträge bis zum Partyprogramm. Auf dieser Basis bekommst du ein transparentes Angebot mit klar ausgewiesenen Posten für Dauer und Technik.
 
 Für Veranstaltungen unter der Woche oder tagsüber kalkuliere ich übrigens spürbar günstiger.
 
-Wann darf ich Sie am besten anrufen?
+Wann darf ich dich am besten anrufen?
 
-Mit freundlichen Grüßen
+Viele Grüße
 Markus Jankowski – DJ Lauschgift
 
-PS: Stimmen bisheriger Kunden finden Sie hier: {bewertungen}"],
+PS: Stimmen bisheriger Kunden findest du hier: {bewertungen}"],
     [4, 'Technik-Anfrage – Erstantwort', 'Eure Technik-Anfrage – Lauschgift Veranstaltungstechnik',
 "Hallo {vorname},
 
