@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 65;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 66;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -550,6 +550,7 @@ function upgrade(PDO $p): void {
     try { seedCampaignPages($p); } catch (PDOException $e) {}
   }
   if ($v < 65) { try { campaignBackgroundMusicUpdate($p); } catch (PDOException $e) {} }
+  if ($v < 66) seedExtraTemplates($p);   // neue Absage-Vorlagen nachziehen (idempotent per Name)
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -865,6 +866,15 @@ function seedExtraTemplates(PDO $p): void {
       "Hallo {vorname},\n\ndanke für das gute Gespräch! Euer Angebot ist fertig und wartet hier auf euch:\n{link}\n\nIhr könnt es direkt online ansehen, Fragen zu einzelnen Positionen stellen oder mit einem Klick annehmen. Login ist eure Postleitzahl.\n\nWenn euch etwas nicht passt: sagt es mir einfach – wir biegen das hin.\n\nViele Grüße\nMarkus"],
     [92, 'Workshop-Bestätigung (Zahlung eingegangen)', 'Dein Platz ist fix!',
       "Hallo {vorname},\n\ndeine Zahlung ist da – damit ist dein Workshop-Platz verbindlich reserviert!\n\nWann: {datum}\nWo: Lager Hemer, Büttmecker Weg 35c\n\nBring gern dein eigenes Equipment-Problem mit – wir schauen uns echte Fälle an. Getränke gehen auf mich.\n\nBis bald!\nMarkus"],
+    /* Absage-Bausteine: Jede Absage soll persönlich klingen und möglichst in eine
+       Vermittlung münden - eine unpassende Anfrage ist trotzdem ein Mensch, der
+       gerade Musik für seine Feier sucht. */
+    [93, 'Absage: Budget passt nicht', 'Zu eurer Anfrage für den {datum}',
+      "Hallo {vorname},\n\ndanke, dass ihr an mich gedacht habt – und danke, dass ihr euer Budget offen dazugeschrieben habt. Das macht es für uns beide einfacher.\n\nEhrlich gesagt komme ich in dem Rahmen nicht raus: Bei mir hängen an einem Abend Anfahrt, Auf- und Abbau, die Technik und der Abend selbst dran, deshalb liege ich deutlich darüber. Ich will euch nichts verkaufen, das sich für euch nicht richtig anfühlt.\n\nWas ich euch aber anbieten kann:\n– Feiert ihr unter der Woche oder tagsüber, sieht die Rechnung ganz anders aus. Sagt mir einfach Bescheid, dann rechne ich das durch.\n– Wenn der Termin feststeht: Ich kenne Kollegen, die günstiger einsteigen und trotzdem gut sind. Sagt kurz Bescheid, dann frage ich für euch herum.\n\nSo oder so: Ich drücke euch die Daumen, dass es ein schöner Abend wird.\n\nViele Grüße\nMarkus"],
+    [94, 'Absage: Anfahrt zu weit', 'Eure Feier am {datum} in {ort}',
+      "Hallo {vorname},\n\nschön, dass ihr euch gemeldet habt! Leider muss ich ehrlich sein: {ort} ist von Hemer aus so weit weg, dass Anfahrt und Übernachtung euren Preis deutlich nach oben treiben würden – und dafür bekommt ihr vor Ort jemanden, der genauso gut ist, ohne dass ihr meine Fahrerei mitbezahlt.\n\nWenn ihr mögt, frage ich in meinem Kollegen-Netzwerk nach jemandem in eurer Ecke. Schreibt mir dafür kurz, was für eine Feier es wird und was euch musikalisch wichtig ist – dann melde ich mich mit Vorschlägen.\n\nUnd falls ihr doch unbedingt mich wollt: Sagt es, dann rechne ich es euch einmal ehrlich durch, damit ihr die Zahl kennt.\n\nViele Grüße\nMarkus"],
+    [95, 'Absage: musikalisch nicht mein Ding', 'Zu eurer Anfrage für den {datum}',
+      "Hallo {vorname},\n\ndanke für eure Anfrage und dafür, dass ihr so klar geschrieben habt, was ihr musikalisch wollt. Genau deshalb sage ich euch offen: Das ist nicht mein Zuhause. Ich könnte den Abend irgendwie über die Bühne bringen, aber ihr hättet nicht den DJ, den diese Feier verdient – und ich wäre nicht der, der ich sonst bin.\n\nIhr habt euch etwas Bestimmtes vorgestellt, und dafür gibt es Leute, die genau dafür brennen. Wenn ihr wollt, frage ich in meinem Netzwerk nach jemandem, der das wirklich draufhat.\n\nSchreibt mir einfach kurz, ob ich das machen soll.\n\nViele Grüße\nMarkus"],
   ];
   foreach ($extra as [$s, $n, $sub, $b]) {
     $c = $p->prepare('select count(*) from email_templates where name = ?');
@@ -1083,6 +1093,22 @@ function planPathSet(array &$data, string $path, $value): void {
   $cur[$last] = $value;
 }
 
+/* Zerlegt den eingegebenen Namen in Vor-/Nachname. Anfragen kommen oft als Paar oder
+   Familie herein - "Familie Brinkmann" darf nicht zu einer Anrede "Hallo Familie,"
+   führen und "Lena und Tobias Vogt" nicht zum Nachnamen "und Tobias Vogt". */
+function splitPersonName(string $name): array {
+  $name = trim(preg_replace('/\s+/u', ' ', $name));
+  if ($name === '') return ['', ''];
+  $words = explode(' ', $name);
+  $last = end($words);
+  if (preg_match('/^(Familie|Fam\.|Eheleute)\b/iu', $name))
+    return [$name, $last];                       // Anrede: "Hallo Familie Brinkmann,"
+  if (preg_match('/\s(und|&|\+)\s/iu', $name) && count($words) > 2)
+    return [implode(' ', array_slice($words, 0, -1)), $last];  // "Lena und Tobias" / "Vogt"
+  if (count($words) === 1) return [$name, ''];
+  return [$words[0], implode(' ', array_slice($words, 1))];
+}
+
 function autoInquiryPlanner(PDO $p, array $row): void {
   if (empty($row['email'])) return;
   $email = mb_substr(strtolower(trim((string)$row['email'])), 0, 160);
@@ -1090,16 +1116,24 @@ function autoInquiryPlanner(PDO $p, array $row): void {
   $st->execute([$email]);
   $custId = $st->fetchColumn();
   if (!$custId) {
-    $parts = preg_split('/\s+/', trim((string)$row['name']), 2);
+    [$vorname, $nachname] = splitPersonName((string)$row['name']);
     $custId = uuid();
     $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, phone, source, created_at, updated_at)
       values (?,?,?,?,?,?,?,?,?,?)')
-      ->execute([$custId, 'privat', 'lead', $parts[0] ?: $row['name'], $parts[1] ?? '', $email,
+      ->execute([$custId, 'privat', 'lead', $vorname ?: $row['name'], $nachname, $email,
         $row['phone'] ?? null, 'Homepage', now(), now()]);
   }
   $p->prepare('update inquiries set customer_id = ? where id = ?')->execute([$custId, $row['id']]);
   if (($row['event_type'] ?? '') === 'Technik-Check bestehende Anlage') autoTechCheckInvite($p, $custId, $row);
   if (empty($row['event_date'])) return;
+  /* Termine in der Vergangenheit (Tippfehler im Datumsfeld) erzeugen keine Buchung -
+     sonst hängt ein Geisterauftrag dauerhaft in der Liste. Die Anfrage selbst bleibt. */
+  if ($row['event_date'] < gmdate('Y-m-d')) return;
+  /* Schickt jemand dieselbe Anfrage mehrfach ab (Ungeduld, Zurück-Taste), darf daraus
+     nicht jedes Mal eine weitere Buchung samt Planer entstehen. */
+  $dupe = $p->prepare("select count(*) from bookings where customer_id = ? and event_date = ? and status = 'anfrage'");
+  $dupe->execute([$custId, $row['event_date']]);
+  if ((int)$dupe->fetchColumn()) return;
   $guests = is_numeric($row['guests'] ?? null) ? (int)$row['guests'] : null;
   $basics = array_filter([
     'venue_name' => $row['location'] ?? null, 'venue_address' => $row['location'] ?? null,
@@ -1645,7 +1679,7 @@ function campaignPageRows(): array {
      ['icon' => 'mic', 'title' => 'Üben an echter Technik',
       'text' => 'Wir arbeiten am richtigen Material, nicht an Folien: Mikrofon anschließen, Pegel einstellen, eine Rückkopplung absichtlich provozieren und wieder wegbekommen. Fehler machen ist hier ausdrücklich Teil des Programms – dafür ist es ein Workshop und keine Vorlesung.'],
      ['icon' => 'home', 'title' => 'Auf Wunsch bei euch vor Ort',
-      'text' => 'Am meisten bringt der Workshop an der Anlage, mit der ihr nachher wirklich arbeitet. Ich komme mit dem Programm auch zu euch ins Vereinsheim oder Gemeindehaus – dann üben alle an genau den Knöpfen, die sie am Festabend drehen. Ab etwa vier Leuten lohnt sich das.'],
+      'text' => 'Am meisten bringt der Workshop an der Anlage, mit der ihr nachher wirklich arbeitet. Ich komme mit dem Programm auch zu euch ins Vereinsheim oder Gemeindehaus – dann üben alle an genau den Knöpfen, die sie am Festabend drehen. Ab drei Leuten lohnt sich das.'],
    ],
    'kicker2' => 'Im Detail', 'h2_2' => 'So laufen die Workshops',
    'features' => [
@@ -2201,8 +2235,21 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       else { $q['public'] = 'eq.true'; }
       if ($t === 'equipment') { $q['status'] = 'eq.aktiv'; }
     } elseif ($method === 'POST' && $t === 'inquiries') {
+      /* Spam-Bremse ohne IP-Speicherung (die Datenschutzerklärung sagt zu, dass keine
+         IP-Adressen verarbeitet werden):
+         1. Honigtopf-Feld "website" - für Menschen unsichtbar, Bots füllen es aus.
+            Antwort trotzdem freundlich, damit ein Bot nicht lernt, was ihn verraten hat.
+         2. Drossel je E-Mail-Adresse gegen Dauerfeuer aufs Formular. */
+      if (trim((string)(is_array($body) ? ($body['website'] ?? '') : '')) !== '')
+        out(['ok' => true], 201);
       $row = array_intersect_key(is_array($body) ? $body : [], array_flip(INQUIRY_FIELDS));
       if (empty($row['name'])) fail('Name erforderlich.', 400);
+      if (!empty($row['email'])) {
+        $rl = $p->prepare("select count(*) from inquiries where lower(email) = ? and created_at > ?");
+        $rl->execute([strtolower(trim((string)$row['email'])), gmdate('Y-m-d\TH:i:s\Z', time() - 600)]);
+        if ((int)$rl->fetchColumn() >= 3)
+          fail('Deine Anfrage ist schon bei mir angekommen – ich melde mich in Kürze. Wenn es eilt, ruf gern direkt an.', 429);
+      }
       /* E-Mail serverseitig validieren: verhindert, dass krude Zeichenketten gespeichert und
          später im Backoffice weiterverarbeitet werden (Defense-in-Depth gegen Attribut-Ausbruch). */
       if (!empty($row['email']) && !filter_var($row['email'], FILTER_VALIDATE_EMAIL))
@@ -2484,6 +2531,10 @@ function workshopInvoice(PDO $p, string $signupId): array {
   $st->execute([$signupId]);
   $s = $st->fetch();
   if (!$s) return ['ok' => false, 'reason' => 'Anmeldung nicht gefunden.'];
+  /* Nur für echte Teilnehmer: Auf der Warteliste steht die Zusage "bezahlt wird erst,
+     wenn du wirklich einen Platz hast" - eine Rechnung dorthin wäre ein Wortbruch. */
+  if (($s['status'] ?? '') !== 'angemeldet')
+    return ['ok' => false, 'reason' => 'Für Wartelisten- und stornierte Anmeldungen wird keine Rechnung erstellt – erst nach dem Nachrücken.'];
   if ($s['invoice_id']) {
     $n = $p->prepare('select number from documents where id = ?'); $n->execute([$s['invoice_id']]);
     return ['ok' => true, 'number' => (string)$n->fetchColumn(), 'mailed' => false, 'existing' => true];
@@ -2537,7 +2588,9 @@ function workshopInvoice(PDO $p, string $signupId): array {
     $payDays = (int)($defs['payment_days'] ?? 14);
     $due = gmdate('Y-m-d', time() + $payDays * 86400);
     if ($s['w_date'] && $s['w_date'] > gmdate('Y-m-d') && $s['w_date'] < $due) $due = $s['w_date'];
-    $dTitle = $s['w_title'] . ' am ' . $s['w_date'];
+    /* Deutsches Datumsformat: Auf einer Kundenrechnung hat "2026-10-15" nichts zu suchen. */
+    $wDateDe = $s['w_date'] ? date('d.m.Y', strtotime((string)$s['w_date'])) : '';
+    $dTitle = $s['w_title'] . ($wDateDe ? ' am ' . $wDateDe : '');
     $docId = uuid(); $token = bin2hex(random_bytes(24));
     $p->prepare('insert into documents (id, share_token, doc_type, number, customer_id, status, doc_date, due_date,
         tax_rate, is_small_business, intro_text, outro_text, total_net, total_tax, total_gross, created_at)
@@ -2560,13 +2613,13 @@ function workshopInvoice(PDO $p, string $signupId): array {
   /* Mail mit Portal-Link */
   $portal = baseUrl() . '/portal.html?a=' . $token;
   $bodyTxt = "Hallo " . ($parts[0] ?? $s['name']) . ",\n\n" .
-    "danke für deine Anmeldung zum Workshop „" . $s['w_title'] . "“ am " . $s['w_date'] . "!\n\n" .
+    "danke für deine Anmeldung zum Workshop „" . $s['w_title'] . "“ am " . $wDateDe . "!\n\n" .
     "Hier ist deine Rechnung $number (" . number_format($gross, 2, ',', '.') . " €):\n$portal\n" .
     "Login: deine Postleitzahl ($custZip). Dort kannst du die Rechnung ansehen und als PDF speichern.\n\n" .
     "Mit Zahlungseingang ist dein Platz verbindlich reserviert. Zahlbar bis $due per Überweisung – die Bankverbindung steht auf der Rechnung.\n\n" .
     "Bis bald im Workshop!\n" . ($comp['owner'] ?? '') . "\n" . ($comp['name'] ?? '') .
     ($comp['phone'] ?? '' ? "\n" . $comp['phone'] : '');
-  $mailed = sendMailSafe((string)$s['email'], "Rechnung $number – dein Workshop-Platz am " . $s['w_date'], $bodyTxt);
+  $mailed = sendMailSafe((string)$s['email'], "Rechnung $number – dein Workshop-Platz am " . $wDateDe, $bodyTxt);
   $p->prepare('update documents set status = ?, sent_at = ? where id = ?')
     ->execute([$mailed ? 'versendet' : 'entwurf', $mailed ? now() : null, $docId]);
   $p->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, created_at)
@@ -3152,7 +3205,18 @@ function handlePortal(string $path, string $method, $body): never {
     $name = mb_substr(trim((string)($body['name'] ?? '')), 0, 120);
     $email = mb_substr(trim((string)($body['email'] ?? '')), 0, 160);
     if ($name === '' || $email === '') fail('Name und E-Mail erforderlich.');
-    $seats = max(1, min(5, (int)($body['seats'] ?? 1)));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL))
+      fail('Bitte eine gültige E-Mail-Adresse angeben – sonst kommt die Bestätigung nicht an.');
+    /* Dublette zuerst prüfen: Sonst bekommt jemand, der schon angemeldet ist, bei einem
+       inzwischen vollen Termin fälschlich "ausgebucht" statt des richtigen Hinweises. */
+    $dup = $p->prepare("select count(*) from workshop_signups where workshop_id = ? and email = ? and status in ('angemeldet','warteliste')");
+    $dup->execute([$w['id'], $email]);
+    if ((int)$dup->fetchColumn()) fail('Mit dieser E-Mail-Adresse bist du für diesen Termin schon angemeldet bzw. auf der Warteliste.', 409);
+    /* Nicht stillschweigend kürzen: Eine gekürzte Platzzahl hieße auch eine Rechnung
+       über den falschen Betrag. Größere Gruppen bekommen lieber einen eigenen Termin. */
+    $seats = max(1, (int)($body['seats'] ?? 1));
+    if ($seats > 5)
+      fail('Mehr als 5 Plätze kann ich hier nicht auf einmal buchen. Schreib mir kurz – für eine ganze Gruppe machen wir am besten einen eigenen Termin.');
     $free = max(0, (int)$w['capacity'] - (int)$w['booked']);
     $wantWaitlist = !empty($body['waitlist']);
     if ($seats > $free && !$wantWaitlist)
@@ -3161,11 +3225,10 @@ function handlePortal(string $path, string $method, $body): never {
     $street = mb_substr(trim((string)($body['street'] ?? '')), 0, 160);
     $zip = mb_substr(trim((string)($body['zip'] ?? '')), 0, 10);
     $city = mb_substr(trim((string)($body['city'] ?? '')), 0, 80);
-    if ((float)($w['price_net'] ?? 0) > 0 && ($street === '' || $zip === '' || $city === ''))
+    /* Auf der Warteliste wird noch nichts berechnet ("bezahlt wird erst, wenn du wirklich
+       einen Platz hast") - die Anschrift wird deshalb erst beim Nachrücken gebraucht. */
+    if ($status === 'angemeldet' && (float)($w['price_net'] ?? 0) > 0 && ($street === '' || $zip === '' || $city === ''))
       fail('Bitte Anschrift angeben (Straße, PLZ, Ort) – sie wird für die Rechnung benötigt.');
-    $dup = $p->prepare("select count(*) from workshop_signups where workshop_id = ? and email = ? and status in ('angemeldet','warteliste')");
-    $dup->execute([$w['id'], $email]);
-    if ((int)$dup->fetchColumn()) fail('Mit dieser E-Mail-Adresse bist du für diesen Termin schon angemeldet bzw. auf der Warteliste.', 409);
     $sid = uuid();
     $p->prepare('insert into workshop_signups (id, workshop_id, name, email, phone, seats, message,
         q_music, q_challenge, q_goal, street, zip, city, status, created_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
@@ -3310,9 +3373,16 @@ function handlePortal(string $path, string $method, $body): never {
     $row = $st->fetch();
     if ($row && $row['confirmed_at'] && !$row['unsubscribed_at'])
       out(['ok' => true, 'already' => true]);
-    $token = bin2hex(random_bytes(16));
+    /* Vorhandenes Bestätigungs-Token behalten, damit ein bereits verschickter Link
+       gültig bleibt (sonst entwertet eine zweite Anmeldung die erste Mail). */
+    $token = ($row && !empty($row['token'])) ? (string)$row['token'] : bin2hex(random_bytes(16));
     if ($row) {
-      $p->prepare('update newsletter set token=?, name=coalesce(nullif(?,\'\'), name), source=?, unsubscribed_at=null where id=?')
+      /* Wichtig: Eine Abmeldung wird hier NICHT aufgehoben. Wer sich erneut anmeldet,
+         muss den Bestätigungslink erneut anklicken - sonst könnte jeder Dritte eine
+         fremde, abgemeldete Adresse allein durch Absenden des Formulars reaktivieren. */
+      $p->prepare('update newsletter set token=?, name=coalesce(nullif(?,\'\'), name), source=?,
+          confirmed_at = case when unsubscribed_at is not null then null else confirmed_at end
+        where id=?')
         ->execute([$token, $name, $source, $row['id']]);
     } else {
       $p->prepare('insert into newsletter (id, email, name, token, source, created_at) values (?,?,?,?,?,?)')
@@ -3329,13 +3399,18 @@ function handlePortal(string $path, string $method, $body): never {
       "Falls du das nicht warst, ignoriere diese Mail einfach – dann passiert nichts.\n\nBis bald!\nMarkus");
     out(['ok' => true, 'mailed' => $mailed], 201);
   }
-  if (preg_match('#^portal/newsletter/(confirm|unsubscribe)/([a-f0-9]{32})$#', $path, $m) && $method === 'GET') {
+  /* Token bewusst großzügig entgegennehmen: Ein im Mailprogramm abgeschnittener Link
+     soll die freundliche "Link ungültig"-Seite zeigen und nicht eine nackte
+     JSON-Fehlermeldung aus dem Router. */
+  if (preg_match('#^portal/newsletter/(confirm|unsubscribe)/([A-Za-z0-9]{1,64})$#', $path, $m) && $method === 'GET') {
     $st = $p->prepare('select * from newsletter where token = ?');
     $st->execute([$m[2]]);
     $row = $st->fetch();
     $ok = false; $title = 'Link ungültig'; $text = 'Dieser Link ist nicht mehr gültig. Melde dich einfach neu an – oder schreib mir kurz.';
     if ($row && $m[1] === 'confirm') {
-      if (!$row['confirmed_at']) {
+      /* Auch nach einer früheren Abmeldung wieder aktivieren - die Anmeldung selbst
+         hebt die Abmeldung nicht mehr auf, erst dieser Klick tut es. */
+      if (!$row['confirmed_at'] || $row['unsubscribed_at']) {
         $p->prepare('update newsletter set confirmed_at=?, unsubscribed_at=null where id=?')->execute([now(), $row['id']]);
         notifyOwner('Neuer Newsletter-Abonnent', 'E-Mail: ' . $row['email'] . ($row['name'] ? "\nName: " . $row['name'] : '') . "\nQuelle: " . ($row['source'] ?: '–'));
       }
@@ -3353,7 +3428,9 @@ function handlePortal(string $path, string $method, $body): never {
       '<div style="max-width:440px;background:#181e20;border:1px solid #26302f;border-radius:14px;padding:36px;text-align:center">' .
       '<h1 style="font-size:22px;margin:0 0 12px">' . htmlspecialchars($title) . '</h1>' .
       '<p style="color:#9aa8a3;line-height:1.6;margin:0 0 22px">' . htmlspecialchars($text) . '</p>' .
-      '<a href="technik.html#workshops" style="color:#3cc8b4;text-decoration:none;font-weight:600">' .
+      /* Absoluter Pfad: Die Seite liegt unter /api.php/portal/newsletter/…, ein relativer
+         Link würde vom Browser dorthin aufgelöst und im Router als 404 landen. */
+      '<a href="' . htmlspecialchars(baseUrl() . '/technik.html#workshops') . '" style="color:#3cc8b4;text-decoration:none;font-weight:600">' .
       ($ok && $m[1] === 'confirm' ? 'Zu den Workshop-Terminen →' : 'Zur Technik-Seite →') . '</a></div></body></html>';
     exit;
   }

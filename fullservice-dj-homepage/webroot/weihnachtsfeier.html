@@ -137,6 +137,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     <h2>Wann feiert ihr?</h2>
     <p class="lead">Kurz eintragen – ihr bekommt in der Regel innerhalb von 24 Stunden eine Antwort mit Verfügbarkeit und Preisrahmen. Unverbindlich.</p>
     <form id="inqForm">
+      <div aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden"><label for="hpWebsiteW">Website (bitte frei lassen)</label><input type="text" id="hpWebsiteW" name="website" tabindex="-1" autocomplete="off"></div>
       <div class="form-msg" id="formMsg"></div>
       <div class="row">
         <div><label for="wName">Name *</label><input type="text" id="wName" name="name" required></div>
@@ -189,6 +190,7 @@ document.getElementById('inqForm').addEventListener('submit',function(ev){
   if(f.company.value.trim())extra.push('Firma/Verein: '+f.company.value.trim());
   var data={
     name:f.name.value.trim(),email:f.email.value.trim(),phone:f.phone.value.trim(),
+    website:f.website?f.website.value:'',   /* Honigtopf gegen Bots, bleibt bei Menschen leer */
     event_type:'Weihnachtsfeier',event_date:f.event_date.value||null,
     guests:f.guests.value||null,location:f.location.value.trim(),
     message:(extra.length?extra.join('\n')+'\n':'')+f.message.value.trim()

@@ -348,7 +348,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 
   <!-- E-MAIL-VORLAGEN -->
   <div class="pg" id="pg-tpl">
-    <div class="phead"><div><div class="pt">E-Mail-Vorlagen</div><div class="ps">Antwort-Bausteine für Anfragen – Platzhalter: {vorname} {name} {datum} {anlass} {ort}</div></div>
+    <div class="phead"><div><div class="pt">E-Mail-Vorlagen</div><div class="ps">Antwort-Bausteine für Anfragen – Platzhalter: {vorname} {name} {datum} {anlass} {ort} · in Rechnungs-/Angebotsmails außerdem {nr} {betrag} {faellig} {link} {fragebogen} {bewertungen}</div></div>
       <button class="btn" onclick="openTplModal()">+ Neue Vorlage</button></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Betreff</th><th class="num">Sortierung</th></tr></thead><tbody id="tplRows"></tbody></table></div>
     <div class="card"><h3>Upsell-Extras <span class="mut sml" style="font-weight:400">– erscheinen im Kundenportal unter jedem Angebot und per „+ Extra“ im Editor</span> <button class="btn sm" style="float:right" onclick="openUpModal()">+ Extra</button></h3><div id="upList" class="sml"></div></div>
@@ -1086,7 +1086,7 @@ function openWsDetail(id){
   openModal('Teilnehmer – '+esc(w.title)+' am '+dt(w.event_date),
     '<div class="sml mut" style="margin-bottom:10px">Belegt: <b style="color:var(--wh)">'+wsBooked(id)+' / '+(w.capacity||0)+'</b>'+
     (wsWaitlist(id)?' · Warteliste: <b style="color:var(--wh)">'+wsWaitlist(id)+'</b>':'')+
-    (w.price_net!=null?' · Preis p. P.: '+euro(w.price_net):'')+' – Bezahlung vor Ort oder per Rechnung.</div>'+
+    (w.price_net!=null?' · Preis p. P.: '+euro(w.price_net):'')+' – Rechnung geht automatisch per Mail raus.</div>'+
     (sg.length?('<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Kontakt</th><th class="num">Plätze</th><th>Antworten</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>')
       :'<span class="mut">Noch keine Anmeldungen.</span>'));
 }
@@ -1102,7 +1102,7 @@ function wsPromote(sid,wid){
     })
     .then(function(inv){
       if(inv&&inv.ok)toast(inv.mailed?('Nachgerückt ✓ Rechnung '+inv.number+'wurde automatisch gemailt.')
-        :('Nachgerückt ✓ Rechnung '+inv.number+'erstellt – Mailversand prüfen/manuell senden.'));
+        :('Nachgerückt ✓ Rechnung '+inv.number+' erstellt – Mailversand prüfen/manuell senden.'));
       else toast('Nachgerückt ✓ (keine Rechnung: '+((inv&&inv.reason)||'siehe Termin-Preis')+')');
       refreshDocs();
       return api('workshop_signups?select=*&order=created_at.desc');
@@ -1223,8 +1223,16 @@ function markFollowDone(id){api('communications?id=eq.'+id,{method:'PATCH',body:
 var INQ_BADGE={neu:'gold',in_bearbeitung:'blue',erledigt:'green',archiviert:'grey'};
 function renderInq(){
   document.getElementById('inqRows').innerHTML=applySort((CACHE.inquiries||[]).slice(),'inquiries').map(function(i){
+    /* Dringend (Termin <= 10 Tage) und Terminkonflikt direkt in der Liste zeigen -
+       wer über die Liste arbeitet, sieht das sonst nur auf dem Dashboard. */
+    var tage=i.event_date?Math.round((new Date(i.event_date)-new Date(new Date().toISOString().slice(0,10)))/86400000):null;
+    var eilig=tage!=null&&tage>=0&&tage<=10;
+    var konf=dateConflicts(i.event_date);
     return '<tr><td>'+dtt(i.created_at)+'</td><td><b>'+esc(i.name)+'</b><br><span class="mut sml">'+esc(i.email||'')+' '+esc(i.phone||'')+'</span></td>'+
-    '<td>'+esc(i.event_type||'–')+'</td><td>'+dt(i.event_date)+'</td>'+
+    '<td>'+esc(i.event_type||'–')+'</td>'+
+    '<td>'+dt(i.event_date)+
+      (eilig?' <span class="b red" title="Termin steht kurz bevor">bald</span>':'')+
+      (konf.length?' <span class="b gold" title="'+esc(konf.join(' · '))+'">Termin belegt</span>':'')+'</td>'+
     '<td><span class="b '+(INQ_BADGE[i.status]||'grey')+'">'+i.status.replace('_',' ')+'</span></td>'+
     '<td style="white-space:nowrap"><button class="btn g sm" onclick="viewInq(\''+i.id+'\')">Ansehen</button> '+
     (i.customer_id?'<a class="sml" onclick="openCustDetail(\''+i.customer_id+'\')">→ Kunde</a>':'<button class="btn sm" onclick="inqToCust(\''+i.id+'\')">→ CRM übernehmen</button>')+'</td></tr>';
@@ -1232,10 +1240,16 @@ function renderInq(){
 }
 function viewInq(id){
   var i=CACHE.inquiries.find(function(x){return x.id===id});if(!i)return;
+  var konf=dateConflicts(i.event_date);
+  var tage=i.event_date?Math.round((new Date(i.event_date)-new Date(new Date().toISOString().slice(0,10)))/86400000):null;
+  var eilig=tage!=null&&tage>=0&&tage<=10;
   openModal('Anfrage von '+esc(i.name),
+    (konf.length?'<div class="msg err" style="margin-bottom:10px"><b>Am '+dt(i.event_date)+' steht schon etwas im Kalender:</b> '+esc(konf.join(' · '))+'</div>':'')+
+    (eilig?'<div class="msg" style="margin-bottom:10px;border:1px solid var(--gold,#b8860b)"><b>Kurzfristig:</b> nur noch '+tage+' Tage bis zum Termin.</div>':'')+
     '<div class="sml"><b>Kontakt:</b> '+esc(i.email||'–')+' · '+esc(i.phone||'–')+'<br>'+
     '<b>Anlass:</b> '+esc(i.event_type||'–')+' · <b>Datum:</b> '+dt(i.event_date)+' · <b>Ort:</b> '+esc(i.location||'–')+'<br><br>'+
-    '<div style="white-space:pre-wrap;background:var(--bg);border:1px solid var(--bdr);padding:10px">'+esc(i.message||'(keine Nachricht)')+'</div></div>'+
+    /* overflow-wrap: sonst sprengt ein langer Text ohne Leerzeichen das Fenster */
+    '<div style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:40vh;overflow-y:auto;background:var(--bg);border:1px solid var(--bdr);padding:10px">'+esc(i.message||'(keine Nachricht)')+'</div></div>'+
     '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--bdr)">'+
     '<label>Antworten mit Vorlage</label>'+
     '<div style="display:flex;gap:8px"><select id="replyTpl">'+
@@ -4189,7 +4203,7 @@ function loadNewsletter(){
     var conf=rows.filter(function(s){return s.confirmed_at&&!s.unsubscribed_at});
     var pend=rows.filter(function(s){return !s.confirmed_at&&!s.unsubscribed_at});
     var off=rows.filter(function(s){return s.unsubscribed_at});
-    document.getElementById('nlSendBtn').textContent='An '+conf.length+'Abonnenten senden';
+    document.getElementById('nlSendBtn').textContent='An '+conf.length+' Abonnenten senden';
     document.getElementById('nlAdminList').innerHTML=
       '<div class="mut" style="margin-bottom:8px">'+conf.length+' bestätigt · '+pend.length+' unbestätigt · '+off.length+' abgemeldet</div>'+
       (conf.map(function(s){
@@ -5026,17 +5040,44 @@ function composeReply(inqId){
   }
   openCompose(i,t,null);
 }
+/* Termin-Konflikte zum Anfragedatum: eigene Aufträge (außer Storno) und Kalender-Blocker.
+   Mehrtägige Einträge zählen mit, solange das Datum im Zeitraum liegt. */
+function dateConflicts(datum){
+  if(!datum)return [];
+  var out=[];
+  (CACHE.bookings||[]).forEach(function(b){
+    if(b.status==='storniert'||!b.event_date)return;
+    var bis=b.end_date||b.event_date;
+    if(datum>=b.event_date&&datum<=bis)
+      out.push((b.title||b.event_type||'Auftrag')+(b.customers?' · '+custName(b.customers):''));
+  });
+  (CACHE.blocks||[]).forEach(function(c){
+    var bis=c.end_date||c.start_date;
+    if(datum>=c.start_date&&datum<=bis)out.push(c.title||'Kalender-Blocker');
+  });
+  return out;
+}
 function openCompose(i,t,formLink){
   var body=fillTpl(t.body,i);
   if(formLink)body=body.replace(/\{fragebogen\}/g,formLink);
+  /* Die Erstantwort-Vorlagen sagen "der Termin ist noch frei". Steht an dem Tag schon
+     etwas im Kalender, wäre das eine Falschaussage an den Kunden - deshalb hier
+     unübersehbar warnen, statt nur allgemein ans Prüfen zu erinnern. */
+  var konflikt=dateConflicts(i.event_date);
+  var hinweis=konflikt.length
+    ? '<div class="msg err" style="margin-bottom:12px"><b>Achtung: Am '+dt(i.event_date)+' steht schon etwas im Kalender</b>'+
+      '<div class="sml" style="margin-top:4px">'+konflikt.map(esc).join('<br>')+'</div>'+
+      '<div class="sml" style="margin-top:6px">Die Vorlage behauptet unten, der Termin sei frei. Text anpassen oder die Vorlage „Termin belegt“ nehmen.</div></div>'
+    : '';
   openModal('Antwort an '+esc(i.name)+(i.email?' <span class="mut sml">('+esc(i.email)+')</span>':''),
+    hinweis+
     '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
     '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+edBtn('rBody')+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
     (i.email?'<button class="btn" onclick="adminSendMail(\''+jsq(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+jsq(i.customer_id||i.id||'')+'\',closeModal)">Direkt senden</button>':'')+
     '<button class="btn g" onclick="copyReply()">Text kopieren</button>'+
     (i.email?'<button class="btn g" onclick="mailReply(\''+jsq(i.email)+'\')">Im Mail-Programm öffnen</button>':'')+
-    '</div><div class="sml mut" style="margin-top:8px">Tipp: Vor dem Senden prüfen, ob der Termin wirklich frei ist – die Vorlage geht davon aus.</div>');
+    '</div>'+(konflikt.length?'':'<div class="sml mut" style="margin-top:8px">Am '+(i.event_date?dt(i.event_date):'angefragten Termin')+' ist bei dir nichts eingetragen – die Vorlage passt.</div>'));
 }
 function adminSendMail(to,subject,body,custId,cb){
   fetch('api.php/sendmail',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},

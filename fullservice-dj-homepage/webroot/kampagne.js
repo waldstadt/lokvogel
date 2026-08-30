@@ -117,7 +117,11 @@ function render(pg){
       '<label for="cpLocation">'+esc(cfg.location_label||'Ort / Location')+'</label>'+
       '<input type="text" id="cpLocation" placeholder="'+esc(cfg.location_ph||'')+'">'+
       '<label for="cpMsg">'+esc(cfg.msg_label||'Worum geht es?')+'</label>'+
-      '<textarea id="cpMsg" placeholder="'+esc(cfg.msg_ph||'')+'"></textarea>'+
+      '<textarea id="cpMsg" maxlength="4000" placeholder="'+esc(cfg.msg_ph||'')+'"></textarea>'+
+      /* Honigtopf gegen Bots: für Menschen unsichtbar, bleibt leer */
+      '<div aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden">'+
+        '<label for="cpWebsite">Website (bitte frei lassen)</label>'+
+        '<input type="text" id="cpWebsite" tabindex="-1" autocomplete="off"></div>'+
       '<button class="btn" type="submit" id="sendBtn">Anfrage senden</button>'+
     '</form>'+
     '<div style="margin-top:18px;font-size:13px;color:var(--mut2)">Lieber direkt schreiben? '+
@@ -130,6 +134,9 @@ function render(pg){
     '<div><a href="index.html?legal=impressum">Impressum</a> &nbsp;·&nbsp; <a href="index.html?legal=datenschutz">Datenschutz</a> &nbsp;·&nbsp; <a href="'+homeHref+'">'+esc(homeLabel)+'</a></div>'+
   '</div></footer>';
 
+  /* Kein Termin in der Vergangenheit auswählbar */
+  var dEl=document.getElementById('cpDate');
+  if(dEl)dEl.min=new Date().toISOString().slice(0,10);
   document.getElementById('inqForm').addEventListener('submit',function(ev){
     ev.preventDefault();
     var v=function(id){var el=document.getElementById(id);return el?el.value.trim():''};
@@ -141,6 +148,7 @@ function render(pg){
       event_type:types.length>1?v('cpType'):types[0],
       event_date:v('cpDate')||null,guests:v('cpGuests')||null,
       location:v('cpLocation'),
+      website:v('cpWebsite'),
       message:(extra.length?extra.join('\n')+'\n':'')+v('cpMsg')
     };
     if(!data.name||!data.email){msg.className='form-msg err';msg.textContent='Bitte Name und E-Mail angeben.';return}
@@ -148,14 +156,34 @@ function render(pg){
     fetch(API+'/rest/inquiries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
     .then(function(r){
       if(!r.ok)throw new Error('HTTP '+r.status);
+      /* Kurzfristige Termine bekommen dieselbe ehrliche Ansage wie auf der Startseite */
+      var tage=data.event_date?Math.round((new Date(data.event_date)-new Date())/86400000):null;
       msg.className='form-msg ok';
-      msg.textContent=cfg.success_text||'Danke! Eure Anfrage ist angekommen – ich melde mich innerhalb von 24 Stunden mit einer ehrlichen Antwort.';
+      msg.textContent=(tage!=null&&tage>=0&&tage<=10)
+        ?'Danke! Euer Termin ist ja bald – ich melde mich so schnell wie möglich, meist noch am selben Tag. Wenn es eilig ist, schreibt mir gern zusätzlich per WhatsApp.'
+        :(cfg.success_text||'Danke! Eure Anfrage ist angekommen – ich melde mich innerhalb von 24 Stunden mit einer ehrlichen Antwort.');
       document.getElementById('inqForm').reset();
+      showRegHint(data);
     }).catch(function(){
       msg.className='form-msg err';
       msg.textContent='Senden fehlgeschlagen – bitte versucht es später erneut oder ruft direkt an: 01523 6439373.';
     }).finally(function(){btn.disabled=false;btn.textContent='Anfrage senden'});
   });
+}
+
+/* Hinweis aufs Kundenkonto nach dem Absenden. Bewusst als ruhiger Kasten unter dem
+   Formular statt als Overlay: kein Zwang, keine Tastaturfalle, nichts zum Wegklicken. */
+function showRegHint(data){
+  if(document.getElementById('regHint'))return;
+  var form=document.getElementById('inqForm');
+  if(!form)return;
+  var box=document.createElement('div');
+  box.id='regHint';
+  box.style.cssText='margin-top:22px;padding:20px 22px;border:1px solid var(--line);border-radius:14px;background:var(--card)';
+  box.innerHTML='<div style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;margin-bottom:8px">Wenn ihr mögt: Kundenkonto anlegen</div>'+
+    '<div style="color:var(--mut);font-size:14px;line-height:1.7">Ihr müsst nicht – ich melde mich so oder so. Mit Konto seht ihr aber jederzeit, was schon geplant ist, habt alle Unterlagen an einem Ort und tragt Adresse und Eckdaten selbst ein, statt sie am Telefon zu diktieren. Kostenlos, kein Abo.</div>'+
+    '<a class="btn" style="margin-top:14px" href="portal.html?register=1&email='+encodeURIComponent(data.email)+'&name='+encodeURIComponent(data.name)+'">Kostenlos registrieren</a>';
+  form.parentNode.insertBefore(box, form.nextSibling);
 }
 
 /* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */

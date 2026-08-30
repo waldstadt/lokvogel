@@ -368,6 +368,7 @@ footer a:hover{color:var(--acc)}
         <div class="c-item"><div class="cl">Lager &amp; Abholung</div><div class="cv" id="cAddr">Büttmecker Weg 35c, 58675 Hemer</div></div>
       </div>
       <form id="inqForm" class="reveal">
+      <div aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden"><label for="hpWebsite">Website (bitte frei lassen)</label><input type="text" id="hpWebsite" name="website" tabindex="-1" autocomplete="off"></div>
         <div class="form-msg" id="formMsg"></div>
         <div class="row">
           <div><label for="inqName">Name *</label><input type="text" id="inqName" name="name" required></div>
@@ -388,7 +389,7 @@ footer a:hover{color:var(--acc)}
           <div><label for="inqLocation">Location / Ort</label><input type="text" id="inqLocation" name="location" placeholder="z. B. Hemer oder Location-Name"></div>
         </div>
         <label for="inqMsg">Eure Nachricht</label>
-        <textarea name="message" id="inqMsg" placeholder="Erzählt kurz von eurer Feier: Gästezahl, Uhrzeiten, Musikrichtung …"></textarea>
+        <textarea name="message" id="inqMsg" maxlength="4000" placeholder="Erzählt kurz von eurer Feier: Gästezahl, Uhrzeiten, Musikrichtung …"></textarea>
         <button class="btn" type="submit" id="sendBtn">Anfrage senden</button>
       </form>
     </div>
@@ -726,6 +727,9 @@ navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{
 /* Firmenfeiern brauchen fürs spätere Angebot oft Firmenname/Rechnungsadresse - dafür gibt es
    kein eigenes Feld (kein Schema-Wechsel nötig), aber der Nachrichten-Platzhalter leitet
    gezielt dazu an, das mit reinzuschreiben. */
+/* Kein Datum in der Vergangenheit anbietbar - ein Tippfehler im Jahr erzeugt sonst
+   eine Anfrage zu einem längst vergangenen Termin. */
+(function(){var d=document.getElementById('inqDate');if(d)d.min=new Date().toISOString().slice(0,10)})();
 function inqMsgPlaceholder(){
   var t=document.getElementById('inqEventType').value,m=document.getElementById('inqMsg');
   m.placeholder=t==='Firmenfeier'
@@ -738,6 +742,7 @@ document.getElementById('inqForm').addEventListener('submit',function(ev){
   var f=ev.target,msg=document.getElementById('formMsg'),btn=document.getElementById('sendBtn');
   var data={
     name:f.name.value.trim(),email:f.email.value.trim(),phone:f.phone.value.trim(),
+    website:f.website?f.website.value:'',   /* Honigtopf gegen Bots, bleibt bei Menschen leer */
     event_type:f.event_type.value,event_date:f.event_date.value||null,
     location:f.location.value.trim(),message:f.message.value.trim()
   };
@@ -757,15 +762,44 @@ document.getElementById('inqForm').addEventListener('submit',function(ev){
       :'Danke! Eure Anfrage ist angekommen – ich melde mich in der Regel innerhalb von 24 Stunden.';
     f.reset();
     document.getElementById('regOverlayLink').href='portal.html?register=1&email='+encodeURIComponent(data.email)+'&name='+encodeURIComponent(data.name);
-    document.getElementById('regOverlay').classList.add('open');
+    openRegOverlay();
   }).catch(function(){
     msg.className='form-msg err';msg.textContent='Senden fehlgeschlagen – bitte versucht es später erneut oder ruft direkt an.';
   }).finally(function(){btn.disabled=false;btn.textContent='Anfrage senden'});
 });
+/* Registrierungs-Hinweis als echter Dialog: Fokus hinein, Escape schließt, Tab bleibt
+   im Fenster und der Hintergrund scrollt nicht mit - sonst kommt man per Tastatur
+   nicht mehr heraus. */
+var regLastFocus=null;
+function openRegOverlay(){
+  var ov=document.getElementById('regOverlay');
+  regLastFocus=document.activeElement;
+  ov.classList.add('open');
+  document.body.style.overflow='hidden';
+  var link=document.getElementById('regOverlayLink');
+  if(link)link.focus();
+}
+function closeRegOverlay(){
+  var ov=document.getElementById('regOverlay');
+  ov.classList.remove('open');
+  document.body.style.overflow='';
+  if(regLastFocus&&regLastFocus.focus)regLastFocus.focus();
+}
+document.addEventListener('keydown',function(e){
+  var ov=document.getElementById('regOverlay');
+  if(!ov||!ov.classList.contains('open'))return;
+  if(e.key==='Escape'){closeRegOverlay();return}
+  if(e.key!=='Tab')return;
+  var f=ov.querySelectorAll('a[href],button');
+  if(!f.length)return;
+  var first=f[0],last=f[f.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+});
 </script>
-<div class="reg-overlay" id="regOverlay">
+<div class="reg-overlay" id="regOverlay" role="dialog" aria-modal="true" aria-labelledby="regOverlayTitle">
   <div class="reg-card">
-    <h3>Anfrage ist da – und jetzt?</h3>
+    <h3 id="regOverlayTitle">Anfrage ist da – und jetzt?</h3>
     <p class="lead" style="margin:0">Wenn ihr mögt, legt euch direkt ein kostenloses Kundenkonto an:</p>
     <ul>
       <li>Ihr seht jederzeit, was zu eurer Feier schon geplant ist, und könnt Dinge direkt korrigieren.</li>
@@ -775,7 +809,7 @@ document.getElementById('inqForm').addEventListener('submit',function(ev){
     </ul>
     <div class="row">
       <a class="btn" id="regOverlayLink" href="portal.html">Jetzt kostenlos registrieren</a>
-      <a class="btn ghost" onclick="document.getElementById('regOverlay').classList.remove('open')" style="cursor:pointer">Vielleicht später</a>
+      <button type="button" class="btn ghost" onclick="closeRegOverlay()">Vielleicht später</button>
     </div>
   </div>
 </div>
