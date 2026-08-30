@@ -1147,8 +1147,11 @@ function renderDash(){
     tile(newInq.length,'Neue Anfragen')+tile(upcoming.length,'Kommende Termine')+
     tile(openQ.length,'Offene Angebote')+tile(openInv.length,'Offene Rechnungen')+
     tile(euro(rev),'Umsatz '+year);
+  /* Der Zähler muss zur Liste passen: Warenkorb-Mietanfragen sind Buchungen und stehen
+     nicht unter "Anfragen" - sie erscheinen im Dashboard und unter Buchungen. */
   var badge=document.getElementById('inqBadge');
-  badge.style.display=newInq.length?'':'none';badge.textContent=newInq.length;
+  var offeneInq=CACHE.inquiries.filter(function(i){return i.status==='neu'}).length;
+  badge.style.display=offeneInq?'':'none';badge.textContent=offeneInq;
   document.getElementById('dashNext').innerHTML=upcoming.slice(0,6).map(function(b){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Auftrag')+'</a> <span class="mut">'+esc(custName(b.customers))+'</span></div>';
   }).join('')||'Keine anstehenden Termine.';
@@ -1178,11 +1181,12 @@ function renderDash(){
   document.getElementById('dashPlan').innerHTML=openPlan.slice(0,8).map(function(c){
     var bk=CACHE.bookings.find(function(x){return x.id===c.booking_id});
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+c.booking_id+'\')">'+esc(c.field_label||c.field_path)+'</a> <span class="mut">'+(bk?esc(custName(bk.customers))+' · '+dt(bk.event_date):'')+'</span>'+
-      '<div class="mut sml">„'+esc(planChangeValueText(c.field_path,c.old_value))+'" → „'+esc(planChangeValueText(c.field_path,c.new_value))+'"</div></div>';
+      '<div class="mut sml" style="overflow-wrap:anywhere">„'+esc(planChangeValueText(c.field_path,c.old_value).slice(0,140))+'" → „'+esc(planChangeValueText(c.field_path,c.new_value).slice(0,140))+'"</div></div>';
   }).join('')||'Keine offenen Vorschläge.';
   var answered=(CACHE.forms||[]).filter(function(f){return f.status==='beantwortet'});
   document.getElementById('dashForms').innerHTML=answered.slice(0,5).map(function(f){
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="viewFormAnswers(\''+f.id+'\')">'+esc(f.title)+'</a> <span class="mut">'+dtt(f.submitted_at)+'</span></div>';
+    var fc=CACHE.customers.find(function(x){return x.id===f.customer_id});
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="viewFormAnswers(\''+f.id+'\')">'+esc(f.title)+'</a> <span class="mut">'+(fc?esc(custName(fc))+' · ':'')+dtt(f.submitted_at)+'</span></div>';
   }).join('')||'Noch keine Antworten.';
   var pastNoRev=CACHE.bookings.filter(function(b){
     return b.event_date<today&&!b.review_requested&&['gebucht','abgeschlossen'].indexOf(b.status)>=0;
@@ -1261,14 +1265,21 @@ function viewInq(id){
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'archiviert\')">Archivieren</button></div>');
 }
 function setInqStatus(id,st){api('inquiries?id=eq.'+id,{method:'PATCH',body:{status:st}}).then(function(){closeModal();loadAll()})}
+var INQ_UEBERNAHME={};   /* laufende Übernahmen - schützt vor Doppelklick */
 function inqToCust(id){
   var i=CACHE.inquiries.find(function(x){return x.id===id});if(!i)return;
+  /* Ein zweiter Klick, bevor der erste durch ist, legte Kunde und Buchung doppelt an
+     (der Cache-Abgleich unten sieht den ersten Durchlauf noch nicht). */
+  if(INQ_UEBERNAHME[id])return;
+  INQ_UEBERNAHME[id]=true;
+  var fertig=function(){delete INQ_UEBERNAHME[id]};
   /* Seit die Anfrage-API automatisch schon Kunde+Buchung+Planer anlegt (autoInquiryPlanner),
      ist customer_id bei neuen Anfragen meist schon gesetzt - dann nur noch den Status
      weitersetzen, statt einen zweiten Kunden/eine zweite Buchung anzulegen. */
   if(i.customer_id){
     api('inquiries?id=eq.'+id,{method:'PATCH',body:{status:'in_bearbeitung'}})
-      .then(function(){closeModal();toast('In CRM übernommen ✓');loadAll()}).catch(function(e){toast(e.message,1)});
+      .then(function(){closeModal();toast('In CRM übernommen ✓');loadAll()})
+      .catch(function(e){toast(e.message,1)}).finally(fertig);
     return;
   }
   var parts=(i.name||'').trim().split(/\s+/),first=parts.slice(0,-1).join(' '),last=parts.slice(-1)[0]||'';
@@ -1285,7 +1296,8 @@ function inqToCust(id){
     jobs.push(api('communications',{method:'POST',body:{customer_id:c.id,channel:'note',direction:'in',
       subject:'Anfrage über Homepage',content:i.message||'',occurred_at:i.created_at}}));
     return Promise.all(jobs);
-  }).then(function(){closeModal();toast('In CRM übernommen ✓');loadAll()}).catch(function(e){toast(e.message,1)});
+  }).then(function(){closeModal();toast('In CRM übernommen ✓');loadAll()})
+  .catch(function(e){toast(e.message,1)}).finally(fertig);
 }
 
 /* ===== Kunden ===== */
@@ -1386,6 +1398,13 @@ function saveCust(id){
       closeModal();toast('Gespeichert ✓');
       var newRow=!id&&res&&res[0]?res[0]:null;
       if(newRow){CACHE.customers=CACHE.customers||[];CACHE.customers.push(newRow)}
+      /* Geänderte Werte sofort in den Cache spiegeln: loadAll() läuft asynchron, die
+         Detailansicht zeigte sonst direkt danach noch die alten Daten. */
+      if(id){
+        var cached=(CACHE.customers||[]).find(function(x){return x.id===id});
+        if(cached)Object.assign(cached,body);
+        if(curCust&&curCust.id===id)Object.assign(curCust,body);
+      }
       loadAll();
       if(id&&curCust)openCustDetail(id);
       if(newRow&&cb)cb(newRow.id);
@@ -1939,7 +1958,9 @@ function renderPlan(){
     row('Rechnungsadresse',[inv.company,inv.name,inv.street,inv.zip_city].filter(Boolean).join(', '))+
     row('Musik-Musts',mus.musts)+row('No-Gos',mus.nogos)+
     '</div>'+
-    (Array.isArray(mus.playlists)&&mus.playlists.length?'<div style="margin-top:6px">'+row('Playlists',fmtPlaylists(mus.playlists))+'</div>':'')+
+    /* row() escaped seinen Wert - fmtPlaylists liefert aber fertiges HTML, sonst stand
+       das Markup wörtlich in der Karte statt eines klickbaren Links. */
+    (Array.isArray(mus.playlists)&&mus.playlists.length?'<div style="margin-top:6px"><b>Playlists</b>'+fmtPlaylists(mus.playlists)+'</div>':'')+
     (Array.isArray(pl.timetable)&&pl.timetable.length?'<div style="margin-top:6px"><b>Ablaufplan</b>'+fmtTimetable(pl.timetable)+'</div>':'')+
     (pl.freitext?'<div style="margin-top:6px">'+row('Freitext',pl.freitext)+'</div>':'')
     :'Noch kein Planer ausgefüllt – mit „Bearbeiten" alles Wichtige erfassen, das sonst mühsam am Telefon herausgefunden werden müsste.';
@@ -1993,7 +2014,14 @@ function applyPlanChange(id){
   Promise.all([
     api('bookings?id=eq.'+curBook.id,{method:'PATCH',body:{event_plan:pl}}),
     api('event_plan_changes?id=eq.'+id,{method:'PATCH',body:{status:'uebernommen',reviewed_at:new Date().toISOString()}})
-  ]).then(function(){curBook.event_plan=pl;toast('Übernommen ✓');loadAll()}).catch(function(e){toast(e.message,1)});
+  ]).then(function(){
+    curBook.event_plan=pl;
+    c.status='uebernommen';
+    /* Die offene Detailansicht sofort neu zeichnen - loadAll() lädt zwar neu, rendert
+       das bereits offene Buchungsfenster aber nicht noch einmal. */
+    renderPlan();
+    toast('Übernommen ✓');loadAll();
+  }).catch(function(e){toast(e.message,1)});
 }
 function rejectPlanChange(id){
   api('event_plan_changes?id=eq.'+id,{method:'PATCH',body:{status:'abgelehnt',reviewed_at:new Date().toISOString()}})
@@ -5033,7 +5061,10 @@ function composeReviewMail(bookingId){
   api('bookings?id=eq.'+bookingId,{method:'PATCH',body:{review_requested:true,status:'abgeschlossen'}}).then(function(){
     b.review_requested=true;b.status='abgeschlossen';renderDash();renderBook();
   });
-  openCompose({name:custName(c),email:c.email,event_date:b.event_date,event_type:b.event_type,location:b.venue_name},t,null);
+  /* event_date bewusst nicht mitgeben: Die Feier ist vorbei, ein Terminkonflikt-Hinweis
+     wäre hier sinnlos. Das Datum steckt über {datum} bereits im Vorlagentext. */
+  openCompose({name:custName(c),email:c.email,event_type:b.event_type,location:b.venue_name,
+    _datum:b.event_date},t,null);
 }
 
 /* ===== Upsell-Extras ===== */
@@ -5087,7 +5118,7 @@ function fillTpl(text,i){
   var links=rv.google_url||'';
   var map={
     '{vorname}':parts[0]||i.name||'','{name}':i.name||'',
-    '{datum}':i.event_date?dt(i.event_date):'eurem Wunschtermin',
+    '{datum}':(i.event_date||i._datum)?dt(i.event_date||i._datum):'eurem Wunschtermin',
     '{anlass}':i.event_type||'eurer Feier','{ort}':i.location||'',
     '{bewertungen}':links||'(Bewertungslinks unter Inhalte → Bewertungen eintragen)'
   };

@@ -313,7 +313,9 @@ document.getElementById('year').textContent=new Date().getFullYear();
 try{var _tp=JSON.stringify({p:location.pathname.split('/').pop()||'mieten.html',r:document.referrer||''});
 navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 
-function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
+/* maximumFractionDigits muss mit: Ohne die Angabe rundet der Browser auf 3 Stellen,
+   und die Netto-Umrechnung ergab Beträge wie "294,118 €". */
+function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0,maximumFractionDigits:2})+' €'}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 /* Sicher als JS-String-Literal in Inline-onclick="fn('…')" – siehe admin.html */
 function jsq(s){return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'))}
@@ -600,7 +602,7 @@ function updatePriceToggleUI(){
   b.className='btn small'+(PRICE_MODE==='brutto'?'':' ghost');
   n.className='btn small'+(PRICE_MODE==='netto'?'':' ghost');
   var note=document.getElementById('priceNote');
-  if(note)note.textContent=(PRICE_MODE==='brutto'&&!SMALL_BUSINESS?'Alle Preise inkl. MwSt.':'Alle Preise netto')+' Ab 1 Woche, 2 Wochen und 1 Monat gelten automatisch günstigere Tagessätze – die Staffel-Gesamtsumme seht ihr live im Tourcase.';
+  if(note)note.textContent=(PRICE_MODE==='brutto'&&!SMALL_BUSINESS?'Alle Preise inkl. MwSt.':'Alle Preise netto.')+' Ab 1 Woche, 2 Wochen und 1 Monat gelten automatisch günstigere Tagessätze – die Staffel-Gesamtsumme seht ihr live im Tourcase.';
 }
 fetch(API+'/public/tax-info').then(function(r){return r.json()}).then(function(j){
   TAX_RATE=Number(j.tax_rate)||19;SMALL_BUSINESS=!!j.small_business;
@@ -760,6 +762,14 @@ function addToCart(id,qtyId){
   var mq=minQty(e);
   var qty=Math.max(mq,Number(qf&&qf.value)||mq);
   qty=Math.ceil(qty/mq)*mq;
+  /* Obergrenze: Mehr als verfügbar darf gar nicht erst in den Korb - sonst steht dort
+     eine Fantasiesumme und die Absage kommt erst beim Absenden. */
+  var frei=(!e.on_request&&AVAIL[id]&&AVAIL[id].available!=null)?Number(AVAIL[id].available):null;
+  if(frei!=null&&qty>frei){
+    qty=Math.max(mq,Math.floor(frei/mq)*mq);
+    if(qty>frei||qty<mq){toast('Am Wunschtermin sind davon nur '+frei+' Stück frei.');return}
+    toast('Am Wunschtermin sind nur '+frei+' Stück frei – Menge angepasst.');
+  }
   if(qf)qf.value=qty;
   var existing=CART.find(function(c){return c.type!=='set'&&c.id===id});
   if(existing)existing.qty=qty;else CART.push({type:'equipment',id:id,qty:qty});
@@ -790,9 +800,11 @@ function renderCart(){
       Number(e&&e.tier_2week_pct!=null?e.tier_2week_pct:20),
       Number(e&&e.tier_month_pct!=null?e.tier_month_pct:12))*qty;
   }
-  function row(name,amount,idx){
-    var priceTxt=amount==null?'<span style="color:var(--mut2)">auf Anfrage</span>':euro(amount*priceFactor());
-    return '<div class="tc-item"><span>'+esc(name)+'</span><span>'+priceTxt+
+  var belegt=0;   // Positionen, die im gewählten Zeitraum nicht (mehr) verfügbar sind
+  function row(name,amount,idx,warn){
+    var priceTxt=warn?'<span style="color:var(--red,#e0a0a0)">nicht verfügbar</span>'
+      :(amount==null?'<span style="color:var(--mut2)">auf Anfrage</span>':euro(amount*priceFactor()));
+    return '<div class="tc-item"'+(warn?' style="opacity:.75"':'')+'><span>'+esc(name)+'</span><span>'+priceTxt+
       ' <a onclick="removeFromCart('+idx+')" style="color:var(--mut2);margin-left:8px" title="Entfernen">✕</a></span></div>';
   }
   var html=CART.map(function(c,idx){
@@ -803,15 +815,28 @@ function renderCart(){
       return row('Set: '+s.name+' × '+c.qty,sl,idx);
     }
     var e=EQ.find(function(x){return x.id===c.id})||EQ_ALL[c.id];if(!e)return'';
+    /* Nach einem Datumswechsel kann eine Position inzwischen belegt sein - dann darf sie
+       weder mitgerechnet noch mitgeschickt werden. */
+    var frei=(!e.on_request&&AVAIL[c.id]&&AVAIL[c.id].available!=null)?Number(AVAIL[c.id].available):null;
+    var warn=frei!=null&&frei<c.qty;
     var rate=partnerPrice(e)!=null?partnerPrice(e):Number(e.day_rate||0);
     var l=line(rate,c.qty,e);
-    if(l==null)onRequest=true; else total+=l;
-    return row(e.name+' × '+c.qty,l,idx);
+    if(warn)belegt++;
+    else if(l==null)onRequest=true; else total+=l;
+    return row(e.name+' × '+c.qty,l,idx,warn);
   }).join('');
   document.getElementById('cartItems').innerHTML=html;
   document.getElementById('cartEmpty').style.display=CART.length?'none':'block';
   document.getElementById('cartTotalRow').style.display=CART.length?'flex':'none';
   document.getElementById('cartSubmitWrap').style.display=CART.length?'block':'none';
+  var sbtn=document.getElementById('cartSubmitWrap').querySelector('button');
+  var hinweisId='cartBelegtHinweis',alt=document.getElementById(hinweisId);
+  if(alt)alt.remove();
+  if(sbtn){
+    sbtn.disabled=belegt>0;
+    if(belegt>0)sbtn.insertAdjacentHTML('beforebegin','<div id="'+hinweisId+'" class="sml" style="color:var(--red,#e0a0a0);margin-bottom:8px">'+
+      belegt+' Position(en) sind im gewählten Zeitraum nicht mehr frei. Bitte entfernen oder den Zeitraum ändern.</div>');
+  }
   document.getElementById('cartTotal').textContent=euro(total*priceFactor())+(from&&days>1?' · '+days+' Tage':'')+(onRequest?' + Artikel auf Anfrage':'');
   document.getElementById('cartTotalLabel').textContent='Gesamt ('+(PRICE_MODE==='brutto'&&!SMALL_BUSINESS?'inkl. MwSt.':'netto')+', für den gewählten Zeitraum)';
   renderTcBadge();
@@ -845,7 +870,7 @@ function renderAuthForm(){
       '<select id="authPartnerKind" style="display:none;margin-top:8px"><option value="dj">DJ</option><option value="band">Band</option><option value="musiker">Musiker:in</option></select>'):'')+
     '<div class="sml" style="margin-top:6px"><a onclick="toggleAuthMode()">'+(reg?'Schon ein Konto? Einloggen':'Noch kein Konto? Registrieren')+'</a></div>';
 }
-function custLogout(){CUST=null;PARTNER=null;localStorage.removeItem('lg_cust');localStorage.removeItem('lg_cust_token');sessionStorage.removeItem('lg_partner');document.getElementById('cartAuth').removeAttribute('data-mode');renderCart()}
+function custLogout(){CUST=null;PARTNER=null;localStorage.removeItem('lg_cust');localStorage.removeItem('lg_cust_token');sessionStorage.removeItem('lg_partner');document.getElementById('cartAuth').removeAttribute('data-mode');renderRent();renderCart()}
 function authAndSubmit(){
   var mode=(document.getElementById('cartAuth').dataset.mode)||'login';
   var email=v_('authEmail'),pass=v_('authPass');
@@ -869,7 +894,7 @@ function authAndSubmit(){
       PARTNER=res.j.partner||null;
       if(PARTNER)sessionStorage.setItem('lg_partner',JSON.stringify(PARTNER));else sessionStorage.removeItem('lg_partner');
       document.getElementById('cartAuth').removeAttribute('data-mode');
-      renderCart();
+      renderRent();renderCart();   /* Kacheln zeigen sonst weiter die alten Preise */
     });
 }
 function v_(id){var el=document.getElementById(id);return el?el.value.trim():''}
