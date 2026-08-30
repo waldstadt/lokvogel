@@ -2484,13 +2484,17 @@ function addItemRow(){curItems.push({pos:curItems.length+1,description:'',qty:1,
 /* Positionspreise (unit_price) sind brutto - Markus pflegt und nennt Kunden immer den Preis
    inkl. USt. Netto wird daraus abgeleitet, nicht umgekehrt draufgerechnet. */
 function docCalc(){
-  var sub=curItems.reduce(function(s,it){return s+lineTotal(it)},0);
+  /* Auf Cent runden, und zwar zeilenweise: ein Beleg darf keine halben Cent mit sich
+     herumschleppen - sonst weicht die gedruckte Summe von der gespeicherten ab und in der
+     Buchhaltung landen Beträge wie 100,005 €. */
+  var r2=function(x){return Math.round(x*100)/100};
+  var sub=r2(curItems.reduce(function(s,it){return s+r2(lineTotal(it))},0));
   var dv=Number(v('docDiscVal'))||0,dtp=v('docDiscType')||'pct';
-  var disc=dv?(dtp==='eur'?Math.min(sub,dv):sub*Math.min(100,dv)/100):0;
-  var gross=sub-disc;
+  var disc=dv?(dtp==='eur'?Math.min(sub,r2(dv)):r2(sub*Math.min(100,dv)/100)):0;
+  var gross=r2(sub-disc);
   var rate=Number(document.getElementById('docTax').value)||0;
   var net=rate?gross/(1+rate/100):gross,tax=gross-net;
-  var override=v('docTotalOverride')!==''?Number(v('docTotalOverride')):null;
+  var override=v('docTotalOverride')!==''?r2(Number(v('docTotalOverride'))):null;
   if(override!=null){gross=override;net=rate?gross/(1+rate/100):gross;tax=gross-net;}
   var dep=Number(document.getElementById('docDep').value)||0;
   return {sub:sub,disc:disc,discVal:dv,discType:dtp,net:net,tax:tax,gross:gross,rate:rate,dep:dep,override:override};
@@ -3023,7 +3027,7 @@ function docRowsHtml(items,f){
       '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+it.qty+' '+esc(it.unit||'')+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(it.unit_price*f)+'</td>'+
-      '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(lineTotal(it)*f)+'</td></tr>';
+      '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(printedLineTotal(it,f))+'</td></tr>';
     }
     var head='<tr><td style="padding:5px 6px 1px;font-weight:700">'+label+'</td>'+
       '<td style="padding:5px 6px 1px;font-weight:700">'+esc(it.description)+
@@ -3036,7 +3040,7 @@ function docRowsHtml(items,f){
       '<td style="padding:0 6px">'+esc(sit.description)+rab+'</td>'+
       '<td style="padding:0 6px;text-align:right">'+subMenge(sit)+' '+esc(sit.unit||'')+'</td>'+
       '<td style="padding:0 6px;text-align:right">'+euro(sit.unit_price*f)+'</td>'+
-      '<td style="padding:0 6px;text-align:right">'+euro(lineTotal(sit)*f)+'</td></tr>';
+      '<td style="padding:0 6px;text-align:right">'+euro(printedLineTotal(sit,f))+'</td></tr>';
     }).join('');
     var foot='<tr><td></td><td colspan="3" style="padding:2px 6px 5px;text-align:right;font-weight:700;border-bottom:1px solid #ddd;font-size:10.5px">Gesamtsumme der Position</td>'+
       '<td style="padding:2px 6px 5px;text-align:right;font-weight:700;border-bottom:1px solid #ddd;font-size:10.5px">'+euro(printedGroupTotal(filtered,g,f))+'</td></tr>';
@@ -3047,9 +3051,19 @@ function docRowsHtml(items,f){
    exakt gerechnet, gedruckt wird auf Cent gerundet - in der Nettoansicht liefen die
    Positionszeilen sonst um einzelne Cent an der Summe vorbei. Deshalb werden Positions- und
    Gruppensummen aus den gerundeten Einzelbeträgen gebildet, nicht umgekehrt. */
+/* Zeilenbetrag so, wie er im Beleg steht: in der Nettoansicht wird der Einzelpreis gerundet
+   gedruckt, also muss auch der Zeilenbetrag aus diesem gerundeten Einzelpreis entstehen -
+   sonst geht "Menge × Einzelpreis" auf dem Papier nicht auf. Brutto (f = 1) ändert sich nichts. */
+function printedLineTotal(it,f){
+  if(it.is_header)return 0;
+  var ep=Math.round((Number(it.unit_price)||0)*f*100)/100;
+  var sum=(Number(it.qty)||0)*ep;
+  var d=Number(it.discount_value)||0;
+  if(d)sum=it.discount_type==='eur'?Math.max(0,sum-Math.round(d*f*100)/100):sum*(1-Math.min(100,d)/100);
+  return Math.round(sum*100)/100;
+}
 function printedGroupTotal(items,g,f){
-  var r=function(it){return Math.round(lineTotal(it)*f*100)/100};
-  return g.subs.reduce(function(s,i){return s+r(items[i])},r(items[g.main]));
+  return g.subs.reduce(function(s,i){return s+printedLineTotal(items[i],f)},printedLineTotal(items[g.main],f));
 }
 function docPrintedSum(items,f){
   var filtered=items.filter(function(it){return it.description});
@@ -3073,7 +3087,8 @@ function printDoc(){
   if(brutto){ dAbzug=r2(dSub-dGross); dNet=r2(c.net); }
   else {
     dAbzug=(c.override!=null)?r2(dSub-r2(c.net)):r2(c.disc*f);
-    /* Ein einzelner Cent ist ein Rundungsrest, kein vereinbarter Nachlass oder Zuschlag. */
+    /* In der Nettoansicht bleibt ein Cent Rundungsrest übrig, weil aus Bruttopreisen
+       zurückgerechnet wird. Der gehört in die USt.-Zeile, nicht als "Zuschlag" auf den Beleg. */
     if(Math.abs(dAbzug)<=0.01)dAbzug=0;
     dNet=r2(dSub-dAbzug);
   }

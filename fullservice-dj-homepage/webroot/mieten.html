@@ -802,7 +802,11 @@ function addToCart(id,qtyId){
   saveCart();
   /* Aus dem Produktfenster hinzugefügt: Fenster schließen, damit der Tourcase frei sichtbar ist */
   if(document.getElementById('prodBg').style.display==='block')closeProductModal();
-  renderRent();openTourcase();
+  renderRent();
+  /* renderRent() zeichnet die Kachel neu und setzt das Mengenfeld dabei zurück - die
+     übernommene (ggf. gekürzte) Menge soll dort aber weiter stehen. */
+  var qf2=document.getElementById('qty-'+id);if(qf2)qf2.value=qty;
+  openTourcase();
 }
 function addSetToCart(setId,qtyId){
   var qf=document.getElementById(qtyId||('qty-set-'+setId));
