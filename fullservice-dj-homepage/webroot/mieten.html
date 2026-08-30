@@ -777,13 +777,17 @@ function addToCart(id,qtyId){
   /* Ohne gewählten Zeitraum kennen wir die freie Stückzahl nicht - dann wenigstens auf den
      Gesamtbestand deckeln (steht im öffentlichen Katalog), damit im Korb keine Fantasiesumme
      steht. Nur wenn selbst der unbekannt ist, greift eine grobe Obergrenze. */
-  if(frei==null&&!e.on_request){
-    var bestand=(AVAIL[id]&&AVAIL[id].total!=null)?Number(AVAIL[id].total)
-               :(e.qty_total!=null?Number(e.qty_total):null);
-    var max=(bestand!=null&&bestand>0)?bestand:99;
+  if(frei==null){
+    /* Bei "auf Anfrage"-Artikeln sagt der Bestand nichts aus (die besorge ich dazu) - dort
+       gilt dieselbe Obergrenze wie serverseitig, sonst fragt jemand 9999 Stück an und in der
+       Anfrage stehen am Ende stillschweigend 50. */
+    var bestand=e.on_request?null
+      :((AVAIL[id]&&AVAIL[id].total!=null)?Number(AVAIL[id].total)
+        :(e.qty_total!=null?Number(e.qty_total):null));
+    var max=(bestand!=null&&bestand>0)?bestand:50;
     if(qty>max){
       toast(bestand!=null&&bestand>0?('Davon habe ich insgesamt '+max+' Stück – Menge angepasst.')
-                  :'So große Stückzahlen klären wir besser direkt – ruf mich kurz an.');
+                  :('Mehr als '+max+' Stück kann ich hier nicht aufnehmen – für größere Mengen ruf mich kurz an.'));
       qty=Math.max(mq,Math.floor(max/mq)*mq);
     }
   }
