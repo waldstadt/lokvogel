@@ -44,6 +44,9 @@ textarea{min-height:100px;resize:vertical}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut2);text-align:left;padding:8px;border-bottom:1px solid var(--line)}
 td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}
+.subrow td{padding:1px 8px;border-bottom:none;font-size:11.5px}
+.grouphead td{padding-top:9px;padding-bottom:1px}
+.groupfoot td{padding-top:2px;padding-bottom:7px}
 .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 th.num{text-align:right}
 .pos-desc{position:relative;cursor:default}
@@ -166,20 +169,20 @@ function docRowsHtml(items,f){
         '<td class="num">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
         '<td class="num">'+euro(lineTotal(it)*f)+'</td></tr>';
     }
-    var head='<tr><td class="num" style="font-weight:700">'+label+'</td>'+
+    var head='<tr class="grouphead"><td class="num" style="font-weight:700">'+label+'</td>'+
       '<td style="font-weight:700">'+esc(it.description)+
-      '<div style="font-size:11px;color:var(--mut2);font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
+      '<div style="font-size:10.5px;color:var(--mut2);font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
       '<td class="num"></td><td class="num"></td></tr>';
     var subs=g.subs.map(function(si,k){
       var sit=items[si];
       var info=sit.note?'<span class="info">i</span><span class="tip">'+esc(sit.note)+'</span>':'';
-      return '<tr style="font-size:12.5px;color:var(--mut)"><td class="num">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
+      return '<tr class="subrow" style="color:var(--mut)"><td class="num">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
         '<td class="pos-desc" style="padding-left:18px" onclick="this.classList.toggle(\'open\')">'+esc(sit.description)+info+'</td>'+
         '<td class="num">'+Number(sit.qty)+' '+esc(sit.unit||'')+'</td>'+
         '<td class="num">'+euro(lineTotal(sit)*f)+'</td></tr>';
     }).join('');
-    var foot='<tr><td></td><td colspan="2" style="text-align:right;font-weight:700">Gesamtsumme der Position</td>'+
-      '<td class="num" style="font-weight:700">'+euro(groupTotal(items,g)*f)+'</td></tr>';
+    var foot='<tr class="groupfoot"><td></td><td colspan="2" style="text-align:right;font-weight:700;font-size:12.5px">Gesamtsumme der Position</td>'+
+      '<td class="num" style="font-weight:700;font-size:12.5px">'+euro(groupTotal(items,g)*f)+'</td></tr>';
     return head+subs+foot;
   }).join('');
 }
@@ -349,20 +352,20 @@ function docRowsHtmlPrint(items,f){
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+euro(lineTotal(it)*f)+'</td></tr>';
     }
-    var head='<tr><td style="padding:6px;border-bottom:1px solid #eee;font-weight:700">'+label+'</td>'+
-      '<td style="padding:6px;border-bottom:1px solid #eee;font-weight:700">'+esc(it.description)+
-      '<div style="font-size:10px;color:#666;font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
-      '<td style="padding:6px;border-bottom:1px solid #eee"></td><td style="padding:6px;border-bottom:1px solid #eee"></td></tr>';
+    var head='<tr><td style="padding:5px 6px 1px;font-weight:700">'+label+'</td>'+
+      '<td style="padding:5px 6px 1px;font-weight:700">'+esc(it.description)+
+      '<div style="font-size:9px;color:#666;font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
+      '<td style="padding:5px 6px 1px"></td><td style="padding:5px 6px 1px"></td></tr>';
     var subs=g.subs.map(function(si,k){
       var sit=items[si];
-      return '<tr style="font-size:10.5px;color:#444"><td style="padding:3px 6px 3px 18px;border-bottom:1px solid #eee">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
-      '<td style="padding:3px 6px;border-bottom:1px solid #eee">'+esc(sit.description)+
-      (sit.note?'<div style="font-size:9px;color:#888;margin-top:2px">'+esc(sit.note)+'</div>':'')+'</td>'+
-      '<td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">'+Number(sit.qty)+' '+esc(sit.unit||'')+'</td>'+
-      '<td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">'+euro(lineTotal(sit)*f)+'</td></tr>';
+      return '<tr style="font-size:9px;color:#555"><td style="padding:0 6px 0 18px">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
+      '<td style="padding:0 6px">'+esc(sit.description)+
+      (sit.note?'<div style="font-size:8px;color:#888">'+esc(sit.note)+'</div>':'')+'</td>'+
+      '<td style="padding:0 6px;text-align:right;white-space:nowrap">'+Number(sit.qty)+' '+esc(sit.unit||'')+'</td>'+
+      '<td style="padding:0 6px;text-align:right;white-space:nowrap">'+euro(lineTotal(sit)*f)+'</td></tr>';
     }).join('');
-    var foot='<tr><td></td><td colspan="2" style="padding:4px 6px;text-align:right;font-weight:700;border-bottom:1px solid #ddd">Gesamtsumme der Position</td>'+
-      '<td style="padding:4px 6px;text-align:right;font-weight:700;border-bottom:1px solid #ddd">'+euro(groupTotal(items,g)*f)+'</td></tr>';
+    var foot='<tr><td></td><td colspan="2" style="padding:2px 6px 5px;text-align:right;font-weight:700;border-bottom:1px solid #ddd;font-size:10.5px">Gesamtsumme der Position</td>'+
+      '<td style="padding:2px 6px 5px;text-align:right;font-weight:700;border-bottom:1px solid #ddd;font-size:10.5px">'+euro(groupTotal(items,g)*f)+'</td></tr>';
     return head+subs+foot;
   }).join('');
 }

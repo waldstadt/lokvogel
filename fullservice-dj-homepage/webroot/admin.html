@@ -173,6 +173,9 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 /* Items-Editor */
 .it-row{display:grid;grid-template-columns:36px 1fr 70px 100px 90px 90px 28px;gap:6px;align-items:center;margin-bottom:6px}
 .it-row input{padding:6px 8px;font-size:11px}
+.it-row.sml{grid-template-columns:30px 1fr 56px 84px 70px 70px 20px;gap:4px;margin-bottom:2px}
+.it-row.sml input,.it-row.sml select{padding:2px 5px;font-size:10px}
+.it-row.sml>div:first-child{padding:2px 0;font-size:9px;min-height:0}
 .it-head{font-size:9px;color:var(--gl);text-transform:uppercase}
 .totals{margin-top:12px;text-align:right;font-size:12px}
 .totals b{font-size:15px;color:var(--acc)}
@@ -1979,8 +1982,20 @@ function groupDocItems(items){
 function groupTotal(items,g){return g.subs.reduce(function(s,i){return s+lineTotal(items[i])},lineTotal(items[g.main]))}
 function itemRowHtml(it,i,posLabel,locked,sml){
   var sum=lineTotal(it);
-  return '<div class="it-row" style="margin-bottom:3px'+(sml?';font-size:12px':'')+'">'+
-  '<div'+(locked||sml?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':(sml?'default':'grab'))+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked||sml?'':'<span style="opacity:.55">⠿</span>')+posLabel+'</div>'+
+  if(sml){
+    /* Kompakte Unterposition (Rabattstaffel-Stufe): eine einzeilige Zeile ohne Notiz/Rabatt-Feld,
+       damit eine Position mit mehreren Miettagen nicht zu viel Platz braucht. */
+    return '<div class="it-row sml">'+
+    '<div style="display:flex;align-items:center;justify-content:center;color:var(--gll);user-select:none">'+posLabel+'</div>'+
+    '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
+    '<input type="number" step="0.5" value="'+it.qty+'" oninput="itSet('+i+',\'qty\',this.value)">'+
+    '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
+    '<input type="number" step="0.01" value="'+it.unit_price+'" oninput="itSet('+i+',\'unit_price\',this.value)">'+
+    '<input value="'+euro(sum)+'" disabled class="num">'+
+    (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)">✕</a>')+'</div>';
+  }
+  return '<div class="it-row" style="margin-bottom:3px">'+
+  '<div'+(locked?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':'grab')+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked?'':'<span style="opacity:.55">⠿</span>')+posLabel+'</div>'+
   '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
   '<input type="number" step="0.5" value="'+it.qty+'" oninput="itSet('+i+',\'qty\',this.value)">'+
   '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
@@ -1995,7 +2010,7 @@ function itemRowHtml(it,i,posLabel,locked,sml){
   '</div>';
 }
 function headerRowHtml(it,i,posLabel,locked){
-  return '<div class="it-row" style="margin-bottom:3px">'+
+  return '<div class="it-row" style="margin-bottom:1px">'+
   '<div style="display:flex;align-items:center;justify-content:center;gap:3px;color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+posLabel+'</div>'+
   '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
   '<input value="'+it.qty+' Stk." disabled>'+
@@ -2003,8 +2018,8 @@ function headerRowHtml(it,i,posLabel,locked){
   '<input value="'+euro(it.unit_price)+' /Tag" disabled>'+
   '<input value="siehe unten" disabled class="num" style="color:var(--gll)">'+
   (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)" title="Ganze Position (inkl. Rabattstaffel) löschen">✕</a>')+'</div>'+
-  '<div style="padding-left:42px;padding-right:34px">'+
-  '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Erklärung für das Kundenportal (erscheint beim Drüberfahren) – optional" style="font-size:10px;padding:5px 8px;color:var(--gll);width:100%">'+
+  '<div style="padding-left:36px;padding-right:24px;margin-bottom:2px">'+
+  '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Erklärung für das Kundenportal (erscheint beim Drüberfahren) – optional" style="font-size:9px;padding:3px 6px;color:var(--gll);width:100%">'+
   '</div>';
 }
 function renderItems(){
@@ -2016,10 +2031,10 @@ function renderItems(){
       return '<div style="margin-bottom:10px"'+(locked?'':' ondragover="itDragOver(event)" ondrop="itDrop('+g.main+',event)"')+'>'+itemRowHtml(it,g.main,mainLabel,locked,false)+'</div>';
     }
     var subsHtml=g.subs.map(function(si,k){
-      return '<div style="margin:4px 0 0 30px;opacity:.92">'+itemRowHtml(curItems[si],si,mainLabel+'.'+String.fromCharCode(65+k),locked,true)+'</div>';
+      return '<div style="margin:1px 0 0 22px">'+itemRowHtml(curItems[si],si,mainLabel+'.'+String.fromCharCode(65+k),locked,true)+'</div>';
     }).join('');
-    return '<div style="margin-bottom:10px">'+headerRowHtml(it,g.main,mainLabel,locked)+subsHtml+
-      '<div style="margin:4px 0 0 30px;padding:6px 10px;text-align:right;font-size:12px;font-weight:700;color:var(--wh);border-top:1px solid var(--line)">Gesamtsumme der Position: '+euro(groupTotal(curItems,g))+'</div></div>';
+    return '<div style="margin-bottom:8px">'+headerRowHtml(it,g.main,mainLabel,locked)+subsHtml+
+      '<div style="margin:2px 0 0 22px;padding:3px 8px;text-align:right;font-size:11px;font-weight:700;color:var(--wh);border-top:1px solid var(--line)">Gesamtsumme der Position: '+euro(groupTotal(curItems,g))+'</div></div>';
   }).join('');
   renderTotals();
 }
@@ -2501,21 +2516,21 @@ function docRowsHtml(items,f){
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(it.unit_price*f)+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(lineTotal(it)*f)+'</td></tr>';
     }
-    var head='<tr><td style="padding:6px;border-bottom:1px solid #eee;font-weight:700">'+label+'</td>'+
-      '<td style="padding:6px;border-bottom:1px solid #eee;font-weight:700">'+esc(it.description)+
-      '<div style="font-size:10px;color:#666;font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
-      '<td style="padding:6px;border-bottom:1px solid #eee"></td><td style="padding:6px;border-bottom:1px solid #eee"></td><td style="padding:6px;border-bottom:1px solid #eee"></td></tr>';
+    var head='<tr><td style="padding:5px 6px 1px;font-weight:700">'+label+'</td>'+
+      '<td style="padding:5px 6px 1px;font-weight:700">'+esc(it.description)+
+      '<div style="font-size:9px;color:#666;font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
+      '<td style="padding:5px 6px 1px"></td><td style="padding:5px 6px 1px"></td><td style="padding:5px 6px 1px"></td></tr>';
     var subs=g.subs.map(function(si,k){
       var sit=filtered[si];
-      var rab=Number(sit.discount_value)?'<div style="font-size:9px;color:#888">Rabatt: −'+(sit.discount_type==='eur'?euro(sit.discount_value*f):sit.discount_value+' %')+'</div>':'';
-      return '<tr style="font-size:10.5px;color:#444"><td style="padding:3px 6px 3px 18px;border-bottom:1px solid #eee">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
-      '<td style="padding:3px 6px;border-bottom:1px solid #eee">'+esc(sit.description)+rab+'</td>'+
-      '<td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:right">'+sit.qty+' '+esc(sit.unit||'')+'</td>'+
-      '<td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:right">'+euro(sit.unit_price*f)+'</td>'+
-      '<td style="padding:3px 6px;border-bottom:1px solid #eee;text-align:right">'+euro(lineTotal(sit)*f)+'</td></tr>';
+      var rab=Number(sit.discount_value)?'<span style="font-size:8px;color:#888"> · Rabatt −'+(sit.discount_type==='eur'?euro(sit.discount_value*f):sit.discount_value+' %')+'</span>':'';
+      return '<tr style="font-size:9px;color:#555"><td style="padding:0 6px 0 18px">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
+      '<td style="padding:0 6px">'+esc(sit.description)+rab+'</td>'+
+      '<td style="padding:0 6px;text-align:right">'+sit.qty+' '+esc(sit.unit||'')+'</td>'+
+      '<td style="padding:0 6px;text-align:right">'+euro(sit.unit_price*f)+'</td>'+
+      '<td style="padding:0 6px;text-align:right">'+euro(lineTotal(sit)*f)+'</td></tr>';
     }).join('');
-    var foot='<tr><td></td><td colspan="3" style="padding:4px 6px;text-align:right;font-weight:700;border-bottom:1px solid #ddd">Gesamtsumme der Position</td>'+
-      '<td style="padding:4px 6px;text-align:right;font-weight:700;border-bottom:1px solid #ddd">'+euro(groupTotal(filtered,g)*f)+'</td></tr>';
+    var foot='<tr><td></td><td colspan="3" style="padding:2px 6px 5px;text-align:right;font-weight:700;border-bottom:1px solid #ddd;font-size:10.5px">Gesamtsumme der Position</td>'+
+      '<td style="padding:2px 6px 5px;text-align:right;font-weight:700;border-bottom:1px solid #ddd;font-size:10.5px">'+euro(groupTotal(filtered,g)*f)+'</td></tr>';
     return head+subs+foot;
   }).join('');
 }
