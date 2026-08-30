@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 57;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 58;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -508,6 +508,12 @@ function upgrade(PDO $p): void {
   if ($v < 55) removePlaceholderProducts($p);
   if ($v < 56) reAddCorePositions($p);
   if ($v < 57) fixSieToDuTexts($p);
+  if ($v < 58) {
+    foreach ([
+      "alter table documents add column rental_from text",
+      "alter table documents add column rental_to text",
+    ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+  }
   if ($v < 50) {
     /* Platzhaltertexte ("bitte ... ergänzen") aus den Rechtstexten entfernen und stattdessen
        einen "geprüft"-Status einführen, den das Dashboard abfragen kann. */
@@ -1081,6 +1087,7 @@ create table documents (id text primary key, share_token text, doc_type text not
   booking_id text references bookings(id) on delete set null,
   parent_id text, status text default 'entwurf', doc_date text, valid_until text, due_date text,
   tax_rate real default 19, is_small_business integer default 0, intro_text text, outro_text text,
+  rental_from text, rental_to text,
   total_net real default 0, total_tax real default 0, total_gross real default 0,
   deposit_deducted real default 0, total_override real, sent_at text, paid_at text,
   accepted_name text, accept_signature text, created_at text, updated_at text);
@@ -2934,6 +2941,15 @@ try {
       'subdir' => $cfg['subdir'] ?? '', 'key' => $cfg['key'] ?? '',
       'has_token' => !empty($cfg['token']),
       'last_sha' => $cfg['last_sha'] ?? null, 'last_time' => $cfg['last_time'] ?? null]);
+  }
+  /* Öffentlich: nur USt.-Satz + Kleinunternehmer-Flag, damit die Technik-Mietseite Preise
+     wahlweise brutto (Privatkunde) oder netto (Firmenkunde) anzeigen kann - kein Zugriff
+     auf die restlichen (geschützten) Einstellungen. */
+  if ($path === 'public/tax-info' && $method === 'GET') {
+    $p = db();
+    $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
+    $comp = json_decode((string)$p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true) ?: [];
+    out(['tax_rate' => (float)($defs['tax_rate'] ?? 19), 'small_business' => !empty($comp['small_business'])]);
   }
   /* KI-Textassistent: Konfiguration (Basis-URL/Modell/API-Schlüssel) liegt in settings.ai –
      nur angemeldet, der Schlüssel selbst wird nie zurückgegeben. */

@@ -93,6 +93,11 @@ var PLZ=sessionStorage.getItem('portal_plz')||'';
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
 function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
 function dt(d){if(!d)return '–';return new Date(d).toLocaleDateString('de-DE')}
+function rentalPeriodLabel(from,to){
+  if(!from)return '';
+  if(!to||to<=from)return 'Mietzeitraum am '+dt(from);
+  return 'Mietzeitraum vom '+dt(from)+' bis '+dt(to);
+}
 function app(html){document.getElementById('app').innerHTML='<div class="fade">'+html+'</div>'}
 function showMsg(id,cls,txt){var m=document.getElementById(id);m.className='msg '+cls;m.textContent=txt}
 
@@ -164,7 +169,7 @@ function renderOffer(){
     '<div class="card"><div class="kicker">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
     '<div><h1>Hallo '+esc(DOC.customer)+'!</h1>'+
-    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until?' · gültig bis '+dt(d.valid_until):'')+'</p></div>'+
+    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until?' · gültig bis '+dt(d.valid_until):'')+(rentalPeriodLabel(d.rental_from,d.rental_to)?' · '+rentalPeriodLabel(d.rental_from,d.rental_to):'')+'</p></div>'+
     '<button class="btn g" onclick="downloadPdf()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Als PDF speichern</button></div>'+
     (statusLine?'<div style="margin-top:12px">'+statusLine+'</div>':'')+
     (d.intro_text?'<p style="margin-top:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+

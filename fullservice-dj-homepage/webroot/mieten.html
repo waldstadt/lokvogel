@@ -242,6 +242,11 @@ footer a:hover{color:var(--acc)}
       <button class="btn g" onclick="checkAvail()">Verfügbarkeit prüfen</button>
       <span class="sub" id="partnerBadge" style="font-size:13px;color:var(--mut)"></span>
     </div>
+    <div id="priceToggleWrap" style="display:flex;gap:10px;align-items:center;margin-top:16px">
+      <span class="sub" style="font-size:13px">Preise anzeigen als:</span>
+      <button class="btn small" id="ptBrutto" onclick="setPriceMode('brutto')">Privatkunde (inkl. MwSt.)</button>
+      <button class="btn small ghost" id="ptNetto" onclick="setPriceMode('netto')">Firmenkunde (netto)</button>
+    </div>
 
     <div class="cats" id="catChips"></div>
 
@@ -251,7 +256,7 @@ footer a:hover{color:var(--acc)}
     </div>
     <h3 style="font-size:19px;margin-top:40px;margin-bottom:4px" id="singleItemsHead">Einzelne Artikel</h3>
     <div class="rent-grid" id="rentGrid"></div>
-    <p class="rent-note">Alle Preise netto. Ab 1 Woche, 2 Wochen und 1 Monat gelten automatisch günstigere Tagessätze – die Staffel-Gesamtsumme seht ihr live im Tourcase.</p>
+    <p class="rent-note" id="priceNote">Alle Preise inkl. MwSt. Ab 1 Woche, 2 Wochen und 1 Monat gelten automatisch günstigere Tagessätze – die Staffel-Gesamtsumme seht ihr live im Tourcase.</p>
   </div>
 </section>
 
@@ -298,7 +303,7 @@ footer a:hover{color:var(--acc)}
   <div id="cartItems"></div>
   <div id="cartEmpty" style="display:none;color:var(--mut);font-size:14px;padding:20px 0">Noch nichts im Tourcase – einfach Artikel oder Sets auswählen und hinzufügen.</div>
   <div id="cartTotalRow" style="display:none;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:15px">
-    <span>Gesamt (netto, für den gewählten Zeitraum)</span><b id="cartTotal" style="font-size:19px"></b>
+    <span id="cartTotalLabel">Gesamt (für den gewählten Zeitraum)</span><b id="cartTotal" style="font-size:19px"></b>
   </div>
   <div id="cartAuth" style="margin-top:18px"></div>
   <div class="msg" id="cartMsg" style="margin-top:14px"></div>
@@ -378,7 +383,8 @@ function rentalPriceClient(rate,days,followupPct,weekPct,twoWeekPct,monthPct){
 }
 function priceLabel(dayRate,pp){
   if(!dayRate&&pp==null)return 'Preis auf Anfrage';
-  return pp!=null?'<span class="old">'+euro(dayRate||0)+'</span>'+euro(pp)+' <small>/ Miettag · Partnerpreis</small>':euro(dayRate||0)+' <small>/ Miettag</small>';
+  var f=priceFactor();
+  return pp!=null?'<span class="old">'+euro((dayRate||0)*f)+'</span>'+euro(pp*f)+' <small>/ Miettag · Partnerpreis</small>':euro((dayRate||0)*f)+' <small>/ Miettag</small>';
 }
 function renderCatChips(){
   var cats=[];
@@ -515,7 +521,7 @@ function renderProductModal(){
       var ap=PARTNER?partnerPrice(a):a.day_rate;
       return '<button type="button" class="pm-addon" onclick="openProductModal(\''+jsq(a.id)+'\')">'+thumb+
         '<span class="pm-addon-name">'+esc(a.name)+'</span>'+
-        '<span class="pm-addon-price">'+(ap!=null?'+ '+euro(ap)+' <small>/ Tag</small>':'Preis auf Anfrage')+'</span></button>';
+        '<span class="pm-addon-price">'+(ap!=null?'+ '+euro(ap*priceFactor())+' <small>/ Tag</small>':'Preis auf Anfrage')+'</span></button>';
     }).join('')+'</div></div>';
   }
   var addonHtml=relSection('Passt dazu',addonItems(e))+relSection('Passend für',fitsItems(e));
@@ -576,6 +582,31 @@ function sfetch(path){
 sfetch('equipment?select=*&public=eq.true&rentable=eq.true&status=eq.aktiv&order=sort').then(function(r){if(r.length){EQ=r;renderCatChips();renderRent()}}).catch(function(){});
 sfetch('equipment?select=*').then(function(r){r.forEach(function(e){EQ_ALL[e.id]=e})}).catch(function(){});
 
+/* Privatkunde (Standard) sieht Preise inkl. MwSt., Firmenkunde kann auf netto umschalten.
+   Reine Anzeigesache – die tatsächliche Abrechnung beim Absenden rechnet der Server verbindlich
+   in netto (wie gehabt). */
+var PRICE_MODE=localStorage.getItem('lg_price_mode')||'brutto';
+var TAX_RATE=19,SMALL_BUSINESS=false;
+function priceFactor(){return(PRICE_MODE==='brutto'&&!SMALL_BUSINESS)?1+TAX_RATE/100:1}
+function setPriceMode(m){
+  PRICE_MODE=m;localStorage.setItem('lg_price_mode',m);
+  updatePriceToggleUI();renderRent();renderSets();renderCart();
+}
+function updatePriceToggleUI(){
+  var b=document.getElementById('ptBrutto'),n=document.getElementById('ptNetto');
+  if(!b)return;
+  b.className='btn small'+(PRICE_MODE==='brutto'?'':' ghost');
+  n.className='btn small'+(PRICE_MODE==='netto'?'':' ghost');
+  var note=document.getElementById('priceNote');
+  if(note)note.textContent=(PRICE_MODE==='brutto'&&!SMALL_BUSINESS?'Alle Preise inkl. MwSt.':'Alle Preise netto')+' Ab 1 Woche, 2 Wochen und 1 Monat gelten automatisch günstigere Tagessätze – die Staffel-Gesamtsumme seht ihr live im Tourcase.';
+}
+fetch(API+'/public/tax-info').then(function(r){return r.json()}).then(function(j){
+  TAX_RATE=Number(j.tax_rate)||19;SMALL_BUSINESS=!!j.small_business;
+  var wrap=document.getElementById('priceToggleWrap');
+  if(wrap)wrap.style.display=SMALL_BUSINESS?'none':'flex';
+  updatePriceToggleUI();renderRent();renderSets();renderCart();
+}).catch(function(){});
+
 /* ---- Sets: mehrere Artikel als ein buchbares Paket ---- */
 function setRawSum(s){
   return SET_ITEMS.filter(function(x){return x.set_id===s.id}).reduce(function(sum,x){
@@ -631,7 +662,7 @@ function renderSets(){
     var items=setItemsOf(s);
     var contains=items.map(function(it){return (it.qty>1?it.qty+'× ':'')+it.e.name}).join(', ');
     var rate=setDayRate(s);
-    var price=rate?euro(rate)+' <small>/ Miettag</small>':'Preis auf Anfrage';
+    var price=rate?euro(rate*priceFactor())+' <small>/ Miettag</small>':'Preis auf Anfrage';
     var inCart=CART.some(function(c){return c.type==='set'&&c.set_id===s.id});
     return '<div class="rent reveal vis clickable" onclick="openSetProductModal(\''+jsq(s.id)+'\')">'+setImageArea(s)+'<div class="rb">'+
       '<div class="rc">SET</div>'+
@@ -657,7 +688,7 @@ function renderSetProductModal(){
   var s=findSet(SET_PROD_OPEN);
   if(!s){closeProductModal();return}
   var rate=setDayRate(s);
-  var price=rate?euro(rate)+' <small>/ Miettag</small>':'Preis auf Anfrage';
+  var price=rate?euro(rate*priceFactor())+' <small>/ Miettag</small>':'Preis auf Anfrage';
   var inCart=CART.some(function(c){return c.type==='set'&&c.set_id===s.id});
   var cartCtrl='<div class="pm-cart">'+
     '<input type="number" min="1" value="1" id="qty-set-m-'+esc(s.id)+'">'+
@@ -759,7 +790,7 @@ function renderCart(){
       Number(e&&e.tier_month_pct!=null?e.tier_month_pct:12))*qty;
   }
   function row(name,amount,idx){
-    var priceTxt=amount==null?'<span style="color:var(--mut2)">auf Anfrage</span>':euro(amount);
+    var priceTxt=amount==null?'<span style="color:var(--mut2)">auf Anfrage</span>':euro(amount*priceFactor());
     return '<div class="tc-item"><span>'+esc(name)+'</span><span>'+priceTxt+
       ' <a onclick="removeFromCart('+idx+')" style="color:var(--mut2);margin-left:8px" title="Entfernen">✕</a></span></div>';
   }
@@ -780,7 +811,8 @@ function renderCart(){
   document.getElementById('cartEmpty').style.display=CART.length?'none':'block';
   document.getElementById('cartTotalRow').style.display=CART.length?'flex':'none';
   document.getElementById('cartSubmitWrap').style.display=CART.length?'block':'none';
-  document.getElementById('cartTotal').textContent=euro(total)+(from&&days>1?' · '+days+' Tage':'')+(onRequest?' + Artikel auf Anfrage':'');
+  document.getElementById('cartTotal').textContent=euro(total*priceFactor())+(from&&days>1?' · '+days+' Tage':'')+(onRequest?' + Artikel auf Anfrage':'');
+  document.getElementById('cartTotalLabel').textContent='Gesamt ('+(PRICE_MODE==='brutto'&&!SMALL_BUSINESS?'inkl. MwSt.':'netto')+', für den gewählten Zeitraum)';
   renderTcBadge();
   renderCartAuth();
 }

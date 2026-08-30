@@ -396,13 +396,18 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div><label>Datum</label><input type="date" id="docDate"></div>
         <div><label id="docDateLbl2">Fällig / gültig bis</label><input type="date" id="docDate2"></div>
       </div>
+      <div class="grid3">
+        <div><label>Miettage von <span class="mut sml" style="text-transform:none;letter-spacing:0">– für Technikartikel mit Menge Stk./Set</span></label><input type="date" id="docRentFrom" onchange="renderRentalHint()"></div>
+        <div><label>Miettage bis <span class="mut sml" style="text-transform:none;letter-spacing:0">– leer = 1 Miettag</span></label><input type="date" id="docRentTo" onchange="renderRentalHint()"></div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:11px"><span class="mut sml" id="docRentHint"></span></div>
+      </div>
       <div class="grid4">
         <div><label>Typ</label><select id="docType">
           <option value="angebot">Angebot</option><option value="rechnung">Rechnung</option>
           <option value="abschlag">Abschlagsrechnung</option><option value="schluss">Schlussrechnung</option>
           <option value="lieferschein">Lieferschein</option></select></div>
         <div><label>USt. %</label><input type="number" id="docTax" step="0.1" value="19"></div>
-        <div><label>Preisanzeige für den Kunden</label><select id="docMode"><option value="netto">Netto + USt. ausgewiesen</option><option value="brutto">Brutto (inkl. USt.)</option></select></div>
+        <div><label>Preisanzeige</label><label style="display:flex;align-items:center;gap:8px;margin-top:9px;font-weight:400;text-transform:none;letter-spacing:normal;cursor:pointer"><input type="checkbox" id="docNetto" style="width:auto" onchange="renderTotals()">Netto anzeigen (für Geschäftskunden)</label></div>
         <div id="docDepWrap" style="display:none"><label>Verrechnete Abschläge (brutto €)</label><input type="number" id="docDep" step="0.01" value="0"></div>
       </div>
       <div class="grid4">
@@ -1445,6 +1450,39 @@ function equipTieredPrice(eq,days){
   if(days>=31)total+=(days-30)*base*monthPct/100;
   return total;
 }
+/* Miettage aus dem Dokument-Header (Angebot/Rechnung): "von" ohne "bis" = 1 Miettag,
+   die Staffel-Multiplikation gilt nur für Positionen mit Einheit Stk./Set - Pauschal-,
+   Kilometer- usw.-Positionen bleiben davon unberührt. */
+function docRentalDays(){
+  var from=v('docRentFrom'),to=v('docRentTo');
+  if(!from||!to||to<=from)return 1;
+  return Math.round((new Date(to)-new Date(from))/86400000)+1;
+}
+function rentalPeriodLabel(from,to){
+  if(!from)return '';
+  if(!to||to<=from)return 'Mietzeitraum am '+dt(from);
+  return 'Mietzeitraum vom '+dt(from)+' bis '+dt(to);
+}
+function renderRentalHint(){
+  var el=document.getElementById('docRentHint');if(!el)return;
+  var days=docRentalDays();
+  el.textContent=days>1?'→ '+days+' Miettage, Rabattstaffel greift für Stk./Set-Positionen':'';
+}
+/* Erklärtext für die Position, damit der Kunde die Rabattstaffel nachvollziehen kann. */
+function tierBreakdownNote(eq,days){
+  var base=Number(eq.day_rate)||0,defs=(S.defaults||{});
+  var followupPct=Number(eq.followup_pct!=null?eq.followup_pct:50);
+  var weekPct=Number(eq.tier_week_pct!=null?eq.tier_week_pct:(defs.tier_week_pct!=null?defs.tier_week_pct:30));
+  var twoWeekPct=Number(eq.tier_2week_pct!=null?eq.tier_2week_pct:(defs.tier_2week_pct!=null?defs.tier_2week_pct:20));
+  var monthPct=Number(eq.tier_month_pct!=null?eq.tier_month_pct:(defs.tier_month_pct!=null?defs.tier_month_pct:12));
+  var parts=['Tag 1: '+euro(base)];
+  var followDays=Math.min(days,7)-1;
+  if(followDays>0)parts.push(followDays+' Folgetag(e) à '+followupPct+' % ('+euro(base*followupPct/100)+'/Tag)');
+  if(days>=8){var d2=Math.min(days,14)-7;parts.push(d2+' Tag(e) ab Woche 2 à '+weekPct+' % ('+euro(base*weekPct/100)+'/Tag)');}
+  if(days>=15){var d3=Math.min(days,30)-14;parts.push(d3+' Tag(e) ab Woche 3 à '+twoWeekPct+' % ('+euro(base*twoWeekPct/100)+'/Tag)');}
+  if(days>=31){var d4=days-30;parts.push(d4+' Tag(e) ab Tag 31 à '+monthPct+' % ('+euro(base*monthPct/100)+'/Tag)');}
+  return 'Rabattstaffel für '+days+' Miettage: '+parts.join(', ')+' = '+euro(equipTieredPrice(eq,days))+' je Stück.';
+}
 function eqAvailable(eqId,b,excludeBeId){
   var eq=CACHE.equipment.find(function(e){return e.id===eqId});if(!eq)return 0;
   var end=b.end_date||b.event_date;
@@ -1703,8 +1741,8 @@ function openDocEditor(id,newType){
       tax_rate:(S.company&&S.company.small_business)?0:(defs.tax_rate!=null?defs.tax_rate:19),
       is_small_business:!!(S.company&&S.company.small_business),
       intro_text:newType==='angebot'?(defs.quote_intro||''):'',outro_text:newType==='angebot'?'':(defs.invoice_outro||''),
-      deposit_deducted:0,customer_id:'',booking_id:null,
-      price_mode:'netto',discount_value:0,discount_type:'pct'};
+      deposit_deducted:0,customer_id:'',booking_id:null,rental_from:null,rental_to:null,
+      price_mode:'brutto',discount_value:0,discount_type:'pct'};
     var days=newType==='angebot'?(defs.quote_valid_days||30):(defs.payment_days||14);
     var d2=new Date();d2.setDate(d2.getDate()+days);
     curDoc[newType==='angebot'?'valid_until':'due_date']=d2.toISOString().slice(0,10);
@@ -1753,15 +1791,17 @@ function fillDocForm(){
   document.getElementById('docDate').value=d.doc_date||'';
   document.getElementById('docDate2').value=d.doc_type==='angebot'?(d.valid_until||''):(d.due_date||'');
   document.getElementById('docTax').value=d.is_small_business?0:d.tax_rate;
-  document.getElementById('docMode').value=d.price_mode||'netto';
+  document.getElementById('docNetto').checked=(d.price_mode==='netto');
   document.getElementById('docDiscVal').value=d.discount_value||0;
   document.getElementById('docDiscType').value=d.discount_type||'pct';
   document.getElementById('docDep').value=d.deposit_deducted||0;
   document.getElementById('docTotalOverride').value=d.total_override!=null?d.total_override:'';
   document.getElementById('docIntro').value=d.intro_text||'';
   document.getElementById('docOutro').value=d.outro_text||'';
+  document.getElementById('docRentFrom').value=d.rental_from||'';
+  document.getElementById('docRentTo').value=d.rental_to||'';
   updateDocTypeUI(d.doc_type);
-  renderItems();renderStatusBtns();applyDocLock();
+  renderItems();renderStatusBtns();applyDocLock();renderRentalHint();
 }
 function showAcceptSig(){
   openModal('Unterschrift – '+esc(curDoc.number)+' · '+esc(curDoc.accepted_name||''),
@@ -1770,7 +1810,7 @@ function showAcceptSig(){
 function docLockedJs(d){return !!(d&&d.id&&['angebot','lieferschein'].indexOf(d.doc_type)<0&&d.status!=='entwurf')}
 function applyDocLock(){
   var locked=docLockedJs(curDoc);
-  ['docType','docCust','docBook','docDate','docDate2','docTax','docMode','docDiscVal','docDiscType','docDep','docTotalOverride','docIntro','docOutro']
+  ['docType','docCust','docBook','docDate','docDate2','docTax','docNetto','docRentFrom','docRentTo','docDiscVal','docDiscType','docDep','docTotalOverride','docIntro','docOutro']
     .forEach(function(i){var el=document.getElementById(i);if(el)el.disabled=locked});
   document.querySelectorAll('#docItems input, #docItems select').forEach(function(el){el.disabled=locked});
   document.getElementById('docSaveBtn').style.display=locked?'none':'';
@@ -1940,16 +1980,17 @@ function renderTotals(){
     if(c.disc)html+='Zwischensumme: '+euro(c.sub)+' &nbsp;·&nbsp; Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+': −'+euro(c.disc)+'<br>';
     html+='Netto: '+euro(c.net)+' &nbsp;·&nbsp; USt. '+c.rate+' %: '+euro(c.tax)+' &nbsp;·&nbsp; Brutto: <b>'+euro(c.gross)+'</b>';
   }
-  if(v('docMode')==='brutto')html+='<br><span class="mut sml">Kundenansicht: Preise werden brutto (inkl. USt.) angezeigt</span>';
+  html+=docModeVal()==='brutto'?'<br><span class="mut sml">Kundenansicht: Preise werden brutto (inkl. USt.) angezeigt – Standard für Privatkunden</span>':
+    '<br><span class="mut sml">Kundenansicht: Preise werden netto + USt. ausgewiesen – für Geschäftskunden</span>';
   if(t==='schluss'&&c.dep)html+='<br>abzgl. Abschläge: −'+euro(c.dep)+' &nbsp;·&nbsp; <b style="color:var(--wh)">Restbetrag: '+euro(c.gross-c.dep)+'</b>';
   document.getElementById('docTotals').innerHTML=html;
 }
+function docModeVal(){var el=document.getElementById('docNetto');return el&&el.checked?'netto':'brutto'}
 document.getElementById('docTax').addEventListener('input',renderTotals);
 document.getElementById('docDep').addEventListener('input',renderTotals);
 document.getElementById('docDiscVal').addEventListener('input',renderTotals);
 document.getElementById('docDiscType').addEventListener('change',renderTotals);
 document.getElementById('docTotalOverride').addEventListener('input',renderTotals);
-document.getElementById('docMode').addEventListener('change',renderTotals);
 
 function saveDoc(){
   var custId=v('docCust');
@@ -1958,7 +1999,8 @@ function saveDoc(){
   var body={doc_type:type,customer_id:custId,booking_id:v('docBook')||null,doc_date:v('docDate'),
     tax_rate:c.rate,is_small_business:c.rate===0&&!!(S.company&&S.company.small_business),
     intro_text:v('docIntro'),outro_text:v('docOutro'),
-    price_mode:v('docMode'),discount_value:c.discVal,discount_type:c.discType,parent_id:curDoc.parent_id||null,
+    rental_from:v('docRentFrom')||null,rental_to:v('docRentTo')||null,
+    price_mode:docModeVal(),discount_value:c.discVal,discount_type:c.discType,parent_id:curDoc.parent_id||null,
     total_net:c.net,total_tax:c.tax,total_gross:c.gross,total_override:c.override,deposit_deducted:type==='schluss'?c.dep:0};
   body[type==='angebot'?'valid_until':'due_date']=v('docDate2')||null;
   var p;
@@ -2350,7 +2392,7 @@ function printDoc(){
   var cust=CACHE.customers.find(function(x){return x.id===v('docCust')})||{};
   var type=v('docType');
   var small=Number(document.getElementById('docTax').value)===0&&comp.small_business;
-  var brutto=v('docMode')==='brutto'&&!small;
+  var brutto=docModeVal()==='brutto'&&!small;
   var f=brutto?1+c.rate/100:1;
   var rows=curItems.filter(function(it){return it.description}).map(function(it,i){
     var rab=Number(it.discount_value)?'<div style="font-size:10px;color:#666">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):it.discount_value+' %')+'</div>':'';
@@ -2386,7 +2428,7 @@ function printDoc(){
   '<div style="margin-bottom:30px">'+esc(custName(cust))+'<br>'+esc(cust.street||'')+'<br>'+esc([cust.zip,cust.city].filter(Boolean).join(' '))+'</div>'+
   '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px">'+
   '<div style="font-size:17px;font-weight:700">'+docTypeName(type)+' '+esc(d.number)+'</div>'+
-  '<div style="text-align:right;color:#555">Datum: '+dt(v('docDate'))+(v('docDate2')?('<br>'+(type==='angebot'?'Gültig bis: ':'Zahlbar bis: ')+dt(v('docDate2'))):'')+'</div></div>'+
+  '<div style="text-align:right;color:#555">Datum: '+dt(v('docDate'))+(v('docDate2')?('<br>'+(type==='angebot'?'Gültig bis: ':'Zahlbar bis: ')+dt(v('docDate2'))):'')+(rentalPeriodLabel(v('docRentFrom'),v('docRentTo'))?'<br>'+rentalPeriodLabel(v('docRentFrom'),v('docRentTo')):'')+'</div></div>'+
   (v('docIntro')?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(v('docIntro'))+'</p>':'')+
   '<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2">'+
   '<th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Beschreibung</th><th style="padding:6px;text-align:right">Menge</th><th style="padding:6px;text-align:right">Einzel'+(brutto?' brutto':' netto')+'</th><th style="padding:6px;text-align:right">Gesamt'+(brutto?' brutto':' netto')+'</th></tr></thead>'+
@@ -4039,7 +4081,7 @@ function catalogFind(identifier){
   var prod=(CACHE.products||[]).find(function(x){return x.sku===idU});
   if(prod)return{type:'product',item:prod,sku:prod.sku,name:prod.name,unit:prod.unit||'Stk.',price:prodPrice(prod)};
   var eq=(CACHE.equipment||[]).find(function(x){return(x.sku&&x.sku.toUpperCase()===idU)||x.name.toLowerCase()===identifier.toLowerCase()});
-  if(eq)return{type:'equipment',item:eq,sku:eq.sku||eq.name,name:eq.name,unit:'Tag',price:Number(eq.day_rate)||0};
+  if(eq)return{type:'equipment',item:eq,sku:eq.sku||eq.name,name:eq.name,unit:'Stk.',price:equipTieredPrice(eq,typeof curDoc!=='undefined'&&curDoc?docRentalDays():1)};
   return null;
 }
 function prodPrice(p){
@@ -4122,7 +4164,8 @@ function renderPicker(){
   var eq=(CACHE.equipment||[]).filter(function(e){
     return e.status==='aktiv'&&(!q||[e.sku,e.name,e.category].join(' ').toLowerCase().indexOf(q)>=0);
   }).map(function(e){
-    return{key:'e:'+e.id,sku:e.sku||'–',name:e.name,unit:'Tag',price:Number(e.day_rate)||0,desc:e.description||'',
+    var days=docRentalDays();
+    return{key:'e:'+e.id,sku:e.sku||'–',name:e.name,unit:days>1?'Stk. ('+days+' Tage)':'Stk.',price:equipTieredPrice(e,days),desc:e.description||'',
       badge:'<span class="b grey">Technikkatalog</span>'};
   });
   var list=prods.concat(eq).sort(byNameDe);
@@ -4137,15 +4180,15 @@ function renderPicker(){
 function insertProduct(key){
   if(key.indexOf('e:')===0){
     var eq=(CACHE.equipment||[]).find(function(x){return x.id===key.slice(2)});if(!eq)return;
-    var linkedBooking=curDoc&&curDoc.booking_id?(CACHE.bookings||[]).find(function(b){return b.id===curDoc.booking_id}):null;
-    var defDays=linkedBooking?rentDays(linkedBooking):1;
+    var days=docRentalDays();
     var menge=Number(prompt('Menge (Stückzahl)?',String(eq.min_qty||1)))||1;
-    var tage=Number(prompt('Für wie viele Miettage?',String(defDays)))||1;
-    var price=equipTieredPrice(eq,tage);
-    curItems.push({pos:curItems.length+1,description:eq.name,note:eq.description||'',
-      qty:menge,unit:tage>1?'Stk. ('+tage+' Tage)':'Stk.',unit_price:price});
+    var price=equipTieredPrice(eq,days);
+    var note=eq.description||'';
+    if(days>1)note=(note?note+' ':'')+tierBreakdownNote(eq,days);
+    curItems.push({pos:curItems.length+1,description:eq.name,note:note,
+      qty:menge,unit:'Stk.',unit_price:price});
     closeModal();renderItems();
-    toast('„'+eq.name+'" eingefügt ('+menge+' Stk.'+(tage>1?', '+tage+' Tage gestaffelt':'')+') ✓');
+    toast('„'+eq.name+'" eingefügt ('+menge+' Stk.'+(days>1?', '+days+' Miettage gestaffelt':'')+') ✓');
     return;
   }
   var p=(CACHE.products||[]).find(function(x){return x.id===(key.indexOf('p:')===0?key.slice(2):key)});if(!p)return;
