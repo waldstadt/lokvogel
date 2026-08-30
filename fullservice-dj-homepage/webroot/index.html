@@ -379,7 +379,7 @@ footer a:hover{color:var(--acc)}
         </div>
         <div class="row">
           <div><label>Anlass</label>
-            <select name="event_type">
+            <select name="event_type" id="inqEventType" onchange="inqMsgPlaceholder()">
               <option>Hochzeit</option><option>Geburtstag</option><option>Firmenfeier</option>
               <option>Technik mieten</option><option>Sonstiges</option>
             </select>
@@ -387,7 +387,7 @@ footer a:hover{color:var(--acc)}
           <div><label>Location / Ort</label><input type="text" name="location" placeholder="z. B. Hemer oder Location-Name"></div>
         </div>
         <label>Eure Nachricht</label>
-        <textarea name="message" placeholder="Erzählt kurz von eurer Feier: Gästezahl, Uhrzeiten, Musikrichtung …"></textarea>
+        <textarea name="message" id="inqMsg" placeholder="Erzählt kurz von eurer Feier: Gästezahl, Uhrzeiten, Musikrichtung …"></textarea>
         <button class="btn" type="submit" id="sendBtn">Anfrage senden</button>
       </form>
     </div>
@@ -722,6 +722,15 @@ sfetch('friends?select=*&public=eq.true&order=sort').then(function(r){
 try{var _tp=JSON.stringify({p:location.pathname.split('/').pop()||'index.html',r:document.referrer||''});
 navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 
+/* Firmenfeiern brauchen fürs spätere Angebot oft Firmenname/Rechnungsadresse - dafür gibt es
+   kein eigenes Feld (kein Schema-Wechsel nötig), aber der Nachrichten-Platzhalter leitet
+   gezielt dazu an, das mit reinzuschreiben. */
+function inqMsgPlaceholder(){
+  var t=document.getElementById('inqEventType').value,m=document.getElementById('inqMsg');
+  m.placeholder=t==='Firmenfeier'
+    ?'Erzählt kurz von der Feier: Gästezahl, Uhrzeiten, Musikrichtung … und für die Rechnung gerne gleich Firmenname und Rechnungsadresse.'
+    :'Erzählt kurz von eurer Feier: Gästezahl, Uhrzeiten, Musikrichtung …';
+}
 /* ===== Anfrage-Formular ===== */
 document.getElementById('inqForm').addEventListener('submit',function(ev){
   ev.preventDefault();
