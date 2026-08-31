@@ -400,7 +400,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
   <!-- ANGEBOTE -->
   <div class="pg" id="pg-quotes">
     <div class="phead"><div><div class="pt">Angebote</div><div class="ps" id="qStats"></div></div>
-      <button class="btn" onclick="openDocEditor(null,'angebot')">+ Neues Angebot</button></div>
+      <button class="btn" onclick="newQuote(null)">+ Neues Angebot</button></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Datum</th><th>Kunde</th><th class="num">Brutto</th><th>Gültig bis</th><th>Status</th></tr></thead><tbody id="quoteRows"></tbody></table></div>
   </div>
 
@@ -419,25 +419,28 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <a id="docBack" onclick="showPage('inv')">← Zurück</a>
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="docTitle">Dokument</div><div class="ps" id="docSub"></div></div>
       <div>
-        <button class="btn g sm" onclick="printDoc()">Drucken / PDF</button>
+        <span id="docDocBtns"><button class="btn g sm" onclick="printDoc()">Drucken / PDF</button>
         <button class="btn g sm" onclick="shareDoc()">Kundenlink</button>
-        <span id="docStatusBtns"></span>
+        <span id="docStatusBtns"></span></span>
         <button class="btn sm" id="docSaveBtn" onclick="saveDoc()">Speichern</button>
       </div></div>
     <div id="docLockNote" style="display:none;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--gll)"> <b>Festgeschrieben (GoBD):</b>Diese Rechnung wurde versendet – Inhalte lassen sich nicht mehr ändern. Für Änderungen eine <a onclick="korrekturDoc()">Korrekturrechnung erstellen</a>oder die Rechnung stornieren. <a onclick="openAuditModal()" style="float:right">Änderungsprotokoll</a></div>
     <div class="card">
-      <div class="grid4">
+      <div id="docTplNote" class="sml mut" style="display:none;margin-bottom:12px;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:10px 14px">
+        Das hier ist eine Vorlage, kein echtes Angebot: Kunde, Datum und Nummer kommen erst dazu, wenn du daraus ein Angebot anlegst. Gespeichert werden Name, Einleitungstext, Positionen und Schlusstext.</div>
+      <div id="docTplNameWrap" style="display:none"><label>Name der Vorlage *</label><input id="docTplName" placeholder="z. B. Hochzeit Standard"></div>
+      <div class="grid4" id="docHeadGrid">
         <div><label>Kunde *</label><select id="docCust"></select></div>
         <div><label>Buchung</label><select id="docBook"><option value="">–</option></select></div>
         <div><label>Datum</label><input type="date" id="docDate"></div>
         <div><label id="docDateLbl2">Fällig / gültig bis</label><input type="date" id="docDate2"></div>
       </div>
-      <div class="grid3">
+      <div class="grid3" id="docRentGrid">
         <div><label>Miettage von <span class="mut sml" style="text-transform:none;letter-spacing:0">– für Technikartikel mit Menge Stk./Set</span></label><input type="date" id="docRentFrom" onchange="renderRentalHint()"></div>
         <div><label>Miettage bis <span class="mut sml" style="text-transform:none;letter-spacing:0">– leer = 1 Miettag</span></label><input type="date" id="docRentTo" onchange="renderRentalHint()"></div>
         <div style="display:flex;align-items:flex-end;padding-bottom:11px"><span class="mut sml" id="docRentHint"></span></div>
       </div>
-      <div class="grid4">
+      <div class="grid4" id="docTypeGrid">
         <div><label>Typ</label><select id="docType">
           <option value="angebot">Angebot</option><option value="bestaetigung">Auftragsbestätigung</option>
           <option value="rechnung">Rechnung</option>
@@ -447,7 +450,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div><label>Preisanzeige</label><label style="display:flex;align-items:center;gap:8px;margin-top:9px;font-weight:400;text-transform:none;letter-spacing:normal;cursor:pointer"><input type="checkbox" id="docNetto" style="width:auto" onchange="renderTotals()">Netto anzeigen (für Geschäftskunden)</label></div>
         <div id="docDepWrap" style="display:none"><label>Verrechnete Abschläge (brutto €)</label><input type="number" id="docDep" step="0.01" value="0"></div>
       </div>
-      <div class="grid4">
+      <div class="grid4" id="docDiscGrid">
         <div><label>Rabatt aufs Gesamtdokument</label><input type="number" step="0.01" id="docDiscVal" value="0"></div>
         <div><label>Rabatt-Art</label><select id="docDiscType"><option value="pct">%</option><option value="eur">€ (brutto)</option></select></div>
         <div><label>Pauschal-Gesamtpreis (brutto €) <span class="mut sml" style="text-transform:none;letter-spacing:0">– überschreibt die Positionssumme</span></label><input type="number" step="0.01" id="docTotalOverride" placeholder="leer = aus Positionen berechnet"></div>
@@ -836,6 +839,11 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           </div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveNumbering()">Speichern</button></div>
         </div>
+        <div class="card"><h3>Angebots-Vorlagen <span class="mut sml" style="font-weight:400">– Standardangebote zum schnellen Anpassen</span></h3>
+          <div class="sml mut" style="margin-bottom:10px">Leg dir hier deine üblichen Angebote einmal ab: Positionen, Einleitungs- und Schlusstext. Beim Anlegen eines neuen Angebots kannst du dann auswählen, ob du leer startest oder mit einer Vorlage. Anpassen lässt sich danach alles wie gewohnt.</div>
+          <div id="tplSetList"></div>
+          <div style="margin-top:12px"><button class="btn sm" onclick="openTplEditor(null)">+ Neue Vorlage</button></div>
+        </div>
         <div class="card"><h3>Automatische Fahrtstrecke</h3>
           <div class="sml mut" style="margin-bottom:8px">Berechnet im Rider auf Knopfdruck die Autostrecke von deiner Firmenadresse (Firmendaten) zur Location, über <a href="https://openrouteservice.org" target="_blank" rel="noopener">OpenRouteService</a> (EU-Anbieter, kostenloser API-Schlüssel). Ergebnis bleibt danach ein ganz normales, frei überschreibbares Eingabefeld – ohne Schlüssel gibst du Kilometer/Fahrzeit wie bisher von Hand ein.</div>
           <div class="grid2">
@@ -1075,6 +1083,7 @@ function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
   renderEq();renderSetsAdmin();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
   renderProducts();renderPartners();renderWsAdmin();renderCampaigns();renderModulAdmin();renderReportAdmin();
+  renderTplSettings();
   initSort();
 }
 /* ===== Workshop-Termine & Anmeldungen ===== */
@@ -1844,17 +1853,20 @@ function newBookingFor(custId){openBookModal(null,custId)}
    und eine vorhandene Buchung vorausgewaehlt. */
 function newDocFor(type){
   var c=curCust;if(!c)return;
-  openDocEditor(null,type||'angebot');
-  setTimeout(function(){
-    document.getElementById('docCust').value=c.id;
-    refreshBookOpts();
-    /* Hat der Kunde genau eine offene Buchung, gleich verknuepfen - spart einen Griff
-       und sorgt dafuer, dass Abschlag und Schlussrechnung spaeter zusammenfinden. */
-    var offen=(CACHE.bookings||[]).filter(function(b){
-      return b.customer_id===c.id&&['anfrage','angebot','gebucht'].indexOf(b.status)>=0});
-    if(offen.length===1)document.getElementById('docBook').value=offen[0].id;
-    renderTotals();
-  },30);
+  if(!type||type==='angebot'){newQuote(c.id);return}
+  openDocEditor(null,type);
+  setTimeout(function(){presetDocCust(c.id);renderTotals()},30);
+}
+/* Kunde setzen und - falls es genau eine offene Buchung gibt - diese gleich verknuepfen.
+   Spart einen Griff und sorgt dafuer, dass Abschlag und Schlussrechnung spaeter
+   zusammenfinden. */
+function presetDocCust(custId){
+  if(!custId)return;
+  document.getElementById('docCust').value=custId;
+  refreshBookOpts();
+  var offen=(CACHE.bookings||[]).filter(function(b){
+    return b.customer_id===custId&&['anfrage','angebot','gebucht'].indexOf(b.status)>=0});
+  if(offen.length===1)document.getElementById('docBook').value=offen[0].id;
 }
 function openBookModal(b,presetCust){
   b=b||{};
@@ -2265,6 +2277,9 @@ function nextNumber(type){
   }};
 }
 function openDocEditor(id,newType){
+  /* Immer als echter Beleg starten - sonst blieben nach dem Vorlagen-Editor die
+     Kundenfelder ausgeblendet und "Speichern" haenge noch am Vorlagen-Speichern. */
+  setTplMode(false);
   var custOpts='<option value="">– wählen –</option><option value="__new__">-- NEUER KUNDE --</option>'+CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custName(c))+'</option>'}).join('');
   document.getElementById('docCust').innerHTML=custOpts;
   refreshBookOpts();
@@ -2320,6 +2335,7 @@ document.getElementById('docType').addEventListener('change',function(){updateDo
 function updateDocTypeUI(t){
   document.getElementById('docDepWrap').style.display=t==='schluss'?'':'none';
   document.getElementById('docDateLbl2').textContent=istZahlbeleg(t)?'Fällig am':'Gültig bis';
+  if(curTpl)return; /* im Vorlagen-Editor gelten Zurueck-Link und Vorlagen-Buttons von setTplMode */
   document.getElementById('docBack').setAttribute('onclick',"showPage('"+((t==='angebot'||t==='bestaetigung')?'quotes':'inv')+"')");
   document.getElementById('docTplBtns').innerHTML=t==='angebot'?
     '<button class="btn sm" onclick="openTplPicker()">Vorlage laden</button> <button class="btn sm" onclick="saveAsTpl()">Als Vorlage speichern</button>':'';
@@ -5559,7 +5575,7 @@ function openTplPicker(){
 }
 function applyTpl(id){
   var t=(CACHE.quoteTpls||[]).find(function(x){return x.id===id});if(!t)return;
-  curItems=(t.items||[]).map(function(it,i){return{pos:i+1,description:it.description,note:it.note||'',qty:it.qty,unit:it.unit,unit_price:it.unit_price,is_header:it.is_header||0,group_pos:it.group_pos!=null?it.group_pos:null}});
+  curItems=tplItems(t);
   if(t.intro_text)document.getElementById('docIntro').value=t.intro_text;
   if(t.outro_text)document.getElementById('docOutro').value=t.outro_text;
   closeModal();renderItems();toast('Vorlage „'+t.name+'" geladen ✓ – jetzt für den Kunden anpassen');
@@ -5569,13 +5585,111 @@ function saveAsTpl(){
   var name=prompt('Name der Vorlage (z. B. „Hochzeit Standard"):');
   if(!name)return;
   var body={name:name,intro_text:v('docIntro')||'',outro_text:v('docOutro')||'',
-    items:curItems.map(function(it,i){return{pos:i+1,description:it.description,note:it.note||'',qty:it.qty,unit:it.unit,unit_price:it.unit_price,is_header:it.is_header||0,group_pos:it.group_pos!=null?it.group_pos:null}}),
+    items:tplItems({items:curItems.filter(function(it){return it.description})}),
     sort:(CACHE.quoteTpls||[]).length};
   api('quote_templates',{method:'POST',body:body}).then(function(){toast('Vorlage „'+name+'" gespeichert ✓');reloadQuoteTpls()}).catch(function(e){toast(e.message,1)});
 }
 /* Eigener Name: hiess frueher wie die Funktion fuer die E-Mail-Vorlagen und hat sie
    ueberschrieben - deren Liste blieb nach dem Speichern veraltet stehen. */
-function reloadQuoteTpls(){api('quote_templates?select=*&order=sort').then(function(r){CACHE.quoteTpls=r||[]})}
+function reloadQuoteTpls(){api('quote_templates?select=*&order=sort').then(function(r){CACHE.quoteTpls=r||[];renderTplSettings()})}
+
+/* Neues Angebot: erst fragen, ob leer oder aus einer Vorlage. Ohne gespeicherte Vorlage
+   waere der Dialog nur ein Klick mehr - dann geht es direkt in die leere Maske. */
+var NQ_CUST=null;
+function newQuote(custId){
+  NQ_CUST=custId||null;
+  var tpls=CACHE.quoteTpls||[];
+  if(!tpls.length){startQuote(null);return}
+  openModal('Neues Angebot',
+    '<label for="nqTpl">Womit möchtest du starten?</label>'+
+    '<select id="nqTpl"><option value="">Leeres Angebot</option>'+
+      tpls.map(function(t){
+        var n=(t.items||[]).length;
+        return '<option value="'+esc(t.id)+'">'+esc(t.name)+' ('+n+' Position'+(n===1?'':'en')+')</option>'}).join('')+
+    '</select>'+
+    '<div class="mut sml" style="margin-top:8px">Die Positionen einer Vorlage lassen sich danach ganz normal anpassen. Vorlagen pflegst du unter Einstellungen → Angebots-Vorlagen.</div>'+
+    '<div style="margin-top:16px"><button class="btn" onclick="startQuote(document.getElementById(\'nqTpl\').value)">Angebot anlegen</button></div>');
+}
+function startQuote(tplId){
+  closeModal();
+  var custId=NQ_CUST;
+  openDocEditor(null,'angebot');
+  setTimeout(function(){
+    presetDocCust(custId);
+    if(tplId)applyTpl(tplId);
+    renderTotals();
+  },30);
+}
+
+/* ===== Vorlagen-Editor: dieselbe Belegmaske, nur ohne Kunde, Datum und Nummer ===== */
+var curTpl=null;
+function setTplMode(on){
+  curTpl=on?curTpl:null;
+  ['docHeadGrid','docRentGrid','docTypeGrid','docDiscGrid','docDocBtns'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.style.display=on?'none':'';});
+  ['docTplNote','docTplNameWrap'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.style.display=on?'':'none';});
+  document.getElementById('docSaveBtn').setAttribute('onclick',on?'saveQuoteTpl()':'saveDoc()');
+  document.getElementById('docBack').setAttribute('onclick',"showPage('"+(on?'set':'inv')+"')");
+  var tb=document.getElementById('docTplBtns');if(on&&tb)tb.innerHTML='';
+}
+function openTplEditor(id){
+  var t=id?(CACHE.quoteTpls||[]).find(function(x){return x.id===id}):null;
+  if(id&&!t)return;
+  var defs=S.defaults||{};
+  openDocEditor(null,'angebot');
+  curTpl={id:id||null};
+  setTplMode(true);
+  document.getElementById('docTitle').textContent=t?'Vorlage bearbeiten':'Neue Angebots-Vorlage';
+  document.getElementById('docSub').textContent='';
+  document.getElementById('docTplName').value=t?(t.name||''):'';
+  document.getElementById('docIntro').value=t?(t.intro_text||''):(defs.quote_intro||'');
+  document.getElementById('docOutro').value=t?(t.outro_text||''):'';
+  curItems=t?tplItems(t):[{pos:1,description:'',qty:1,unit:'Stk.',unit_price:0}];
+  renderItems();renderTotals();
+}
+/* Positionen einer Vorlage - in beide Richtungen dieselbe Form, damit Kopfzeilen und
+   Unterpositionen (Artikel mit Staffelpreis) die Vorlage unbeschadet ueberstehen. */
+function tplItems(t){
+  return (t.items||[]).map(function(it,i){
+    return {pos:i+1,description:it.description,note:it.note||'',qty:it.qty,unit:it.unit,
+      unit_price:it.unit_price,is_header:it.is_header||0,
+      group_pos:it.group_pos!=null?it.group_pos:null}});
+}
+function saveQuoteTpl(){
+  var name=(v('docTplName')||'').trim();
+  if(!name){toast('Bitte der Vorlage einen Namen geben.',1);document.getElementById('docTplName').focus();return}
+  var items=curItems.filter(function(it){return it.description});
+  if(!items.length){toast('Bitte mindestens eine Position eintragen.',1);return}
+  var body={name:name,intro_text:v('docIntro')||'',outro_text:v('docOutro')||'',items:tplItems({items:items})};
+  var p=curTpl&&curTpl.id
+    ? api('quote_templates?id=eq.'+curTpl.id,{method:'PATCH',prefer:'return=representation',body:body})
+    : (body.sort=(CACHE.quoteTpls||[]).length,api('quote_templates',{method:'POST',prefer:'return=representation',body:body}));
+  p.then(function(rows){
+    if(rows&&rows[0])curTpl={id:rows[0].id};
+    document.getElementById('docTitle').textContent='Vorlage bearbeiten';
+    toast('Vorlage „'+name+'" gespeichert ✓');
+    reloadQuoteTpls();
+  }).catch(function(e){toast('Fehler: '+e.message,1)});
+}
+function dupQuoteTpl(id){
+  var t=(CACHE.quoteTpls||[]).find(function(x){return x.id===id});if(!t)return;
+  api('quote_templates',{method:'POST',body:{name:t.name+' (Kopie)',intro_text:t.intro_text||'',
+    outro_text:t.outro_text||'',items:t.items||[],sort:(CACHE.quoteTpls||[]).length}})
+    .then(function(){toast('Kopie angelegt ✓');reloadQuoteTpls()}).catch(function(e){toast(e.message,1)});
+}
+function renderTplSettings(){
+  var el=document.getElementById('tplSetList');if(!el)return;
+  var list=CACHE.quoteTpls||[];
+  el.innerHTML=list.length?list.map(function(t){
+    var n=(t.items||[]).length;
+    return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">'+
+    '<div><b>'+esc(t.name)+'</b> <span class="mut sml">'+n+' Position'+(n===1?'':'en')+'</span></div>'+
+    '<span><button class="btn sm" onclick="openTplEditor(\''+esc(t.id)+'\')">Bearbeiten</button> '+
+    '<button class="btn g sm" onclick="dupQuoteTpl(\''+esc(t.id)+'\')">Kopieren</button> '+
+    '<button class="btn sm r" onclick="delRow(\'quote_templates\',\''+esc(t.id)+'\',reloadQuoteTpls)">Löschen</button></span></div>';
+  }).join(''):'<span class="mut sml">Noch keine Vorlage angelegt.</span>';
+}
 
 /* ===== Partner (Technik-Vermietung) ===== */
 function renderPartners(){
