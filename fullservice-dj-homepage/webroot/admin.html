@@ -4021,7 +4021,7 @@ var DD_LISTS={
   reviews:{tbl:'reviews',cache:'reviews',render:function(){renderRevAdmin()}},
   badges:{tbl:'badges',cache:'badges',render:function(){renderBadgeAdmin()}},
   blocks:{tbl:'blocks',cache:'module',render:function(){renderModulAdmin()}},
-  reports:{tbl:'event_reports',cache:'reports',render:function(){renderReportAdmin()}}
+  event_reports:{tbl:'event_reports',cache:'reports',render:function(){renderReportAdmin()}}
 };
 function pubSwitch(name,id,isPub){
   return '<span class="b '+(isPub?'green':'grey')+'" style="cursor:pointer" title="Klicken zum Ein-/Ausschalten" '+
@@ -4108,10 +4108,11 @@ function pImgUpload(inp){
   inp.value='';
 }
 function pImgFromPool(){
-  openMediaPicker(function(urls){
-    if(!urls||!urls[0])return;
-    document.getElementById('pImg').value=urls[0];
-    document.getElementById('pImgFocalWrap').innerHTML=focalWidget(urls[0],'50% 50%','pFocal','16/10');
+  /* Einzelauswahl liefert die Adresse als Zeichenkette, nicht als Liste. */
+  openMediaPicker(function(url){
+    if(!url)return;
+    document.getElementById('pImg').value=url;
+    document.getElementById('pImgFocalWrap').innerHTML=focalWidget(url,'50% 50%','pFocal','16/10');
   });
 }
 function pImgRemove(){
@@ -4259,10 +4260,11 @@ function frImgUpload(inp){
   inp.value='';
 }
 function frImgFromPool(){
-  openMediaPicker(function(urls){
-    if(!urls||!urls[0])return;
-    document.getElementById('frImg').value=urls[0];
-    document.getElementById('frImgFocalWrap').innerHTML=focalWidget(urls[0],'50% 50%','frFocal','1/1');
+  /* Einzelauswahl liefert die Adresse als Zeichenkette, nicht als Liste. */
+  openMediaPicker(function(url){
+    if(!url)return;
+    document.getElementById('frImg').value=url;
+    document.getElementById('frImgFocalWrap').innerHTML=focalWidget(url,'50% 50%','frFocal','1/1');
   });
 }
 function frImgRemove(){
@@ -4364,9 +4366,10 @@ function bgImgUpload(inp){
   inp.value='';
 }
 function bgImgFromPool(){
-  openMediaPicker(function(urls){
-    if(!urls||!urls[0])return;
-    document.getElementById('bgImg').value=urls[0];bgPrevUpdate();
+  /* Einzelauswahl liefert die Adresse als Zeichenkette, nicht als Liste. */
+  openMediaPicker(function(url){
+    if(!url)return;
+    document.getElementById('bgImg').value=url;bgPrevUpdate();
   });
 }
 function bgImgRemove(){document.getElementById('bgImg').value='';bgPrevUpdate()}
@@ -4538,7 +4541,7 @@ function renderReportAdmin(){
   var el=document.getElementById('reportList');if(!el)return;
   el.innerHTML=(CACHE.reports||[]).map(function(r,i){
     var med=Array.isArray(r.media)?r.media:[];
-    return '<div'+ddAttrs('reports',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
+    return '<div'+ddAttrs('event_reports',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
     (med[0]&&med[0].url?'<img src="'+esc(med[0].url)+'" alt="" style="width:44px;height:32px;object-fit:cover;border-radius:3px">':'<span class="mut sml">ohne Foto</span>')+
     '<a onclick="openReportModal(\''+r.id+'\')" style="flex:1">'+esc(r.title)+'</a>'+
     '<span class="mut sml">'+esc(r.meta||'')+' · '+med.length+(med.length===1?' Foto':' Fotos')+'</span>'+
@@ -5115,7 +5118,8 @@ function sLogoUpload(inp){
   inp.value='';
 }
 function sLogoFromPool(){
-  openMediaPicker(function(urls){if(urls&&urls[0]){sLogoUrl=urls[0];renderSLogoPrev()}},false);
+  /* Einzelauswahl liefert die Adresse als Zeichenkette, nicht als Liste. */
+  openMediaPicker(function(url){if(url){sLogoUrl=url;renderSLogoPrev()}},false);
 }
 function sLogoRemove(){sLogoUrl='';renderSLogoPrev()}
 function saveCompany(){
@@ -5819,7 +5823,7 @@ function mpRenderGrid(){
       var sel=MEDIA_SEL.indexOf(m.url)>=0;
       return '<div onclick="mpPick('+i+')" style="cursor:pointer;position:relative">'+
       (m.kind==='video'
-        ? '<video src="'+esc(m.url)+'" muted loop playsinline preload="metadata" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:2px solid '+(sel?'var(--acc)':'var(--bdr)')+';background:#000"></video>'
+        ? '<video src="'+esc(m.url)+'" muted loop autoplay playsinline preload="metadata" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:2px solid '+(sel?'var(--acc)':'var(--bdr)')+';background:#000"></video>'
         : '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:2px solid '+(sel?'var(--acc)':'var(--bdr)')+'">')+
       (m.kind==='video'?'<span style="position:absolute;bottom:34px;left:6px;background:rgba(0,0,0,.65);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px">Video</span>':'')+
       (sel?'<span style="position:absolute;top:6px;right:6px;background:var(--acc);color:#141414;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:0;width:12px;height:12px"><polyline points="20 6 9 17 4 12"/></svg></span>':'')+
@@ -5869,7 +5873,9 @@ function renderMediaPage(){
       var vid=m.kind==='video';
       return '<div class="card" style="padding:8px">'+
       (vid
-        ? '<video src="'+esc(m.url)+'" muted loop playsinline preload="metadata" controls style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px;background:#000"></video>'
+        /* Ohne autoplay bleibt die Kachel weiss, bis jemand abspielt - das erste Bild
+           soll aber gleich zu sehen sein. */
+        ? '<video src="'+esc(m.url)+'" muted loop autoplay playsinline preload="metadata" controls style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px;background:#000"></video>'
         : '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px">')+
       '<div class="mut sml" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
       '<div class="mut sml" style="margin-bottom:8px">'+mpKb(m.size)+(vid?' · Video':'')+(m.source==='instagram'?' · Instagram':'')+'</div>'+
@@ -5882,7 +5888,7 @@ function renderMediaPage(){
 }
 function mediaPgCopy(i){
   var m=MEDIA_PG_LIST[i];if(!m)return;
-  navigator.clipboard.writeText(m.url).then(function(){toast('Bild-URL kopiert ✓ – zum Einfügen in ein Bildfeld bereit.')},
+  navigator.clipboard.writeText(m.url).then(function(){toast('URL kopiert ✓ – zum Einfügen in ein Bildfeld bereit.')},
     function(){toast('Kopieren nicht möglich – URL: '+m.url,1)});
 }
 function mediaPgToGallery(i){
@@ -5896,11 +5902,16 @@ function mediaPgToGallery(i){
 /* „Aus Pool"-Button neben Bildfeldern: setzt die URL und aktualisiert die Fokus-Vorschau */
 function poolPick(targetId,focalId){
   openMediaPicker(function(url){
-    var el=document.getElementById(targetId);if(!el)return;
+    var el=document.getElementById(targetId);if(!el||!url)return;
     el.value=url;
     if(focalId){
       var box=document.getElementById(focalId+'-box');
       if(box)box.style.backgroundImage="url('"+url+"')";
+      else {
+        /* War vorher kein Bild gesetzt, gibt es das Widget noch gar nicht. */
+        var wrap=document.getElementById(targetId+'FocalWrap')||document.getElementById(focalId+'Wrap');
+        if(wrap)wrap.innerHTML=focalWidget(url,'50% 50%',focalId,'21/9');
+      }
     }
   });
 }

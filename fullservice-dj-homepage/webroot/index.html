@@ -251,6 +251,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
 .rep-box .rep-text{color:var(--mut);font-size:15.5px;line-height:1.8;margin-top:16px;white-space:pre-line}
 .rep-box .rep-fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:24px}
 .rep-box .rep-fotos img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:5px;border:1px solid var(--line)}
+.rep-box .rep-fotos figure{margin:0}
+.rep-box .rep-fotos figcaption{font-size:12.5px;color:var(--mut);margin-top:7px;line-height:1.5}
 @media(max-width:560px){.rep-box{padding:24px 18px}.rep-ovl{padding:20px 12px}}
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
 .reveal.vis{opacity:1;transform:none}
@@ -701,7 +703,7 @@ function applyContent(rows){
     if(c.hero.cta)document.getElementById('heroCta').textContent=c.hero.cta;
     /* Standbild immer setzen: Es ist zugleich das Standbild des Videos und bleibt
        stehen, wenn das Video nicht geladen wird oder nicht geladen werden soll. */
-    if(c.hero.image){document.getElementById('heroImg').style.backgroundImage='url("'+c.hero.image+'")';
+    if(c.hero.image){document.getElementById('heroImg').style.backgroundImage='url("'+String(c.hero.image).replace(/["\\]/g,'')+'")';
       document.getElementById('heroImg').style.backgroundPosition=c.hero.image_focal||'center'}
     if(c.hero.image||c.hero.video){
       var hero=document.querySelector('.hero');if(hero)hero.classList.add('hat-medien');
@@ -853,10 +855,16 @@ function openReport(i){
   var fo=document.getElementById('repFotos');fo.innerHTML='';
   (Array.isArray(r.media)?r.media:[]).forEach(function(m){
     if(!m||!m.url)return;
+    var fig=document.createElement('figure');
     var img=document.createElement('img');
     img.src=m.url;img.alt=m.caption||'';img.loading='lazy';
-    img.addEventListener('error',function(){img.remove()});
-    fo.appendChild(img);
+    img.addEventListener('error',function(){fig.remove()});
+    fig.appendChild(img);
+    if(m.caption){
+      var cap=document.createElement('figcaption');
+      cap.textContent=m.caption;fig.appendChild(cap);
+    }
+    fo.appendChild(fig);
   });
   document.getElementById('repOvl').style.display='block';
   document.body.style.overflow='hidden';

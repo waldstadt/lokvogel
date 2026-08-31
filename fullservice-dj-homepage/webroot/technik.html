@@ -598,7 +598,8 @@ sfetch('site_content?select=key,value').then(function(rows){
   }
   if(c.tech_hero){
     if(c.tech_hero.image){var hi=document.getElementById('heroImg');
-      hi.style.backgroundImage='url("'+c.tech_hero.image+'")';
+      /* Anfuehrungszeichen im Pfad wuerden die CSS-Deklaration zerreissen. */
+      hi.style.backgroundImage='url("'+String(c.tech_hero.image).replace(/["\\]/g,'')+'")';
       hi.style.backgroundPosition=c.tech_hero.image_focal||'center';}
     if(c.tech_hero.image||c.tech_hero.video){
       var th=document.querySelector('.hero');if(th)th.classList.add('hat-medien');
