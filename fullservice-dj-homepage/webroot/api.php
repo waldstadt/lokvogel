@@ -1191,9 +1191,9 @@ function autoInquiryPlanner(PDO $p, array $row): void {
      "In CRM übernehmen" legt diesen Eintrag ebenfalls an). */
   if (trim((string)($row['message'] ?? '')) !== '' || !empty($row['event_type'])) {
     $inhalt = trim(
-      ($row['event_type'] ? 'Anlass: ' . $row['event_type'] . "\n" : '') .
-      ($row['event_date'] ? 'Termin: ' . $row['event_date'] . "\n" : '') .
-      ($row['location'] ? 'Ort: ' . $row['location'] . "\n" : '') .
+      (!empty($row['event_type']) ? 'Anlass: ' . $row['event_type'] . "\n" : '') .
+      (!empty($row['event_date']) ? 'Termin: ' . $row['event_date'] . "\n" : '') .
+      (!empty($row['location']) ? 'Ort: ' . $row['location'] . "\n" : '') .
       (!empty($row['guests']) ? 'Gäste: ' . $row['guests'] . "\n" : '') .
       "\n" . (string)($row['message'] ?? ''));
     $p->prepare('insert into communications (id,customer_id,channel,direction,subject,content,occurred_at,created_at)
@@ -1225,7 +1225,7 @@ function autoInquiryPlanner(PDO $p, array $row): void {
       venue_name, venue_address, guests, event_plan, created_at, updated_at)
     values (?,?,?,?,?,?,?,?,?,?,?,?,?)')
     ->execute([$bookingId, $custId, 'anfrage', $kind, $row['event_type'] ?? null,
-      trim(($row['event_type'] ?: 'Anfrage') . ' ' . $row['name']), $row['event_date'],
+      trim((($row['event_type'] ?? '') ?: 'Anfrage') . ' ' . $row['name']), $row['event_date'],
       $row['location'] ?? null, null, $guests,   /* Adresse bleibt leer statt den Ortsnamen zu doppeln */
       json_encode(['basics' => $basics], JSON_UNESCAPED_UNICODE), now(), now()]);
 }
@@ -2456,7 +2456,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       /* Fehler beim automatischen Anlegen des Veranstaltungsplaners dürfen die Anfrage selbst
          nie verhindern - das ist ein Service-Extra, kein kritischer Pfad. */
       try { autoInquiryPlanner($p, $row); } catch (Throwable $e) {}
-      notifyOwner('Neue Anfrage: ' . $row['name'] . ($row['event_type'] ?? '' ? ' – ' . $row['event_type'] : ''),
+      notifyOwner('Neue Anfrage: ' . $row['name'] . (($row['event_type'] ?? '') ? ' – ' . $row['event_type'] : ''),
         "Name: {$row['name']}\nE-Mail: " . ($row['email'] ?? '–') . "\nTelefon: " . ($row['phone'] ?? '–') .
         "\nAnlass: " . ($row['event_type'] ?? '–') . "\nDatum: " . ($row['event_date'] ?? '–') .
         "\nOrt: " . ($row['location'] ?? '–') . "\n\n" . ($row['message'] ?? ''));

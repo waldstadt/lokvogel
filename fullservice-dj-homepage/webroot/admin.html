@@ -194,6 +194,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .it-row.sml input,.it-row.sml select{padding:2px 5px;font-size:10px}
 .it-row.sml>div:first-child{padding:2px 0;font-size:9px;min-height:0}
 .it-head{font-size:9px;color:var(--gl);text-transform:uppercase}
+/* Die Knoepfe schwebten rechts; ein Grid-Kind daneben weicht dem Float aus und die
+   erste Positionszeile schrumpfte auf wenige Pixel. */
+.doc-add{float:right}
+@media(max-width:420px){.doc-add{float:none;display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}}
 .totals{margin-top:12px;text-align:right;font-size:12px}
 .totals b{font-size:15px;color:var(--acc)}
 
@@ -446,7 +450,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
       <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('docIntro')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
     </div>
-    <div class="card"><h3>Positionen <span style="float:right" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()"> + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()"> + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button> <span id="docTplBtns"></span></span></h3>
+    <div class="card"><h3>Positionen <span class="doc-add" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()"> + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()"> + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button> <span id="docTplBtns"></span></span></h3>
       <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel brutto</div><div>Gesamt</div><div></div></div>
       <div id="docItems"></div>
       <div class="totals" id="docTotals"></div>
@@ -2481,9 +2485,9 @@ function itemRowHtml(it,i,posLabel,locked,sml){
     '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
     '<input value="'+subMenge(it)+'" disabled title="Stückzahl - zum Ändern die ganze Position löschen und neu einfügen">'+
     '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
-    '<input type="number" step="0.01" value="'+it.unit_price+'" oninput="itSet('+i+',\'unit_price\',this.value)">'+
-    '<input value="'+euro(sum)+'" disabled class="num">'+
-    (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)">✕</a>')+'</div>';
+    '<input type="number" step="0.01" value="'+it.unit_price+'" placeholder="Einzelpreis" title="Einzelpreis brutto" oninput="itSet('+i+',\'unit_price\',this.value)">'+
+    '<input value="'+euro(sum)+'" disabled class="num" title="Gesamt" data-sum="'+i+'">'+
+    (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)" title="Stufe löschen">✕</a>')+'</div>';
   }
   return '<div class="it-row" style="margin-bottom:3px">'+
   '<div'+(locked?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':'grab')+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked?'':'<span style="opacity:.55">⠿</span>')+posLabel+'</div>'+
@@ -2527,7 +2531,7 @@ function renderItems(){
     return '<div style="margin-bottom:8px">'+headerRowHtml(it,g.main,mainLabel,locked)+subsHtml+
       '<div style="margin:2px 0 0 22px;padding:3px 8px;text-align:right;font-size:11px;display:flex;justify-content:flex-end;align-items:center;gap:10px;border-top:1px solid var(--line)">'+
       (locked?'':'<a onclick="openTierEditor('+g.main+')" style="font-weight:400">Rabattstaffel bearbeiten</a>')+
-      '<b style="color:var(--wh)">Gesamtsumme der Position: '+euro(groupTotal(curItems,g))+'</b></div></div>';
+      '<b style="color:var(--wh)" data-gsum="'+g.main+'">Gesamtsumme der Position: '+euro(groupTotal(curItems,g))+'</b></div></div>';
   }).join('');
   renderTotals();
 }
@@ -2538,6 +2542,12 @@ function itSet(i,k,val){
      stehen, bis die Liste neu gezeichnet wurde. */
   var feld=document.querySelector('#docItems [data-sum="'+i+'"]');
   if(feld)feld.value=euro(lineTotal(curItems[i]));
+  /* Gehoert die Zeile zu einer Rabattstaffel, muss auch deren Gesamtsumme nachziehen. */
+  groupDocItems(curItems).forEach(function(g){
+    if(g.main!==i&&g.subs.indexOf(i)<0)return;
+    var el=document.querySelector('#docItems [data-gsum="'+g.main+'"]');
+    if(el)el.textContent='Gesamtsumme der Position: '+euro(groupTotal(curItems,g));
+  });
   renderTotals();
 }
 function lineTotal(it){
