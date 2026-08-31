@@ -637,18 +637,20 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <label>Text</label><textarea id="cHeroText"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cHeroText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Button-Text</label><input id="cHeroCta">
-          <label>Hintergrundbild</label><div style="display:flex;gap:8px"><input id="cHeroImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upHero" onchange="uploadImg(this,'cHeroImg','cHeroFocal')"><button class="btn g sm" onclick="document.getElementById('upHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cHeroImg','cHeroFocal','21/9')">Aus Pool</button></div>
+          <label>Hintergrundbild</label><div style="display:flex;gap:8px"><input id="cHeroImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upHero" onchange="uploadImg(this,'cHeroImg','cHeroFocal')"><button class="btn g sm" onclick="document.getElementById('upHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cHeroImg','cHeroFocal','21/9')">Aus Pool</button><button class="btn g sm" onclick="imgRemove('cHeroImg','cHeroFocal','cHeroFocalWrap','21/9')">Entfernen</button></div>
           <div id="cHeroFocalWrap"></div>
           <label style="margin-top:12px">Hintergrundvideo <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional, mp4 oder webm, max. 24 MB)</span></label><div style="display:flex;gap:8px"><input id="cHeroVid" placeholder="leer lassen für nur Bild"><input type="file" accept="video/mp4,video/webm" style="display:none" id="upHeroVid" onchange="uploadHeroVideo(this)"><button class="btn g sm" onclick="document.getElementById('upHeroVid').click()">Hochladen</button><button class="btn g sm" onclick="document.getElementById('cHeroVid').value='';heroVidHint()">Entfernen</button></div>
           <div class="mut sml" style="margin-top:6px">Läuft stumm in Endlosschleife hinter der Überschrift. Das Hintergrundbild bleibt das Standbild – es wird gezeigt, solange das Video lädt, und ersetzt es bei „Bewegung reduzieren" oder im Mobilfunknetz. Kurz halten (8 bis 15 Sekunden) und vorher komprimieren: Jeder Besucher lädt es mit.</div>
           <div id="cHeroVidHint" class="sml" style="margin-top:6px"></div>
+          <label style="margin-top:12px">Abdunklung über Bild und Video</label><div class="mut sml" style="margin:2px 0 8px">Damit die Überschrift auf jedem Foto lesbar bleibt. Ganz ohne Abdunklung kann die Schrift auf hellen Bildern untergehen – unter der Vorschau steht der gemessene Kontrastwert.</div><div class="grid3"><div><label>Art</label><select id="cHeroScrimMode" onchange="scrimUi('cHeroScrim')"><option value="gleich">Gleichmäßig</option><option value="oben">Verlauf von oben nach unten</option><option value="unten">Verlauf von unten nach oben</option></select></div><div id="cHeroScrimPctWrap"><label>Deckkraft %</label><input type="number" min="0" max="100" id="cHeroScrimPct" oninput="scrimUi('cHeroScrim')"></div><div></div></div><div class="grid3" id="cHeroScrimGradWrap" style="display:none"><div><label>Start %</label><input type="number" min="0" max="100" id="cHeroScrimFrom" oninput="scrimUi('cHeroScrim')"></div><div><label>Ende %</label><input type="number" min="0" max="100" id="cHeroScrimTo" oninput="scrimUi('cHeroScrim')"></div><div></div></div><div id="cHeroScrimPrev"></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('hero')">Speichern</button></div>
           <div id="vb_hero"></div></div>
         <div class="card"><h3>Über mich</h3>
-          <label>Überschrift</label><input id="cAboutTitle">
+          <label>Überschrift</label><textarea id="cAboutTitle" style="min-height:56px"></textarea>
+          <div class="mut sml" style="margin-top:4px">Wie im Hero: jede Zeile hier wird auch auf der Seite eine eigene Zeile, eine reicht. Eine Zeile in *Sternchen* erscheint in der Akzentfarbe.</div>
           <label>Text</label><textarea id="cAboutText" style="min-height:110px"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cAboutText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
-          <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg','cAboutFocal')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cAboutImg','cAboutFocal','4/5')">Aus Pool</button></div>
+          <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg','cAboutFocal')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cAboutImg','cAboutFocal','4/5')">Aus Pool</button><button class="btn g sm" onclick="imgRemove('cAboutImg','cAboutFocal','cAboutFocalWrap','4/5')">Entfernen</button></div>
           <div id="cAboutFocalWrap"></div>
           <label>Technik-Marken <span class="mut sml" style="text-transform:none;letter-spacing:0">(kommagetrennt, erscheinen als Text-Leiste unter „Über mich")</span></label><input id="cAboutGear" placeholder="z. B. Seeburg Acoustic Line, Sennheiser, Rane">
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('about')">Speichern</button></div>
@@ -668,12 +670,13 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <label style="margin-top:12px">Merkmale unter dem Hero <span class="mut sml" style="text-transform:none;letter-spacing:0">(max. 4)</span></label>
           <div class="mut sml" style="margin:2px 0 8px">Die drei bis vier kurzen Zahlen unter dem Hero. Große Zeile in Akzentfarbe, kleine Zeile darunter in Großbuchstaben. Leere Zeilen werden weggelassen – wer nur zwei will, füllt nur zwei aus.</div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cThBadge1v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cThBadge1l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cThBadge2v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cThBadge2l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cThBadge3v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cThBadge3l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cThBadge4v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cThBadge4l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div>
           <label>Hero-Hintergrundbild <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional)</span></label>
-          <div style="display:flex;gap:8px"><input id="cThImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upThHero" onchange="uploadImg(this,'cThImg','cThFocal')"><button class="btn g sm" onclick="document.getElementById('upThHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cThImg','cThFocal','21/9')">Aus Pool</button></div>
+          <div style="display:flex;gap:8px"><input id="cThImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upThHero" onchange="uploadImg(this,'cThImg','cThFocal')"><button class="btn g sm" onclick="document.getElementById('upThHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cThImg','cThFocal','21/9')">Aus Pool</button><button class="btn g sm" onclick="imgRemove('cThImg','cThFocal','cThFocalWrap','21/9')">Entfernen</button></div>
           <div id="cThFocalWrap"></div>
           <label style="margin-top:12px">Hero-Hintergrundvideo <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional, mp4 oder webm, max. 24 MB)</span></label>
           <div style="display:flex;gap:8px"><input id="cThVid" placeholder="leer lassen für nur Bild"><input type="file" accept="video/mp4,video/webm" style="display:none" id="upThVid" onchange="uploadThVideo(this)"><button class="btn g sm" onclick="document.getElementById('upThVid').click()">Hochladen</button><button class="btn g sm" onclick="document.getElementById('cThVid').value='';thVidHint()">Entfernen</button></div>
           <div class="mut sml" style="margin-top:6px">Läuft stumm in Endlosschleife hinter der Überschrift. Das Bild bleibt Standbild und ersetzt das Video bei „Bewegung reduzieren" oder im Mobilfunknetz.</div>
           <div id="cThVidHint" class="sml" style="margin-top:6px"></div>
+          <label style="margin-top:12px">Abdunklung über Bild und Video</label><div class="mut sml" style="margin:2px 0 8px">Damit die Überschrift auf jedem Foto lesbar bleibt. Ganz ohne Abdunklung kann die Schrift auf hellen Bildern untergehen – unter der Vorschau steht der gemessene Kontrastwert.</div><div class="grid3"><div><label>Art</label><select id="cThScrimMode" onchange="scrimUi('cThScrim')"><option value="gleich">Gleichmäßig</option><option value="oben">Verlauf von oben nach unten</option><option value="unten">Verlauf von unten nach oben</option></select></div><div id="cThScrimPctWrap"><label>Deckkraft %</label><input type="number" min="0" max="100" id="cThScrimPct" oninput="scrimUi('cThScrim')"></div><div></div></div><div class="grid3" id="cThScrimGradWrap" style="display:none"><div><label>Start %</label><input type="number" min="0" max="100" id="cThScrimFrom" oninput="scrimUi('cThScrim')"></div><div><label>Ende %</label><input type="number" min="0" max="100" id="cThScrimTo" oninput="scrimUi('cThScrim')"></div><div></div></div><div id="cThScrimPrev"></div>
           <label>Hero-Text</label><textarea id="cThText"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cThText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Mietpark-Titel</label><input id="cThRentTitle">
@@ -1156,8 +1159,8 @@ function openWsModal(id){
     '<label>Kurzbeschreibung</label><input id="wDesc" value="'+esc(w.description||'')+'" placeholder="z. B. Grundlagen: Gain, EQ, Feedback – Praxis am Pult">'+
     '<label>Ausführlicher Text (Homepage)</label><textarea id="wLongDesc" style="min-height:100px">'+esc(w.long_description||'')+'</textarea>'+
     edBtn('wLongDesc')+
-    '<label>Foto</label><div style="display:flex;gap:8px"><input id="wImg" value="'+esc(w.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upWs" onchange="uploadImg(this,\'wImg\',\'wFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upWs\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'wImg\',\'wFocal\',\'4/3\')">Aus Pool</button></div>'+
-    focalWidget(w.image_url,w.image_focal,'wFocal','4/3')+
+    '<label>Foto</label><div style="display:flex;gap:8px"><input id="wImg" value="'+esc(w.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upWs" onchange="uploadImg(this,\'wImg\',\'wFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upWs\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'wImg\',\'wFocal\',\'4/3\')">Aus Pool</button><button class="btn g sm" onclick="imgRemove(\'wImg\',\'wFocal\',\'wFocalWrap\',\'4/3\')">Entfernen</button></div>'+
+    '<div id="wFocalWrap">'+focalWidget(w.image_url,w.image_focal,'wFocal','4/3')+'</div>'+
     '<div class="grid3"><div><label>Datum *</label><input type="date" id="wDate" value="'+(w.event_date||'')+'"></div>'+
     '<div><label>Beginn</label><input type="time" id="wStart" value="'+(w.start_time||'')+'"></div>'+
     '<div><label>Ende</label><input type="time" id="wEnd" value="'+(w.end_time||'')+'"></div></div>'+
@@ -4094,8 +4097,8 @@ function openSetModal(id){
     '<label style="margin-top:10px">Enthaltene Artikel</label><div id="sItemRows"></div>'+
     '<button class="btn g sm" style="margin-top:6px" onclick="addSetItemRow()">+ Artikel</button>'+
     '<label style="margin-top:14px">Foto <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional – ohne eigenes Foto zeigt die Homepage automatisch eine Collage aus den Hauptbildern der enthaltenen Artikel)</span></label>'+
-    '<div style="display:flex;gap:8px"><input id="sImg" value="'+esc(s.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upSet" onchange="uploadImg(this,\'sImg\',\'sFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upSet\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'sImg\',\'sFocal\',\'4/3\')">Aus Pool</button></div>'+
-    focalWidget(s.image_url,s.image_focal,'sFocal','4/3')+
+    '<div style="display:flex;gap:8px"><input id="sImg" value="'+esc(s.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upSet" onchange="uploadImg(this,\'sImg\',\'sFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upSet\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'sImg\',\'sFocal\',\'4/3\')">Aus Pool</button><button class="btn g sm" onclick="imgRemove(\'sImg\',\'sFocal\',\'sFocalWrap\',\'4/3\')">Entfernen</button></div>'+
+    '<div id="sFocalWrap">'+focalWidget(s.image_url,s.image_focal,'sFocal','4/3')+'</div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="sPub" style="width:auto;margin-right:6px" '+(s.public!==false?'checked':'')+'>Auf Homepage anzeigen (buchbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveSet(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delSet(\''+id+'\')">Löschen</button>':'')+'</div>');
@@ -4159,6 +4162,7 @@ function renderCms(){
   function g(k,f){return (c[k]&&c[k][f])||''}
   document.getElementById('cHeroTitle').value=g('hero','headline');
   fillBadgeFields('cHeroBadge',g('hero','badges'));
+  scrimFill('cHeroScrim',g('hero','scrim'));
   document.getElementById('cHeroSub').value=g('hero','subtitle');
   document.getElementById('cHeroText').value=g('hero','text');
   document.getElementById('cHeroCta').value=g('hero','cta');
@@ -4177,6 +4181,7 @@ function renderCms(){
   document.getElementById('cSeoDesc').value=g('seo','description');
   document.getElementById('cThTitle').value=g('tech_hero','headline');
   fillBadgeFields('cThBadge',g('tech_hero','badges'));
+  scrimFill('cThScrim',g('tech_hero','scrim'));
   document.getElementById('cThSub').value=g('tech_hero','subtitle');
   document.getElementById('cThImg').value=g('tech_hero','image');
   document.getElementById('cThFocalWrap').innerHTML=focalWidget(g('tech_hero','image'),g('tech_hero','image_focal'),'cThFocal','21/9');
@@ -4243,6 +4248,70 @@ var FONT_CHOICES=[
   {id:'anton',      name:'Extra-fett',    css:"'Anton',sans-serif"}
 ];
 var FONT_DEMO='Volle Tanzfläche. 23';
+/* Abdunklung ueber dem Hero-Bild: gleichmaessig oder als Verlauf. Dieselbe Funktion
+   baut den CSS-Wert im Backoffice und auf den oeffentlichen Seiten - nur einmal
+   ueberlegt, nie auseinandergelaufen. */
+function scrimCss(sc){
+  sc=sc||{};
+  var m=sc.mode||'gleich';
+  var a=function(x){return Math.max(0,Math.min(100,Number(x)||0))/100};
+  if(m==='gleich')return 'rgba(0,0,0,'+a(sc.pct!=null?sc.pct:30)+')';
+  var von=a(sc.from!=null?sc.from:60),bis=a(sc.to!=null?sc.to:0);
+  var richtung=m==='unten'?'to top':'to bottom';
+  return 'linear-gradient('+richtung+',rgba(0,0,0,'+von+'),rgba(0,0,0,'+bis+'))';
+}
+function scrimVal(pre){
+  return {mode:v(pre+'Mode')||'gleich',
+    pct:Number(v(pre+'Pct'))||0,from:Number(v(pre+'From'))||0,to:Number(v(pre+'To'))||0};
+}
+function scrimFill(pre,sc){
+  sc=sc||{};
+  var set=function(id,x){var el=document.getElementById(id);if(el)el.value=x};
+  set(pre+'Mode',sc.mode||'gleich');
+  set(pre+'Pct',sc.pct!=null?sc.pct:30);
+  set(pre+'From',sc.from!=null?sc.from:60);
+  set(pre+'To',sc.to!=null?sc.to:0);
+  scrimUi(pre);
+}
+/* Vorschau mit dem echten Hero-Bild, sonst mit einem hellen Ersatzbild - auf hellem
+   Grund faellt zu wenig Abdunklung am ehesten auf. */
+function scrimUi(pre){
+  var sc=scrimVal(pre),grad=sc.mode!=='gleich';
+  var pw=document.getElementById(pre+'PctWrap'),gw=document.getElementById(pre+'GradWrap');
+  if(pw)pw.style.display=grad?'none':'';
+  if(gw)gw.style.display=grad?'':'none';
+  var prev=document.getElementById(pre+'Prev');if(!prev)return;
+  var bild=v(pre==='cThScrim'?'cThImg':'cHeroImg');
+  var grund=bild?'url(\''+cssUrl(bild)+'\') center/cover':'linear-gradient(135deg,#d8d4cc,#8f9aa6)';
+  prev.innerHTML='<div style="position:relative;height:96px;border-radius:8px;overflow:hidden;border:1px solid var(--bdr);margin-top:10px;background:'+grund+'">'+
+    '<div style="position:absolute;inset:0;background:'+scrimCss(sc)+'"></div>'+
+    '<div style="position:absolute;left:14px;top:12px;font-size:19px;font-weight:700;color:#fff">Volle Tanzfläche.</div>'+
+    '<div style="position:absolute;left:14px;bottom:12px;font-size:11px;color:#fff">und hier unten steht Text</div></div>'+
+    '<div class="mut sml" style="margin-top:4px">'+scrimHinweis(sc)+'</div>';
+}
+/* Kontrast weisser Schrift ueber der abgedunkelten Flaeche. Gerechnet wird gegen ein
+   rein weisses Foto, also den unguenstigsten denkbaren Fall - ein normales Foto ist
+   dunkler und damit besser. Beim Verlauf zaehlt die schwaechste Stelle. */
+function scrimKontrast(a){
+  var v=1-Math.max(0,Math.min(100,Number(a)||0))/100;
+  var l=v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);
+  return Math.round(1.05/(l+0.05)*100)/100;
+}
+function scrimText(k){
+  var txt=String(k).replace('.',',')+':1';
+  if(k>=4.5)return 'sicher lesbar ('+txt+')';
+  if(k>=3)return 'auf normalen Fotos gut, auf sehr hellen knapp ('+txt+')';
+  return 'auf hellen Fotos zu wenig (nur '+txt+')';
+}
+function scrimHinweis(sc){
+  if(sc.mode==='gleich')
+    return 'Wei\u00dfe Schrift auf hellstem Foto: '+scrimText(scrimKontrast(sc.pct))+'. Ab etwa 50 % ist es \u00fcberall sicher.';
+  /* Beim Verlauf kommt es darauf an, wo die Schrift steht - deshalb beide Enden nennen
+     statt nur den schlechtesten Wert. */
+  var oben=sc.mode==='oben'?sc.from:sc.to,unten=sc.mode==='oben'?sc.to:sc.from;
+  return 'Oben '+scrimText(scrimKontrast(oben))+', unten '+scrimText(scrimKontrast(unten))+
+    ' \u2013 entscheidend ist die Stelle, an der die Schrift steht.';
+}
 function fontById(id){
   return FONT_CHOICES.find(function(f){return f.id===id})||FONT_CHOICES[0];
 }
@@ -4291,7 +4360,7 @@ function saveTheme(){
 /* Baut den Wert eines site_content-Keys aus dem aktuellen Formularstand –
    genutzt von saveContent (live speichern) UND von den Versionen (Entwurf sichern). */
 function buildContentVal(key){
-  if(key==='hero')return {title:'DJ Lauschgift',headline:v('cHeroTitle'),badges:badgeFields('cHeroBadge'),subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal'),video:v('cHeroVid')};
+  if(key==='hero')return {title:'DJ Lauschgift',headline:v('cHeroTitle'),badges:badgeFields('cHeroBadge'),scrim:scrimVal('cHeroScrim'),subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal'),video:v('cHeroVid')};
   if(key==='about')return {title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg'),image_focal:v('cAboutFocal'),
     gear:v('cAboutGear').split(',').map(function(s){return s.trim()}).filter(Boolean)};
   if(key==='contact')return {title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
@@ -4314,7 +4383,7 @@ function buildContentVal(key){
 }
 function saveContent(key){
   if(key==='tech'){
-    upsertContent('tech_hero',{headline:v('cThTitle'),badges:badgeFields('cThBadge'),subtitle:v('cThSub'),text:v('cThText'),image:v('cThImg'),image_focal:v('cThFocal'),video:v('cThVid'),enabled:document.getElementById('cThEnabled').checked});
+    upsertContent('tech_hero',{headline:v('cThTitle'),badges:badgeFields('cThBadge'),scrim:scrimVal('cThScrim'),subtitle:v('cThSub'),text:v('cThText'),image:v('cThImg'),image_focal:v('cThFocal'),video:v('cThVid'),enabled:document.getElementById('cThEnabled').checked});
     upsertContent('rental',{title:v('cThRentTitle'),text:v('cThRentText')});
     upsertContent('tech_teaser',{title:v('cThTeaTitle'),text:v('cThTeaText')});
     return;
@@ -4408,6 +4477,15 @@ function openEqInvoice(id){
 /* Fokuspunkt-Widget: Klick aufs Vorschaubild legt fest, welcher Bereich beim Zuschneiden (object-fit:cover)
    sichtbar bleibt, statt stur die Mitte zu nehmen. focalId = versteckte Werte-Input-ID, ratio = CSS aspect-ratio
    des Vorschaukastens (z.B. "4/5"). */
+/* Ein Foto wieder loswerden: Feld leeren und den Ausschnitt-Waehler zuruecksetzen.
+   Das Bild selbst bleibt im Medien-Pool - hier wird nur die Zuordnung geloest. */
+function imgRemove(inputId,focalId,wrapId,ratio){
+  var inp=document.getElementById(inputId);if(inp)inp.value='';
+  var wrap=wrapId?document.getElementById(wrapId):null;
+  if(wrap)wrap.innerHTML=focalWidget('','50% 50%',focalId,ratio||'4/3');
+  else{var f=document.getElementById(focalId);if(f)f.value='50% 50%'}
+  toast('Foto entfernt – mit „Speichern" übernehmen.');
+}
 function focalWidget(imgUrl,focal,focalId,ratio){
   focal=focal||'50% 50%';
   var parts=focal.split(' '),fx=parseFloat(parts[0])||50,fy=parseFloat(parts[1])||50;
@@ -4688,9 +4766,9 @@ function openLocModal(id){
       '<label style="margin:0"><input type="checkbox" id="lImgApprove" style="width:auto;margin-right:6px" '+(l.image_approved?'checked':'')+'>Rechte geprüft – Bild freigeben</label>'+
       '</div>'
       :'')+
-    '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\',\'lFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'lImg\',\'lFocal\',\'4/3\')">Aus Pool</button></div>'+
+    '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\',\'lFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'lImg\',\'lFocal\',\'4/3\')">Aus Pool</button><button class="btn g sm" onclick="imgRemove(\'lImg\',\'lFocal\',\'lFocalWrap\',\'4/3\')">Entfernen</button></div>'+
     (webPending?'<div class="mut sml" style="margin-top:4px">Hier ein eigenes Foto einfügen ersetzt den Internet-Vorschlag ohne weitere Prüfung.</div>':'')+
-    focalWidget(l.image_url,l.image_focal,'lFocal','4/3')+
+    '<div id="lFocalWrap">'+focalWidget(l.image_url,l.image_focal,'lFocal','4/3')+'</div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="lPub" style="width:auto;margin-right:6px" '+(l.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
     '<label><input type="checkbox" id="lHl" style="width:auto;margin-right:6px" '+(l.highlight?'checked':'')+'>Highlight – wird immer angezeigt (an wechselnder Position)</label>'+
     '<div class="mut sml" style="margin-top:6px">Die Reihenfolge stellst du in der Liste per Ziehen am ⠿-Griff ein.</div>'+
@@ -6821,7 +6899,7 @@ function fillContent(key,val){
   val=val||{};
   function set(id,x){var el=document.getElementById(id);if(el)el.value=x==null?'':x}
   if(key==='hero'){
-    set('cHeroTitle',val.headline);fillBadgeFields('cHeroBadge',val.badges);set('cHeroSub',val.subtitle);set('cHeroText',val.text);set('cHeroCta',val.cta);set('cHeroImg',val.image);set('cHeroVid',val.video||'');heroVidHint();
+    set('cHeroTitle',val.headline);fillBadgeFields('cHeroBadge',val.badges);scrimFill('cHeroScrim',val.scrim);set('cHeroSub',val.subtitle);set('cHeroText',val.text);set('cHeroCta',val.cta);set('cHeroImg',val.image);set('cHeroVid',val.video||'');heroVidHint();
     document.getElementById('cHeroFocalWrap').innerHTML=focalWidget(val.image,val.image_focal,'cHeroFocal','21/9');
   }
   if(key==='about'){

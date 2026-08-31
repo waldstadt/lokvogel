@@ -33,6 +33,7 @@ section{padding:88px 0}
 .kicker{font-family:'Space Grotesk',sans-serif;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);margin-bottom:14px;font-weight:600}
 .kicker::before{content:"";display:inline-block;width:22px;height:2px;background:var(--acc);vertical-align:middle;margin-right:10px}
 h2{font-size:clamp(28px,4.2vw,40px);font-weight:700;line-height:1.12;margin-bottom:18px}
+h2 em,h3 em{font-style:normal;color:var(--acc)}
 .lead{color:var(--mut);max-width:640px}
 
 /* LOGO */
@@ -591,6 +592,21 @@ function setHeroBadges(list){
     box.appendChild(d);
   });
 }
+/* Abdunklung ueber dem Hero: gleichmaessig oder als Verlauf, eingestellt im Backoffice.
+   Gleiche Berechnung wie dort - so sieht die Vorschau aus wie die Seite. */
+function scrimCss(sc){
+  sc=sc||{};
+  var m=sc.mode||'gleich';
+  var a=function(x){return Math.max(0,Math.min(100,Number(x)||0))/100};
+  if(m==='gleich')return 'rgba(0,0,0,'+a(sc.pct!=null?sc.pct:30)+')';
+  var von=a(sc.from!=null?sc.from:60),bis=a(sc.to!=null?sc.to:0);
+  return 'linear-gradient('+(m==='unten'?'to top':'to bottom')+',rgba(0,0,0,'+von+'),rgba(0,0,0,'+bis+'))';
+}
+function setHeroScrim(sc){
+  if(!sc)return;
+  var el=document.querySelector('.hero-scrim');
+  if(el)el.style.background=scrimCss(sc);
+}
 function setHeroHeadline(txt,id){
   var el=document.getElementById(id||'heroTitle');
   if(!el||!txt||!String(txt).trim())return;
@@ -747,6 +763,7 @@ function applyContent(rows){
   if(c.hero){
     setHeroHeadline(c.hero.headline);
     setHeroBadges(c.hero.badges);
+    setHeroScrim(c.hero.scrim);
     if(c.hero.subtitle)document.getElementById('heroKick').textContent=c.hero.subtitle;
     if(c.hero.text)document.getElementById('heroText').innerHTML=mdRender(c.hero.text);
     if(c.hero.cta)document.getElementById('heroCta').textContent=c.hero.cta;
@@ -760,7 +777,7 @@ function applyContent(rows){
     setHeroVideo(c.hero.video)
   }
   if(c.about){
-    if(c.about.title)document.getElementById('aboutTitle').textContent=c.about.title;
+    setHeroHeadline(c.about.title,'aboutTitle');
     if(c.about.text)document.getElementById('aboutText').innerHTML=mdRender(c.about.text);
     if(c.about.image){document.getElementById('aboutImg').style.backgroundImage='url("'+cssUrl(c.about.image)+'")';
       document.getElementById('aboutImg').style.backgroundPosition=c.about.image_focal||'center';
