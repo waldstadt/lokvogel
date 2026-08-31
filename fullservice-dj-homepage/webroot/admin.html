@@ -183,7 +183,13 @@ table.batch td.chk,table.batch th.chk{text-align:center}
   .it-row,.it-row.sml{grid-template-columns:28px 1fr;gap:5px;row-gap:4px;
     padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
   .it-row>*:nth-child(n+3){grid-column:2}
-  .it-row input{font-size:13px;padding:8px}
+  .it-row input,.it-row select{font-size:13px;padding:8px}
+  /* Die Kopfzeile wuerde als Buchstabenturm mitstapeln - untereinander beschriftet
+     jedes Feld sich selbst ueber seinen Platzhalter. */
+  .it-head{display:none}
+  /* Notiz und Rabatt darunter ebenfalls untereinander, sonst bleiben 32px Breite uebrig. */
+  #docItems .it-row+div{padding:0 0 10px 28px !important;flex-wrap:wrap}
+  #docItems .it-row+div>input:first-child{flex:1 1 100%}
 }
 .it-row.sml input,.it-row.sml select{padding:2px 5px;font-size:10px}
 .it-row.sml>div:first-child{padding:2px 0;font-size:9px;min-height:0}
@@ -2481,12 +2487,12 @@ function itemRowHtml(it,i,posLabel,locked,sml){
   }
   return '<div class="it-row" style="margin-bottom:3px">'+
   '<div'+(locked?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':'grab')+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked?'':'<span style="opacity:.55">⠿</span>')+posLabel+'</div>'+
-  '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
-  '<input type="number" step="0.5" value="'+it.qty+'" oninput="itSet('+i+',\'qty\',this.value)">'+
+  '<input value="'+esc(it.description)+'" placeholder="Beschreibung" oninput="itSet('+i+',\'description\',this.value)">'+
+  '<input type="number" step="0.5" value="'+it.qty+'" placeholder="Menge" title="Menge" oninput="itSet('+i+',\'qty\',this.value)">'+
   '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
-  '<input type="number" step="0.01" value="'+it.unit_price+'" oninput="itSet('+i+',\'unit_price\',this.value)">'+
-  '<input value="'+euro(sum)+'" disabled class="num">'+
-  (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)">✕</a>')+'</div>'+
+  '<input type="number" step="0.01" value="'+it.unit_price+'" placeholder="Einzelpreis" title="Einzelpreis brutto" oninput="itSet('+i+',\'unit_price\',this.value)">'+
+  '<input value="'+euro(sum)+'" disabled class="num" title="Gesamt" data-sum="'+i+'">'+
+  (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)" title="Position löschen">✕</a>')+'</div>'+
   '<div style="padding-left:42px;padding-right:34px;display:flex;gap:6px">'+
   '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Erklärung für das Kundenportal (erscheint beim Drüberfahren) – optional" style="font-size:10px;padding:5px 8px;color:var(--gll)">'+
   '<input type="number" step="0.01" value="'+(it.discount_value||0)+'" oninput="itSet('+i+',\'discount_value\',this.value)" title="Rabatt auf diese Position" style="width:74px;font-size:10px;padding:5px 8px" placeholder="Rabatt">'+
@@ -2525,7 +2531,15 @@ function renderItems(){
   }).join('');
   renderTotals();
 }
-function itSet(i,k,val){curItems[i][k]=(k==='qty'||k==='unit_price'||k==='discount_value')?Number(val)||0:val;if(k!=='note')renderTotals()}
+function itSet(i,k,val){
+  curItems[i][k]=(k==='qty'||k==='unit_price'||k==='discount_value')?Number(val)||0:val;
+  if(k==='note')return;
+  /* Auch die Gesamtspalte der Zeile mitziehen - sie blieb sonst auf dem alten Wert
+     stehen, bis die Liste neu gezeichnet wurde. */
+  var feld=document.querySelector('#docItems [data-sum="'+i+'"]');
+  if(feld)feld.value=euro(lineTotal(curItems[i]));
+  renderTotals();
+}
 function lineTotal(it){
   if(it.is_header)return 0; /* reine Kopfzeile (Artikel/Stückzahl/Tagespreis) - Summe steckt in den Unterpositionen */
   var g=(Number(it.qty)||0)*(Number(it.unit_price)||0);
@@ -2598,7 +2612,11 @@ function saveDoc(){
   if(!custId){toast('Bitte Kunden wählen.',1);return}
   var type=v('docType'),c=docCalc();
   var body={doc_type:type,customer_id:custId,booking_id:v('docBook')||null,doc_date:v('docDate'),
-    tax_rate:c.rate,is_small_business:c.rate===0&&!!(S.company&&S.company.small_business),
+    /* Bei einem uebernommenen Beleg zaehlt dessen Kennzeichen, sonst die Firmeneinstellung -
+       sonst verliert eine Korrektur an einem Altbeleg den Paragraf-19-Hinweis, sobald
+       Markus die Kleinunternehmer-Regelung verlaesst. */
+    tax_rate:c.rate,is_small_business:c.rate===0&&(curDoc.is_small_business!=null&&curDoc.is_small_business!==''
+      ? !!Number(curDoc.is_small_business) : !!(S.company&&S.company.small_business)),
     intro_text:v('docIntro'),outro_text:v('docOutro'),
     rental_from:v('docRentFrom')||null,rental_to:v('docRentTo')||null,
     price_mode:docModeVal(),discount_value:c.discVal,discount_type:c.discType,parent_id:curDoc.parent_id||null,
@@ -3156,7 +3174,8 @@ function printDoc(){
   var d=curDoc,c=docCalc(),comp=S.company||{};
   var cust=CACHE.customers.find(function(x){return x.id===v('docCust')})||{};
   var type=v('docType');
-  var small=Number(document.getElementById('docTax').value)===0&&comp.small_business;
+  var small=Number(document.getElementById('docTax').value)===0&&
+    (d.is_small_business!=null&&d.is_small_business!=='' ? !!Number(d.is_small_business) : !!comp.small_business);
   var brutto=docModeVal()==='brutto'&&!small;
   var f=brutto?1:(c.rate?1/(1+c.rate/100):1);
   var rows=docRowsHtml(curItems,f);

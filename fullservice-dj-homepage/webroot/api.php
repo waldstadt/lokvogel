@@ -1194,7 +1194,7 @@ function autoInquiryPlanner(PDO $p, array $row): void {
       ($row['event_type'] ? 'Anlass: ' . $row['event_type'] . "\n" : '') .
       ($row['event_date'] ? 'Termin: ' . $row['event_date'] . "\n" : '') .
       ($row['location'] ? 'Ort: ' . $row['location'] . "\n" : '') .
-      ($row['guests'] ? 'Gäste: ' . $row['guests'] . "\n" : '') .
+      (!empty($row['guests']) ? 'Gäste: ' . $row['guests'] . "\n" : '') .
       "\n" . (string)($row['message'] ?? ''));
     $p->prepare('insert into communications (id,customer_id,channel,direction,subject,content,occurred_at,created_at)
       values (?,?,?,?,?,?,?,?)')
