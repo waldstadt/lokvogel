@@ -584,6 +584,24 @@ function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:
 /* Bildpfade und Positionsangaben landen in CSS-Deklarationen. Anfuehrungszeichen,
    Klammern und Semikola dort erlauben es, die Deklaration zu verlassen und weitere
    Regeln unterzuschieben - deshalb fliegen sie raus. */
+/* Ueberschrift aus dem Backoffice: eine Zeile pro Zeile, *Sternchen* faerbt eine Zeile
+   in der Akzentfarbe ein. Bewusst ueber DOM-Knoten gebaut - eingegebener Text darf nie
+   als Markup landen. */
+function setHeroHeadline(txt,id){
+  var el=document.getElementById(id||'heroTitle');
+  if(!el||!txt||!String(txt).trim())return;
+  var zeilen=String(txt).replace(/\r/g,'').split('\n').filter(function(z){return z.trim()!==''});
+  if(!zeilen.length)return;
+  el.textContent='';
+  zeilen.forEach(function(z,i){
+    if(i)el.appendChild(document.createElement('br'));
+    var t=z.trim(),akzent=/^\*.+\*$/.test(t);
+    if(akzent)t=t.slice(1,-1);
+    var node=akzent?document.createElement('em'):document.createTextNode(t);
+    if(akzent)node.textContent=t;
+    el.appendChild(node);
+  });
+}
 function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 var LEGAL={};
@@ -609,6 +627,7 @@ sfetch('site_content?select=key,value').then(function(rows){
       var th=document.querySelector('.hero');if(th)th.classList.add('hat-medien');
     }
     setHeroVideo(c.tech_hero.video);
+    setHeroHeadline(c.tech_hero.headline);
     if(c.tech_hero.subtitle)document.getElementById('heroKick').textContent=c.tech_hero.subtitle;
     if(c.tech_hero.text)document.getElementById('heroText').textContent=c.tech_hero.text;
   }

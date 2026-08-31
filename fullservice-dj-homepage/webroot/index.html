@@ -569,6 +569,24 @@ function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:
 /* Nur echte Web-Adressen verlinken - javascript: in einem gepflegten Linkfeld waere
    sonst ausfuehrbar. */
 function safeUrl(u){u=String(u==null?'':u).trim();return /^https?:\/\//i.test(u)?u:''}
+/* Ueberschrift aus dem Backoffice: eine Zeile pro Zeile, *Sternchen* faerbt eine Zeile
+   in der Akzentfarbe ein. Bewusst ueber DOM-Knoten gebaut - eingegebener Text darf nie
+   als Markup landen. */
+function setHeroHeadline(txt,id){
+  var el=document.getElementById(id||'heroTitle');
+  if(!el||!txt||!String(txt).trim())return;
+  var zeilen=String(txt).replace(/\r/g,'').split('\n').filter(function(z){return z.trim()!==''});
+  if(!zeilen.length)return;
+  el.textContent='';
+  zeilen.forEach(function(z,i){
+    if(i)el.appendChild(document.createElement('br'));
+    var t=z.trim(),akzent=/^\*.+\*$/.test(t);
+    if(akzent)t=t.slice(1,-1);
+    var node=akzent?document.createElement('em'):document.createTextNode(t);
+    if(akzent)node.textContent=t;
+    el.appendChild(node);
+  });
+}
 function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
@@ -708,6 +726,7 @@ function applyContent(rows){
     var navTech=document.querySelector('a.switch[href="technik.html"]');if(navTech)navTech.style.display='none';
   }
   if(c.hero){
+    setHeroHeadline(c.hero.headline);
     if(c.hero.subtitle)document.getElementById('heroKick').textContent=c.hero.subtitle;
     if(c.hero.text)document.getElementById('heroText').innerHTML=mdRender(c.hero.text);
     if(c.hero.cta)document.getElementById('heroCta').textContent=c.hero.cta;

@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 76;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 77;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -682,6 +682,22 @@ function upgrade(PDO $p): void {
       $defs['confirm_intro'] = 'schön, dass ihr euch entschieden habt. Hiermit bestätige ich euch den Auftrag verbindlich – der Termin ist ab jetzt für euch reserviert.';
       $p->prepare("update settings set value = ? where key = 'defaults'")
         ->execute([json_encode($defs, JSON_UNESCAPED_UNICODE)]);
+    }
+  } catch (PDOException $e) {}
+  if ($v < 77) try {
+    /* Die beiden Hero-Ueberschriften standen bisher fest im HTML. Damit sie im Backoffice
+       nicht als leeres Feld auftauchen, einmalig mit dem bisherigen Wortlaut befuellen. */
+    foreach ([['hero', "Volle Tanzfläche.\n*Ohne Schnickschnack.*"],
+              ['tech_hero', "Jedes Wort verständlich.\n*Auch in der schwierigsten Location.*"]] as [$key, $txt]) {
+      $st = $p->prepare('select value from site_content where key = ?');
+      $st->execute([$key]);
+      $val = $st->fetchColumn();
+      if ($val === false) continue;
+      $arr = json_decode((string)$val, true);
+      if (!is_array($arr) || isset($arr['headline'])) continue;
+      $arr['headline'] = $txt;
+      $p->prepare('update site_content set value = ? where key = ?')
+        ->execute([json_encode($arr, JSON_UNESCAPED_UNICODE), $key]);
     }
   } catch (PDOException $e) {}
   if ($v < 76) try {
@@ -2082,12 +2098,12 @@ function seed(PDO $p): void {
   ] as [$k, $v]) $p->prepare('insert into settings (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
 
   foreach ([
-    ['hero', '{"title":"DJ Lauschgift","subtitle":"DJ für Hochzeiten, Geburtstage & Firmenfeiern · deutschlandweit","text":"Ich bin Markus – seit 23 Jahren DJ, quer durch Deutschland unterwegs. Keine Show um meine Person, kein Programm von der Stange: Ich lese den Raum und spiele das, was eure Gäste auf die Tanzfläche bringt. Ihr müsst euch um nichts kümmern – dafür bin ich da.","cta":"Unverbindlich anfragen","image":""}'],
+    ['hero', '{"title":"DJ Lauschgift","headline":"Volle Tanzfläche.\n*Ohne Schnickschnack.*","subtitle":"DJ für Hochzeiten, Geburtstage & Firmenfeiern · deutschlandweit","text":"Ich bin Markus – seit 23 Jahren DJ, quer durch Deutschland unterwegs. Keine Show um meine Person, kein Programm von der Stange: Ich lese den Raum und spiele das, was eure Gäste auf die Tanzfläche bringt. Ihr müsst euch um nichts kümmern – dafür bin ich da.","cta":"Unverbindlich anfragen","image":""}'],
     ['about', '{"title":"Einfach Markus. Und trotzdem kein Standard-DJ.","gear":["Seeburg Acoustic Line","ApeLabs","Sennheiser","Rane","Allen & Heath"],"text":"Angefangen hat alles mit zwei Plattenspielern und einem alten Mischpult zum 18. Geburtstag. Ein Jahr lang habe ich in der heimischen Garage geübt, bis ich für bekannte DJs das Warm-up in angesagten Clubs übernehmen durfte. Den eigentlichen Wendepunkt gab es aber bei einer ganz anderen Feier: Als meine Tante mich zu ihrem runden Geburtstag fragte, ob ich auch gemischte Musik auflegen könnte, war ich skeptisch – bis Jung und Alt gemeinsam auf der Tanzfläche standen und weitersangen, als ich den Regler runterzog. Seitdem ist mir in 23 Jahren kein einziger Abend langweilig geworden.\\n\\nWas mich von vielen anderen unterscheidet: Ich bin ein echter Technik- und Menschenfreund. Ich nehme euch und eure Gäste bewusst wahr und setze auf Licht- und Tontechnik, die man sonst eher von deutlich größeren Produktionen kennt – weil auch eine Feier mit 40 Gästen großartige Technik verdient. Mein Sound kommt von Seeburg Acoustic Line, einem der deutschen Top-Hersteller für mobile PA-Systeme – das hört man sofort. Dazu passe ich mich flexibel an jede Location an, ob Scheune, Schloss, Industriehalle oder Gartenparty: Ich kenne mein Equipment in- und auswendig und weiß, wie ich jeden Raum klanglich und optisch in Szene setze.","image":"img/markus_1.jpg"}'],
     ['services', '{"title":"Das bekommt ihr","text":"Vom Sektempfang bis zum letzten Song: Musik, Ton für die freie Trauung, dezentes Licht passend zur Location – und ein Plan B für alle Fälle. Ihr feiert, ich kümmere mich um den Rest.","image":""}'],
     ['guarantee', '{"title":"Schon ausgebucht? Ihr steht trotzdem nicht ohne DJ da.","text":"Wenn ich an eurem Termin keine Zeit habe – oder merke, dass ich nicht der richtige DJ für eure Feier bin – wähle ich persönlich bis zu fünf Kollegen aus meinem Partner-Netzwerk aus, die wirklich zu euch passen. Keine anonyme Liste: Ich kenne die Kollegen und ihre Stärken, und ihr bekommt die Vorschläge direkt von mir – auch günstigere Optionen sind dabei, falls euer Budget das erfordert. Und Transparenz gehört dazu: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision (Details in den AGB)."}'],
     ['rental', '{"title":"Technik mieten","text":"Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung."}'],
-    ['tech_hero', '{"subtitle":"Lauschgift Veranstaltungstechnik · Hemer","text":"Große Bühnen mit viel Platz kann jeder beschallen. Die Kunst ist die kleine Location: niedrige Decke, harte Wände, Publikum direkt vor der Box. Genau darauf bin ich spezialisiert – Ton und Licht für Veranstaltungen von 30 bis 200 Gästen, mit hochwertiger Technik, die dafür gebaut ist."}'],
+    ['tech_hero', '{"headline":"Jedes Wort verständlich.\n*Auch in der schwierigsten Location.*","subtitle":"Lauschgift Veranstaltungstechnik · Hemer","text":"Große Bühnen mit viel Platz kann jeder beschallen. Die Kunst ist die kleine Location: niedrige Decke, harte Wände, Publikum direkt vor der Box. Genau darauf bin ich spezialisiert – Ton und Licht für Veranstaltungen von 30 bis 200 Gästen, mit hochwertiger Technik, die dafür gebaut ist."}'],
     ['tech_teaser', '{"title":"Lauschgift Veranstaltungstechnik","text":"Ton und Licht gehören für mich untrennbar zum DJ-Sein dazu – deshalb biete ich beides auch unabhängig voneinander an: Technik zum Mieten direkt aus meinem Lager in Hemer, oder mich als Techniker inklusive Equipment, ganz ohne Auflegen. Alle Details dazu auf der Technik-Seite."}'],
     ['contact', '{"title":"Kontakt","phone":"01523 6439373","email":"lauschgiftmarkus@gmail.com","address":"Büttmecker Weg 35c, 58675 Hemer","instagram":"https://www.instagram.com/dj_lauschgift/","whatsapp":""}'],
     ['theme', '{"preset":"koralle","primary":"#ff6f5b","bg":"#0f1012","font":"grotesk"}'],
