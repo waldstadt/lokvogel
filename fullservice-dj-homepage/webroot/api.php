@@ -3842,16 +3842,27 @@ function processImage(string $raw, int $maxDim = 2000, int $quality = 85): strin
       case 8: $img = imagerotate($img, 90, 0); break;
     }
   }
+  /* Transparenz erhalten: PNG und WebP koennen einen Alphakanal haben - Logos ohne
+     Hintergrund leben davon. GD wirft ihn beim Speichern weg, wenn man es nicht
+     ausdruecklich anders sagt; transparente Flaechen wurden dadurch schwarz. */
+  $transparent = ($mime === 'image/png' || $mime === 'image/webp');
   $w = imagesx($img); $h = imagesy($img);
   $scale = min(1, $maxDim / max($w, $h));
   if ($scale < 1) {
     $nw = max(1, (int)round($w * $scale)); $nh = max(1, (int)round($h * $scale));
     $resized = imagecreatetruecolor($nw, $nh);
-    if ($mime === 'image/png') { imagealphablending($resized, false); imagesavealpha($resized, true); }
+    if ($transparent) {
+      imagealphablending($resized, false);
+      imagesavealpha($resized, true);
+      /* Leere Flaeche zuerst wirklich durchsichtig machen, sonst bleibt Schwarz stehen,
+         wo das Bild spaeter nichts hinmalt. */
+      imagefill($resized, 0, 0, imagecolorallocatealpha($resized, 0, 0, 0, 127));
+    }
     imagecopyresampled($resized, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
     imagedestroy($img);
     $img = $resized;
   }
+  if ($transparent) { imagealphablending($img, false); imagesavealpha($img, true); }
   ob_start();
   if ($mime === 'image/png') imagepng($img, null, 6);
   elseif ($mime === 'image/webp') imagewebp($img, null, $quality);
