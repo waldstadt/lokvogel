@@ -127,11 +127,13 @@ function loadOffer(){
     }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
 }
 function renderPlzGate(){
-  app('<div class="card"><div class="kicker">Euer Angebot</div><h1>Kurze Sicherheitsfrage</h1>'+
+  /* Der Gate steht vor dem Laden des Belegs - welcher Typ dahintersteckt, ist hier
+     noch unbekannt. Deshalb neutral formulieren statt immer "Angebot" zu sagen. */
+  app('<div class="card"><div class="kicker">Eure Unterlagen</div><h1>Kurze Sicherheitsfrage</h1>'+
     '<p class="sub">Zum Schutz eurer Daten: Gebt bitte die Postleitzahl eurer Rechnungsadresse ein.</p>'+
     '<div class="msg err" id="gateMsg" style="display:'+(PLZ?'block':'none')+'">Die Postleitzahl passt leider nicht – bitte erneut versuchen.</div>'+
     '<label for="plzIn">Postleitzahl</label><input id="plzIn" inputmode="numeric" maxlength="10" placeholder="z. B. 58675">'+
-    '<div style="margin-top:16px"><button class="btn" onclick="submitPlz()">Angebot öffnen</button></div></div>');
+    '<div style="margin-top:16px"><button class="btn" onclick="submitPlz()">Unterlagen öffnen</button></div></div>');
   var inp=document.getElementById('plzIn');
   inp.focus();
   inp.addEventListener('keydown',function(e){if(e.key==='Enter')submitPlz()});
@@ -141,7 +143,7 @@ function submitPlz(){
   sessionStorage.setItem('portal_plz',PLZ);
   loadOffer();
 }
-var TYPE_NAME={angebot:'Angebot',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'};
+var TYPE_NAME={angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'};
 function lineTotal(it){
   if(it.is_header)return 0; /* reine Kopfzeile (Artikel/Stückzahl/Tagespreis) - Summe steckt in den Unterpositionen */
   var g=(Number(it.qty)||0)*(Number(it.unit_price)||0);
@@ -265,7 +267,7 @@ function renderOffer(){
     })()+
     '<div class="card" id="actionCard">'+
     (decided?
-      '<p class="sub">'+(!istAngebot?'Fragen zur Rechnung? Schreibt mir einfach hier, ich melde mich:'
+      '<p class="sub">'+(!istAngebot?('Fragen zu'+(d.doc_type==='bestaetigung'?'r Auftragsbestätigung':'r Rechnung')+'? Schreibt mir einfach hier, ich melde mich:')
         :(d.status==='angenommen'?'Ich melde mich zeitnah bei euch mit den nächsten Schritten. Wenn euch noch etwas einfällt, schreibt mir hier:':'Ihr habt Fragen oder wollt doch nochmal sprechen? Schreibt mir gerne:'))+'</p>'+
       '<div class="msg" id="aMsg"></div>'+
       '<label for="cmt">Nachricht</label><textarea id="cmt"></textarea>'+

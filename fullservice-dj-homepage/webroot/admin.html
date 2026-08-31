@@ -1217,10 +1217,10 @@ function renderDash(){
       sub:(b.event_type||'Technik-Miete')+(b.event_date?(' · '+dt(b.event_date)):''),urgent:isUrgent(b.event_date)};});
   newInq=newInq.concat(cartInq).sort(function(a,b){return (b.urgent?1:0)-(a.urgent?1:0)});
   var upcoming=CACHE.bookings.filter(function(b){return b.event_date>=today&&b.status!=='storniert'}).sort(function(a,b){return a.event_date<b.event_date?-1:1});
-  var openInv=CACHE.documents.filter(function(d){return d.doc_type!=='angebot'&&['versendet','ueberfaellig'].indexOf(d.status)>=0});
+  var openInv=CACHE.documents.filter(function(d){return istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0});
   var openQ=CACHE.documents.filter(function(d){return d.doc_type==='angebot'&&d.status==='versendet'});
   var year=new Date().getFullYear();
-  var rev=CACHE.documents.filter(function(d){return d.doc_type!=='angebot'&&d.status==='bezahlt'&&d.paid_at&&d.paid_at.slice(0,4)==String(year)})
+  var rev=CACHE.documents.filter(function(d){return istZahlbeleg(d.doc_type)&&d.status==='bezahlt'&&d.paid_at&&d.paid_at.slice(0,4)==String(year)})
     .reduce(function(s,d){return s+Number(d.total_gross)-Number(d.deposit_deducted||0)},0);
   document.getElementById('dashTiles').innerHTML=
     tile(newInq.length,'Neue Anfragen')+tile(upcoming.length,'Kommende Termine')+
@@ -2285,9 +2285,13 @@ function openDocEditor(id,newType){
       outro_text:istZahlbeleg(newType)?(defs.invoice_outro||''):'',
       deposit_deducted:0,customer_id:'',booking_id:null,rental_from:null,rental_to:null,
       price_mode:'brutto',discount_value:0,discount_type:'pct'};
-    var days=newType==='angebot'?(defs.quote_valid_days||30):(defs.payment_days||14);
+    /* Nur Zahlbelege haben ein Fälligkeitsdatum. Angebot und Auftragsbestätigung
+       tragen ein "Gültig bis" - sonst schrieb der Editor das Datum ins falsche Feld
+       und beim Speichern war es weg. */
+    var zahl=istZahlbeleg(newType);
+    var days=zahl?(defs.payment_days||14):(defs.quote_valid_days||30);
     var d2=new Date();d2.setDate(d2.getDate()+days);
-    curDoc[newType==='angebot'?'valid_until':'due_date']=d2.toISOString().slice(0,10);
+    curDoc[zahl?'due_date':'valid_until']=d2.toISOString().slice(0,10);
     curItems=[{pos:1,description:'',qty:1,unit:'Stk.',unit_price:0}];
     fillDocForm();showPage('doc');
   }
@@ -2315,8 +2319,8 @@ document.getElementById('docCust').addEventListener('change',docCustChanged);
 document.getElementById('docType').addEventListener('change',function(){updateDocTypeUI(this.value)});
 function updateDocTypeUI(t){
   document.getElementById('docDepWrap').style.display=t==='schluss'?'':'none';
-  document.getElementById('docDateLbl2').textContent=t==='angebot'?'Gültig bis':'Fällig am';
-  document.getElementById('docBack').setAttribute('onclick',"showPage('"+(t==='angebot'?'quotes':'inv')+"')");
+  document.getElementById('docDateLbl2').textContent=istZahlbeleg(t)?'Fällig am':'Gültig bis';
+  document.getElementById('docBack').setAttribute('onclick',"showPage('"+((t==='angebot'||t==='bestaetigung')?'quotes':'inv')+"')");
   document.getElementById('docTplBtns').innerHTML=t==='angebot'?
     '<button class="btn sm" onclick="openTplPicker()">Vorlage laden</button> <button class="btn sm" onclick="saveAsTpl()">Als Vorlage speichern</button>':'';
 }
@@ -2414,7 +2418,7 @@ function exportInvoicesCsv(){
   var year=prompt('Rechnungen welchen Jahres exportieren? (für den Steuerberater)',String(new Date().getFullYear()));
   if(!year)return;
   var list=CACHE.documents.filter(function(d){
-    return d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'&&d.status!=='entwurf'
+    return istZahlbeleg(d.doc_type)&&d.status!=='entwurf'
       &&(d.doc_date||'').slice(0,4)===year.trim();
   }).sort(function(a,b){return (a.number||'').localeCompare(b.number||'')});
   if(!list.length){toast('Keine Rechnungen im Jahr '+year+'.',1);return}
@@ -2429,7 +2433,7 @@ function exportInvoicesCsv(){
   toast(list.length+'Rechnungen exportiert ✓');
 }
 function isOverdue(d){
-  return d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'&&d.status==='versendet'
+  return istZahlbeleg(d.doc_type)&&d.status==='versendet'
     &&d.due_date&&d.due_date<new Date().toISOString().slice(0,10);
 }
 function composeReminderMail(){
@@ -2925,6 +2929,19 @@ function copyItems(items){
     discount_value:it.discount_value,discount_type:it.discount_type,
     is_header:it.is_header,group_pos:it.group_pos}});
 }
+/* Das ursprüngliche Angebot liegt seit der Auftragsbestätigung nicht mehr direkt
+   am parent_id, sondern eine Stufe weiter oben: Abschlag → Bestätigung → Angebot.
+   Deshalb die Kette hochlaufen statt nur einen Schritt zu prüfen. */
+function findAngebot(doc){
+  var cur=doc,tiefe=0;
+  while(cur&&cur.parent_id&&tiefe++<6){
+    var up=CACHE.documents.find(function(d){return d.id===cur.parent_id});
+    if(!up)return null;
+    if(up.doc_type==='angebot')return up;
+    cur=up;
+  }
+  return null;
+}
 function docToInvoice(type){
   var src=curDoc,items=curItems.slice();
   /* Der verbindliche Endbetrag des Angebots: Pauschalpreis schlägt die Summe, sonst
@@ -2966,8 +2983,8 @@ function docToInvoice(type){
          0 € aufhebt. Dann lieber die Positionen des zugrunde liegenden Angebots holen. */
       var basis=items,basisDoc=src;
       if(src.doc_type==='abschlag'){
-        /* Zuerst über die festgehaltene Herkunft, sonst über die Buchung suchen. */
-        var ang=CACHE.documents.find(function(d){return d.id===src.parent_id&&d.doc_type==='angebot'})
+        /* Zuerst die Herkunftskette hochlaufen, sonst über die Buchung suchen. */
+        var ang=findAngebot(src)
           ||CACHE.documents.filter(function(d){return d.doc_type==='angebot'&&d.booking_id&&d.booking_id===src.booking_id})
             .sort(function(a,b){return (b.created_at||'')<(a.created_at||'')?-1:1})[0];
         if(ang){basisDoc=ang;basis=null;}
