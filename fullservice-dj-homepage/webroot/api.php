@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 68;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 69;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -631,6 +631,7 @@ function upgrade(PDO $p): void {
       where price_mode = 'netto'
         and intro_text like 'vielen Dank für deine Anmeldung zum Workshop%'");
   } catch (PDOException $e) {}
+  if ($v < 69) try { campaignTechCheckBruttoUpdate($p); } catch (PDOException $e) {}
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1679,7 +1680,7 @@ function campaignPageRows(): array {
 
   ['slug' => 'technik-check', 'sort' => 120, 'accent' => '#3cc8b4', 'accent2' => '#5fdcc9', 'btn_txt' => '#0a2420',
    'page_title' => 'Technik-Check für eure Tonanlage | Lauschgift Veranstaltungstechnik',
-   'meta_desc' => 'Die Anlage im Vereinsheim brummt, pfeift oder keiner traut sich ran? Ehrlicher Technik-Check mit schriftlichem Bericht: 149 Euro zzgl. MwSt., wird bei Folgeauftrag verrechnet. Keine Verkaufsshow – aus Hemer.',
+   'meta_desc' => 'Die Anlage im Vereinsheim brummt, pfeift oder keiner traut sich ran? Ehrlicher Technik-Check mit schriftlichem Bericht: 149 Euro inkl. MwSt., wird bei Folgeauftrag verrechnet. Keine Verkaufsshow – aus Hemer.',
    'badge' => 'Für Vereinsheime, Gemeindehäuser, Schulen, Kneipen – überall, wo eine Anlage fest hängt',
    'h1_line1' => 'Eure Anlage brummt seit Jahren?', 'h1_line2' => 'Das muss sie nicht.',
    'sub' => 'Ich bin Markus von Lauschgift Veranstaltungstechnik. In fast jedem Vereinsheim hängt eine Anlage, die irgendwann mal jemand angeschlossen hat, der längst weggezogen ist. Seitdem: Brummen, Pfeifen und ein Mischpult, an das sich keiner traut. Ich schaue mir das an – gründlich, ehrlich und mit schriftlichem Bericht.',
@@ -1699,7 +1700,7 @@ function campaignPageRows(): array {
      'Schriftlicher Bericht mit klarer Empfehlung und Prioritäten',
      'Beschriftung und Spickzettel für die Bedienung',
      'Vorab-Fragebogen kommt automatisch nach eurer Anfrage',
-     '149 € zzgl. MwSt. je Anlage bzw. Raum, jede weitere 79 € – wird bei Folgeauftrag verrechnet',
+     '149 € inkl. MwSt. je Anlage bzw. Raum, jede weitere 79 € – wird bei Folgeauftrag verrechnet',
    ],
    'pricenote' => 'Beauftragt ihr nach dem Check etwas aus dem Bericht, wird der Check komplett verrechnet – ihr riskiert also nichts außer zwei Stunden eurer Zeit. Und wenn alles gut ist, wisst ihr das danach schwarz auf weiß.',
    'form_kicker' => 'Check anfragen', 'form_h2' => 'Was macht eure Anlage?',
@@ -1800,6 +1801,33 @@ function campaignTechCheckPriceUpdate(PDO $p): void {
   $desc = (string)$row['meta_desc'];
   $descNeu = str_replace('149 Euro pauschal, wird bei Folgeauftrag verrechnet',
     '149 Euro zzgl. MwSt., wird bei Folgeauftrag verrechnet', $desc);
+  if ($changed || $descNeu !== $desc)
+    $p->prepare('update campaign_pages set features = ?, meta_desc = ?, updated_at = ? where id = ?')
+      ->execute([json_encode($feats, JSON_UNESCAPED_UNICODE), $descNeu, now(), $row['id']]);
+}
+
+/* v69: Alle Preise werden brutto ausgewiesen (Entscheidung von Markus). Die mit v67
+   eingefügte Formulierung "zzgl. MwSt." widersprach dem Katalogpreis - dort sind 149 €
+   der Bruttopreis, den der Kunde auf der Rechnung sieht. Beworben wären es sonst
+   177,31 € gewesen. Ersetzt nur die beiden bekannten Formulierungen. */
+function campaignTechCheckBruttoUpdate(PDO $p): void {
+  $sel = $p->prepare('select id, features, meta_desc from campaign_pages where slug = ?');
+  $sel->execute(['technik-check']);
+  $row = $sel->fetch();
+  if (!$row) return;
+  $neu = '149 € inkl. MwSt. je Anlage bzw. Raum, jede weitere 79 € – wird bei Folgeauftrag verrechnet';
+  $alt = ['149 € zzgl. MwSt. je Anlage bzw. Raum, jede weitere 79 € – wird bei Folgeauftrag verrechnet',
+          '149 € pauschal je Anlage bzw. Raum, jede weitere 79 € – wird bei Folgeauftrag verrechnet'];
+  $feats = json_decode((string)$row['features'], true);
+  $changed = false;
+  if (is_array($feats)) {
+    foreach ($feats as &$f) if (in_array($f, $alt, true)) { $f = $neu; $changed = true; }
+    unset($f);
+  }
+  $desc = (string)$row['meta_desc'];
+  $descNeu = str_replace(['149 Euro zzgl. MwSt., wird bei Folgeauftrag verrechnet',
+      '149 Euro pauschal, wird bei Folgeauftrag verrechnet'],
+    '149 Euro inkl. MwSt., wird bei Folgeauftrag verrechnet', $desc);
   if ($changed || $descNeu !== $desc)
     $p->prepare('update campaign_pages set features = ?, meta_desc = ?, updated_at = ? where id = ?')
       ->execute([json_encode($feats, JSON_UNESCAPED_UNICODE), $descNeu, now(), $row['id']]);

@@ -268,11 +268,10 @@ alle tagsüber/unter der Woche (= Auslastungsziel):
 
 ## Offene Entscheidungen für Markus (Stand QA-Durchlauf)
 
-- **Technik-Check-Preis.** Auf technik.html steht jetzt "149 € zzgl. MwSt.",
-  im Katalog liegt der Artikel als Bruttopreis. Wenn 149 € der Endpreis für
-  Vereine sein soll (die keine Vorsteuer ziehen), muss der Katalogpreis auf
-  125,21 € netto - bei rund 24 € Kosten je Check ist das die entscheidende
-  Zahl. Bitte einmal festlegen.
+- **Technik-Check-Preis (geklärt).** 149 € sind der Bruttopreis, den der Kunde
+  auf der Rechnung sieht; die Seiten sagen jetzt "inkl. MwSt.". Netto bleiben
+  davon 125,21 €, bei rund 24 € Kosten je Check. Falls die Marge zu dünn wird,
+  ist das eine Preis-, keine Anzeigefrage.
 - **Workshop-Preise.** Die Kacheln zeigen jetzt "89,00 € p. P. inkl. MwSt.",
   abgerechnet wird der Betrag als Brutto. Die Datenbankspalte heißt zwar
   `price_net`, enthält aber den Bruttopreis - fachlich stimmt es, der

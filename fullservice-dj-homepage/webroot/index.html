@@ -511,7 +511,7 @@ function mdRender(t){
 function renderPacks(list){
   document.getElementById('packGrid').innerHTML=list.map(function(p){
     var feats=(p.features||[]).map(function(f){return '<li>'+esc(f)+'</li>'}).join('');
-    var price=p.price_from?('<div class="price">'+esc(p.price_note||'ab')+' '+euro(p.price_from)+' <small>zzgl. Anfahrt</small></div>')
+    var price=p.price_from?('<div class="price">'+esc(p.price_note||'ab')+' '+euro(p.price_from)+' <small>inkl. MwSt., zzgl. Anfahrt</small></div>')
       :'<div class="price" style="font-size:14px;color:var(--mut);font-weight:400">Preis richtet sich nach Aufwand &amp; Dauer – im kostenlosen Kennenlerngespräch gibt es ein klares Angebot</div>';
     return '<div class="pack reveal vis"><h3>'+esc(p.title)+'</h3><div class="psub">'+esc(p.subtitle||'')+'</div><ul>'+feats+'</ul>'+price+'</div>';
   }).join('');
