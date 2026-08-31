@@ -343,7 +343,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <span class="l-priv"><i></i>Privat / geblockt</span>
       </div>
     </div>
-    <div class="tbl-wrap card"><table><thead><tr><th>Datum</th><th>Titel / Kunde</th><th>Art</th><th>Location</th><th class="num">Gage</th><th>Status</th></tr></thead><tbody id="bookRows"></tbody></table></div>
+    <div class="tbl-wrap card"><table><thead><tr><th>Datum</th><th>Titel / Kunde</th><th>Art</th><th>Location</th><th class="num">Auftragswert</th><th>Status</th></tr></thead><tbody id="bookRows"></tbody></table></div>
   </div>
 
   <!-- BUCHUNG-DETAIL -->
@@ -440,6 +440,26 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div><label>Miettage bis <span class="mut sml" style="text-transform:none;letter-spacing:0">– leer = 1 Miettag</span></label><input type="date" id="docRentTo" onchange="renderRentalHint()"></div>
         <div style="display:flex;align-items:flex-end;padding-bottom:11px"><span class="mut sml" id="docRentHint"></span></div>
       </div>
+      <div id="docEventBox" style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:normal;cursor:pointer;margin:0">
+          <input type="checkbox" id="evShow" style="width:auto" onchange="renderEventHint()">
+          <b style="color:var(--wh)">Eckdaten der Veranstaltung auf dem Beleg anzeigen</b></label>
+        <div class="mut sml" style="margin:6px 0 10px">Erscheint als kurze Infozeile unter der Belegnummer – im Ausdruck und in der Kundenansicht. Ist eine Buchung verknüpft, übernehme ich die Angaben von dort, du kannst sie aber jederzeit überschreiben: auf dem Beleg steht dann das, was ihr vereinbart habt.</div>
+        <div class="grid4">
+          <div><label>Art</label><select id="evKind"><option value="">–</option>
+            <option value="dj">DJ</option><option value="technik">Technikvermietung</option>
+            <option value="dj_technik">DJ + Technik</option></select></div>
+          <div><label>Anlass</label><input id="evOcc" placeholder="Hochzeit, Firmenfeier …"></div>
+          <div><label>Datum</label><input type="date" id="evDate"></div>
+          <div><label>ab Uhrzeit</label><input type="time" id="evTime"></div>
+        </div>
+        <div class="grid3">
+          <div><label>Location</label><input id="evVenue" placeholder="Name der Location"></div>
+          <div><label>Ort / Adresse</label><input id="evAddr"></div>
+          <div><label>Gäste (ca.)</label><input type="number" id="evGuests"></div>
+        </div>
+        <div class="mut sml" id="evHint" style="margin-top:6px"></div>
+      </div>
       <div class="grid4" id="docTypeGrid">
         <div><label>Typ</label><select id="docType">
           <option value="angebot">Angebot</option><option value="bestaetigung">Auftragsbestätigung</option>
@@ -459,7 +479,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
       <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('docIntro')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
     </div>
-    <div class="card"><h3>Positionen <span class="doc-add" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()"> + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()"> + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button> <span id="docTplBtns"></span></span></h3>
+    <div class="card"><h3>Positionen <span class="doc-add" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()"> + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()"> + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button> <span id="docBookBtns"></span> <span id="docTplBtns"></span></span></h3>
       <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel brutto</div><div>Gesamt</div><div></div></div>
       <div id="docItems"></div>
       <div class="totals" id="docTotals"></div>
@@ -1524,7 +1544,7 @@ function renderBook(){
     return '<tr class="click" onclick="openBookDetail(\''+b.id+'\')"><td>'+dt(b.event_date)+(b.end_date?' – '+dt(b.end_date):'')+'</td>'+
     '<td><b>'+esc(b.title||b.event_type||'Auftrag')+'</b><br><span class="mut sml">'+esc(custName(b.customers))+'</span></td>'+
     '<td>'+({dj:'DJ',technik:'Technik',dj_technik:'DJ + Technik'}[b.kind]||b.kind)+'</td>'+
-    '<td>'+esc(b.venue_name||'–')+'</td><td class="num">'+(b.fee_net?euro(b.fee_net):'–')+'</td>'+
+    '<td>'+esc(b.venue_name||'–')+'</td><td class="num">'+(bookingValue(b)?euro(bookingValue(b)):'–')+'</td>'+
     '<td><span class="b '+bookBadge(b.status)+'">'+b.status+'</span></td></tr>';
   }).join('')||'<tr><td colspan="6" class="mut">Noch keine Buchungen.</td></tr>';
 }
@@ -1592,7 +1612,7 @@ function openBookDetail(id){
   document.getElementById('bdData').innerHTML=
     row('Anlass',b.event_type)+row('Zeit',[b.start_time,b.end_time].filter(Boolean).join(' – '))+
     row('Location',b.venue_name)+row('Adresse',b.venue_address)+row('Gäste',b.guests)+
-    row('Gage brutto',b.fee_net?euro(b.fee_net):'')+row('Notizen',b.notes)+
+    row('Auftragswert',bookingValue(b)?euro(bookingValue(b)):'')+row('Notizen',b.notes)+
     (b.customer_notes&&(b.customer_notes.schedule||b.customer_notes.music||b.customer_notes.agreements)
       ?'<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b style="color:var(--acc)">Vom Kunden gepflegt'+(b.customer_notes.updated_at?' ('+dt(b.customer_notes.updated_at)+')':'')+':</b>'+
        row('Programmablauf',b.customer_notes.schedule)+row('Musikwünsche',b.customer_notes.music)+row('Vereinbarungen',b.customer_notes.agreements)+'</div>':'');
@@ -1887,7 +1907,7 @@ function openBookModal(b,presetCust){
     '<div class="grid3"><div><label>Location</label><input id="bVenue" value="'+esc(b.venue_name||'')+'"></div>'+
     '<div><label>Adresse</label><input id="bAddr" value="'+esc(b.venue_address||'')+'"></div>'+
     '<div><label>Gäste</label><input type="number" id="bGuests" value="'+(b.guests||'')+'"></div></div>'+
-    '<label>Gage brutto (€, ohne Technik)</label><input type="number" step="0.01" id="bFee" value="'+(b.fee_net||'')+'">'+
+
     '<label>Notizen</label><textarea id="bNotes">'+esc(b.notes||'')+'</textarea>'+edBtn('bNotes')+
     '<div style="margin-top:14px"><button class="btn" onclick="saveBook(\''+(b.id||'')+'\')">Speichern</button>'+
     (b.id?' <button class="btn r" onclick="delBook(\''+b.id+'\')">Löschen</button>':'')+'</div>');
@@ -1899,7 +1919,7 @@ function saveBook(id){
   var body={customer_id:v('bCust'),status:v('bStatus'),kind:v('bKind'),event_type:v('bType'),title:v('bTitle'),
     event_date:v('bDate'),end_date:v('bEnd')||null,start_time:v('bStart')||null,end_time:v('bTend')||null,
     venue_name:v('bVenue'),venue_address:v('bAddr'),guests:v('bGuests')?Number(v('bGuests')):null,
-    fee_net:v('bFee')?Number(v('bFee')):null,notes:v('bNotes'),
+    notes:v('bNotes'),
     billable_days:v('bBillDays')?Number(v('bBillDays')):null,
     open_ended:document.getElementById('bOpenEnded').checked};
   (id?api('bookings?id=eq.'+id,{method:'PATCH',body:body}):api('bookings',{method:'POST',body:body}))
@@ -2308,6 +2328,7 @@ function openDocEditor(id,newType){
     var d2=new Date();d2.setDate(d2.getDate()+days);
     curDoc[zahl?'due_date':'valid_until']=d2.toISOString().slice(0,10);
     curItems=[{pos:1,description:'',qty:1,unit:'Stk.',unit_price:0}];
+    curDoc.event_info=null;
     fillDocForm();showPage('doc');
   }
 }
@@ -2324,6 +2345,11 @@ function docCustChanged(){
   }
   refreshBookOpts();
 }
+document.getElementById('docBook').addEventListener('change',function(){
+  var id=this.value;
+  fillEventFromBooking((CACHE.bookings||[]).find(function(x){return x.id===id}),true);
+  renderDocExtraBtns();
+});
 function refreshBookOpts(){
   var custId=document.getElementById('docCust').value;
   var books=CACHE.bookings.filter(function(b){return !custId||b.customer_id===custId});
@@ -2362,8 +2388,9 @@ function fillDocForm(){
   document.getElementById('docOutro').value=d.outro_text||'';
   document.getElementById('docRentFrom').value=d.rental_from||'';
   document.getElementById('docRentTo').value=d.rental_to||'';
+  evFill(evOf(d));
   updateDocTypeUI(d.doc_type);
-  renderItems();renderStatusBtns();applyDocLock();renderRentalHint();
+  renderItems();renderStatusBtns();applyDocLock();renderRentalHint();renderDocExtraBtns();
 }
 function showAcceptSig(){
   openModal('Unterschrift – '+esc(curDoc.number)+' · '+esc(curDoc.accepted_name||''),
@@ -2394,6 +2421,7 @@ function korrekturDoc(){
   curDoc.discount_value=src.discount_value;curDoc.discount_type=src.discount_type;
   curDoc.intro_text='Korrektur zur Rechnung '+src.number+'. '+(src.intro_text||'');
   curDoc.outro_text=src.outro_text;
+  curDoc.event_info=evOf(src);
   curItems=items;
   fillDocForm();
   toast('Korrektur-Entwurf angelegt – Original '+src.number+' ggf. noch stornieren.');
@@ -2693,6 +2721,7 @@ function saveDoc(){
     intro_text:v('docIntro'),outro_text:v('docOutro'),
     rental_from:v('docRentFrom')||null,rental_to:v('docRentTo')||null,
     price_mode:docModeVal(),discount_value:c.discVal,discount_type:c.discType,parent_id:curDoc.parent_id||null,
+    event_info:evVal(),
     total_net:c.net,total_tax:c.tax,total_gross:c.gross,total_override:c.override,deposit_deducted:type==='schluss'?c.dep:0};
   body[istZahlbeleg(type)?'due_date':'valid_until']=v('docDate2')||null;
   var p;
@@ -2744,52 +2773,144 @@ function confirmAbschlag(total,label){
   closeModal();
   if(window._abCb)window._abCb(amount,desc);
 }
+/* Aus der Buchung heraus wird nur vorbelegt, was zum Beleg gehoert: Kunde, Buchung,
+   Mietzeitraum und die Eckdaten der Veranstaltung. Positionen entstehen ausschliesslich
+   im Belegformular - entweder aus einer Vorlage oder von Hand. Frueher hat diese Stelle
+   eine "DJ-Leistung"-Zeile mit der Gage aus der Buchungsmaske erzeugt; damit gab es zwei
+   Orte fuer denselben Betrag. */
 function createDocFromBooking(type){
   var b=curBook;if(!b)return;
+  if(type==='angebot'){NQ_BOOK=b;newQuote(b.customer_id);return}
   openDocEditor(null,type);
   setTimeout(function(){
-    document.getElementById('docCust').value=b.customer_id;refreshBookOpts();
-    document.getElementById('docBook').value=b.id;
-    /* Miettage aus der Buchung übernehmen, damit die Rabattstaffel-Positionen unten und die
-       "Mietzeitraum"-Zeile im gedruckten Dokument zusammenpassen - auch wenn danach noch
-       weitere Technikpositionen manuell ergänzt werden. */
-    if(b.kind==='technik'||b.kind==='dj_technik'){
-      document.getElementById('docRentFrom').value=b.event_date||'';
-      document.getElementById('docRentTo').value=(b.end_date&&b.end_date>b.event_date)?b.end_date:'';
-    }
-    curItems=[];
-    var label=(b.title||b.event_type||'Veranstaltung')+' am '+dt(b.event_date);
-    if(b.kind!=='technik')curItems.push({pos:1,description:'DJ-Leistung: '+label+(b.start_time?' ('+b.start_time.slice(0,5)+(b.end_time?'–'+b.end_time.slice(0,5):'')+' Uhr)':''),qty:1,unit:'pausch.',unit_price:Number(b.fee_net)||0});
-    CACHE.be.filter(function(x){return x.booking_id===b.id}).forEach(function(x){
-      var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};
-      var days=rentDays(b);
-      if(x.price_override!=null){
-        /* Manuell überschriebener Pauschalpreis - keine bekannte Tagesrate, bleibt eine Zeile. */
-        curItems.push({pos:curItems.length+1,description:'Technik-Miete: '+(eq.name||'?')+' ('+days+' Miettag'+(days>1?'e':'')+')',
-          qty:x.qty,unit:'Stk.',unit_price:x.qty?Number(x.price_override)/x.qty:Number(x.price_override)});
-      }else{
-        equipTierLineItems(Object.assign({},eq,{name:'Technik-Miete: '+(eq.name||'?')}),days,x.qty,curItems.length+1).forEach(function(it){curItems.push(it)});
-      }
-    });
-    var rd=riderOf(b),tc=rd.distance_km?travelCost(rd.distance_km):0;
-    if(tc>0)curItems.push({pos:curItems.length+1,description:'Anfahrt ('+rd.distance_km+' km einfache Strecke)',
-      note:(travelFreeMode()==='schwelle'?'Ab '+travelFree()+' km Freigrenze wird die volle Strecke berechnet.':travelFree()+' Freikilometer bereits abgezogen.')+(travelRoundtrip()?' Hin- und Rückweg.':' Einfache Strecke.'),
-      qty:1,unit:'pausch.',unit_price:tc});
-    var onThresh=overnightThresholdType()==='zeit'?rd.travel_minutes:rd.distance_km;
-    if(overnightEnabled()&&onThresh&&onThresh>=overnightThresholdValue())
-      curItems.push({pos:curItems.length+1,description:'Übernachtung',
-        note:'Automatisch ergänzt ab '+overnightThresholdValue()+(overnightThresholdType()==='zeit'?' Min. Fahrzeit':' km Fahrtstrecke')+' – bei Bedarf entfernen oder eine zweite Übernachtung ergänzen.',
-        qty:1,unit:'pausch.',unit_price:overnightPrice()});
-    if(!curItems.length)curItems=[{pos:1,description:label,qty:1,unit:'pausch.',unit_price:0}];
-    renderItems();renderRentalHint();
+    presetDocFromBooking(b);
     if(type==='abschlag'){
-      var total=curItems.reduce(function(s,it){return s+lineTotal(it)},0);
-      askAbschlag(total,label,function(amount,desc){
+      askAbschlag(bookingValue(b),(b.title||b.event_type||'Veranstaltung')+' am '+dt(b.event_date),function(amount,desc){
         curItems=[{pos:1,description:desc,note:'Nach Zahlungseingang ist euer Termin verbindlich reserviert. Der Restbetrag folgt mit der Schlussrechnung nach der Veranstaltung.',qty:1,unit:'pausch.',unit_price:amount}];
-        renderItems();
+        renderItems();renderTotals();
       });
     }
   },80);
+}
+function presetDocFromBooking(b){
+  document.getElementById('docCust').value=b.customer_id;refreshBookOpts();
+  document.getElementById('docBook').value=b.id;
+  /* Mietzeitraum uebernehmen, damit die Rabattstaffel der Technikartikel und die
+     "Mietzeitraum"-Zeile im Ausdruck zusammenpassen. */
+  if(b.kind==='technik'||b.kind==='dj_technik'){
+    document.getElementById('docRentFrom').value=b.event_date||'';
+    document.getElementById('docRentTo').value=(b.end_date&&b.end_date>b.event_date)?b.end_date:'';
+  }
+  fillEventFromBooking(b,true);
+  renderRentalHint();renderTotals();renderDocExtraBtns();
+}
+
+/* ===== Eckdaten der Veranstaltung am Beleg ===== */
+function evOf(d){
+  var e=d&&d.event_info;
+  if(!e)return null;
+  if(typeof e==='string'){try{e=JSON.parse(e)}catch(err){return null}}
+  return e;
+}
+function evVal(){
+  return {show:document.getElementById('evShow').checked?1:0,
+    kind:v('evKind')||'',occasion:v('evOcc')||'',date:v('evDate')||'',time_from:v('evTime')||'',
+    venue:v('evVenue')||'',address:v('evAddr')||'',guests:v('evGuests')?Number(v('evGuests')):null};
+}
+function evFill(e){
+  e=e||{};
+  document.getElementById('evShow').checked=!!Number(e.show||0);
+  document.getElementById('evKind').value=e.kind||'';
+  document.getElementById('evOcc').value=e.occasion||'';
+  document.getElementById('evDate').value=e.date||'';
+  document.getElementById('evTime').value=e.time_from||'';
+  document.getElementById('evVenue').value=e.venue||'';
+  document.getElementById('evAddr').value=e.address||'';
+  document.getElementById('evGuests').value=e.guests!=null?e.guests:'';
+  renderEventHint();
+}
+/* Aus der Buchung uebernehmen - standardmaessig nur in leere Felder, damit eine
+   bewusst abweichende Angabe auf dem Beleg nicht ueberschrieben wird. */
+function fillEventFromBooking(b,nurLeere){
+  if(!b)return;
+  var set=function(id,val){var el=document.getElementById(id);
+    if(val==null||val==='')return;
+    if(nurLeere&&String(el.value||'').trim()!=='')return;
+    el.value=val;};
+  set('evKind',b.kind||'');
+  set('evOcc',b.event_type||b.title||'');
+  set('evDate',b.event_date||'');
+  set('evTime',b.start_time?b.start_time.slice(0,5):'');
+  set('evVenue',b.venue_name||'');
+  set('evAddr',b.venue_address||'');
+  set('evGuests',b.guests!=null?b.guests:'');
+  if(!document.getElementById('evShow').checked&&eventInfoLine(evVal()))
+    document.getElementById('evShow').checked=true;
+  renderEventHint();
+}
+var EV_KIND_LABEL={dj:'DJ',technik:'Technikvermietung',dj_technik:'DJ + Technik'};
+/* Eine Zeile, keine Aufzaehlung: nur was gefuellt ist, in fester Reihenfolge. */
+function eventInfoLine(e){
+  if(!e)return '';
+  var t=[];
+  if(e.kind&&EV_KIND_LABEL[e.kind])t.push(EV_KIND_LABEL[e.kind]);
+  if(e.occasion)t.push(e.occasion);
+  if(e.date)t.push('am '+dt(e.date)+(e.time_from?', ab '+e.time_from+' Uhr':''));
+  else if(e.time_from)t.push('ab '+e.time_from+' Uhr');
+  if(e.venue||e.address)t.push([e.venue,e.address].filter(Boolean).join(', '));
+  if(e.guests)t.push('ca. '+e.guests+' Gäste');
+  return t.join(' · ');
+}
+function renderEventHint(){
+  var e=evVal(),line=eventInfoLine(e),el=document.getElementById('evHint');
+  if(!el)return;
+  el.innerHTML=line
+    ? (e.show?'Auf dem Beleg steht: <b style="color:var(--wh)">'+esc(line)+'</b>'
+            :'Ausgeblendet. Eingeschaltet stünde da: '+esc(line))
+    : 'Noch keine Angaben – die Zeile bleibt leer.';
+}
+['evKind','evOcc','evDate','evTime','evVenue','evAddr','evGuests'].forEach(function(id){
+  var el=document.getElementById(id);
+  if(el)el.addEventListener('input',renderEventHint);
+});
+/* Optionale Helfer im Belegformular - nur sichtbar, wenn eine Buchung verknuepft ist.
+   Sie fuegen nichts von selbst ein, sondern erst auf Klick. */
+function renderDocExtraBtns(){
+  var el=document.getElementById('docBookBtns');if(!el)return;
+  var b=(CACHE.bookings||[]).find(function(x){return x.id===v('docBook')});
+  var hatTechnik=b&&(CACHE.be||[]).some(function(x){return x.booking_id===b.id});
+  var rd=b?riderOf(b):{},hatWeg=!!(rd&&rd.distance_km);
+  el.innerHTML=(hatTechnik?'<button class="btn g sm" onclick="addBookingEquip()">+ Technik aus der Buchung</button> ':'')+
+    (hatWeg?'<button class="btn g sm" onclick="addBookingTravel()">+ Anfahrt</button>':'');
+}
+function addBookingEquip(){
+  var b=(CACHE.bookings||[]).find(function(x){return x.id===v('docBook')});if(!b)return;
+  var days=rentDays(b),n=0;
+  (CACHE.be||[]).filter(function(x){return x.booking_id===b.id}).forEach(function(x){
+    var eq=(CACHE.equipment||[]).find(function(e){return e.id===x.equipment_id})||{};
+    if(x.price_override!=null){
+      curItems.push({pos:curItems.length+1,description:'Technik-Miete: '+(eq.name||'?')+' ('+days+' Miettag'+(days>1?'e':'')+')',
+        qty:x.qty,unit:'Stk.',unit_price:x.qty?Number(x.price_override)/x.qty:Number(x.price_override)});
+    }else{
+      equipTierLineItems(Object.assign({},eq,{name:'Technik-Miete: '+(eq.name||'?')}),days,x.qty,curItems.length+1)
+        .forEach(function(it){curItems.push(it)});
+    }
+    n++;
+  });
+  renderItems();renderTotals();
+  toast(n?(n+' Artikel aus der Buchung übernommen ✓ – Preise wie immer frei änderbar'):'Der Buchung ist keine Technik zugeordnet.',n?0:1);
+}
+function addBookingTravel(){
+  var b=(CACHE.bookings||[]).find(function(x){return x.id===v('docBook')});if(!b)return;
+  var rd=riderOf(b),tc=rd.distance_km?travelCost(rd.distance_km):0;
+  if(!tc){toast('Im Rider der Buchung steht keine Strecke.',1);return}
+  curItems.push({pos:curItems.length+1,description:'Anfahrt ('+rd.distance_km+' km einfache Strecke)',
+    note:(travelFreeMode()==='schwelle'?'Ab '+travelFree()+' km Freigrenze wird die volle Strecke berechnet.':travelFree()+' Freikilometer bereits abgezogen.')+(travelRoundtrip()?' Hin- und Rückweg.':' Einfache Strecke.'),
+    qty:1,unit:'pausch.',unit_price:tc});
+  var onThresh=overnightThresholdType()==='zeit'?rd.travel_minutes:rd.distance_km;
+  if(overnightEnabled()&&onThresh&&onThresh>=overnightThresholdValue())
+    curItems.push({pos:curItems.length+1,description:'Übernachtung',qty:1,unit:'pausch.',unit_price:overnightPrice()});
+  renderItems();renderTotals();toast('Anfahrt übernommen ✓');
 }
 /* ===== Storno-Rechnung (Staffel gemäß AGB §5) ===== */
 var STORNO_TIERS=[
@@ -2799,14 +2920,23 @@ var STORNO_TIERS=[
   {minDays:7,  pct:80,label:'weniger als 6 Wochen vor dem Termin'},
   {minDays:-99999,pct:90,label:'weniger als 7 Tage vor dem Termin'}
 ];
-function bookingBaseNet(b){
-  var base=Number(b.fee_net)||0;
-  CACHE.be.filter(function(x){return x.booking_id===b.id}).forEach(function(x){
-    var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};
-    base+=x.price_override!=null?Number(x.price_override):rentPrice(eq,b)*x.qty;
+/* Was ein Auftrag wert ist, steht im Beleg und nirgends sonst: erst die
+   Auftragsbestätigung, sonst das angenommene Angebot, sonst der jüngste Beleg zur
+   Buchung. So kann kein zweiter Betrag danebenlaufen. */
+function bookingValue(b){
+  var docs=(CACHE.documents||[]).filter(function(d){
+    return d.booking_id===b.id&&d.status!=='storniert'&&d.doc_type!=='lieferschein'});
+  if(!docs.length)return 0;
+  var rang={bestaetigung:3,rechnung:2,schluss:2,angebot:1,abschlag:0};
+  docs.sort(function(x,y){
+    var rx=(rang[x.doc_type]||0)+(x.status==='angenommen'?1:0),
+        ry=(rang[y.doc_type]||0)+(y.status==='angenommen'?1:0);
+    if(rx!==ry)return ry-rx;
+    return (y.created_at||'')<(x.created_at||'')?-1:1;
   });
-  return Math.round(base*100)/100;
+  return Math.round(Number(docs[0].total_gross||0)*100)/100;
 }
+function bookingBaseNet(b){return bookingValue(b)}
 function stornoDays(){
   var b=curBook,ein=v('stEingang')||new Date().toISOString().slice(0,10);
   return Math.floor((new Date(b.event_date)-new Date(ein))/86400000);
@@ -2880,7 +3010,7 @@ function runStorno(){
       customer_id:b.customer_id,status:'gebucht',kind:b.kind,event_type:b.event_type,
       title:(b.title||b.event_type||'Auftrag')+' (Ersatztermin)',event_date:neu,
       start_time:b.start_time,end_time:b.end_time,venue_name:b.venue_name,venue_address:b.venue_address,
-      guests:b.guests,fee_net:b.fee_net,notes:'Umbuchung – ursprünglicher Termin: '+dt(b.event_date)}}).then(function(r){return r[0]});
+      guests:b.guests,notes:'Umbuchung – ursprünglicher Termin: '+dt(b.event_date)}}).then(function(r){return r[0]});
     jobs.push(stornoNote('Absage vom '+dt(v('stEingang'))+' ('+days+' Tage vorher). Umbuchung auf Ersatztermin '+dt(v('stNeu'))+' vereinbart; Umbuchungspauschale: '+euro(Number(v('stUmb'))||0)+' brutto.'));
   }
 
@@ -2984,6 +3114,8 @@ function docToInvoice(type){
     curDoc.tax_rate=src.tax_rate;
     curDoc.price_mode=src.price_mode;
     curDoc.is_small_business=src.is_small_business;
+    /* Die Eckdaten gehoeren zum Vorgang, nicht zum einzelnen Beleg - sie wandern mit. */
+    evFill(evOf(src));
     document.getElementById('docTax').value=src.is_small_business?0:src.tax_rate;
     document.getElementById('docNetto').checked=(src.price_mode==='netto');
     renderTotals();
@@ -3314,6 +3446,8 @@ function printDoc(){
   '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px">'+
   '<div style="font-size:17px;font-weight:700">'+docTypeName(type)+' '+esc(d.number)+'</div>'+
   '<div style="text-align:right;color:#555">Datum: '+dt(v('docDate'))+(v('docDate2')?('<br>'+(istZahlbeleg(type)?'Zahlbar bis: ':'Gültig bis: ')+dt(v('docDate2'))):'')+(rentalPeriodLabel(v('docRentFrom'),v('docRentTo'))?'<br>'+rentalPeriodLabel(v('docRentFrom'),v('docRentTo')):'')+'</div></div>'+
+  (function(){var e=evVal(),l=e.show?eventInfoLine(e):'';
+    return l?'<div style="border:1px solid #ddd;border-left:3px solid #111;border-radius:4px;padding:7px 10px;margin-bottom:16px;color:#333">'+esc(l)+'</div>':''})()+
   (v('docIntro')?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(v('docIntro'))+'</p>':'')+
   '<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2">'+
   '<th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Beschreibung</th><th style="padding:6px;text-align:right">Menge</th><th style="padding:6px;text-align:right">Einzel'+(brutto?' brutto':' netto')+'</th><th style="padding:6px;text-align:right">Gesamt'+(brutto?' brutto':' netto')+'</th></tr></thead>'+
@@ -3383,7 +3517,7 @@ var SORTDEFS={
     {get:function(b){return b.title||b.event_type},type:'text'},
     {get:function(b){return b.kind},type:'text'},
     {get:function(b){return b.venue_name},type:'text'},
-    {get:function(b){return b.fee_net},type:'num'},
+    {get:function(b){return bookingValue(b)},type:'num'},
     {get:function(b){return b.status},type:'text'}]},
   quotes:{rowsId:'quoteRows',render:function(){renderQuotes()},cols:[
     {get:function(d){return d.number},type:'text'},
@@ -5595,7 +5729,7 @@ function reloadQuoteTpls(){api('quote_templates?select=*&order=sort').then(funct
 
 /* Neues Angebot: erst fragen, ob leer oder aus einer Vorlage. Ohne gespeicherte Vorlage
    waere der Dialog nur ein Klick mehr - dann geht es direkt in die leere Maske. */
-var NQ_CUST=null;
+var NQ_CUST=null,NQ_BOOK=null;
 function newQuote(custId){
   NQ_CUST=custId||null;
   var tpls=CACHE.quoteTpls||[];
@@ -5612,10 +5746,10 @@ function newQuote(custId){
 }
 function startQuote(tplId){
   closeModal();
-  var custId=NQ_CUST;
+  var custId=NQ_CUST,book=NQ_BOOK;NQ_BOOK=null;
   openDocEditor(null,'angebot');
   setTimeout(function(){
-    presetDocCust(custId);
+    if(book)presetDocFromBooking(book);else presetDocCust(custId);
     if(tplId)applyTpl(tplId);
     renderTotals();
   },30);
@@ -5625,7 +5759,7 @@ function startQuote(tplId){
 var curTpl=null;
 function setTplMode(on){
   curTpl=on?curTpl:null;
-  ['docHeadGrid','docRentGrid','docTypeGrid','docDiscGrid','docDocBtns'].forEach(function(id){
+  ['docHeadGrid','docRentGrid','docTypeGrid','docDiscGrid','docDocBtns','docEventBox'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.style.display=on?'none':'';});
   ['docTplNote','docTplNameWrap'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.style.display=on?'':'none';});

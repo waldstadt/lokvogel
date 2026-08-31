@@ -144,6 +144,22 @@ function submitPlz(){
   loadOffer();
 }
 var TYPE_NAME={angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'};
+/* Eckdaten der Veranstaltung, wie sie am Beleg hinterlegt sind. Kommen als JSON-Text
+   vom Server, deshalb beides annehmen. */
+var EV_KIND_LABEL={dj:'DJ',technik:'Technikvermietung',dj_technik:'DJ + Technik'};
+function eventInfoLine(d){
+  var e=d&&d.event_info;
+  if(typeof e==='string'){try{e=JSON.parse(e)}catch(err){e=null}}
+  if(!e||!Number(e.show))return '';
+  var t=[];
+  if(e.kind&&EV_KIND_LABEL[e.kind])t.push(EV_KIND_LABEL[e.kind]);
+  if(e.occasion)t.push(e.occasion);
+  if(e.date)t.push('am '+dt(e.date)+(e.time_from?', ab '+e.time_from+' Uhr':''));
+  else if(e.time_from)t.push('ab '+e.time_from+' Uhr');
+  if(e.venue||e.address)t.push([e.venue,e.address].filter(Boolean).join(', '));
+  if(e.guests)t.push('ca. '+e.guests+' Gäste');
+  return t.join(' · ');
+}
 function lineTotal(it){
   if(it.is_header)return 0; /* reine Kopfzeile (Artikel/Stückzahl/Tagespreis) - Summe steckt in den Unterpositionen */
   var g=(Number(it.qty)||0)*(Number(it.unit_price)||0);
@@ -241,6 +257,7 @@ function renderOffer(){
     '<div><h1>Hallo '+esc(DOC.customer)+'!</h1>'+
     '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until?' · gültig bis '+dt(d.valid_until):'')+(rentalPeriodLabel(d.rental_from,d.rental_to)?' · '+rentalPeriodLabel(d.rental_from,d.rental_to):'')+'</p></div>'+
     '<button class="btn g" onclick="downloadPdf()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Als PDF speichern</button></div>'+
+    (eventInfoLine(d)?'<div class="sub" style="margin-top:12px;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:9px 12px">'+esc(eventInfoLine(d))+'</div>':'')+
     (statusLine?'<div style="margin-top:12px">'+statusLine+'</div>':'')+
     (d.intro_text?'<p style="margin-top:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
     '</div>'+
@@ -434,6 +451,7 @@ function downloadPdf(){
   '<div style="font-size:17px;font-weight:700">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+
   '<div style="text-align:right;color:#555">Für: '+esc(DOC.customer)+'<br>Datum: '+dt(d.doc_date)+
   (d.valid_until?'<br>Gültig bis: '+dt(d.valid_until):'')+(d.due_date?'<br>Zahlbar bis: '+dt(d.due_date):'')+'</div></div>'+
+  (eventInfoLine(d)?'<div style="border:1px solid #ddd;border-left:3px solid #111;border-radius:4px;padding:7px 10px;margin-bottom:16px;color:#333">'+esc(eventInfoLine(d))+'</div>':'')+
   (d.intro_text?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
   '<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2">'+
   '<th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Leistung</th><th style="padding:6px;text-align:right">Menge</th><th style="padding:6px;text-align:right">Gesamt'+(brutto?' brutto':' netto')+'</th></tr></thead>'+

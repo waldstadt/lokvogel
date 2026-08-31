@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 74;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 75;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -169,7 +169,7 @@ const JSON_COLS = [
   'settings' => ['value'], 'site_content' => ['value'], 'content_versions' => ['value'],
   'packages' => ['features'],
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
-  'products' => ['bundle'], 'quote_templates' => ['items'], 'bookings' => ['rider', 'customer_notes', 'event_plan', 'event_plan_internal'], 'rental_contracts' => ['snapshot'],
+  'products' => ['bundle'], 'quote_templates' => ['items'], 'documents' => ['event_info'], 'bookings' => ['rider', 'customer_notes', 'event_plan', 'event_plan_internal'], 'rental_contracts' => ['snapshot'],
   'customers' => ['tags', 'tech_check'],
   'equipment' => ['addon_ids', 'images', 'fits_ids'],
   'campaign_pages' => ['cards', 'features', 'form_cfg'],
@@ -683,6 +683,11 @@ function upgrade(PDO $p): void {
       $p->prepare("update settings set value = ? where key = 'defaults'")
         ->execute([json_encode($defs, JSON_UNESCAPED_UNICODE)]);
     }
+  } catch (PDOException $e) {}
+  if ($v < 75) try {
+    /* Eckdaten der Veranstaltung direkt am Beleg: Was auf dem Angebot steht, muss auch
+       dann noch stimmen, wenn die Buchung spaeter geaendert wird. */
+    $p->exec('alter table documents add column event_info text');
   } catch (PDOException $e) {}
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -1995,7 +2000,7 @@ create table documents (id text primary key, share_token text, doc_type text not
   rental_from text, rental_to text,
   total_net real default 0, total_tax real default 0, total_gross real default 0,
   deposit_deducted real default 0, total_override real, sent_at text, paid_at text,
-  accepted_name text, accept_signature text, created_at text, updated_at text);
+  accepted_name text, accept_signature text, event_info text, created_at text, updated_at text);
 create table email_templates (id text primary key, sort integer default 0, name text not null,
   subject text, body text, created_at text);
 create table products (id text primary key, sku text unique, sort integer default 0,
@@ -3366,7 +3371,9 @@ function handlePortal(string $path, string $method, $body): never {
     out([
       'doc' => array_intersect_key($d, array_flip(['doc_type','number','status','doc_date','valid_until','due_date',
         'tax_rate','is_small_business','intro_text','outro_text','total_net','total_tax','total_gross','deposit_deducted',
-        'price_mode','discount_value','discount_type'])),
+        /* rental_from/rental_to standen bisher nicht in der Liste - die Mietzeitraum-Zeile
+           im Portal blieb deshalb immer leer. */
+        'price_mode','discount_value','discount_type','event_info','rental_from','rental_to'])),
       'customer' => trim(($d['company'] ? $d['company'] : ($d['first_name'].' '.$d['last_name']))),
       'items' => $it->fetchAll(),
       'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city','iban','bic','bank','tax_id'])),
