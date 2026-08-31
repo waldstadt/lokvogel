@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 75;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 76;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -683,6 +683,11 @@ function upgrade(PDO $p): void {
       $p->prepare("update settings set value = ? where key = 'defaults'")
         ->execute([json_encode($defs, JSON_UNESCAPED_UNICODE)]);
     }
+  } catch (PDOException $e) {}
+  if ($v < 76) try {
+    /* Merkt sich, dass diese Veranstaltung aus einem Angebot entstanden ist - nur solche
+       werden automatisch nachgezogen, von Hand gepflegte bleiben unangetastet. */
+    $p->exec('alter table bookings add column auto_from_doc text');
   } catch (PDOException $e) {}
   if ($v < 75) try {
     /* Eckdaten der Veranstaltung direkt am Beleg: Was auf dem Angebot steht, muss auch

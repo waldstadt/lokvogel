@@ -166,6 +166,9 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .cal .ev.tech{border-left-color:var(--blu);background:rgba(85,136,221,.13)}
 .cal .ev.ws{border-left-color:var(--grn);background:rgba(90,160,90,.13)}
 .cal .ev.priv{border-left-color:#b08fd8;background:rgba(176,143,216,.14)}
+/* Vorlaeufig: Angebot liegt beim Kunden, noch nichts entschieden. Gestrichelt statt
+   blass - ausgegraut waere schlechter lesbar. */
+.cal .ev.vor{border-left-style:dashed;font-style:italic}
 .cal-legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:10.5px;color:var(--gll)}
 .cal-legend i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px;border-left:3px solid}
 .cal-legend .l-dj i{border-color:var(--acc);background:rgba(201,162,39,.15)}
@@ -308,8 +311,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <a onclick="showPage('cust')">← Kunden</a>
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="cdName"></div><div class="ps" id="cdSub"></div></div>
       <div><button class="btn g sm" onclick="openCustModal(curCust)">Bearbeiten</button>
-      <button class="btn g sm" onclick="newBookingFor(curCust.id)">+ Buchung</button>
-      <button class="btn sm" onclick="newDocFor('angebot')">+ Angebot</button></div></div>
+      <button class="btn sm" onclick="newDocFor('angebot')">Angebot erstellen</button></div></div>
     <div class="grid2" style="gap:16px;align-items:start">
       <div>
         <div class="card"><h3>Kommunikation <button class="btn sm" style="float:right" onclick="openCommModal()">+ Eintrag</button></h3>
@@ -319,7 +321,8 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div class="card"><h3>Stammdaten</h3><div id="cdData" class="sml"></div></div>
         <div class="card"><h3>Kunden-Backoffice <button class="btn sm" style="float:right" onclick="portalInvite()">Einladungslink</button></h3>
           <div id="cdPortal" class="sml mut">–</div></div>
-        <div class="card"><h3>Buchungen</h3><div id="cdBookings" class="sml mut">–</div></div>
+        <div class="card"><h3>Veranstaltungen <span class="mut sml" style="font-weight:400">– entstehen automatisch aus dem Angebot</span></h3><div id="cdBookings" class="sml mut">–</div></div>
+        <div class="card"><h3>Veranstaltungsplaner</h3><div id="cdPlan" class="sml mut">–</div></div>
         <div class="card"><h3>Belege <span style="float:right;display:flex;gap:6px">
           <button class="btn g sm" onclick="newDocFor('angebot')">+ Angebot</button>
           <button class="btn g sm" onclick="newDocFor('rechnung')">+ Rechnung</button></span></h3>
@@ -341,6 +344,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <span class="l-tech"><i></i>Technik / Vermietung</span>
         <span class="l-ws"><i></i>Workshop</span>
         <span class="l-priv"><i></i>Privat / geblockt</span>
+        <span style="font-style:italic">gestrichelt / kursiv = vorläufig, Angebot noch offen</span>
       </div>
     </div>
     <div class="tbl-wrap card"><table><thead><tr><th>Datum</th><th>Titel / Kunde</th><th>Art</th><th>Location</th><th class="num">Auftragswert</th><th>Status</th></tr></thead><tbody id="bookRows"></tbody></table></div>
@@ -459,6 +463,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <div><label>Gäste (ca.)</label><input type="number" id="evGuests"></div>
         </div>
         <div class="mut sml" id="evHint" style="margin-top:6px"></div>
+        <div class="sml" id="evDateCheck" style="margin-top:4px"></div>
       </div>
       <div class="grid4" id="docTypeGrid">
         <div><label>Typ</label><select id="docType">
@@ -1344,7 +1349,7 @@ function renderInq(){
        wer über die Liste arbeitet, sieht das sonst nur auf dem Dashboard. */
     var tage=i.event_date?Math.round((new Date(i.event_date)-new Date(new Date().toISOString().slice(0,10)))/86400000):null;
     var eilig=tage!=null&&tage>=0&&tage<=10;
-    var konf=dateConflicts(i.event_date);
+    var konf=dateConflicts(i.event_date,i.customer_id);
     return '<tr><td>'+dtt(i.created_at)+'</td><td><b>'+esc(i.name)+'</b><br><span class="mut sml">'+esc(i.email||'')+' '+esc(i.phone||'')+'</span></td>'+
     '<td>'+esc(i.event_type||'–')+'</td>'+
     '<td>'+dt(i.event_date)+
@@ -1357,7 +1362,7 @@ function renderInq(){
 }
 function viewInq(id){
   var i=CACHE.inquiries.find(function(x){return x.id===id});if(!i)return;
-  var konf=dateConflicts(i.event_date);
+  var konf=dateConflicts(i.event_date,i.customer_id);
   var tage=i.event_date?Math.round((new Date(i.event_date)-new Date(new Date().toISOString().slice(0,10)))/86400000):null;
   var eilig=tage!=null&&tage>=0&&tage<=10;
   openModal('Anfrage von '+esc(i.name),
@@ -1443,10 +1448,22 @@ function openCustDetail(id){
     '<div style="margin-top:10px"><a class="sml" onclick="openTechCheck()">'+
     (c.tech_check&&c.tech_check.date?'Technik-Check ansehen oder ergänzen':'Technik-Check erfassen')+'</a></div>';
   renderCdPortal();
-  var books=CACHE.bookings.filter(function(b){return b.customer_id===id});
+  var books=CACHE.bookings.filter(function(b){return b.customer_id===id})
+    .sort(function(a,b){return a.event_date<b.event_date?1:-1});
   document.getElementById('cdBookings').innerHTML=books.map(function(b){
     return '<div style="padding:4px 0"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Auftrag')+'</a> <span class="b '+bookBadge(b.status)+'">'+b.status+'</span></div>';
-  }).join('')||'Keine Buchungen.';
+  }).join('')||'Noch keine – die erste entsteht, sobald du ein Angebot mit Datum speicherst.';
+  document.getElementById('cdPlan').innerHTML=books.length?books.map(function(b){
+    var pl=planOf(b),gefuellt=Object.keys(pl).length>0;
+    var offen=(CACHE.planChanges||[]).filter(function(c){return c.booking_id===b.id&&c.status==='offen'}).length;
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+
+      '<div>'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Veranstaltung')+
+      (offen?' <span class="b gold">'+offen+' Vorschlag'+(offen>1?'e':'')+'</span>':'')+'</div>'+
+      '<div class="mut" style="margin:2px 0 4px">'+(gefuellt?'Planer ausgefüllt':'Noch nichts eingetragen')+'</div>'+
+      '<button class="btn sm" onclick="openPlanFor(\''+b.id+'\')">Planer bearbeiten</button> '+
+      (gefuellt?'<button class="btn g sm" onclick="printEventPlanFor(\''+b.id+'\')">Handout drucken</button>':'')+
+      '</div>';
+  }).join(''):'Sobald es eine Veranstaltung gibt, kannst du hier Location, Ablaufplan und Musikwünsche pflegen.';
   var docs=CACHE.documents.filter(function(d){return d.customer_id===id});
   document.getElementById('cdDocs').innerHTML=docs.map(function(d){
     return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+euro(d.total_gross)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
@@ -1568,7 +1585,9 @@ function renderCal(){
     var ws=(CACHE.wsEvents||[]).filter(function(w){return w.event_date===ds&&w.public!==false});
     var bl=(CACHE.blocks||[]).filter(function(x){var end=x.end_date||x.start_date;return x.start_date<=ds&&end>=ds});
     html+='<div class="cd-c'+(ds===today?' today':'')+'"><div class="cdn">'+d+'</div>'+
-      evs.map(function(b){return '<span class="ev'+(b.kind==='technik'?' tech':'')+'" onclick="openBookDetail(\''+b.id+'\')">'+esc(b.title||b.event_type||'Auftrag')+'</span>'}).join('')+
+      evs.map(function(b){
+        var vor=['anfrage','angebot'].indexOf(b.status)>=0;
+        return '<span class="ev'+(b.kind==='technik'?' tech':'')+(vor?' vor':'')+'" title="'+esc((b.title||b.event_type||'Auftrag')+' – '+b.status)+'" onclick="openBookDetail(\''+b.id+'\')">'+esc(b.title||b.event_type||'Auftrag')+'</span>'}).join('')+
       ws.map(function(w){return '<span class="ev ws" onclick="openWsModal(\''+w.id+'\')">'+esc(w.title||'Workshop')+'</span>'}).join('')+
       bl.map(function(x){return '<span class="ev priv" onclick="openBlockModal(\''+x.id+'\')">'+esc(x.title)+'</span>'}).join('')+
       '</div>';
@@ -1867,7 +1886,6 @@ function beFlag(id,k,val){var b={};b[k]=val;api('booking_equipment?id=eq.'+id,{m
 function beDel(id){api('booking_equipment?id=eq.'+id,{method:'DELETE'}).then(function(){
   api('booking_equipment?select=*').then(function(r){CACHE.be=r||[];renderBe();renderEq()})})}
 
-function newBookingFor(custId){openBookModal(null,custId)}
 /* Beleg aus dem Kunden heraus anlegen. Bewusst derselbe Editor wie unter "Angebote" bzw.
    "Rechnungen" - es gibt nur eine Belegmaske, hier ist lediglich der Kunde schon gesetzt
    und eine vorhandene Buchung vorausgewaehlt. */
@@ -2054,6 +2072,16 @@ function printRider(){
    komplett und kann Änderungen vorschlagen), event_plan_internal bleibt immer admin-only.
    Leere Felder darf der Kunde direkt ausfüllen, bereits gesetzte nur per Vorschlag ändern -
    siehe plan-suggest in api.php. Markus selbst editiert hier immer direkt. */
+/* Der Planer haengt an der Veranstaltung, laesst sich aber auch aus dem Kunden heraus
+   oeffnen - dort sucht Markus zuerst. Beide Wege benutzen dieselbe Maske. */
+function openPlanFor(id){
+  var b=(CACHE.bookings||[]).find(function(x){return x.id===id});if(!b)return;
+  curBook=b;openPlanModal();
+}
+function printEventPlanFor(id){
+  var b=(CACHE.bookings||[]).find(function(x){return x.id===id});if(!b)return;
+  curBook=b;printEventPlan();
+}
 function planOf(b){return (b&&b.event_plan&&typeof b.event_plan==='object')?b.event_plan:{}}
 function planInternalOf(b){return (b&&b.event_plan_internal&&typeof b.event_plan_internal==='object')?b.event_plan_internal:{}}
 function planGet(obj,path){return path.split('.').reduce(function(o,k){return o&&o[k]!=null?o[k]:undefined},obj)}
@@ -2523,6 +2551,7 @@ function setDocStatus(st){
     curDoc.status=st;toast('Status: '+st+' ✓');
     document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(st)+'">'+st+'</span>';
     renderStatusBtns();renderItems();applyDocLock();refreshDocs();
+    return syncVeranstaltungStatus(st);
   }).catch(function(e){toast(e.message,1)});
 }
 function refreshDocs(){api('documents?select=*,customers(*)&order=created_at.desc').then(function(r){CACHE.documents=r||[];renderQuotes();renderInv();renderDash()})}
@@ -2752,12 +2781,68 @@ function saveDoc(){
       return items.length?api('document_items',{method:'POST',body:items}):null;
     });
   }).then(function(){
+    return syncVeranstaltung();
+  }).then(function(){
     toast('Gespeichert ✓ '+curDoc.number);
     document.getElementById('docTitle').textContent=docTypeName(curDoc.doc_type)+' '+curDoc.number;
     renderStatusBtns();refreshDocs();
   }).catch(function(e){toast('Fehler: '+e.message,1)});
 }
 
+/* Markus legt keine Veranstaltung an - er schreibt ein Angebot mit einem Datum. Genau
+   daraus entsteht der Kalendereintrag: beim Speichern, wenn ein Datum in den Eckdaten
+   steht und noch nichts verknuepft ist. Vorlaeufig, solange das Angebot offen ist.
+   An dieser Veranstaltung haengen danach Technik-Zuordnung, Rider und Planer. */
+function syncVeranstaltung(){
+  var e=evVal(),d=curDoc;
+  if(!e.date||!d.customer_id)return Promise.resolve();
+  var titel=e.occasion||'Veranstaltung';
+  var felder={event_date:e.date,kind:e.kind||'dj',event_type:e.occasion||null,
+    start_time:e.time_from||null,venue_name:e.venue||null,venue_address:e.address||null,
+    guests:e.guests!=null?e.guests:null};
+  if(d.booking_id){
+    var b=(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id});
+    /* Nur solange noch nichts fest ist. Ab "gebucht" bleibt der Kalendereintrag stehen,
+       wie er ist - ein spaeter geaenderter Beleg soll einen bestaetigten Termin nicht
+       stillschweigend verschieben. */
+    if(!b||['anfrage','angebot'].indexOf(b.status)<0)return Promise.resolve();
+    return api('bookings?id=eq.'+d.booking_id,{method:'PATCH',body:felder}).then(reloadBookings);
+  }
+  felder.customer_id=d.customer_id;
+  felder.status='angebot';
+  felder.title=titel;
+  felder.auto_from_doc=d.id;
+  return api('bookings',{method:'POST',prefer:'return=representation',body:felder}).then(function(rows){
+    var id=rows&&rows[0]&&rows[0].id;if(!id)return;
+    curDoc.booking_id=id;
+    return api('documents?id=eq.'+d.id,{method:'PATCH',body:{booking_id:id}}).then(function(){
+      return reloadBookings();
+    }).then(function(){
+      document.getElementById('docBook').innerHTML+='';
+      refreshBookOpts();document.getElementById('docBook').value=id;
+      renderDocExtraBtns();
+      toast('Termin '+dt(e.date)+' vorgemerkt – steht jetzt im Kalender');
+    });
+  });
+}
+function reloadBookings(){
+  return api('bookings?select=*,customers(*)&order=event_date').then(function(r){
+    CACHE.bookings=r||[];renderBook();});
+}
+/* Angenommen heisst fest im Kalender, abgelehnt heisst wieder frei - aber nur, solange
+   der Termin noch nicht von Hand auf fest oder abgeschlossen gesetzt wurde. */
+function syncVeranstaltungStatus(st){
+  var d=curDoc;if(!d.booking_id)return Promise.resolve();
+  var b=(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id});
+  if(!b||['anfrage','angebot'].indexOf(b.status)<0)return Promise.resolve();
+  var neu=null;
+  if(d.doc_type==='angebot'&&st==='angenommen')neu='gebucht';
+  if(d.doc_type==='angebot'&&st==='abgelehnt'&&b.status==='angebot')neu='storniert';
+  if(d.doc_type==='bestaetigung'&&st==='versendet')neu='gebucht';
+  if(!neu||b.status===neu)return Promise.resolve();
+  return api('bookings?id=eq.'+b.id,{method:'PATCH',body:{status:neu}}).then(reloadBookings)
+    .then(function(){toast('Termin im Kalender: '+neu)});
+}
 function askAbschlag(total,label,cb){
   openModal('Abschlagsrechnung – Höhe festlegen',
     '<div class="sml mut" style="margin-bottom:10px">Gesamtwert der Leistung: <b style="color:var(--wh)">'+euro(total)+' brutto</b></div>'+
@@ -2868,6 +2953,27 @@ function renderEventHint(){
     ? (e.show?'Auf dem Beleg steht: <b style="color:var(--wh)">'+esc(line)+'</b>'
             :'Ausgeblendet. Eingeschaltet stünde da: '+esc(line))
     : 'Noch keine Angaben – die Zeile bleibt leer.';
+  renderDateCheck(e.date);
+}
+/* Kalenderprüfung direkt beim Eintippen des Datums: sonst faellt eine Doppelbelegung
+   erst auf, wenn das Angebot schon beim Kunden liegt. Die eigene Veranstaltung zaehlt
+   dabei natuerlich nicht als Konflikt. */
+function renderDateCheck(datum){
+  var el=document.getElementById('evDateCheck');if(!el)return;
+  if(!datum){el.innerHTML='';return}
+  var eigen=curDoc&&curDoc.booking_id;
+  var konf=(CACHE.bookings||[]).filter(function(b){
+    if(b.id===eigen||b.status==='storniert'||!b.event_date)return false;
+    return datum>=b.event_date&&datum<=(b.end_date||b.event_date);
+  }).map(function(b){return (b.title||b.event_type||'Veranstaltung')+' ('+b.status+')'})
+  .concat((CACHE.blocks||[]).filter(function(c){
+    return datum>=c.start_date&&datum<=(c.end_date||c.start_date);
+  }).map(function(c){return c.title||'Kalender-Blocker'}))
+  .concat((CACHE.wsEvents||[]).filter(function(w){return w.event_date===datum})
+    .map(function(w){return 'Workshop: '+(w.title||'')}));
+  el.innerHTML=konf.length
+    ? '<span style="color:var(--yel)">Achtung, an dem Tag steht schon etwas im Kalender: '+esc(konf.join(' · '))+'</span>'
+    : '<span style="color:var(--grn)">Der Tag ist im Kalender noch frei.</span>';
 }
 ['evKind','evOcc','evDate','evTime','evVenue','evAddr','evGuests'].forEach(function(id){
   var el=document.getElementById(id);
@@ -6077,11 +6183,14 @@ function composeReply(inqId){
 }
 /* Termin-Konflikte zum Anfragedatum: eigene Aufträge (außer Storno) und Kalender-Blocker.
    Mehrtägige Einträge zählen mit, solange das Datum im Zeitraum liegt. */
-function dateConflicts(datum){
+function dateConflicts(datum,eigenerKunde){
   if(!datum)return [];
   var out=[];
   (CACHE.bookings||[]).forEach(function(b){
     if(b.status==='storniert'||!b.event_date)return;
+    /* Die Veranstaltung, die zu dieser Anfrage selbst gehoert, ist kein Konflikt -
+       sonst meldet jede Anfrage sich gegen sich selbst. */
+    if(eigenerKunde&&b.customer_id===eigenerKunde&&b.event_date===datum)return;
     var bis=b.end_date||b.event_date;
     if(datum>=b.event_date&&datum<=bis)
       out.push((b.title||b.event_type||'Auftrag')+(b.customers?' · '+custName(b.customers):''));
@@ -6098,7 +6207,7 @@ function openCompose(i,t,formLink){
   /* Die Erstantwort-Vorlagen sagen "der Termin ist noch frei". Steht an dem Tag schon
      etwas im Kalender, wäre das eine Falschaussage an den Kunden - deshalb hier
      unübersehbar warnen, statt nur allgemein ans Prüfen zu erinnern. */
-  var konflikt=dateConflicts(i.event_date);
+  var konflikt=dateConflicts(i.event_date,i.customer_id);
   var hinweis=konflikt.length
     ? '<div class="msg err" style="margin-bottom:12px"><b>Achtung: Am '+dt(i.event_date)+' steht schon etwas im Kalender</b>'+
       '<div class="sml" style="margin-top:4px">'+konflikt.map(esc).join('<br>')+'</div>'+
