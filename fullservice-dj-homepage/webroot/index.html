@@ -211,9 +211,11 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
 .blk{padding:78px 0}
 .blk+.blk{padding-top:0}
 .blk-med{display:grid;gap:14px;margin-top:34px}
-.blk-med.c2{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
-.blk-med.c3{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
-.blk-med.c4{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.blk-med.c2{grid-template-columns:repeat(2,1fr)}
+.blk-med.c3{grid-template-columns:repeat(3,1fr)}
+.blk-med.c4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:900px){.blk-med.c3,.blk-med.c4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.blk-med.c2,.blk-med.c3,.blk-med.c4{grid-template-columns:1fr}}
 .blk-med figure{margin:0}
 .blk-med img,.blk-med video{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:5px;
   border:1px solid var(--line);display:block;background:var(--card)}
@@ -798,7 +800,11 @@ function blockMediaEl(m,solo){
     if(m.focal)el.style.objectPosition=m.focal;
   }
   el.addEventListener('error',function(){
+    var sec=el.closest('section.blk');
     var f=el.closest('figure');(f||el).remove();
+    /* Bleibt danach kein einziges Motiv uebrig, muss auch der Kopf weg - sonst steht dort
+       eine Ueberschrift ueber einer leeren Flaeche. */
+    if(sec&&!sec.querySelector('img,video'))sec.remove();
   });
   return el;
 }
@@ -863,9 +869,9 @@ function buildBlock(b){
     var split=document.createElement('div');
     split.className='blk-split'+(b.layout==='rechts'?' rechts':'');
     var mbox=document.createElement('div');mbox.className='blk-split-med';
-    var m1=blockMediaEl(med[0],false);
-    if(!m1)return null;
-    mbox.appendChild(m1);
+    var f1=blockFigure(med[0],false);
+    if(!f1)return null;
+    mbox.appendChild(f1);
     var tbox=document.createElement('div');
     blockKopf(b,tbox);
     /* Kopf steht hier neben dem Bild, nicht darueber */
@@ -884,6 +890,18 @@ function buildBlock(b){
   wrap.appendChild(grid);
   return sec;
 }
+/* Bereiche wie Galerie, Freunde oder Locations blenden sich selbst aus, wenn sie keine
+   Inhalte haben - und zwar erst, wenn ihre Daten geladen sind. Module dahinter wuerden
+   sonst in der Luft haengen, deshalb hier nachziehen. */
+function syncBlockSlots(){
+  document.querySelectorAll('[id^=blkslot-]').forEach(function(slot){
+    var id=slot.id.replace('blkslot-','');
+    if(id==='ende')return;
+    var sec=document.getElementById(id);
+    var weg=!sec||getComputedStyle(sec).display==='none';
+    slot.style.display=weg?'none':'';
+  });
+}
 function renderBlocks(rows){
   (rows||[]).forEach(function(b){
     var slot=document.getElementById('blkslot-'+(b.anchor||'ende'));
@@ -894,6 +912,9 @@ function renderBlocks(rows){
     var el=buildBlock(b);
     if(el)slot.appendChild(el);
   });
+  syncBlockSlots();
+  window.addEventListener('load',syncBlockSlots);
+  setTimeout(syncBlockSlots,1500);
 }
 
 sfetch('site_content?select=key,value').then(applyContent).then(function(){

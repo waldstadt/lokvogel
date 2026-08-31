@@ -525,7 +525,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
   <div class="pg" id="pg-blocks">
     <div class="phead"><div><div class="pt">Module</div>
       <div class="ps">Foto-, Video- und Instagram-Bausteine, die du zwischen die festen Bereiche der Seite setzt</div></div>
-      <button class="btn" onclick="openBlockModal()">+ Modul</button></div>
+      <button class="btn" onclick="openModulModal()">+ Modul</button></div>
     <div class="mut sml" style="margin-bottom:12px">Jedes Modul hängt hinter einem festen Bereich. Reihenfolge innerhalb desselben Ankers per Ziehen am ⠿-Griff, Klick aufs Badge schaltet live/aus. Ist der Bereich davor ausgeschaltet, wird das Modul mit ausgeblendet.</div>
     <div id="blockList" class="sml"></div>
   </div>
@@ -1011,7 +1011,7 @@ function loadAll(){
     CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
     CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];CACHE.blocks=r[23]||[];
     CACHE.quoteTpls=r[24]||[];CACHE.planChanges=r[25]||[];CACHE.rentalContracts=r[26]||[];
-    CACHE.campaigns=r[27]||[];CACHE.blocks=r[28]||[];
+    CACHE.campaigns=r[27]||[];CACHE.module=r[28]||[];
     applyBrand();
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
@@ -1027,7 +1027,7 @@ function applyBrand(){
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
   renderEq();renderSetsAdmin();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
-  renderProducts();renderPartners();renderWsAdmin();renderCampaigns();renderBlockAdmin();
+  renderProducts();renderPartners();renderWsAdmin();renderCampaigns();renderModulAdmin();
   initSort();
 }
 /* ===== Workshop-Termine & Anmeldungen ===== */
@@ -3980,7 +3980,7 @@ var DD_LISTS={
   friends:{tbl:'friends',cache:'friends',render:function(){renderFriendAdmin()}},
   reviews:{tbl:'reviews',cache:'reviews',render:function(){renderRevAdmin()}},
   badges:{tbl:'badges',cache:'badges',render:function(){renderBadgeAdmin()}},
-  blocks:{tbl:'blocks',cache:'blocks',render:function(){renderBlockAdmin()}}
+  blocks:{tbl:'blocks',cache:'module',render:function(){renderModulAdmin()}}
 };
 function pubSwitch(name,id,isPub){
   return '<span class="b '+(isPub?'green':'grey')+'" style="cursor:pointer" title="Klicken zum Ein-/Ausschalten" '+
@@ -4314,30 +4314,39 @@ var BLOCK_ANCHORS=[['ueber','hinter „Über mich"'],['leistungen','hinter „Le
   ['ende','ganz unten, vor dem Anfrageformular']];
 function blockTypeName(t){var f=BLOCK_TYPES.find(function(x){return x[0]===t});return f?f[1]:t}
 function blockAnchorName(a){var f=BLOCK_ANCHORS.find(function(x){return x[0]===a});return f?f[1]:a}
-function renderBlockAdmin(){
+function modulZeile(b){
+  var rows=(CACHE.module||[]);
+  var i=rows.indexOf(b);
+  var med=Array.isArray(b.media)?b.media:[];
+  var anz=b.type==='instagram'?'aus dem Instagram-Feed':(med.length+(med.length===1?' Datei':' Dateien'));
+  return '<div'+ddAttrs('blocks',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
+  '<a onclick="openModulModal(\''+b.id+'\')" style="flex:1">'+esc(b.title||blockTypeName(b.type))+'</a>'+
+  '<span class="mut sml">'+esc(blockTypeName(b.type))+' · '+esc(anz)+'</span>'+
+  pubSwitch('blocks',b.id,!!b.public)+'</div>';
+}
+function renderModulAdmin(){
   var el=document.getElementById('blockList');if(!el)return;
-  var rows=(CACHE.blocks||[]);
+  var rows=(CACHE.module||[]);
   if(!rows.length){el.innerHTML='<span class="mut">Noch keine Module. Über „+ Modul" legst du das erste an.</span>';return}
   var html='';
   BLOCK_ANCHORS.forEach(function(a){
     var list=rows.filter(function(b){return (b.anchor||'ende')===a[0]});
     if(!list.length)return;
     html+='<div class="mut sml" style="margin:14px 0 4px;text-transform:uppercase;letter-spacing:.1em;font-size:10.5px">'+esc(a[1])+'</div>';
-    html+=list.map(function(b){
-      var i=rows.indexOf(b);
-      var med=Array.isArray(b.media)?b.media:[];
-      var anz=b.type==='instagram'?'aus dem Instagram-Feed':(med.length+(med.length===1?' Datei':' Dateien'));
-      return '<div'+ddAttrs('blocks',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
-      '<a onclick="openBlockModal(\''+b.id+'\')" style="flex:1">'+esc(b.title||blockTypeName(b.type))+'</a>'+
-      '<span class="mut sml">'+esc(blockTypeName(b.type))+' · '+esc(anz)+'</span>'+
-      pubSwitch('blocks',b.id,!!b.public)+'</div>';
-    }).join('');
+    html+=list.map(modulZeile).join('');
   });
+  /* Module mit unbekanntem Anker duerfen nicht unsichtbar werden - sonst kaeme man nicht
+     mehr an sie heran, um sie zu korrigieren oder zu loeschen. */
+  var bekannt=BLOCK_ANCHORS.map(function(a){return a[0]});
+  var rest=rows.filter(function(b){return bekannt.indexOf(b.anchor||'ende')<0});
+  if(rest.length)
+    html+='<div class="mut sml" style="margin:14px 0 4px;text-transform:uppercase;letter-spacing:.1em;font-size:10.5px">Unbekannter Platz – erscheint ganz unten</div>'
+      +rest.map(modulZeile).join('');
   el.innerHTML=html;
 }
 var curBlockMedia=[];
-function openBlockModal(id){
-  var b=id?(CACHE.blocks||[]).find(function(x){return x.id===id}):{};b=b||{};
+function openModulModal(id){
+  var b=id?(CACHE.module||[]).find(function(x){return x.id===id}):{};b=b||{};
   curBlockMedia=Array.isArray(b.media)?JSON.parse(JSON.stringify(b.media)):[];
   var typeSel=BLOCK_TYPES.map(function(t){return '<option value="'+t[0]+'"'+((b.type||'kacheln')===t[0]?' selected':'')+'>'+esc(t[1])+'</option>'}).join('');
   var ancSel=BLOCK_ANCHORS.map(function(a){return '<option value="'+a[0]+'"'+((b.anchor||'ende')===a[0]?' selected':'')+'>'+esc(a[1])+'</option>'}).join('');
@@ -4357,8 +4366,8 @@ function openBlockModal(id){
       '</select></div>'+
     '<div id="blkMediaWrap"></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="blkPub" style="width:auto;margin-right:6px" '+(b.public!==false&&b.public!==0?'checked':'')+'>Auf der Homepage anzeigen</label>'+
-    '<div style="margin-top:14px"><button class="btn" onclick="saveBlock(\''+(id||'')+'\')">Speichern</button>'+
-    (id?' <button class="btn r" onclick="delRow(\'blocks\',\''+id+'\',reloadBlocks)">Löschen</button>':'')+'</div>');
+    '<div style="margin-top:14px"><button class="btn" onclick="saveModul(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delRow(\'blocks\',\''+id+'\',reloadModule)">Löschen</button>':'')+'</div>');
   blockTypeChanged();
 }
 function blockTypeChanged(){
@@ -4419,7 +4428,7 @@ function blockMedUpload(inp){
   });
   reihe.then(function(){toast('Fertig ✓ – „Speichern" nicht vergessen.')});
 }
-function saveBlock(id){
+function saveModul(id){
   var t=v('blkType');
   if(t!=='instagram'&&!curBlockMedia.length){toast('Für dieses Modul fehlt noch mindestens ein Foto oder Video.',1);return}
   var body={page:'start',type:t,anchor:v('blkAnchor'),
@@ -4427,11 +4436,11 @@ function saveBlock(id){
     layout:(t==='foto'||t==='video')?'3':v('blkLayout'),
     media:t==='instagram'?[]:curBlockMedia,
     public:document.getElementById('blkPub').checked};
-  if(!id)body.sort=(CACHE.blocks||[]).length;
+  if(!id)body.sort=(CACHE.module||[]).length;
   (id?api('blocks?id=eq.'+id,{method:'PATCH',body:body}):api('blocks',{method:'POST',body:body}))
-    .then(function(){closeModal();toast('Gespeichert ✓');reloadBlocks()}).catch(function(e){toast(e.message,1)});
+    .then(function(){closeModal();toast('Gespeichert ✓');reloadModule()}).catch(function(e){toast(e.message,1)});
 }
-function reloadBlocks(){api('blocks?select=*&order=anchor,sort').then(function(r){CACHE.blocks=r||[];renderBlockAdmin()})}
+function reloadModule(){api('blocks?select=*&order=anchor,sort').then(function(r){CACHE.module=r||[];renderModulAdmin()})}
 
 
 
@@ -5524,7 +5533,7 @@ function dateConflicts(datum){
     if(datum>=b.event_date&&datum<=bis)
       out.push((b.title||b.event_type||'Auftrag')+(b.customers?' · '+custName(b.customers):''));
   });
-  (CACHE.blocks||[]).forEach(function(c){
+  (CACHE.module||[]).forEach(function(c){
     var bis=c.end_date||c.start_date;
     if(datum>=c.start_date&&datum<=bis)out.push(c.title||'Kalender-Blocker');
   });
