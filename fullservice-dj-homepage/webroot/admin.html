@@ -1468,7 +1468,9 @@ function renderBook(){
     '<td><span class="b '+bookBadge(b.status)+'">'+b.status+'</span></td></tr>';
   }).join('')||'<tr><td colspan="6" class="mut">Noch keine Buchungen.</td></tr>';
 }
-function calShift(n){calBase.setMonth(calBase.getMonth()+n);renderCal()}
+/* Erst auf den Monatsersten setzen: sonst wird aus dem 31. August beim Weiterblaettern
+   der 31. September, den es nicht gibt - und der Kalender springt auf Oktober. */
+function calShift(n){calBase.setDate(1);calBase.setMonth(calBase.getMonth()+n);renderCal()}
 function renderCal(){
   var y=calBase.getFullYear(),m=calBase.getMonth();
   document.getElementById('calTitle').textContent=calBase.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
@@ -4350,6 +4352,10 @@ function openModulModal(id){
   curBlockMedia=Array.isArray(b.media)?JSON.parse(JSON.stringify(b.media)):[];
   var typeSel=BLOCK_TYPES.map(function(t){return '<option value="'+t[0]+'"'+((b.type||'kacheln')===t[0]?' selected':'')+'>'+esc(t[1])+'</option>'}).join('');
   var ancSel=BLOCK_ANCHORS.map(function(a){return '<option value="'+a[0]+'"'+((b.anchor||'ende')===a[0]?' selected':'')+'>'+esc(a[1])+'</option>'}).join('');
+  /* Sonst faellt ein unbekannter Platz stillschweigend auf den ersten Eintrag und das
+     Modul wandert beim naechsten Speichern woanders hin. */
+  if(b.anchor&&!BLOCK_ANCHORS.some(function(a){return a[0]===b.anchor}))
+    ancSel='<option value="'+esc(b.anchor)+'" selected>Unbekannter Platz („'+esc(b.anchor)+'") – erscheint ganz unten</option>'+ancSel;
   var lay=String(b.layout||'3');
   openModal(id?'Modul bearbeiten':'Neues Modul',
     '<div class="grid2"><div><label>Art</label><select id="blkType" onchange="blockTypeChanged()">'+typeSel+'</select></div>'+
@@ -5251,7 +5257,7 @@ function openTplPicker(){
   openModal('Vorlage laden',(CACHE.quoteTpls||[]).map(function(t){
     return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:10px;align-items:center">'+
     '<div><b>'+esc(t.name)+'</b> <span class="mut sml">'+(t.items||[]).length+' Position(en)</span></div>'+
-    '<span><button class="btn sm" onclick="applyTpl(\''+t.id+'\')">Laden</button> <button class="btn sm r" onclick="delRow(\'quote_templates\',\''+t.id+'\',reloadTpls)">Löschen</button></span></div>';
+    '<span><button class="btn sm" onclick="applyTpl(\''+t.id+'\')">Laden</button> <button class="btn sm r" onclick="delRow(\'quote_templates\',\''+t.id+'\',reloadQuoteTpls)">Löschen</button></span></div>';
   }).join(''));
 }
 function applyTpl(id){
@@ -5268,9 +5274,11 @@ function saveAsTpl(){
   var body={name:name,intro_text:v('docIntro')||'',outro_text:v('docOutro')||'',
     items:curItems.map(function(it,i){return{pos:i+1,description:it.description,note:it.note||'',qty:it.qty,unit:it.unit,unit_price:it.unit_price,is_header:it.is_header||0,group_pos:it.group_pos!=null?it.group_pos:null}}),
     sort:(CACHE.quoteTpls||[]).length};
-  api('quote_templates',{method:'POST',body:body}).then(function(){toast('Vorlage „'+name+'" gespeichert ✓');reloadTpls()}).catch(function(e){toast(e.message,1)});
+  api('quote_templates',{method:'POST',body:body}).then(function(){toast('Vorlage „'+name+'" gespeichert ✓');reloadQuoteTpls()}).catch(function(e){toast(e.message,1)});
 }
-function reloadTpls(){api('quote_templates?select=*&order=sort').then(function(r){CACHE.quoteTpls=r||[]})}
+/* Eigener Name: hiess frueher wie die Funktion fuer die E-Mail-Vorlagen und hat sie
+   ueberschrieben - deren Liste blieb nach dem Speichern veraltet stehen. */
+function reloadQuoteTpls(){api('quote_templates?select=*&order=sort').then(function(r){CACHE.quoteTpls=r||[]})}
 
 /* ===== Partner (Technik-Vermietung) ===== */
 function renderPartners(){
@@ -5533,7 +5541,7 @@ function dateConflicts(datum){
     if(datum>=b.event_date&&datum<=bis)
       out.push((b.title||b.event_type||'Auftrag')+(b.customers?' · '+custName(b.customers):''));
   });
-  (CACHE.module||[]).forEach(function(c){
+  (CACHE.blocks||[]).forEach(function(c){
     var bis=c.end_date||c.start_date;
     if(datum>=c.start_date&&datum<=bis)out.push(c.title||'Kalender-Blocker');
   });
