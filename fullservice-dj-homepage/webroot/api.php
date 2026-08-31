@@ -2927,17 +2927,27 @@ function serveIcal(string $typ): never {
   $p = db();
   $ev = '';
   $custName = fn($b) => trim((string)($b['company'] ?: trim(($b['first_name'] ?? '') . ' ' . ($b['last_name'] ?? ''))));
+  /* Im Termin steht Art der Veranstaltung und Kundenname - der Status steckt darin,
+     welchen der drei Kalender man gerade sieht, und damit in dessen Farbe. */
+  $titel = function ($b) use ($custName) {
+    $art = trim((string)($b['event_type'] ?: $b['title'] ?: 'Veranstaltung'));
+    $k = $custName($b);
+    return $k !== '' ? $art . ' · ' . $k : $art;
+  };
   if ($typ === 'anfragen') {
     $q = $p->query("select b.*, c.first_name, c.last_name, c.company, c.phone from bookings b
       join customers c on c.id = b.customer_id where b.status in ('anfrage','angebot')");
     foreach ($q->fetchAll() as $b)
-      $ev .= icsEvent($b['id'], 'Anfrage: ' . ($b['title'] ?: $b['event_type'] ?: 'Feier') . ' (' . $b['status'] . ')',
+      $ev .= icsEvent($b['id'], $titel($b) . ($b['status'] === 'angebot' ? ' (Angebot offen)' : ' (Anfrage)'),
         $b['event_date'], $b['end_date'], $b['start_time'], $b['end_time'],
         $custName($b) . ($b['phone'] ? ' · ' . $b['phone'] : '') . ($b['guests'] ? ' · ' . $b['guests'] . ' Gäste' : ''),
         trim(($b['venue_name'] ?? '') . ' ' . ($b['venue_address'] ?? '')), true);
-    $qi = $p->query("select * from inquiries where status = 'neu' and event_date is not null and event_date != ''");
+    /* Anfragen legen inzwischen selbst eine Veranstaltung an - die steht schon in der
+       Schleife darueber. Ohne diesen Filter stand jede Anfrage zweimal im Kalender. */
+    $qi = $p->query("select * from inquiries where status = 'neu' and event_date is not null and event_date != ''
+      and (customer_id is null or customer_id = '')");
     foreach ($qi->fetchAll() as $i)
-      $ev .= icsEvent('inq-' . $i['id'], 'Anfrage: ' . ($i['event_type'] ?: 'Feier') . ' – ' . $i['name'],
+      $ev .= icsEvent('inq-' . $i['id'], ($i['event_type'] ?: 'Feier') . ' · ' . $i['name'] . ' (Anfrage)',
         $i['event_date'], null, null, null,
         trim(($i['email'] ?? '') . ' ' . ($i['phone'] ?? '')) . ($i['message'] ? ' · ' . mb_substr($i['message'], 0, 150) : ''),
         (string)($i['location'] ?? ''), true);
@@ -2950,7 +2960,7 @@ function serveIcal(string $typ): never {
       $desc = $custName($b) . ($b['phone'] ? ' · ' . $b['phone'] : '') . ($b['guests'] ? ' · ' . $b['guests'] . ' Gäste' : '');
       if (!empty($r['setup_from'])) $desc .= ' · Aufbau ab ' . substr($r['setup_from'], 0, 5);
       if (!empty($r['contact_name'])) $desc .= ' · vor Ort: ' . $r['contact_name'] . (!empty($r['contact_phone']) ? ' ' . $r['contact_phone'] : '');
-      $ev .= icsEvent($b['id'], 'DJ: ' . ($b['title'] ?: $b['event_type'] ?: 'Auftrag'),
+      $ev .= icsEvent($b['id'], $titel($b),
         $b['event_date'], $b['end_date'], $b['start_time'], $b['end_time'], $desc,
         trim(($b['venue_name'] ?? '') . ' ' . ($b['venue_address'] ?? '')), false);
     }
@@ -2966,7 +2976,7 @@ function serveIcal(string $typ): never {
       $eq = $p->prepare('select be.qty, e.name from booking_equipment be join equipment e on e.id = be.equipment_id where be.booking_id = ?');
       $eq->execute([$b['id']]);
       $list = implode(', ', array_map(fn($x) => $x['qty'] . '× ' . $x['name'], $eq->fetchAll()));
-      $ev .= icsEvent($b['id'], 'Vermietung: ' . ($b['title'] ?: 'Technik'),
+      $ev .= icsEvent($b['id'], $titel($b),
         $b['event_date'], $b['end_date'], $b['start_time'], $b['end_time'],
         $custName($b) . ($b['phone'] ? ' · ' . $b['phone'] : '') . ($list ? ' · ' . $list : ''),
         trim(($b['venue_name'] ?? '') . ' ' . ($b['venue_address'] ?? '')), false);

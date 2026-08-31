@@ -162,19 +162,27 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .cal .cd-c.out{opacity:.32}
 .cal .cd-c.today{border-color:var(--acc)}
 .cal .cdn{color:var(--gl);font-size:9px}
-.cal .ev{display:block;background:rgba(201,162,39,.15);border-left:2px solid var(--acc);padding:1px 4px;margin-top:3px;color:var(--wh);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
-.cal .ev.tech{border-left-color:var(--blu);background:rgba(85,136,221,.13)}
-.cal .ev.ws{border-left-color:var(--grn);background:rgba(90,160,90,.13)}
-.cal .ev.priv{border-left-color:#b08fd8;background:rgba(176,143,216,.14)}
-/* Vorlaeufig: Angebot liegt beim Kunden, noch nichts entschieden. Gestrichelt statt
-   blass - ausgegraut waere schlechter lesbar. */
-.cal .ev.vor{border-left-style:dashed;font-style:italic}
-.cal-legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:10.5px;color:var(--gll)}
-.cal-legend i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px;border-left:3px solid}
-.cal-legend .l-dj i{border-color:var(--acc);background:rgba(201,162,39,.15)}
-.cal-legend .l-tech i{border-color:var(--blu);background:rgba(85,136,221,.13)}
-.cal-legend .l-ws i{border-color:var(--grn);background:rgba(90,160,90,.13)}
-.cal-legend .l-priv i{border-color:#b08fd8;background:rgba(176,143,216,.14)}
+.cal .ev{display:block;border-left:3px solid var(--gl);background:rgba(255,255,255,.05);padding:1px 4px;margin-top:3px;color:var(--wh);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+/* Ein Kalender = eine Farbe. Der Status steckt in der Farbe, im Eintrag selbst steht
+   Anlass und Kundenname - so ist auf einen Blick klar, was der Tag bedeutet. */
+.cal .ev.k-anfrage{border-left-color:var(--yel);background:rgba(216,168,57,.14)}
+.cal .ev.k-angebot{border-left-color:var(--acc);background:rgba(255,111,91,.13)}
+.cal .ev.k-fest{border-left-color:var(--grn);background:rgba(90,160,90,.14)}
+.cal .ev.k-fertig{border-left-color:var(--gl);background:rgba(143,140,132,.14)}
+.cal .ev.k-technik{border-left-color:var(--blu);background:rgba(85,136,221,.14)}
+.cal .ev.k-workshop{border-left-color:#3fa89b;background:rgba(63,168,155,.14)}
+.cal .ev.k-privat{border-left-color:#b08fd8;background:rgba(176,143,216,.14)}
+.cal-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:10.5px;color:var(--gll)}
+.cal-legend label{display:flex;align-items:center;gap:5px;margin:0;font-weight:400;text-transform:none;letter-spacing:normal;cursor:pointer;color:var(--gll);font-size:10.5px}
+.cal-legend input{width:auto;margin:0}
+.cal-legend i{display:inline-block;width:11px;height:11px;border-left:3px solid;border-radius:2px}
+.cal-legend .c-anfrage i{border-color:var(--yel);background:rgba(216,168,57,.14)}
+.cal-legend .c-angebot i{border-color:var(--acc);background:rgba(255,111,91,.13)}
+.cal-legend .c-fest i{border-color:var(--grn);background:rgba(90,160,90,.14)}
+.cal-legend .c-fertig i{border-color:var(--gl);background:rgba(143,140,132,.14)}
+.cal-legend .c-technik i{border-color:var(--blu);background:rgba(85,136,221,.14)}
+.cal-legend .c-workshop i{border-color:#3fa89b;background:rgba(63,168,155,.14)}
+.cal-legend .c-privat i{border-color:#b08fd8;background:rgba(176,143,216,.14)}
 
 /* Items-Editor */
 .it-row{display:grid;grid-template-columns:36px 1fr 70px 100px 90px 90px 28px;gap:6px;align-items:center;margin-bottom:6px}
@@ -339,13 +347,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       &nbsp;<button class="btn g" onclick="openBlockModal()">+ Blocken</button>
       &nbsp;<button class="btn" onclick="openBookModal()">+ Neue Buchung</button></div></div>
     <div class="card"><div class="cal" id="calGrid"></div>
-      <div class="cal-legend">
-        <span class="l-dj"><i></i>DJ-Auftrag</span>
-        <span class="l-tech"><i></i>Technik / Vermietung</span>
-        <span class="l-ws"><i></i>Workshop</span>
-        <span class="l-priv"><i></i>Privat / geblockt</span>
-        <span style="font-style:italic">gestrichelt / kursiv = vorläufig, Angebot noch offen</span>
-      </div>
+      <div class="cal-legend" id="calLayers"></div>
     </div>
     <div class="tbl-wrap card"><table><thead><tr><th>Datum</th><th>Titel / Kunde</th><th>Art</th><th>Location</th><th class="num">Auftragswert</th><th>Status</th></tr></thead><tbody id="bookRows"></tbody></table></div>
   </div>
@@ -1568,7 +1570,48 @@ function renderBook(){
 /* Erst auf den Monatsersten setzen: sonst wird aus dem 31. August beim Weiterblaettern
    der 31. September, den es nicht gibt - und der Kalender springt auf Oktober. */
 function calShift(n){calBase.setDate(1);calBase.setMonth(calBase.getMonth()+n);renderCal()}
+/* Die Kalender: jeder eine eigene Farbe, einzeln ein- und ausschaltbar. Ein Eintrag
+   gehoert immer zu genau einem davon - so bleibt eine Farbe eindeutig lesbar. Technik
+   laeuft als eigener Kalender, weil Markus sie auch im Handy getrennt abonniert. */
+var CAL_LAYERS=[
+  {key:'anfrage', label:'Anfragen'},
+  {key:'angebot', label:'Angebote offen'},
+  {key:'fest',    label:'Fest gebucht'},
+  {key:'fertig',  label:'Abgeschlossen'},
+  {key:'technik', label:'Technikvermietung'},
+  {key:'workshop',label:'Workshops'},
+  {key:'privat',  label:'Privat / geblockt'}
+];
+function calLayerOn(key){
+  try{var v=localStorage.getItem('cal_'+key);return v===null?true:v==='1'}catch(e){return true}
+}
+function calLayerToggle(key,on){
+  try{localStorage.setItem('cal_'+key,on?'1':'0')}catch(e){}
+  renderCal();
+}
+function calLayerOf(b){
+  if(b.kind==='technik')return 'technik';
+  if(b.status==='anfrage')return 'anfrage';
+  if(b.status==='angebot')return 'angebot';
+  if(b.status==='abgeschlossen')return 'fertig';
+  return 'fest';
+}
+/* Im Eintrag steht, was Markus wissen muss: Art der Veranstaltung und Kundenname.
+   Der Status steckt in der Farbe. */
+function calLabel(b){
+  var art=b.event_type||b.title||'Veranstaltung';
+  var kunde=custName(b.customers)||'';
+  return kunde?art+' \u00b7 '+kunde:art;
+}
+function renderCalLayers(){
+  var el=document.getElementById('calLayers');if(!el)return;
+  el.innerHTML=CAL_LAYERS.map(function(l){
+    return '<label class="c-'+l.key+'"><input type="checkbox"'+(calLayerOn(l.key)?' checked':'')+
+      ' onchange="calLayerToggle(\''+l.key+'\',this.checked)"><i></i>'+l.label+'</label>';
+  }).join('');
+}
 function renderCal(){
+  renderCalLayers();
   var y=calBase.getFullYear(),m=calBase.getMonth();
   document.getElementById('calTitle').textContent=calBase.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
   var first=new Date(y,m,1),start=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate();
@@ -1579,17 +1622,17 @@ function renderCal(){
     var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     var evs=CACHE.bookings.filter(function(b){
       if(b.status==='storniert')return false;
+      if(!calLayerOn(calLayerOf(b)))return false;
       var end=b.end_date||b.event_date;
       return b.event_date<=ds&&end>=ds;
     });
-    var ws=(CACHE.wsEvents||[]).filter(function(w){return w.event_date===ds&&w.public!==false});
-    var bl=(CACHE.blocks||[]).filter(function(x){var end=x.end_date||x.start_date;return x.start_date<=ds&&end>=ds});
+    var ws=calLayerOn('workshop')?(CACHE.wsEvents||[]).filter(function(w){return w.event_date===ds&&w.public!==false}):[];
+    var bl=calLayerOn('privat')?(CACHE.blocks||[]).filter(function(x){var end=x.end_date||x.start_date;return x.start_date<=ds&&end>=ds}):[];
     html+='<div class="cd-c'+(ds===today?' today':'')+'"><div class="cdn">'+d+'</div>'+
       evs.map(function(b){
-        var vor=['anfrage','angebot'].indexOf(b.status)>=0;
-        return '<span class="ev'+(b.kind==='technik'?' tech':'')+(vor?' vor':'')+'" title="'+esc((b.title||b.event_type||'Auftrag')+' – '+b.status)+'" onclick="openBookDetail(\''+b.id+'\')">'+esc(b.title||b.event_type||'Auftrag')+'</span>'}).join('')+
-      ws.map(function(w){return '<span class="ev ws" onclick="openWsModal(\''+w.id+'\')">'+esc(w.title||'Workshop')+'</span>'}).join('')+
-      bl.map(function(x){return '<span class="ev priv" onclick="openBlockModal(\''+x.id+'\')">'+esc(x.title)+'</span>'}).join('')+
+        return '<span class="ev k-'+calLayerOf(b)+'" title="'+esc(calLabel(b)+' \u2013 '+b.status)+'" onclick="openBookDetail(\''+b.id+'\')">'+esc(calLabel(b))+'</span>'}).join('')+
+      ws.map(function(w){return '<span class="ev k-workshop" onclick="openWsModal(\''+w.id+'\')">'+esc(w.title||'Workshop')+'</span>'}).join('')+
+      bl.map(function(x){return '<span class="ev k-privat" onclick="openBlockModal(\''+x.id+'\')">'+esc(x.title)+'</span>'}).join('')+
       '</div>';
   }
   document.getElementById('calGrid').innerHTML=html;
@@ -1915,7 +1958,7 @@ function openBookModal(b,presetCust){
     '<div><label>Art</label><select id="bKind"><option value="dj">DJ</option><option value="technik">Technikverleih</option><option value="dj_technik">DJ + Technik</option></select></div>'+
     '<div><label>Anlass</label><input id="bType" value="'+esc(b.event_type||'')+'" placeholder="Hochzeit, Geburtstag …"></div></div>'+
     '<label>Titel</label><input id="bTitle" value="'+esc(b.title||'')+'" placeholder="z. B. Hochzeit Lisa & Tom">'+
-    '<div class="grid4"><div><label>Datum *</label><input type="date" id="bDate" value="'+(b.event_date||'')+'"></div>'+
+    '<div class="grid4"><div><label>Datum *</label><input type="date" id="bDate" value="'+(b.event_date||'')+'" onchange="bookDateCheck()" oninput="bookDateCheck()"></div>'+
     '<div><label>Ende (Verleih)</label><input type="date" id="bEnd" value="'+(b.end_date||'')+'"></div>'+
     '<div><label>Beginn</label><input type="time" id="bStart" value="'+(b.start_time||'')+'"></div>'+
     '<div><label>Ende</label><input type="time" id="bTend" value="'+(b.end_time||'')+'"></div></div>'+
@@ -1927,10 +1970,25 @@ function openBookModal(b,presetCust){
     '<div><label>Gäste</label><input type="number" id="bGuests" value="'+(b.guests||'')+'"></div></div>'+
 
     '<label>Notizen</label><textarea id="bNotes">'+esc(b.notes||'')+'</textarea>'+edBtn('bNotes')+
+    '<div class="sml" id="bDateCheck" style="margin-top:6px"></div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveBook(\''+(b.id||'')+'\')">Speichern</button>'+
     (b.id?' <button class="btn r" onclick="delBook(\''+b.id+'\')">Löschen</button>':'')+'</div>');
   if(b.status)document.getElementById('bStatus').value=b.status;
   if(b.kind)document.getElementById('bKind').value=b.kind;
+  BOOK_EDIT_ID=b.id||null;
+  bookDateCheck();
+}
+/* Gleiche Kalenderprüfung wie im Angebot - wer hier von Hand einen Termin einträgt,
+   soll genauso sehen, ob der Tag schon vergeben ist. */
+var BOOK_EDIT_ID=null;
+function bookDateCheck(){
+  var el=document.getElementById('bDateCheck');if(!el)return;
+  var datum=v('bDate');
+  if(!datum){el.innerHTML='';return}
+  var konf=konflikteAm(datum,BOOK_EDIT_ID);
+  el.innerHTML=konf.length
+    ? '<span style="color:var(--yel)">An dem Tag steht schon etwas im Kalender: '+esc(konf.join(' · '))+'</span>'
+    : '<span style="color:var(--grn)">Der Tag ist im Kalender noch frei.</span>';
 }
 function saveBook(id){
   if(!v('bDate')){toast('Bitte Datum angeben.',1);return}
@@ -2826,7 +2884,7 @@ function syncVeranstaltung(){
   });
 }
 function reloadBookings(){
-  return api('bookings?select=*,customers(*)&order=event_date').then(function(r){
+  return api('bookings?select=*,customers(*)&order=event_date.desc').then(function(r){
     CACHE.bookings=r||[];renderBook();});
 }
 /* Angenommen heisst fest im Kalender, abgelehnt heisst wieder frei - aber nur, solange
@@ -2958,19 +3016,22 @@ function renderEventHint(){
 /* Kalenderprüfung direkt beim Eintippen des Datums: sonst faellt eine Doppelbelegung
    erst auf, wenn das Angebot schon beim Kunden liegt. Die eigene Veranstaltung zaehlt
    dabei natuerlich nicht als Konflikt. */
-function renderDateCheck(datum){
-  var el=document.getElementById('evDateCheck');if(!el)return;
-  if(!datum){el.innerHTML='';return}
-  var eigen=curDoc&&curDoc.booking_id;
-  var konf=(CACHE.bookings||[]).filter(function(b){
-    if(b.id===eigen||b.status==='storniert'||!b.event_date)return false;
+function konflikteAm(datum,ausser){
+  if(!datum)return [];
+  return (CACHE.bookings||[]).filter(function(b){
+    if(b.id===ausser||b.status==='storniert'||!b.event_date)return false;
     return datum>=b.event_date&&datum<=(b.end_date||b.event_date);
-  }).map(function(b){return (b.title||b.event_type||'Veranstaltung')+' ('+b.status+')'})
+  }).map(function(b){return calLabel(b)+' ('+b.status+')'})
   .concat((CACHE.blocks||[]).filter(function(c){
     return datum>=c.start_date&&datum<=(c.end_date||c.start_date);
   }).map(function(c){return c.title||'Kalender-Blocker'}))
   .concat((CACHE.wsEvents||[]).filter(function(w){return w.event_date===datum})
     .map(function(w){return 'Workshop: '+(w.title||'')}));
+}
+function renderDateCheck(datum){
+  var el=document.getElementById('evDateCheck');if(!el)return;
+  if(!datum){el.innerHTML='';return}
+  var konf=konflikteAm(datum,curDoc&&curDoc.booking_id);
   el.innerHTML=konf.length
     ? '<span style="color:var(--yel)">Achtung, an dem Tag steht schon etwas im Kalender: '+esc(konf.join(' · '))+'</span>'
     : '<span style="color:var(--grn)">Der Tag ist im Kalender noch frei.</span>';
