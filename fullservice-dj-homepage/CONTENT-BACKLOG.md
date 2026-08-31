@@ -276,14 +276,24 @@ alle tagsüber/unter der Woche (= Auslastungsziel):
   abgerechnet wird der Betrag als Brutto. Die Datenbankspalte heißt zwar
   `price_net`, enthält aber den Bruttopreis - fachlich stimmt es, der
   Spaltenname ist nur historisch.
-- **`data/`-Verzeichnis auf dem Live-Server.** Bitte einmal im Browser
-  prüfen, dass `lauschgift.net/data/` wirklich per `.htaccess` gesperrt ist.
+- **`data/`-Verzeichnis auf dem Live-Server (erledigt).** Markus hat geprüft:
+  über den Browser ist kein Zugriff möglich.
 - **Widerrufs- und Stornoklauseln** rechtlich prüfen lassen, bevor die
   Kampagnenseiten aktiv beworben werden.
 - **halloween.html und weihnachtsfeier.html** sind noch fest verdrahtet und
-  laufen nicht über das neue Kampagnenseiten-System.
-- **Event-Reviews** (echte Veranstaltungen mit Fotos und Geschichte statt
-  erfundener Beispiele) - Markus' Idee, bewusst zurückgestellt.
+  laufen nicht über das neue Kampagnenseiten-System. Zurückgestellt, solange
+  die Kampagnenseiten insgesamt auf Eis liegen.
+- **Kampagnenseiten insgesamt.** Markus findet die Seiten inhaltlich noch
+  nicht gelungen; sie bleiben ausgeschaltet und werden vorerst nicht
+  weiterentwickelt.
+- **Veranstaltungsberichte (gebaut, Inhalte fehlen).** Technik steht: eigene
+  Modulart, zentrale Pflege unter „Module". Markus pflegt bei Gelegenheit
+  echte Feiern mit kurzem Text und einzelnen Fotos ein. Achtung beim
+  Platzieren: Die Startseite soll nicht zu voll werden - deshalb zeigt das
+  Modul nur Kacheln, der ganze Text steht im Detailfenster.
+- **Bilder in den Paketkacheln (gebaut, Bilder fehlen).** Feld je Paket ist
+  da, die Anzeige lässt sich global ein- und ausschalten. Solange nicht jedes
+  Paket ein Bild hat, den Schalter besser aus lassen.
 - **Preise werden brutto angezeigt (entschieden).** Alle Preise auf der
   Homepage sind brutto, Angebote und Rechnungen weisen unten "darin enthaltene
   USt." aus. Die Bruttoansicht geht rechnerisch überall exakt auf (über 1.200
