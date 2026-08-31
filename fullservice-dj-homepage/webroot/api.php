@@ -3797,6 +3797,12 @@ function handleUpload(string $name): never {
     $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($raw);
     if (!is_string($mime) || !str_starts_with($mime, 'video/'))
       fail('Das ist keine gültige Videodatei.');
+    /* Endung und Inhalt muessen zusammenpassen: eine webm-Datei, die mp4 heisst, wird sonst
+       mit falschem Typ ausgeliefert und spielt je nach Browser stumm nicht ab. */
+    $erwartet = $ext === 'mp4' ? ['video/mp4','video/quicktime'] : ['video/webm','video/x-matroska'];
+    if (!in_array($mime, $erwartet, true))
+      fail($ext === 'mp4' ? 'Diese Datei ist kein MP4 – bitte als .webm hochladen oder vorher umwandeln.'
+                          : 'Diese Datei ist kein WebM – bitte als .mp4 hochladen oder vorher umwandeln.');
   } else {
     if (strlen($raw) > MAX_UPLOAD) fail('Die Datei ist zu groß (max. 8 MB).');
     $info = @getimagesizefromstring($raw);

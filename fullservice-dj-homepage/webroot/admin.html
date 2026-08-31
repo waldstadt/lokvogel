@@ -5989,7 +5989,7 @@ function fillContent(key,val){
   val=val||{};
   function set(id,x){var el=document.getElementById(id);if(el)el.value=x==null?'':x}
   if(key==='hero'){
-    set('cHeroSub',val.subtitle);set('cHeroText',val.text);set('cHeroCta',val.cta);set('cHeroImg',val.image);set('cHeroVid',val.video||'');
+    set('cHeroSub',val.subtitle);set('cHeroText',val.text);set('cHeroCta',val.cta);set('cHeroImg',val.image);set('cHeroVid',val.video||'');heroVidHint();
     document.getElementById('cHeroFocalWrap').innerHTML=focalWidget(val.image,val.image_focal,'cHeroFocal','21/9');
   }
   if(key==='about'){

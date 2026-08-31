@@ -67,10 +67,15 @@ nav.scrolled{border-bottom-color:var(--line)}
 .hero{min-height:92vh;display:flex;align-items:center;position:relative;overflow:hidden;padding-top:80px}
 .hero-bg{position:absolute;inset:0;background:
   var(--bg);border-bottom:1px solid var(--line)}
-.hero-img{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.20}
+.hero-img{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.20;transition:opacity .6s ease}
 .hero-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.20;pointer-events:none}
+/* Abdunkler ueber Bild und Video: Ohne ihn faellt die Akzentzeile im Titel bei einem
+   hellen Motiv auf 3,8:1 und bei gestapeltem Bild+Video sogar auf 2,1:1. Mit 30 Prozent
+   sind es 5,05:1 - auch fuer normalen Text ausreichend. */
+.hero-scrim{position:absolute;inset:0;background:rgba(0,0,0,.30);pointer-events:none;display:none}
+.hero.hat-medien .hero-scrim{display:block}
 .hero-in{position:relative;z-index:2}
-.hero h1{font-size:clamp(42px,7.2vw,78px);font-weight:700;line-height:1.04;letter-spacing:-.03em;margin-bottom:20px}
+.hero h1{font-size:clamp(42px,7.2vw,78px);font-weight:700;line-height:1.04;letter-spacing:-.03em;margin-bottom:20px;overflow-wrap:anywhere}
 .hero h1 em{font-style:normal;color:var(--acc)}
 .hero .sub{font-size:clamp(16px,2.2vw,20px);color:var(--mut);max-width:600px;margin-bottom:34px}
 .hero .cta-row{display:flex;gap:14px;flex-wrap:wrap}
@@ -250,6 +255,7 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
   <div class="hero-bg"></div>
   <div class="hero-img" id="heroImg"></div>
   <div id="heroVid"></div>
+  <div class="hero-scrim"></div>
   <div class="wrap hero-in">
     <div class="kicker" id="heroKick">DJ für Hochzeiten, Geburtstage &amp; Firmenfeiern</div>
     <h1 id="heroTitle">Volle Tanzfläche.<br><em>Ohne Schnickschnack.</em></h1>
@@ -560,8 +566,17 @@ function setHeroVideo(url){
   v.addEventListener('error',function(){v.remove()});
   v.src=url;
   box.appendChild(v);
+  v.addEventListener('playing',function(){
+    var bild=document.getElementById('heroImg');
+    if(bild)bild.style.opacity='0';
+  });
+  v.addEventListener('error',function(){
+    var bild=document.getElementById('heroImg');
+    if(bild)bild.style.opacity='';
+  });
   var pl=v.play();
-  if(pl&&pl.catch)pl.catch(function(){v.remove()});
+  if(pl&&pl.catch)pl.catch(function(){v.remove();
+    var bild=document.getElementById('heroImg');if(bild)bild.style.opacity='';});
 }
 function showSection(id){
   var el=document.getElementById(id);if(!el)return;
@@ -655,6 +670,9 @@ function applyContent(rows){
        stehen, wenn das Video nicht geladen wird oder nicht geladen werden soll. */
     if(c.hero.image){document.getElementById('heroImg').style.backgroundImage='url("'+c.hero.image+'")';
       document.getElementById('heroImg').style.backgroundPosition=c.hero.image_focal||'center'}
+    if(c.hero.image||c.hero.video){
+      var hero=document.querySelector('.hero');if(hero)hero.classList.add('hat-medien');
+    }
     setHeroVideo(c.hero.video)
   }
   if(c.about){
