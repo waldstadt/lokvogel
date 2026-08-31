@@ -218,6 +218,7 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
 .blk-med.c4{grid-template-columns:repeat(4,1fr)}
 @media(max-width:900px){.blk-med.c3,.blk-med.c4{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.blk-med.c2,.blk-med.c3,.blk-med.c4{grid-template-columns:1fr}}
+.blk h2,.rep h4,.rep-box h3{overflow-wrap:anywhere}
 .blk-med figure{margin:0}
 .blk-med img,.blk-med video{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:5px;
   border:1px solid var(--line);display:block;background:var(--card)}
@@ -560,6 +561,10 @@ var FALLBACK={
 var LEGAL={};
 
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
+/* Bildpfade und Positionsangaben landen in CSS-Deklarationen. Anfuehrungszeichen,
+   Klammern und Semikola dort erlauben es, die Deklaration zu verlassen und weitere
+   Regeln unterzuschieben - deshalb fliegen sie raus. */
+function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
 /* Tages-Seed: deterministisch pro Tag, damit z. B. Bewertungen nicht bei jedem Reload springen */
@@ -703,7 +708,7 @@ function applyContent(rows){
     if(c.hero.cta)document.getElementById('heroCta').textContent=c.hero.cta;
     /* Standbild immer setzen: Es ist zugleich das Standbild des Videos und bleibt
        stehen, wenn das Video nicht geladen wird oder nicht geladen werden soll. */
-    if(c.hero.image){document.getElementById('heroImg').style.backgroundImage='url("'+String(c.hero.image).replace(/["\\]/g,'')+'")';
+    if(c.hero.image){document.getElementById('heroImg').style.backgroundImage='url("'+cssUrl(c.hero.image)+'")';
       document.getElementById('heroImg').style.backgroundPosition=c.hero.image_focal||'center'}
     if(c.hero.image||c.hero.video){
       var hero=document.querySelector('.hero');if(hero)hero.classList.add('hat-medien');
@@ -713,7 +718,7 @@ function applyContent(rows){
   if(c.about){
     if(c.about.title)document.getElementById('aboutTitle').textContent=c.about.title;
     if(c.about.text)document.getElementById('aboutText').innerHTML=mdRender(c.about.text);
-    if(c.about.image){document.getElementById('aboutImg').style.backgroundImage='url("'+c.about.image+'")';
+    if(c.about.image){document.getElementById('aboutImg').style.backgroundImage='url("'+cssUrl(c.about.image)+'")';
       document.getElementById('aboutImg').style.backgroundPosition=c.about.image_focal||'center';
       document.getElementById('aboutPh').style.display='none'}
     if(c.about.gear&&c.about.gear.length){
@@ -1051,7 +1056,7 @@ function renderLocations(){
   var sel=pickRotate(LOC_DATA,LOC_CFG.max_count,LOC_CFG.rotate,VISIT_SEED);
   document.getElementById('locGrid').innerHTML=sel.map(function(l){
     var showImg=l.image_url&&(l.image_source!=='web'||l.image_approved);
-    var img=showImg?' style="background-image:url(\''+esc(l.image_url)+'\');background-position:'+esc(l.image_focal||'50% 50%')+'"':'';
+    var img=showImg?' style="background-image:url(\''+cssUrl(l.image_url)+'\');background-position:'+cssUrl(l.image_focal||'50% 50%')+'"':'';
     var icon=showImg?'':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
     var meta=[l.address,l.city,l.region].filter(Boolean).join(' · ');
     var links=[];
@@ -1074,7 +1079,7 @@ sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
 sfetch('friends?select=*&public=eq.true&order=sort').then(function(r){
   if(!r.length)return;
   document.getElementById('friendGrid').innerHTML=r.map(function(f){
-    var img=f.image_url?' style="background-image:url(\''+esc(f.image_url)+'\');background-position:'+esc(f.image_focal||'50% 50%')+'"':'';
+    var img=f.image_url?' style="background-image:url(\''+cssUrl(f.image_url)+'\');background-position:'+cssUrl(f.image_focal||'50% 50%')+'"':'';
     return '<div class="rent reveal vis">'+(f.image_url?'<div class="ri"'+img+'></div>':'')+'<div class="rb">'+
       (f.category?'<div class="rc">'+esc(f.category)+'</div>':'')+
       '<h4>'+esc(f.name)+'</h4><p>'+mdRender(f.description||'')+'</p>'+

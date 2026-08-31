@@ -315,6 +315,10 @@ navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{
 
 /* maximumFractionDigits muss mit: Ohne die Angabe rundet der Browser auf 3 Stellen,
    und die Netto-Umrechnung ergab Beträge wie "294,118 €". */
+/* Bildpfade und Positionsangaben landen in CSS-Deklarationen. Anfuehrungszeichen,
+   Klammern und Semikola dort erlauben es, die Deklaration zu verlassen und weitere
+   Regeln unterzuschieben - deshalb fliegen sie raus. */
+function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 /* Sicher als JS-String-Literal in Inline-onclick="fn('…')" – siehe admin.html */
@@ -441,7 +445,7 @@ function fitsItems(e){return relOf(e,'fits_ids','addon_ids')}    // „passend f
 /* Mindestabnahme: manche Artikel nur im Set (z. B. 6er). */
 function minQty(e){return Math.max(1,Number(e&&e.min_qty)||1)}
 function rentCard(e){
-  var img=e.image_url?' style="background-image:url(\''+esc(e.image_url)+'\');background-position:'+esc(e.image_focal||'50% 50%')+'"':'';
+  var img=e.image_url?' style="background-image:url(\''+cssUrl(e.image_url)+'\');background-position:'+cssUrl(e.image_focal||'50% 50%')+'"':'';
   var icon=e.image_url?'':itemIcon(e);
   var pp=partnerPrice(e);
   var price=priceLabel(e.day_rate,pp);
@@ -514,7 +518,7 @@ function renderProductModal(){
     if(!list.length)return '';
     return '<div class="pm-addons"><div class="pm-h">'+title+'</div><div class="pm-addon-grid">'+list.map(function(a){
       var ai=prodImages(a)[0];
-      var thumb=ai?'<div class="pm-addon-img" style="background-image:url(\''+esc(ai)+'\')"></div>':'<div class="pm-addon-img">'+itemIcon(a)+'</div>';
+      var thumb=ai?'<div class="pm-addon-img" style="background-image:url(\''+cssUrl(ai)+'\')"></div>':'<div class="pm-addon-img">'+itemIcon(a)+'</div>';
       var ap=PARTNER?partnerPrice(a):a.day_rate;
       return '<button type="button" class="pm-addon" onclick="openProductModal(\''+jsq(a.id)+'\')">'+thumb+
         '<span class="pm-addon-name">'+esc(a.name)+'</span>'+
@@ -635,11 +639,11 @@ function setItemImages(s){
 }
 function setImageArea(s){
   if(s.image_url)
-    return '<div class="ri" style="background-image:url(\''+esc(s.image_url)+'\');background-position:'+esc(s.image_focal||'50% 50%')+'"></div>';
+    return '<div class="ri" style="background-image:url(\''+cssUrl(s.image_url)+'\');background-position:'+cssUrl(s.image_focal||'50% 50%')+'"></div>';
   var imgs=setItemImages(s).slice(0,4);
   if(!imgs.length)return '<div class="ri">'+catIcon('')+'</div>';
   return '<div class="ri set-collage n'+imgs.length+'">'+imgs.map(function(u){
-    return '<div style="background-image:url(\''+esc(u)+'\')"></div>';
+    return '<div style="background-image:url(\''+cssUrl(u)+'\')"></div>';
   }).join('')+'</div>';
 }
 /* Enthaltene Artikel eines Sets, in Set-Reihenfolge - {qty, e}. */
@@ -655,7 +659,7 @@ function setImageAreaModal(s){
   var imgs=setItemImages(s).slice(0,4);
   if(!imgs.length)return '<div class="pm-main"><span class="pm-fallback">'+catIcon('')+'</span></div>';
   return '<div class="pm-main pm-collage n'+imgs.length+'">'+imgs.map(function(u){
-    return '<div style="background-image:url(\''+esc(u)+'\')"></div>';
+    return '<div style="background-image:url(\''+cssUrl(u)+'\')"></div>';
   }).join('')+'</div>';
 }
 /* Set-Kachel - gleiche Optik wie eine Artikel-Kachel (rentCard), Sets sind eine ganz normale
@@ -697,7 +701,7 @@ function renderSetProductModal(){
   var items=setItemsOf(s);
   var itemsHtml=items.length?'<div class="pm-addons"><div class="pm-h">Enthaltene Artikel</div><div class="pm-items">'+items.map(function(it){
     var img=prodImages(it.e)[0];
-    var thumb=img?'<div class="pm-item-img" style="background-image:url(\''+esc(img)+'\')"></div>':'<div class="pm-item-img">'+itemIcon(it.e)+'</div>';
+    var thumb=img?'<div class="pm-item-img" style="background-image:url(\''+cssUrl(img)+'\')"></div>':'<div class="pm-item-img">'+itemIcon(it.e)+'</div>';
     return '<div class="pm-item" onclick="openProductModal(\''+jsq(it.e.id)+'\')">'+thumb+
       '<div class="pm-item-txt"><div class="pm-item-name">'+(it.qty>1?it.qty+'× ':'')+esc(it.e.name)+'</div>'+
       (it.e.description?'<div class="pm-item-desc">'+esc(it.e.description)+'</div>':'')+'</div></div>';

@@ -575,7 +575,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <label>Text</label><textarea id="cHeroText"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cHeroText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Button-Text</label><input id="cHeroCta">
-          <label>Hintergrundbild</label><div style="display:flex;gap:8px"><input id="cHeroImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upHero" onchange="uploadImg(this,'cHeroImg','cHeroFocal')"><button class="btn g sm" onclick="document.getElementById('upHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cHeroImg','cHeroFocal')">Aus Pool</button></div>
+          <label>Hintergrundbild</label><div style="display:flex;gap:8px"><input id="cHeroImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upHero" onchange="uploadImg(this,'cHeroImg','cHeroFocal')"><button class="btn g sm" onclick="document.getElementById('upHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cHeroImg','cHeroFocal','21/9')">Aus Pool</button></div>
           <div id="cHeroFocalWrap"></div>
           <label style="margin-top:12px">Hintergrundvideo <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional, mp4 oder webm, max. 24 MB)</span></label><div style="display:flex;gap:8px"><input id="cHeroVid" placeholder="leer lassen für nur Bild"><input type="file" accept="video/mp4,video/webm" style="display:none" id="upHeroVid" onchange="uploadHeroVideo(this)"><button class="btn g sm" onclick="document.getElementById('upHeroVid').click()">Hochladen</button><button class="btn g sm" onclick="document.getElementById('cHeroVid').value='';heroVidHint()">Entfernen</button></div>
           <div class="mut sml" style="margin-top:6px">Läuft stumm in Endlosschleife hinter der Überschrift. Das Hintergrundbild bleibt das Standbild – es wird gezeigt, solange das Video lädt, und ersetzt es bei „Bewegung reduzieren" oder im Mobilfunknetz. Kurz halten (8 bis 15 Sekunden) und vorher komprimieren: Jeder Besucher lädt es mit.</div>
@@ -586,7 +586,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <label>Überschrift</label><input id="cAboutTitle">
           <label>Text</label><textarea id="cAboutText" style="min-height:110px"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cAboutText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
-          <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg','cAboutFocal')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cAboutImg','cAboutFocal')">Aus Pool</button></div>
+          <label>Foto</label><div style="display:flex;gap:8px"><input id="cAboutImg"><input type="file" accept="image/*" style="display:none" id="upAbout" onchange="uploadImg(this,'cAboutImg','cAboutFocal')"><button class="btn g sm" onclick="document.getElementById('upAbout').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cAboutImg','cAboutFocal','4/5')">Aus Pool</button></div>
           <div id="cAboutFocalWrap"></div>
           <label>Technik-Marken <span class="mut sml" style="text-transform:none;letter-spacing:0">(kommagetrennt, erscheinen als Text-Leiste unter „Über mich")</span></label><input id="cAboutGear" placeholder="z. B. Seeburg Acoustic Line, Sennheiser, Rane">
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('about')">Speichern</button></div>
@@ -602,7 +602,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <label style="margin-bottom:12px"><input type="checkbox" id="cThEnabled" style="width:auto;margin-right:6px" checked><b>Technik-Seite online</b> – ausschalten zeigt Besuchern nur einen Hinweis „gerade nicht verfügbar" statt der Seite</label>
           <label>Hero-Unterzeile</label><input id="cThSub">
           <label>Hero-Hintergrundbild <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional)</span></label>
-          <div style="display:flex;gap:8px"><input id="cThImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upThHero" onchange="uploadImg(this,'cThImg','cThFocal')"><button class="btn g sm" onclick="document.getElementById('upThHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cThImg','cThFocal')">Aus Pool</button></div>
+          <div style="display:flex;gap:8px"><input id="cThImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upThHero" onchange="uploadImg(this,'cThImg','cThFocal')"><button class="btn g sm" onclick="document.getElementById('upThHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cThImg','cThFocal','21/9')">Aus Pool</button></div>
           <div id="cThFocalWrap"></div>
           <label style="margin-top:12px">Hero-Hintergrundvideo <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional, mp4 oder webm, max. 24 MB)</span></label>
           <div style="display:flex;gap:8px"><input id="cThVid" placeholder="leer lassen für nur Bild"><input type="file" accept="video/mp4,video/webm" style="display:none" id="upThVid" onchange="uploadThVideo(this)"><button class="btn g sm" onclick="document.getElementById('upThVid').click()">Hochladen</button><button class="btn g sm" onclick="document.getElementById('cThVid').value='';thVidHint()">Entfernen</button></div>
@@ -1074,7 +1074,7 @@ function openWsModal(id){
     '<label>Kurzbeschreibung</label><input id="wDesc" value="'+esc(w.description||'')+'" placeholder="z. B. Grundlagen: Gain, EQ, Feedback – Praxis am Pult">'+
     '<label>Ausführlicher Text (Homepage)</label><textarea id="wLongDesc" style="min-height:100px">'+esc(w.long_description||'')+'</textarea>'+
     edBtn('wLongDesc')+
-    '<label>Foto</label><div style="display:flex;gap:8px"><input id="wImg" value="'+esc(w.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upWs" onchange="uploadImg(this,\'wImg\',\'wFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upWs\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'wImg\',\'wFocal\')">Aus Pool</button></div>'+
+    '<label>Foto</label><div style="display:flex;gap:8px"><input id="wImg" value="'+esc(w.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upWs" onchange="uploadImg(this,\'wImg\',\'wFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upWs\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'wImg\',\'wFocal\',\'4/3\')">Aus Pool</button></div>'+
     focalWidget(w.image_url,w.image_focal,'wFocal','4/3')+
     '<div class="grid3"><div><label>Datum *</label><input type="date" id="wDate" value="'+(w.event_date||'')+'"></div>'+
     '<div><label>Beginn</label><input type="time" id="wStart" value="'+(w.start_time||'')+'"></div>'+
@@ -3644,7 +3644,7 @@ function openSetModal(id){
     '<label style="margin-top:10px">Enthaltene Artikel</label><div id="sItemRows"></div>'+
     '<button class="btn g sm" style="margin-top:6px" onclick="addSetItemRow()">+ Artikel</button>'+
     '<label style="margin-top:14px">Foto <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional – ohne eigenes Foto zeigt die Homepage automatisch eine Collage aus den Hauptbildern der enthaltenen Artikel)</span></label>'+
-    '<div style="display:flex;gap:8px"><input id="sImg" value="'+esc(s.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upSet" onchange="uploadImg(this,\'sImg\',\'sFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upSet\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'sImg\',\'sFocal\')">Aus Pool</button></div>'+
+    '<div style="display:flex;gap:8px"><input id="sImg" value="'+esc(s.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upSet" onchange="uploadImg(this,\'sImg\',\'sFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upSet\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'sImg\',\'sFocal\',\'4/3\')">Aus Pool</button></div>'+
     focalWidget(s.image_url,s.image_focal,'sFocal','4/3')+
     '<label style="margin-top:12px"><input type="checkbox" id="sPub" style="width:auto;margin-right:6px" '+(s.public!==false?'checked':'')+'>Auf Homepage anzeigen (buchbar)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveSet(\''+(id||'')+'\')">Speichern</button>'+
@@ -4192,7 +4192,7 @@ function openLocModal(id){
       '<label style="margin:0"><input type="checkbox" id="lImgApprove" style="width:auto;margin-right:6px" '+(l.image_approved?'checked':'')+'>Rechte geprüft – Bild freigeben</label>'+
       '</div>'
       :'')+
-    '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\',\'lFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'lImg\',\'lFocal\')">Aus Pool</button></div>'+
+    '<label>Foto</label><div style="display:flex;gap:8px"><input id="lImg" value="'+esc(l.image_url||'')+'"><input type="file" accept="image/*" style="display:none" id="upLoc" onchange="uploadImg(this,\'lImg\',\'lFocal\')"><button class="btn g sm" onclick="document.getElementById(\'upLoc\').click()">Hochladen</button><button class="btn g sm" onclick="poolPick(\'lImg\',\'lFocal\',\'4/3\')">Aus Pool</button></div>'+
     (webPending?'<div class="mut sml" style="margin-top:4px">Hier ein eigenes Foto einfügen ersetzt den Internet-Vorschlag ohne weitere Prüfung.</div>':'')+
     focalWidget(l.image_url,l.image_focal,'lFocal','4/3')+
     '<label style="margin-top:12px"><input type="checkbox" id="lPub" style="width:auto;margin-right:6px" '+(l.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
@@ -5900,17 +5900,26 @@ function mediaPgToGallery(i){
   toast('Zur Galerie hinzugefügt ✓');
 }
 /* „Aus Pool"-Button neben Bildfeldern: setzt die URL und aktualisiert die Fokus-Vorschau */
-function poolPick(targetId,focalId){
+function poolPick(targetId,focalId,ratio){
   openMediaPicker(function(url){
     var el=document.getElementById(targetId);if(!el||!url)return;
     el.value=url;
     if(focalId){
       var box=document.getElementById(focalId+'-box');
-      if(box)box.style.backgroundImage="url('"+url+"')";
+      if(box)box.style.backgroundImage="url('"+url.replace(/['"\\]/g,'')+"')";
       else {
-        /* War vorher kein Bild gesetzt, gibt es das Widget noch gar nicht. */
-        var wrap=document.getElementById(targetId+'FocalWrap')||document.getElementById(focalId+'Wrap');
-        if(wrap)wrap.innerHTML=focalWidget(url,'50% 50%',focalId,'21/9');
+        /* War vorher kein Bild gesetzt, steht dort nur der Hinweistext von focalWidget -
+           dessen Kasten heißt "<focalId>-wrap". Den ersetzen wir durch das echte Widget. */
+        var wrap=document.getElementById(focalId+'-wrap')
+              ||document.getElementById(targetId+'FocalWrap');
+        if(wrap){
+          var neu=document.createElement('div');
+          neu.innerHTML=focalWidget(url,'50% 50%',focalId,ratio||'21/9');
+          /* Das versteckte Feld steckt im neuen Baustein - das alte muss weg. */
+          var alt=document.getElementById(focalId);
+          if(alt&&alt.parentNode&&alt!==wrap)alt.parentNode.removeChild(alt);
+          wrap.replaceWith(neu);
+        }
       }
     }
   });

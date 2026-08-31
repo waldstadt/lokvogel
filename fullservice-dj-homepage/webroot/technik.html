@@ -581,6 +581,10 @@ try{var _tp=JSON.stringify({p:location.pathname.split('/').pop()||'technik.html'
 navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
+/* Bildpfade und Positionsangaben landen in CSS-Deklarationen. Anfuehrungszeichen,
+   Klammern und Semikola dort erlauben es, die Deklaration zu verlassen und weitere
+   Regeln unterzuschieben - deshalb fliegen sie raus. */
+function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 var LEGAL={};
 
@@ -599,7 +603,7 @@ sfetch('site_content?select=key,value').then(function(rows){
   if(c.tech_hero){
     if(c.tech_hero.image){var hi=document.getElementById('heroImg');
       /* Anfuehrungszeichen im Pfad wuerden die CSS-Deklaration zerreissen. */
-      hi.style.backgroundImage='url("'+String(c.tech_hero.image).replace(/["\\]/g,'')+'")';
+      hi.style.backgroundImage='url("'+cssUrl(c.tech_hero.image)+'")';
       hi.style.backgroundPosition=c.tech_hero.image_focal||'center';}
     if(c.tech_hero.image||c.tech_hero.video){
       var th=document.querySelector('.hero');if(th)th.classList.add('hat-medien');
