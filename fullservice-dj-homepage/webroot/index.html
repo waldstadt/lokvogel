@@ -763,23 +763,16 @@ function renderBadges(rows,cfg,techSeite){
   ['mitglied','technik'].forEach(function(kind){
     var c=cfg[kind]||{},list=rows.filter(function(b){return (b.kind||'mitglied')===kind});
     var an=c.enabled!==false&&list.length&&(!techSeite||c.show_tech!==false);
-    var grp=document.getElementById('lgGrp'+kind.charAt(0).toUpperCase()+kind.slice(1));
+    var suf=kind.charAt(0).toUpperCase()+kind.slice(1);
+    var grp=document.getElementById('lgGrp'+suf);
     if(!grp)return;
     if(!an){grp.style.display='none';return}
-    var suf=kind.charAt(0).toUpperCase()+kind.slice(1);
     if(c.title)document.getElementById('lgTitle'+suf).textContent=c.title;
     var tx=document.getElementById('lgText'+suf);
     if(c.text)tx.textContent=c.text;else tx.style.display='none';
-    document.getElementById('lgRow'+suf).innerHTML=list.map(function(b){
-      var inner=b.image_url
-        ? '<img src="'+esc(b.image_url)+'" alt="'+esc(b.name)+'" loading="lazy" onerror="this.parentNode.innerHTML=\'<span class=&quot;lgt&quot;>'+esc(b.name).replace(/'/g,'')+'</span>\'">'
-        : '<span class="lgt">'+esc(b.name)+(b.subtitle?'<span class="lgs">'+esc(b.subtitle)+'</span>':'')+'</span>';
-      var cls='lg'+(b.light_bg?' light':'');
-      var t=b.subtitle?(b.name+' – '+b.subtitle):b.name;
-      return b.website
-        ? '<a class="'+cls+'" href="'+esc(b.website)+'" target="_blank" rel="noopener noreferrer" title="'+esc(t)+'">'+inner+'</a>'
-        : '<div class="'+cls+'" title="'+esc(t)+'">'+inner+'</div>';
-    }).join('');
+    var row=document.getElementById('lgRow'+suf);
+    row.innerHTML='';
+    list.forEach(function(b){row.appendChild(badgeEl(b))});
     grp.style.display='';any=true;
   });
   var sec=document.getElementById(BADGE_SEC);
@@ -787,6 +780,39 @@ function renderBadges(rows,cfg,techSeite){
     if(typeof showSection==='function')showSection(BADGE_SEC);
     else sec.style.display='';
   }
+}
+/* Kacheln werden als echte Knoten gebaut, nicht als HTML-Text: Namen kommen aus dem
+   Backoffice und dürfen nirgends als Markup interpretiert werden - auch nicht auf dem
+   Umweg über einen onerror-Handler, wenn die Bilddatei einmal fehlt. */
+function badgeName(b){
+  var span=document.createElement('span');
+  span.className='lgt';
+  span.textContent=b.name||'';
+  if(b.subtitle){
+    var sub=document.createElement('span');
+    sub.className='lgs';sub.textContent=b.subtitle;
+    span.appendChild(sub);
+  }
+  return span;
+}
+function badgeEl(b){
+  /* Nur echte Web-Adressen verlinken - "javascript:" im Linkfeld wäre sonst ausführbar. */
+  var url=String(b.website||'').trim();
+  var linkOk=/^https?:\/\//i.test(url);
+  var el=document.createElement(linkOk?'a':'div');
+  el.className='lg'+(b.light_bg?' light':'');
+  el.title=b.subtitle?(b.name+' – '+b.subtitle):(b.name||'');
+  if(linkOk){el.href=url;el.target='_blank';el.rel='noopener noreferrer'}
+  if(b.image_url){
+    var img=document.createElement('img');
+    img.src=b.image_url;img.alt=b.name||'';img.loading='lazy';
+    /* Fehlt die Datei, tritt der Name an die Stelle des Logos - inklusive Zusatz. */
+    img.addEventListener('error',function(){
+      el.innerHTML='';el.appendChild(badgeName(b));
+    });
+    el.appendChild(img);
+  } else el.appendChild(badgeName(b));
+  return el;
 }
 Promise.all([
   sfetch('badges?select=*&public=eq.true&order=sort'),
