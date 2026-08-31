@@ -127,7 +127,10 @@ nav.scrolled{border-bottom-color:var(--line)}
 
 /* PRICES strip */
 .price-strip{border:1px solid var(--line);border-radius:5px;background:linear-gradient(120deg,rgba(255,111,91,.09),transparent 55%),var(--card);padding:44px 42px;display:flex;justify-content:space-between;align-items:center;gap:32px;flex-wrap:wrap;margin-top:20px}
-.price-strip h3{font-size:26px;font-weight:700}
+.price-strip h3{font-size:26px;font-weight:700;overflow-wrap:anywhere}
+/* Auf schmalen Displays ist das 42px-Innenabstand-Paar breiter als das laengste Wort
+   vertraegt - Veranstaltungstechnik allein misst 282px. */
+@media(max-width:420px){.price-strip{padding:30px 20px}}
 .price-strip p{color:var(--mut);max-width:520px;font-size:15px}
 
 /* RENTAL */
