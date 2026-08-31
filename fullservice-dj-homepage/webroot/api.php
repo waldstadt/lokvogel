@@ -3993,6 +3993,24 @@ try {
     usort($files, fn($a, $b) => $b['mtime'] <=> $a['mtime']);
     out($files);
   }
+  /* Datei aus dem Medien-Pool wirklich loeschen. Streng auf den Upload-Ordner begrenzt:
+     nur ein Dateiname ohne Pfadanteile, nur bekannte Endungen, und der aufgeloeste Pfad
+     muss nachweislich im Upload-Ordner liegen - sonst waere das ein Loesch-Werkzeug fuer
+     den ganzen Server. */
+  if ($path === 'media/delete' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $name = basename((string)($body['name'] ?? ''));
+    $ordner = ((string)($body['source'] ?? '') === 'instagram') ? UPLOAD_DIR . '/instagram' : UPLOAD_DIR;
+    if ($name === '' || $name === '.' || $name === '..' || strpbrk($name, "/\\\0") !== false)
+      fail('Ungültiger Dateiname.', 400);
+    if (!preg_match('/\.(jpe?g|png|webp|gif|mp4|webm)$/i', $name)) fail('Dateityp nicht erlaubt.', 400);
+    $pfad = realpath($ordner . '/' . $name);
+    $basis = realpath($ordner);
+    if ($pfad === false || $basis === false || strpos($pfad, $basis . DIRECTORY_SEPARATOR) !== 0 || !is_file($pfad))
+      fail('Datei nicht gefunden.', 404);
+    if (!@unlink($pfad)) fail('Datei ließ sich nicht löschen (Schreibrechte prüfen).', 500);
+    out(['ok' => true, 'geloescht' => $name]);
+  }
   if ($path === 'instagram/sync' && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
     instagramSync(db());
