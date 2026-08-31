@@ -3880,6 +3880,96 @@ function ensureUploadDir(string $dir): void {
     "php_flag engine off\nRemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phar .cgi .pl\n" .
     "<FilesMatch \"\\.(php|phtml|php3|php4|php5|php7|phar|cgi|pl|py|svg|htm|html)\$\">\n  Require all denied\n</FilesMatch>\n");
 }
+/* ===== Medien-Pool: Ordner, Umbenennen, Archiv =====
+   Ordner sind echte Unterordner von uploads/. Beim Verschieben und Umbenennen wandern
+   die Verweise in der Datenbank mit, damit nirgends ein Loch entsteht. Das Archiv ist
+   bewusst anders: dorthin verschobene Dateien lassen ihre Verweise ins Leere laufen -
+   genau das ist der Sinn ("weg, aber zurueckholbar"), und davor wird gewarnt. */
+const MEDIA_ARCHIV = '_archiv';
+function mediaExtOk(string $name): bool {
+  return (bool)preg_match('/\.(jpe?g|png|webp|gif|mp4|webm)$/i', $name);
+}
+/* Dateiname ohne jeden Pfadanteil - alles andere waere ein Loesch- und
+   Ueberschreibwerkzeug fuer den ganzen Server. */
+function mediaName(string $name): string {
+  $n = basename($name);
+  if ($n === '' || $n === '.' || $n === '..' || strpbrk($n, "/\\\0") !== false)
+    fail('Ungültiger Dateiname.', 400);
+  if (!mediaExtOk($n)) fail('Dateityp nicht erlaubt.', 400);
+  return $n;
+}
+/* Ordnernamen bewusst eng: Kleinbuchstaben, Ziffern, Bindestrich. Reicht zum Sortieren
+   und kann nirgends ausbrechen. */
+function mediaFolderSlug(string $f): string {
+  $f = strtolower(trim($f));
+  $f = preg_replace('/[^a-z0-9-]+/', '-', $f);
+  return trim((string)$f, '-');
+}
+function mediaFolderDir(string $f, bool $archivErlaubt = false): string {
+  if ($f === '' ) return UPLOAD_DIR;
+  if ($f === MEDIA_ARCHIV) {
+    if (!$archivErlaubt) fail('Das Archiv ist kein normaler Ordner.', 400);
+    return UPLOAD_DIR . '/' . MEDIA_ARCHIV;
+  }
+  if ($f === 'instagram') return UPLOAD_DIR . '/instagram';
+  $slug = mediaFolderSlug($f);
+  if ($slug === '') fail('Ungültiger Ordnername.', 400);
+  return UPLOAD_DIR . '/' . $slug;
+}
+function mediaPfad(string $folder, string $name, bool $archivErlaubt = false): string {
+  $dir = mediaFolderDir($folder, $archivErlaubt);
+  $pfad = realpath($dir . '/' . mediaName($name));
+  $basis = realpath($dir);
+  if ($pfad === false || $basis === false || strpos($pfad, $basis . DIRECTORY_SEPARATOR) !== 0 || !is_file($pfad))
+    fail('Datei nicht gefunden.', 404);
+  return $pfad;
+}
+function mediaUrl(string $folder, string $name): string {
+  return 'uploads/' . ($folder !== '' ? $folder . '/' : '') . $name;
+}
+/* Verweise auf eine Datei in der ganzen Datenbank umschreiben. Die URLs sind eindeutig
+   genug (Zeitstempel im Namen), deshalb reicht ein einfaches Ersetzen ueber alle
+   Textspalten - sonst muesste jedes Feld einzeln gepflegt werden und ginge irgendwann
+   vergessen. */
+function mediaVerweiseUmschreiben(PDO $p, string $alt, string $neu): int {
+  if ($alt === '' || $alt === $neu) return 0;
+  $n = 0;
+  /* In den JSON-Spalten stehen die Schraegstriche maskiert (json_encode macht aus
+     "uploads/x.jpg" ein "uploads\/x.jpg"). Beide Schreibweisen ersetzen, sonst geht
+     genau der haeufigste Fall - Bilder in den Seiteninhalten - leer aus. */
+  $paare = [[$alt, $neu]];
+  $altJ = str_replace('/', '\\/', $alt);
+  if ($altJ !== $alt) $paare[] = [$altJ, str_replace('/', '\\/', $neu)];
+  foreach (TABLES as $t) {
+    try {
+      $cols = $p->query("PRAGMA table_info(\"$t\")")->fetchAll();
+    } catch (PDOException $e) { continue; }
+    foreach ($cols as $c) {
+      $typ = strtolower((string)($c['type'] ?? ''));
+      if ($typ !== '' && strpos($typ, 'text') === false && strpos($typ, 'char') === false) continue;
+      $spalte = (string)$c['name'];
+      foreach ($paare as [$a, $b]) {
+        try {
+          $st = $p->prepare("update \"$t\" set \"$spalte\" = replace(\"$spalte\", ?, ?) where \"$spalte\" like ?");
+          $st->execute([$a, $b, '%' . $a . '%']);
+          $n += $st->rowCount();
+        } catch (PDOException $e) {}
+      }
+    }
+  }
+  return $n;
+}
+/* Merkt sich, aus welchem Ordner eine archivierte Datei kam, damit "Wiederherstellen"
+   sie genau dorthin zurueckbringt. */
+function mediaArchivIndex(?array $neu = null): array {
+  $datei = UPLOAD_DIR . '/' . MEDIA_ARCHIV . '/_herkunft.json';
+  if ($neu !== null) {
+    @file_put_contents($datei, json_encode($neu, JSON_UNESCAPED_UNICODE));
+    return $neu;
+  }
+  if (!is_file($datei)) return [];
+  return json_decode((string)@file_get_contents($datei), true) ?: [];
+}
 function handleUpload(string $name): never {
   if (!currentUser()) fail('Nicht angemeldet.', 401);
   ensureUploadDir(UPLOAD_DIR);
@@ -3978,38 +4068,162 @@ try {
   /* Medienpool: Bilder und Videos im uploads-Ordner (inkl. gespiegelter Instagram-Bilder) – nur angemeldet */
   if ($path === 'media/list' && $method === 'GET') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
+    ensureUploadDir(UPLOAD_DIR);
+    $archiv = ((string)($_GET['archiv'] ?? '')) === '1';
     $files = [];
-    $scan = function (string $dir, string $prefix, string $source) use (&$files) {
+    $scan = function (string $dir, string $folder) use (&$files) {
+      if (!is_dir($dir)) return;
       foreach (glob($dir . '/*.{jpg,jpeg,png,webp,gif,mp4,webm}', GLOB_BRACE) ?: [] as $f)
         if (is_file($f)) {
           $ext = strtolower(pathinfo($f, PATHINFO_EXTENSION));
-          $files[] = ['name' => basename($f), 'url' => $prefix . basename($f),
-            'kind' => in_array($ext, ['mp4','webm']) ? 'video' : 'bild',
-            'size' => filesize($f), 'mtime' => filemtime($f), 'source' => $source];
+          $files[] = ['name' => basename($f), 'url' => mediaUrl($folder, basename($f)),
+            'folder' => $folder, 'kind' => in_array($ext, ['mp4','webm']) ? 'video' : 'bild',
+            'ext' => $ext, 'size' => filesize($f), 'mtime' => filemtime($f),
+            'source' => $folder === 'instagram' ? 'instagram' : 'upload'];
         }
     };
-    $scan(UPLOAD_DIR, 'uploads/', 'upload');
-    $scan(UPLOAD_DIR . '/instagram', 'uploads/instagram/', 'instagram');
+    if ($archiv) {
+      $scan(UPLOAD_DIR . '/' . MEDIA_ARCHIV, MEDIA_ARCHIV);
+      $herkunft = mediaArchivIndex();
+      foreach ($files as &$f) $f['herkunft'] = (string)($herkunft[$f['name']] ?? '');
+      unset($f);
+    } else {
+      $scan(UPLOAD_DIR, '');
+      foreach (glob(UPLOAD_DIR . '/*', GLOB_ONLYDIR) ?: [] as $d) {
+        $b = basename($d);
+        if ($b === MEDIA_ARCHIV) continue;
+        $scan($d, $b);
+      }
+    }
     usort($files, fn($a, $b) => $b['mtime'] <=> $a['mtime']);
-    out($files);
+    /* Ordnerliste immer mitliefern, auch die leeren - sonst verschwindet ein frisch
+       angelegter Ordner sofort wieder aus der Auswahl. */
+    $ordner = [];
+    foreach (glob(UPLOAD_DIR . '/*', GLOB_ONLYDIR) ?: [] as $d) {
+      $b = basename($d);
+      if ($b === MEDIA_ARCHIV) continue;
+      $ordner[] = $b;
+    }
+    sort($ordner);
+    $arch = glob(UPLOAD_DIR . '/' . MEDIA_ARCHIV . '/*.{jpg,jpeg,png,webp,gif,mp4,webm}', GLOB_BRACE) ?: [];
+    out(['files' => $files, 'folders' => $ordner, 'archiv_anzahl' => count($arch)]);
   }
-  /* Datei aus dem Medien-Pool wirklich loeschen. Streng auf den Upload-Ordner begrenzt:
-     nur ein Dateiname ohne Pfadanteile, nur bekannte Endungen, und der aufgeloeste Pfad
-     muss nachweislich im Upload-Ordner liegen - sonst waere das ein Loesch-Werkzeug fuer
-     den ganzen Server. */
+  if ($path === 'media/folder' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $slug = mediaFolderSlug((string)($body['name'] ?? ''));
+    if ($slug === '' || $slug === MEDIA_ARCHIV) fail('Bitte einen Ordnernamen aus Buchstaben und Ziffern angeben.', 400);
+    $dir = UPLOAD_DIR . '/' . $slug;
+    if (is_dir($dir)) fail('Diesen Ordner gibt es schon.', 409);
+    if (!@mkdir($dir, 0755, true)) fail('Ordner ließ sich nicht anlegen (Schreibrechte prüfen).', 500);
+    out(['ok' => true, 'name' => $slug]);
+  }
+  if ($path === 'media/folder/delete' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $slug = mediaFolderSlug((string)($body['name'] ?? ''));
+    if ($slug === '' || $slug === MEDIA_ARCHIV || $slug === 'instagram') fail('Dieser Ordner lässt sich nicht löschen.', 400);
+    $dir = UPLOAD_DIR . '/' . $slug;
+    if (!is_dir($dir)) fail('Ordner nicht gefunden.', 404);
+    if ((glob($dir . '/*') ?: []) !== []) fail('Der Ordner ist nicht leer – erst die Dateien verschieben oder archivieren.', 409);
+    if (!@rmdir($dir)) fail('Ordner ließ sich nicht löschen.', 500);
+    out(['ok' => true]);
+  }
+  /* Verschieben und Umbenennen ziehen die Verweise in der Datenbank mit. */
+  if ($path === 'media/move' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $ziel = (string)($body['target'] ?? '');
+    $zielDir = mediaFolderDir($ziel);
+    if (!is_dir($zielDir) && !@mkdir($zielDir, 0755, true)) fail('Zielordner nicht gefunden.', 404);
+    $p = db(); $n = 0;
+    foreach ((array)($body['items'] ?? []) as $it) {
+      $von = (string)($it['folder'] ?? '');
+      $name = mediaName((string)($it['name'] ?? ''));
+      if ($von === $ziel) continue;
+      $quelle = mediaPfad($von, $name);
+      $neu = $zielDir . '/' . $name;
+      if (is_file($neu)) fail('Im Zielordner liegt schon eine Datei mit dem Namen „' . $name . '“.', 409);
+      if (!@rename($quelle, $neu)) fail('Verschieben fehlgeschlagen.', 500);
+      mediaVerweiseUmschreiben($p, mediaUrl($von, $name), mediaUrl($ziel === '' ? '' : basename($zielDir), $name));
+      $n++;
+    }
+    out(['ok' => true, 'anzahl' => $n]);
+  }
+  if ($path === 'media/rename' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $folder = (string)($body['folder'] ?? '');
+    $alt = mediaName((string)($body['name'] ?? ''));
+    $ext = strtolower(pathinfo($alt, PATHINFO_EXTENSION));
+    /* Endung bleibt, was drin ist, aendert sich ja nicht - der Rest wird auf
+       unbedenkliche Zeichen gestutzt. */
+    $roh = pathinfo((string)($body['neu'] ?? ''), PATHINFO_FILENAME);
+    $roh = strtolower(preg_replace('/[^a-z0-9._-]+/i', '-', (string)$roh));
+    $roh = trim($roh, '-.');
+    if ($roh === '') fail('Bitte einen Namen angeben.', 400);
+    $neuName = $roh . '.' . $ext;
+    if ($neuName === $alt) out(['ok' => true, 'name' => $alt]);
+    $quelle = mediaPfad($folder, $alt, true);
+    $dir = dirname($quelle);
+    if (is_file($dir . '/' . $neuName)) fail('Eine Datei mit dem Namen gibt es hier schon.', 409);
+    if (!@rename($quelle, $dir . '/' . $neuName)) fail('Umbenennen fehlgeschlagen.', 500);
+    if ($folder !== MEDIA_ARCHIV)
+      mediaVerweiseUmschreiben(db(), mediaUrl($folder, $alt), mediaUrl($folder, $neuName));
+    else {
+      $idx = mediaArchivIndex();
+      if (isset($idx[$alt])) { $idx[$neuName] = $idx[$alt]; unset($idx[$alt]); mediaArchivIndex($idx); }
+    }
+    out(['ok' => true, 'name' => $neuName]);
+  }
+  if ($path === 'media/archive' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $dir = UPLOAD_DIR . '/' . MEDIA_ARCHIV;
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true)) fail('Archiv ließ sich nicht anlegen.', 500);
+    $idx = mediaArchivIndex(); $n = 0;
+    foreach ((array)($body['items'] ?? []) as $it) {
+      $folder = (string)($it['folder'] ?? '');
+      $name = mediaName((string)($it['name'] ?? ''));
+      $quelle = mediaPfad($folder, $name);
+      $ziel = $dir . '/' . $name;
+      /* Namenskollision im Archiv: Zeitstempel davor, damit nichts ueberschrieben wird. */
+      if (is_file($ziel)) { $name2 = time() . '-' . $name; $ziel = $dir . '/' . $name2; } else $name2 = $name;
+      if (!@rename($quelle, $ziel)) fail('Verschieben ins Archiv fehlgeschlagen.', 500);
+      $idx[$name2] = $folder;
+      $n++;
+    }
+    mediaArchivIndex($idx);
+    out(['ok' => true, 'anzahl' => $n]);
+  }
+  if ($path === 'media/restore' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $idx = mediaArchivIndex(); $n = 0;
+    foreach ((array)($body['items'] ?? []) as $it) {
+      $name = mediaName((string)($it['name'] ?? ''));
+      $quelle = mediaPfad(MEDIA_ARCHIV, $name, true);
+      $folder = (string)($idx[$name] ?? '');
+      $zielDir = UPLOAD_DIR . ($folder !== '' ? '/' . basename($folder) : '');
+      if (!is_dir($zielDir) && !@mkdir($zielDir, 0755, true)) $zielDir = UPLOAD_DIR;
+      $ziel = $zielDir . '/' . $name;
+      if (is_file($ziel)) fail('Am Ursprungsort liegt schon wieder eine Datei mit dem Namen „' . $name . '“.', 409);
+      if (!@rename($quelle, $ziel)) fail('Wiederherstellen fehlgeschlagen.', 500);
+      unset($idx[$name]);
+      $n++;
+    }
+    mediaArchivIndex($idx);
+    out(['ok' => true, 'anzahl' => $n]);
+  }
+  /* Endgueltig loeschen - nur aus dem Archiv. Aus dem Pool heraus geht ausschliesslich
+     der Weg ueber das Archiv, damit ein Fehlgriff nichts kostet. */
   if ($path === 'media/delete' && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
-    $name = basename((string)($body['name'] ?? ''));
-    $ordner = ((string)($body['source'] ?? '') === 'instagram') ? UPLOAD_DIR . '/instagram' : UPLOAD_DIR;
-    if ($name === '' || $name === '.' || $name === '..' || strpbrk($name, "/\\\0") !== false)
-      fail('Ungültiger Dateiname.', 400);
-    if (!preg_match('/\.(jpe?g|png|webp|gif|mp4|webm)$/i', $name)) fail('Dateityp nicht erlaubt.', 400);
-    $pfad = realpath($ordner . '/' . $name);
-    $basis = realpath($ordner);
-    if ($pfad === false || $basis === false || strpos($pfad, $basis . DIRECTORY_SEPARATOR) !== 0 || !is_file($pfad))
-      fail('Datei nicht gefunden.', 404);
-    if (!@unlink($pfad)) fail('Datei ließ sich nicht löschen (Schreibrechte prüfen).', 500);
-    out(['ok' => true, 'geloescht' => $name]);
+    $idx = mediaArchivIndex(); $n = 0;
+    $liste = isset($body['items']) ? (array)$body['items'] : [['name' => (string)($body['name'] ?? '')]];
+    foreach ($liste as $it) {
+      $name = mediaName((string)($it['name'] ?? ''));
+      $pfad = mediaPfad(MEDIA_ARCHIV, $name, true);
+      if (!@unlink($pfad)) fail('Datei ließ sich nicht löschen (Schreibrechte prüfen).', 500);
+      unset($idx[$name]);
+      $n++;
+    }
+    mediaArchivIndex($idx);
+    out(['ok' => true, 'anzahl' => $n]);
   }
   if ($path === 'instagram/sync' && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);

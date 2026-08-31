@@ -579,7 +579,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
   <div class="pg" id="pg-media">
     <div class="phead"><div><div class="pt">Medien-Pool</div><div class="ps">Alle hochgeladenen Bilder und Videos an einem Ort – hochladen und direkt verteilen</div></div>
       <div><input type="file" accept="image/*,video/mp4,video/webm" multiple style="display:none" id="mediaPgUp" onchange="mediaPgUpload(this)">
+      <button class="btn g" onclick="mpNeuerOrdner()">+ Ordner</button>
       <button class="btn" onclick="document.getElementById('mediaPgUp').click()">Hochladen</button></div></div>
+    <div id="mediaPgBar"></div>
+    <div id="mediaPgSel" class="sml" style="display:none;position:sticky;top:0;z-index:5;background:var(--cd2);border:1px solid var(--acc);border-radius:8px;padding:9px 12px;margin-bottom:12px;display:none;align-items:center;gap:10px;flex-wrap:wrap"></div>
     <div id="mediaPgGrid" class="mut sml">Lade Medien …</div>
   </div>
 
@@ -6494,7 +6497,9 @@ function openMediaPicker(cb,multi){
 function mpLoad(){
   fetch(API+'/media/list',{headers:{Authorization:'Bearer '+TOKEN}})
     .then(function(r){if(!r.ok)throw new Error('list');return r.json()})
-    .then(function(list){MEDIA_LIST=Array.isArray(list)?list:[];mpRenderGrid()})
+    /* Antwort ist jetzt ein Objekt mit Dateien und Ordnern - die alte Listenform
+       weiter annehmen, damit ein halb aktualisierter Stand nicht leer bleibt. */
+    .then(function(d){MEDIA_LIST=Array.isArray(d)?d:(d&&d.files)||[];mpRenderGrid()})
     .catch(function(){MEDIA_LIST=[];mpRenderGrid()});
 }
 function mpKb(n){n=Number(n)||0;return n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB'}
@@ -6511,7 +6516,7 @@ function mpRenderGrid(){
       (m.kind==='video'?'<span style="position:absolute;bottom:34px;left:6px;background:rgba(0,0,0,.65);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px">Video</span>':'')+
       (sel?'<span style="position:absolute;top:6px;right:6px;background:var(--acc);color:#141414;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:0;width:12px;height:12px"><polyline points="20 6 9 17 4 12"/></svg></span>':'')+
       '<div class="mut" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
-      '<div class="mut" style="font-size:10px">'+mpKb(m.size)+(m.source==='instagram'?' · Instagram':'')+'</div></div>';
+      '<div class="mut" style="font-size:10px">'+mpKb(m.size)+(m.folder?' · '+esc(m.folder):'')+(m.source==='instagram'?' · Instagram':'')+'</div></div>';
     }).join('')+'</div>';
 }
 function mpPick(i){
@@ -6535,46 +6540,214 @@ function mpUpload(inp){
   uploadFilesSeq(inp.files,null,function(urls){toast(urls.length+' Datei(en) hochgeladen ✓');mpLoad()});
   inp.value='';
 }
-/* ===== Medien-Pool als eigene Seite (Hochladen + Verteilen an gängige Bildfelder) ===== */
-var MEDIA_PG_LIST=[];
+/* ===== Medien-Pool: Ordner, Suche, Mehrfachauswahl, Archiv =====
+   Zum Aufraeumen gedacht, deshalb ohne Einbahnstrassen: aus dem Pool geht es nur ins
+   Archiv, endgueltig geloescht wird erst dort. Verschieben und Umbenennen ziehen die
+   Verweise auf der Seite mit, das Archivieren bewusst nicht - siehe api.php. */
+var MEDIA_PG_LIST=[],MEDIA_ORDNER=[],MEDIA_ARCHIV_N=0;
+var MP_ORDNER='',MP_SUCHE='',MP_ART='alle',MP_ARCHIV=false,MP_SEL={};
 function loadMediaPage(){
-  document.getElementById('mediaPgGrid').textContent='Lade Medien …';
-  fetch(API+'/media/list',{headers:{Authorization:'Bearer '+TOKEN}})
+  document.getElementById('mediaPgGrid').textContent='Lade Medien \u2026';
+  fetch(API+'/media/list'+(MP_ARCHIV?'?archiv=1':''),{headers:{Authorization:'Bearer '+TOKEN}})
     .then(function(r){if(!r.ok)throw new Error('list');return r.json()})
-    .then(function(list){MEDIA_PG_LIST=Array.isArray(list)?list:[];renderMediaPage()})
+    .then(function(d){
+      /* Aeltere Antwort war eine reine Liste - beides annehmen, dann macht ein halb
+         aktualisierter Server keinen leeren Pool. */
+      if(Array.isArray(d)){MEDIA_PG_LIST=d;MEDIA_ORDNER=[];MEDIA_ARCHIV_N=0}
+      else{MEDIA_PG_LIST=d.files||[];MEDIA_ORDNER=d.folders||[];MEDIA_ARCHIV_N=d.archiv_anzahl||0}
+      MP_SEL={};renderMediaPage();
+    })
     .catch(function(){MEDIA_PG_LIST=[];renderMediaPage()});
 }
 function mediaPgUpload(inp){
-  uploadFilesSeq(inp.files,null,function(urls){toast(urls.length+' Bild(er) hochgeladen ✓');loadMediaPage()});
+  var ziel=MP_ORDNER;
+  uploadFilesSeq(inp.files,null,function(urls){
+    if(ziel&&urls.length)
+      mpApi('media/move',{target:ziel,items:urls.map(function(u){return {folder:'',name:u.split('/').pop()}})})
+        .then(function(){toast(urls.length+' Datei(en) in \u201e'+ziel+'\u201c hochgeladen \u2713');loadMediaPage()})
+        .catch(function(e){toast(e.message,1);loadMediaPage()});
+    else{toast(urls.length+' Datei(en) hochgeladen \u2713');loadMediaPage()}
+  });
   inp.value='';
 }
+function mpApi(pfad,body){
+  return fetch(API+'/'+pfad,{method:'POST',
+    headers:{'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},
+    body:JSON.stringify(body||{})})
+    .then(function(r){return r.json().catch(function(){return {}}).then(function(j){
+      if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j})});
+}
+function mpGefiltert(){
+  var q=MP_SUCHE.toLowerCase();
+  return MEDIA_PG_LIST.filter(function(m){
+    if(!MP_ARCHIV&&(m.folder||'')!==MP_ORDNER)return false;
+    if(MP_ART==='bild'&&m.kind!=='bild')return false;
+    if(MP_ART==='video'&&m.kind!=='video')return false;
+    if(MP_ART!=='alle'&&MP_ART!=='bild'&&MP_ART!=='video'&&m.ext!==MP_ART)return false;
+    if(q&&m.name.toLowerCase().indexOf(q)<0)return false;
+    return true;
+  });
+}
+function mpSetzen(feld,wert){
+  if(feld==='ordner')MP_ORDNER=wert;
+  if(feld==='art')MP_ART=wert;
+  if(feld==='archiv'){MP_ARCHIV=!!wert;MP_SEL={};loadMediaPage();return}
+  MP_SEL={};renderMediaPage();
+}
+function mpSuche(el){MP_SUCHE=el.value;renderMediaPage()}
+function mpArten(){
+  var vorhanden={};
+  MEDIA_PG_LIST.forEach(function(m){if(m.ext)vorhanden[m.ext]=true});
+  return Object.keys(vorhanden).sort();
+}
+function renderMediaBar(){
+  var el=document.getElementById('mediaPgBar');if(!el)return;
+  var ordnerOpts='<option value="">Ohne Ordner</option>'+
+    MEDIA_ORDNER.map(function(o){return '<option value="'+esc(o)+'"'+(o===MP_ORDNER?' selected':'')+'>'+esc(o)+'</option>'}).join('');
+  var artOpts=[['alle','Alle Dateien'],['bild','Nur Bilder'],['video','Nur Videos']]
+    .concat(mpArten().map(function(e){return [e,'Nur .'+e]}))
+    .map(function(a){return '<option value="'+esc(a[0])+'"'+(a[0]===MP_ART?' selected':'')+'>'+esc(a[1])+'</option>'}).join('');
+  el.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+
+    (MP_ARCHIV
+      ? '<button class="btn g sm" onclick="mpSetzen(\'archiv\',false)">\u2190 Zur\u00fcck zum Pool</button>'+
+        '<b style="color:var(--wh)">Archiv</b>'
+      : '<select style="width:auto;min-width:170px" onchange="mpSetzen(\'ordner\',this.value)">'+ordnerOpts+'</select>'+
+        (MP_ORDNER?'<button class="btn g sm" onclick="mpOrdnerLoeschen()">Ordner l\u00f6schen</button>':''))+
+    '<select style="width:auto;min-width:140px" onchange="mpSetzen(\'art\',this.value)">'+artOpts+'</select>'+
+    '<input type="text" placeholder="Nach Dateiname suchen \u2026" value="'+esc(MP_SUCHE)+'" oninput="mpSuche(this)" style="width:auto;flex:1;min-width:180px">'+
+    '<button class="btn g sm" onclick="mpAlle()">Alle ausw\u00e4hlen</button>'+
+    (MP_ARCHIV?'':'<button class="btn g sm" onclick="mpSetzen(\'archiv\',true)">Archiv ('+MEDIA_ARCHIV_N+')</button>')+
+    '</div>';
+}
+function mpSelListe(){
+  return Object.keys(MP_SEL).filter(function(k){return MP_SEL[k]})
+    .map(function(k){var i=k.indexOf('|');return {folder:k.slice(0,i),name:k.slice(i+1)}});
+}
+function mpKey(m){return (m.folder||'')+'|'+m.name}
+function mpToggle(k,an){MP_SEL[k]=an;renderMediaPage()}
+function mpAlle(){
+  var liste=mpGefiltert();
+  var allesAn=liste.length&&liste.every(function(m){return MP_SEL[mpKey(m)]});
+  liste.forEach(function(m){MP_SEL[mpKey(m)]=!allesAn});
+  renderMediaPage();
+}
+function renderMediaSel(){
+  var el=document.getElementById('mediaPgSel');if(!el)return;
+  var sel=mpSelListe();
+  if(!sel.length){el.style.display='none';return}
+  el.style.display='flex';
+  var ordnerOpts=MEDIA_ORDNER.map(function(o){return '<option value="'+esc(o)+'">'+esc(o)+'</option>'}).join('');
+  el.innerHTML='<b style="color:var(--wh)">'+sel.length+' ausgew\u00e4hlt</b>'+
+    (MP_ARCHIV
+      ? '<button class="btn g sm" onclick="mpWiederherstellen()">Wiederherstellen</button>'+
+        '<button class="btn sm r" onclick="mpEndgueltig()">Endg\u00fcltig l\u00f6schen</button>'
+      : '<select id="mpZiel" style="width:auto;min-width:150px"><option value="">(kein Ordner)</option>'+ordnerOpts+'</select>'+
+        '<button class="btn g sm" onclick="mpVerschieben()">Verschieben</button>'+
+        '<button class="btn sm r" onclick="mpArchivieren()">Ins Archiv</button>')+
+    '<a class="sml" onclick="MP_SEL={};renderMediaPage()">Auswahl aufheben</a>';
+}
 function renderMediaPage(){
+  renderMediaBar();renderMediaSel();
   var g=document.getElementById('mediaPgGrid');if(!g)return;
-  if(!MEDIA_PG_LIST.length){g.innerHTML='<span class="mut">Noch nichts im Pool – über „Hochladen" landen die ersten Dateien hier.</span>';return}
+  var liste=mpGefiltert();
+  if(!liste.length){
+    g.innerHTML='<span class="mut">'+(MEDIA_PG_LIST.length
+      ?'Nichts gefunden \u2013 andere Suche, anderer Ordner oder andere Dateiart.'
+      :(MP_ARCHIV?'Das Archiv ist leer.':'Noch nichts im Pool \u2013 \u00fcber \u201eHochladen\u201c landen die ersten Dateien hier.'))+'</span>';
+    return;
+  }
   g.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px">'+
-    MEDIA_PG_LIST.map(function(m,i){
-      var vid=m.kind==='video';
-      return '<div class="card" style="padding:8px">'+
+    liste.map(function(m){
+      var i=MEDIA_PG_LIST.indexOf(m),vid=m.kind==='video',k=mpKey(m),an=!!MP_SEL[k];
+      var wo=MP_ARCHIV?[]:mediaUsage(m.url);
+      return '<div class="card" style="padding:8px;position:relative'+(an?';outline:2px solid var(--acc)':'')+'">'+
+      '<label style="position:absolute;top:12px;left:12px;z-index:2;background:rgba(0,0,0,.6);border-radius:4px;padding:3px;margin:0;cursor:pointer">'+
+        '<input type="checkbox" style="width:16px;height:16px;margin:0" '+(an?'checked':'')+' onchange="mpToggle(\''+k.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',this.checked)"></label>'+
       (vid
-        /* Ohne autoplay bleibt die Kachel weiss, bis jemand abspielt - das erste Bild
-           soll aber gleich zu sehen sein. */
         ? '<video src="'+esc(m.url)+'" muted loop autoplay playsinline preload="metadata" controls style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px;background:#000"></video>'
         : '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px">')+
       '<div class="mut sml" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
-      '<div class="mut sml" style="margin-bottom:8px">'+mpKb(m.size)+(vid?' · Video':'')+(m.source==='instagram'?' · Instagram':'')+'</div>'+
-      (function(){var wo=mediaUsage(m.url);
-        return wo.length?'<div class="sml" style="color:var(--yel);margin-bottom:6px">In Verwendung: '+esc(wo.join(', '))+'</div>':''})()+
+      '<div class="mut sml" style="margin-bottom:8px">'+mpKb(m.size)+' \u00b7 .'+esc(m.ext||'')+
+        (m.folder&&!MP_ARCHIV?' \u00b7 '+esc(m.folder):'')+
+        (MP_ARCHIV&&m.herkunft?' \u00b7 aus \u201e'+esc(m.herkunft)+'\u201c':'')+'</div>'+
+      (wo.length?'<div class="sml" style="color:var(--yel);margin-bottom:6px">In Verwendung: '+esc(wo.join(', '))+'</div>':'')+
       '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-      '<button class="btn g sm" onclick="mediaPgCopy('+i+')">URL kopieren</button>'+
-      /* Videos gehoeren nicht in die Fotogalerie - die zeigt nur Bilder. */
-      (vid?'':'<button class="btn g sm" onclick="mediaPgToGallery('+i+')">Zur Galerie</button>')+
-      '<button class="btn sm r" onclick="mediaPgDelete('+i+')">Löschen</button>'+
+      (MP_ARCHIV
+        ? '<button class="btn g sm" onclick="mpWiederherstellen('+i+')">Zur\u00fcckholen</button>'+
+          '<button class="btn sm r" onclick="mpEndgueltig('+i+')">L\u00f6schen</button>'
+        : '<button class="btn g sm" onclick="mediaPgCopy('+i+')">URL kopieren</button>'+
+          (vid?'':'<button class="btn g sm" onclick="mediaPgToGallery('+i+')">Zur Galerie</button>')+
+          '<button class="btn g sm" onclick="mpUmbenennen('+i+')">Umbenennen</button>'+
+          '<button class="btn sm r" onclick="mpArchivieren('+i+')">Ins Archiv</button>')+
       '</div></div>';
     }).join('')+'</div>';
 }
+function mpNeuerOrdner(){
+  var n=prompt('Name des neuen Ordners (Kleinbuchstaben, Ziffern, Bindestrich):');
+  if(!n)return;
+  mpApi('media/folder',{name:n}).then(function(j){toast('Ordner \u201e'+j.name+'\u201c angelegt \u2713');MP_ORDNER=j.name;loadMediaPage()})
+    .catch(function(e){toast(e.message,1)});
+}
+function mpOrdnerLoeschen(){
+  if(!MP_ORDNER)return;
+  if(!confirm('Ordner \u201e'+MP_ORDNER+'\u201c l\u00f6schen? Das geht nur, wenn er leer ist.'))return;
+  mpApi('media/folder/delete',{name:MP_ORDNER}).then(function(){toast('Ordner gel\u00f6scht \u2713');MP_ORDNER='';loadMediaPage()})
+    .catch(function(e){toast(e.message,1)});
+}
+function mpUmbenennen(i){
+  var m=MEDIA_PG_LIST[i];if(!m)return;
+  var ohne=m.name.replace(/\.[^.]+$/,'');
+  var neu=prompt('Neuer Name f\u00fcr \u201e'+m.name+'\u201c (ohne Endung):',ohne);
+  if(neu===null)return;
+  mpApi('media/rename',{folder:m.folder||'',name:m.name,neu:neu})
+    .then(function(j){toast('Umbenannt in \u201e'+j.name+'\u201c \u2713 \u2013 Verweise auf der Seite wurden mitgezogen.');loadAll();loadMediaPage()})
+    .catch(function(e){toast(e.message,1)});
+}
+function mpVerschieben(){
+  var sel=mpSelListe();if(!sel.length)return;
+  var ziel=v('mpZiel')||'';
+  mpApi('media/move',{target:ziel,items:sel})
+    .then(function(j){toast(j.anzahl+' Datei(en) verschoben \u2713 \u2013 Verweise wurden mitgezogen.');loadAll();loadMediaPage()})
+    .catch(function(e){toast(e.message,1)});
+}
+/* Ohne Index: die ganze Auswahl. Mit Index: nur diese eine Kachel. */
+function mpZiele(i){
+  if(i==null)return mpSelListe();
+  var m=MEDIA_PG_LIST[i];return m?[{folder:m.folder||'',name:m.name}]:[];
+}
+function mpArchivieren(i){
+  var sel=mpZiele(i);if(!sel.length)return;
+  var benutzt=[];
+  sel.forEach(function(it){
+    var m=MEDIA_PG_LIST.find(function(x){return x.name===it.name&&(x.folder||'')===it.folder});
+    if(m)mediaUsage(m.url).forEach(function(w){if(benutzt.indexOf(w)<0)benutzt.push(w)});
+  });
+  var frage=sel.length===1?('\u201e'+sel[0].name+'\u201c ins Archiv verschieben?'):(sel.length+' Dateien ins Archiv verschieben?');
+  frage+='\n\nIm Archiv kannst du sie jederzeit zur\u00fcckholen oder endg\u00fcltig l\u00f6schen.';
+  if(benutzt.length)frage+='\n\nAchtung: noch in Verwendung ('+benutzt.join(', ')+
+    '). Dort bleibt bis zum Zur\u00fcckholen eine leere Stelle.';
+  if(!confirm(frage))return;
+  mpApi('media/archive',{items:sel})
+    .then(function(j){toast(j.anzahl+' ins Archiv verschoben \u2713');loadMediaPage()})
+    .catch(function(e){toast(e.message,1)});
+}
+function mpWiederherstellen(i){
+  var sel=mpZiele(i);if(!sel.length)return;
+  mpApi('media/restore',{items:sel})
+    .then(function(j){toast(j.anzahl+' wiederhergestellt \u2713');loadMediaPage()})
+    .catch(function(e){toast(e.message,1)});
+}
+function mpEndgueltig(i){
+  var sel=mpZiele(i);if(!sel.length)return;
+  var frage=sel.length===1?('\u201e'+sel[0].name+'\u201c endg\u00fcltig l\u00f6schen?'):(sel.length+' Dateien endg\u00fcltig l\u00f6schen?');
+  if(!confirm(frage+'\n\nDas l\u00e4sst sich nicht r\u00fcckg\u00e4ngig machen.'))return;
+  mpApi('media/delete',{items:sel})
+    .then(function(j){toast(j.anzahl+' gel\u00f6scht \u2713');loadMediaPage()})
+    .catch(function(e){toast(e.message,1)});
+}
 /* Wo steckt diese Datei noch drin? Statt jedes Feld einzeln abzuklappern wird der
    geladene Datenbestand nach dem Dateinamen durchsucht - das findet auch Stellen, die
-   erst spaeter dazukommen, und warnt vor einem Loeschen mit Loch auf der Seite. */
+   erst spaeter dazukommen, und warnt vor einem Archivieren mit Loch auf der Seite. */
 var MEDIA_ORTE=[['content','Seiteninhalte'],['equipment','Technik'],['products','Produkte'],
   ['packages','Pakete'],['wsEvents','Workshops'],['equipmentSets','Sets'],['locations','Locations'],
   ['friends','Freunde & Empfehlungen'],['badges','Logos'],['reports','Veranstaltungsberichte'],
@@ -6591,26 +6764,10 @@ function mediaUsage(url){
   try{if(JSON.stringify(S||{}).indexOf(name)>=0)out.push('Einstellungen')}catch(e){}
   return out;
 }
-function mediaPgDelete(i){
-  var m=MEDIA_PG_LIST[i];if(!m)return;
-  var wo=mediaUsage(m.url);
-  var frage='„'+m.name+'" endgültig vom Server löschen?';
-  if(wo.length)frage+='\n\nAchtung: Die Datei wird noch verwendet in: '+wo.join(', ')+
-    '.\nDort bleibt danach eine leere Stelle, bis du ein anderes Bild einsetzt.';
-  else frage+='\n\nDie Datei wird aktuell nirgends verwendet.';
-  frage+='\n\nDas lässt sich nicht rückgängig machen.';
-  if(!confirm(frage))return;
-  fetch(API+'/media/delete',{method:'POST',
-    headers:{'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},
-    body:JSON.stringify({name:m.name,source:m.source})})
-    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j})})
-    .then(function(){toast('Gelöscht ✓');loadMediaPage()})
-    .catch(function(e){toast('Fehler: '+e.message,1)});
-}
 function mediaPgCopy(i){
   var m=MEDIA_PG_LIST[i];if(!m)return;
-  navigator.clipboard.writeText(m.url).then(function(){toast('URL kopiert ✓ – zum Einfügen in ein Bildfeld bereit.')},
-    function(){toast('Kopieren nicht möglich – URL: '+m.url,1)});
+  navigator.clipboard.writeText(m.url).then(function(){toast('URL kopiert \u2713 \u2013 zum Einf\u00fcgen in ein Bildfeld bereit.')},
+    function(){toast('Kopieren nicht m\u00f6glich \u2013 URL: '+m.url,1)});
 }
 function mediaPgToGallery(i){
   var m=MEDIA_PG_LIST[i];if(!m)return;
@@ -6618,7 +6775,7 @@ function mediaPgToGallery(i){
   if(GAL_IMAGES.indexOf(m.url)>=0){toast('Ist schon in der Galerie.');return}
   GAL_IMAGES.push(m.url);
   upsertContent('gallery',Object.assign({},CACHE.content.gallery||{},{images:GAL_IMAGES.slice()}));
-  toast('Zur Galerie hinzugefügt ✓');
+  toast('Zur Galerie hinzugef\u00fcgt \u2713');
 }
 /* „Aus Pool"-Button neben Bildfeldern: setzt die URL und aktualisiert die Fokus-Vorschau */
 function poolPick(targetId,focalId,ratio){
