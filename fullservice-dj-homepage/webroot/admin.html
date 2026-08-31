@@ -564,6 +564,9 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <label>Button-Text</label><input id="cHeroCta">
           <label>Hintergrundbild</label><div style="display:flex;gap:8px"><input id="cHeroImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upHero" onchange="uploadImg(this,'cHeroImg','cHeroFocal')"><button class="btn g sm" onclick="document.getElementById('upHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cHeroImg','cHeroFocal')">Aus Pool</button></div>
           <div id="cHeroFocalWrap"></div>
+          <label style="margin-top:12px">Hintergrundvideo <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional, mp4 oder webm, max. 24 MB)</span></label><div style="display:flex;gap:8px"><input id="cHeroVid" placeholder="leer lassen für nur Bild"><input type="file" accept="video/mp4,video/webm" style="display:none" id="upHeroVid" onchange="uploadHeroVideo(this)"><button class="btn g sm" onclick="document.getElementById('upHeroVid').click()">Hochladen</button><button class="btn g sm" onclick="document.getElementById('cHeroVid').value='';heroVidHint()">Entfernen</button></div>
+          <div class="mut sml" style="margin-top:6px">Läuft stumm in Endlosschleife hinter der Überschrift. Das Hintergrundbild bleibt das Standbild – es wird gezeigt, solange das Video lädt, und ersetzt es bei „Bewegung reduzieren" oder im Mobilfunknetz. Kurz halten (8 bis 15 Sekunden) und vorher komprimieren: Jeder Besucher lädt es mit.</div>
+          <div id="cHeroVidHint" class="sml" style="margin-top:6px"></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('hero')">Speichern</button></div>
           <div id="vb_hero"></div></div>
         <div class="card"><h3>Über mich</h3>
@@ -3683,6 +3686,7 @@ function renderCms(){
   document.getElementById('cHeroText').value=g('hero','text');
   document.getElementById('cHeroCta').value=g('hero','cta');
   document.getElementById('cHeroImg').value=g('hero','image');
+  document.getElementById('cHeroVid').value=g('hero','video')||'';heroVidHint();
   document.getElementById('cHeroFocalWrap').innerHTML=focalWidget(g('hero','image'),g('hero','image_focal'),'cHeroFocal','21/9');
   document.getElementById('cAboutTitle').value=g('about','title');
   document.getElementById('cAboutText').value=g('about','text');
@@ -3761,7 +3765,7 @@ function saveTheme(){
 /* Baut den Wert eines site_content-Keys aus dem aktuellen Formularstand –
    genutzt von saveContent (live speichern) UND von den Versionen (Entwurf sichern). */
 function buildContentVal(key){
-  if(key==='hero')return {title:'DJ Lauschgift',subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal')};
+  if(key==='hero')return {title:'DJ Lauschgift',subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal'),video:v('cHeroVid')};
   if(key==='about')return {title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg'),image_focal:v('cAboutFocal'),
     gear:v('cAboutGear').split(',').map(function(s){return s.trim()}).filter(Boolean)};
   if(key==='contact')return {title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
@@ -3795,6 +3799,29 @@ function upsertContent(key,val){
   api('site_content',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:key,value:val}})
     .then(function(){CACHE.content[key]=val;toast('„'+key+'“ gespeichert ✓ – Homepage ist aktualisiert.')})
     .catch(function(e){toast(e.message,1)});
+}
+/* Header-Video hochladen. Eigene Funktion statt uploadImg: Videos brauchen kein
+   Bildschnittfenster, dafuer eine deutliche Rueckmeldung zur Dateigroesse. */
+function uploadHeroVideo(inp){
+  var f=inp.files[0];if(!f)return;
+  if(f.size>24*1024*1024){
+    toast('Das Video ist '+(f.size/1048576).toFixed(1)+' MB groß – maximal 24 MB. Bitte kürzer schneiden oder stärker komprimieren.',1);
+    inp.value='';return;
+  }
+  toast('Video wird hochgeladen …');
+  var name=Date.now()+'-'+f.name.toLowerCase().replace(/[^a-z0-9.]+/g,'-');
+  fetch(API+'/storage/'+encodeURIComponent(name),{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:f})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||('Upload fehlgeschlagen ('+r.status+')'));return j})})
+    .then(function(j){document.getElementById('cHeroVid').value=j.url;heroVidHint();
+      toast('Video hochgeladen ✓ – „Speichern" nicht vergessen.');})
+    .catch(function(e){toast(e.message,1)});
+  inp.value='';
+}
+function heroVidHint(){
+  var el=document.getElementById('cHeroVidHint');if(!el)return;
+  var u=v('cHeroVid');
+  el.innerHTML=u?('<video src="'+esc(u)+'" muted loop autoplay playsinline style="max-width:280px;width:100%;border-radius:4px;display:block"></video>')
+    :'<span class="mut">Kein Video hinterlegt – der Header zeigt nur das Bild.</span>';
 }
 function uploadImg(inp,targetId,previewId){
   var f=inp.files[0];if(!f)return;
@@ -5820,7 +5847,7 @@ function fillContent(key,val){
   val=val||{};
   function set(id,x){var el=document.getElementById(id);if(el)el.value=x==null?'':x}
   if(key==='hero'){
-    set('cHeroSub',val.subtitle);set('cHeroText',val.text);set('cHeroCta',val.cta);set('cHeroImg',val.image);
+    set('cHeroSub',val.subtitle);set('cHeroText',val.text);set('cHeroCta',val.cta);set('cHeroImg',val.image);set('cHeroVid',val.video||'');
     document.getElementById('cHeroFocalWrap').innerHTML=focalWidget(val.image,val.image_focal,'cHeroFocal','21/9');
   }
   if(key==='about'){

@@ -11,7 +11,7 @@
  *                                    (erster Login legt den Admin-Account an)
  *   GET/POST/PATCH/DELETE api.php/rest/{tabelle}?col=eq.X&order=col.desc…
  *                                    (PostgREST-Teilmenge, wie vom Frontend genutzt)
- *   POST api.php/storage/{dateiname} (Bild-Upload, nur mit Login) -> {url}
+ *   POST api.php/storage/{dateiname} (Bild- oder Video-Upload, nur mit Login) -> {url}
  *
  * Öffentlich ohne Login: Website-Inhalte lesen, Anfragen einreichen.
  * Alles andere nur mit gültigem Token.
@@ -26,6 +26,9 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
+/* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
+   ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
+const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
 const SCHEMA_VERSION = 70;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
@@ -3747,13 +3750,25 @@ function handleUpload(string $name): never {
   if (!currentUser()) fail('Nicht angemeldet.', 401);
   ensureUploadDir(UPLOAD_DIR);
   $raw = file_get_contents('php://input');
-  if (!$raw || strlen($raw) > MAX_UPLOAD) fail('Datei fehlt oder ist zu groß (max. 8 MB).');
+  if (!$raw) fail('Datei fehlt.');
   $name = strtolower(preg_replace('/[^a-z0-9._-]+/i', '-', basename($name)));
   $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-  if (!in_array($ext, ['jpg','jpeg','png','webp','gif','avif'])) fail('Nur Bilddateien erlaubt.');
-  $info = @getimagesizefromstring($raw);
-  if ($info === false) fail('Keine gültige Bilddatei.');
-  $raw = processImage($raw);
+  $video = in_array($ext, ['mp4','webm']);
+  if (!$video && !in_array($ext, ['jpg','jpeg','png','webp','gif','avif']))
+    fail('Nur Bilder (jpg, png, webp, gif, avif) oder Videos (mp4, webm) erlaubt.');
+  if ($video) {
+    if (strlen($raw) > MAX_UPLOAD_VIDEO)
+      fail('Das Video ist zu groß (max. 24 MB). Kürzer schneiden oder stärker komprimieren – es muss von jedem Besucher geladen werden.');
+    /* Inhalt prüfen, nicht nur die Endung: eine umbenannte Datei darf hier nicht durchrutschen. */
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($raw);
+    if (!is_string($mime) || !str_starts_with($mime, 'video/'))
+      fail('Das ist keine gültige Videodatei.');
+  } else {
+    if (strlen($raw) > MAX_UPLOAD) fail('Die Datei ist zu groß (max. 8 MB).');
+    $info = @getimagesizefromstring($raw);
+    if ($info === false) fail('Keine gültige Bilddatei.');
+    $raw = processImage($raw);
+  }
   file_put_contents(UPLOAD_DIR . '/' . $name, $raw);
   out(['url' => 'uploads/' . $name], 201);
 }
