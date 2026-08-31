@@ -57,6 +57,11 @@ th.num{text-align:right}
 .pos-desc .info{display:inline-block;margin-left:6px;width:17px;height:17px;line-height:17px;text-align:center;border-radius:50%;background:rgba(255,111,91,.15);color:var(--acc);font-size:11px;font-weight:700;cursor:help}
 .tip{display:none;position:absolute;left:0;top:100%;z-index:20;background:var(--card2);border:1px solid var(--acc);border-radius:4px;padding:12px 14px;font-size:13px;color:var(--txt);max-width:380px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-top:4px}
 .pos-desc:hover .tip,.pos-desc.open .tip{display:block}
+/* Auf schmalen Displays war die Sprechblase nur so breit wie die Positionsspalte und
+   ueberlappte die naechste Zeile - dort ueber die volle Breite und im Fluss. */
+@media(max-width:640px){
+  .pos-desc .tip{position:static;max-width:none;width:100%;margin-top:8px;box-shadow:none}
+}
 .totals td{border-bottom:none;padding:5px 8px}
 .totals .grand{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--acc)}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
@@ -787,6 +792,9 @@ function planRow(bookingId,key,path,label,cfg){
     '<div id="ed_'+key+'" hidden style="margin-top:4px">'+box+
     '<div style="margin-top:4px"><button class="btn" style="padding:6px 12px" onclick="planSubmit(\''+key+'\')">Vorschlag senden</button> <span id="ok_'+key+'" style="color:#9fd49f;font-size:13px;display:none">Vorschlag gesendet ✓</span></div></div></div>';
 }
+/* Merkt sich, welche Felder in dieser Sitzung schon abgeschickt wurden - ihr Inhalt
+   darf ein spaeteres Neuladen nicht mehr blockieren. */
+var PLAN_GESENDET={};
 function planToggle(key){var el=document.getElementById('ed_'+key);el.hidden=!el.hidden}
 function planSubmit(key){
   var st=PLAN_STATE[key];if(!st)return;
@@ -805,6 +813,23 @@ function planSubmit(key){
            gesagt - sonst denkt er, alles sei angekommen. */
         if(res.j.hinweis){ok.textContent=res.j.hinweis;ok.style.color='var(--acc)'}
         ok.style.display='';
+      }
+      /* Nach dem Speichern wurde bisher immer die ganze Seite neu geladen - hatte der
+         Kunde parallel ein weiteres Feld getippt und noch nicht abgeschickt, war die
+         Eingabe kommentarlos weg. Also nur neu laden, wenn nirgends sonst etwas steht,
+         das noch nicht gespeichert wurde. Gilt fuer beide Formen: die Eingabefelder
+         leerer Angaben und die aufgeklappten Vorschlagsfelder. */
+      PLAN_GESENDET[key]=true;
+      var offen=[].slice.call(document.querySelectorAll('[id^="in_"]')).some(function(inp){
+        var k=inp.id.slice(3);
+        if(k===key||PLAN_GESENDET[k])return false;
+        if(String(inp.value||'').trim()==='')return false;
+        var ed=document.getElementById('ed_'+k);
+        return ed?!ed.hidden:true;   /* Vorschlagsfeld nur, wenn es aufgeklappt ist */
+      });
+      if(offen){
+        var el=document.getElementById('ed_'+key);if(el)el.hidden=true;
+        return;
       }
       setTimeout(function(){loadAccount()},res.j.hinweis?4000:1200);
     }).catch(function(){alert('Verbindungsfehler – bitte später erneut versuchen.')});

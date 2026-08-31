@@ -9,7 +9,10 @@
 .ic{width:15px;height:15px;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;margin-right:7px;opacity:.85}
 
 :root{--bg:#0f1012;--cd:#17181c;--cd2:#1e1f24;--bdr:#2a2c32;--acc:#ff6f5b;--acch:#ff8d7c;
---wh:#ecebe6;--gl:#8f8c84;--gll:#b0ada4;--red:#d05555;--grn:#5aa05a;--blu:#5588dd;--yel:#d8a839}
+--wh:#ecebe6;--gl:#8f8c84;--gll:#b0ada4;--red:#d05555;
+/* Aufgehellt fuer kleine Schrift: das kraeftige Rot kam auf den Karten nur auf 4,0:1,
+   gefordert sind 4,5:1. Bleibt fuer Flaechen und Knoepfe bei --red. */
+--redl:#e58080;--grn:#5aa05a;--blu:#5588dd;--yel:#d8a839}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--wh);font-size:13px;line-height:1.5}
 a{color:var(--acc);text-decoration:none;cursor:pointer}
 h3{font-size:14px;margin-bottom:10px}
@@ -20,7 +23,7 @@ button{font-family:inherit}
 .lb{background:var(--cd);border:1px solid var(--bdr);padding:44px 38px;max-width:360px;width:100%}
 .lb h1{font-size:19px;margin-bottom:2px}.lb h1 b{color:var(--acc)}
 .lb .s{font-size:11px;color:var(--gl);margin-bottom:26px}
-.lerr{color:var(--red);font-size:11px;margin-top:6px;display:none}
+.lerr{color:var(--redl);font-size:11px;margin-top:6px;display:none}
 
 /* Layout */
 .app{display:none}.app.v{display:flex;min-height:100vh}
@@ -48,7 +51,7 @@ textarea{min-height:70px;resize:vertical}
 .btn{display:inline-block;padding:8px 16px;background:var(--acc);color:#141414;border:none;font-size:11px;font-weight:700;cursor:pointer}
 .btn:hover{background:var(--acch)}
 .btn.g{background:none;border:1px solid var(--bdr);color:var(--gll)}.btn.g:hover{border-color:var(--acc);color:var(--acc)}
-.btn.r{background:none;border:1px solid var(--red);color:var(--red)}
+.btn.r{background:none;border:1px solid var(--redl);color:var(--redl)}
 .btn.sm{padding:4px 10px;font-size:10px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 14px}
@@ -101,7 +104,13 @@ table{width:100%;border-collapse:collapse;font-size:12px}
 th{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gl);text-align:left;padding:6px 8px;border-bottom:1px solid var(--bdr)}
 td{padding:8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}
 tr.click{cursor:pointer}tr.click:hover td{background:rgba(255,255,255,.025)}
-.tbl-wrap{overflow-x:auto}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+/* Ohne Mindestbreite quetscht sich die Tabelle auf die Fensterbreite zusammen, bis jede
+   Spalte einen Buchstaben breit ist - das waagerechte Scrollen kommt dann nie zum Zug.
+   Mit min-width behaelt sie ihre Breite und der Kasten scrollt wie gedacht. */
+.tbl-wrap table{min-width:720px}
+.tbl-wrap th{white-space:nowrap}
+@media(max-width:900px){.tbl-wrap{border:1px solid var(--bdr);border-radius:8px}}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 th.num{text-align:right}
 th.sortable{cursor:pointer;user-select:none}
@@ -130,7 +139,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .b.grey{color:var(--gl);border-color:var(--bdr)}
 .b.gold{color:var(--acc);border-color:var(--acc)}
 .b.green{color:var(--grn);border-color:var(--grn)}
-.b.red{color:var(--red);border-color:var(--red)}
+.b.red{color:var(--redl);border-color:var(--redl)}
 .b.blue{color:var(--blu);border-color:var(--blu)}
 .b.yel{color:var(--yel);border-color:var(--yel)}
 
@@ -430,7 +439,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <div><button class="btn g sm" onclick="exportInvoicesCsv()">CSV-Export</button>
       <button class="btn g" onclick="openDocEditor(null,'abschlag')">+ Abschlag</button>
       <button class="btn" onclick="openDocEditor(null,'rechnung')">+ Neue Rechnung</button></div></div>
-    <div id="invOverdue" class="sml" style="color:var(--red);margin-bottom:10px"></div>
+    <div id="invOverdue" class="sml" style="color:var(--redl);margin-bottom:10px"></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Typ</th><th>Datum</th><th>Kunde</th><th class="num">Brutto</th><th>Fällig</th><th>Status</th></tr></thead><tbody id="invRows"></tbody></table></div>
   </div>
 
@@ -1211,7 +1220,7 @@ function openWsDetail(id){
     '<td class="num">'+(s.seats||1)+'</td>'+
     '<td style="font-size:11px;line-height:1.6">'+qa+(s.message?'<div><span class="mut">Nachricht:</span> '+esc(s.message)+'</div>':'')+'</td>'+
     '<td>'+(s.status==='angemeldet'
-      ?'<a onclick="wsCancel(\''+s.id+'\',\''+id+'\')" style="color:var(--red)">stornieren</a>'
+      ?'<a onclick="wsCancel(\''+s.id+'\',\''+id+'\')" style="color:var(--redl)">stornieren</a>'
       :(s.status==='warteliste'
         ?'<a onclick="wsPromote(\''+s.id+'\',\''+id+'\')">nachrücken ↑</a>'
         :''))+'</td></tr>';
@@ -1420,7 +1429,7 @@ function inqToCust(id){
       .catch(function(e){toast(e.message,1)}).finally(fertig);
     return;
   }
-  var parts=(i.name||'').trim().split(/\s+/),first=parts.slice(0,-1).join(' '),last=parts.slice(-1)[0]||'';
+  var nt=namensTeile(i.name),first=nt[0],last=nt[1];
   api('customers',{method:'POST',prefer:'return=representation',body:{
     first_name:first||i.name,last_name:first?last:'',email:i.email,phone:i.phone,source:'Homepage',status:'lead',
     notes:(i.message?('Anfrage: '+i.message):'')+(i.location?'\nOrt: '+i.location:'')
@@ -1486,7 +1495,9 @@ function openCustDetail(id){
   }).join(''):'Sobald es eine Veranstaltung gibt, kannst du hier Location, Ablaufplan und Musikwünsche pflegen.';
   var docs=CACHE.documents.filter(function(d){return d.customer_id===id});
   document.getElementById('cdDocs').innerHTML=docs.map(function(d){
-    return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+euro(d.total_gross)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
+    /* Bei Zahlbelegen zaehlt der offene Betrag: die Schlussrechnung stand hier mit der
+       vollen Auftragssumme, obwohl der Abschlag laengst bezahlt war. */
+    return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+docOffenText(d)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
   }).join('')||'Keine Dokumente.';
   renderComms();
   showPage('custd');
@@ -1543,6 +1554,18 @@ function openCustModal(c,onCreated){
 }
 var CUST_MODAL_ONCREATED=null;
 function saveCust(id){
+  /* Zwei Kunden mit derselben Adresse fuehren spaeter dazu, dass das Portal-Konto am
+     falschen Datensatz haengt und der Kunde seine Unterlagen nicht sieht. Deshalb hier
+     nachfragen, statt es stillschweigend zuzulassen. */
+  var mail=(v('kMail')||'').trim().toLowerCase();
+  if(mail){
+    var doppelt=(CACHE.customers||[]).filter(function(c){
+      return c.id!==id&&String(c.email||'').trim().toLowerCase()===mail});
+    if(doppelt.length&&!confirm('Zu „'+mail+'\u201c gibt es schon einen Kunden: '+
+        doppelt.map(custName).join(', ')+
+        '.\n\nZwei Datensaetze mit derselben Adresse fuehren dazu, dass das Kundenkonto im '+
+        'Portal spaeter am falschen haengt.\n\nTrotzdem anlegen?'))return;
+  }
   var body={kind:v('kKind'),status:v('kStatus'),source:v('kSource'),first_name:v('kFirst'),last_name:v('kLast'),
     company:v('kComp'),partner_name:v('kPartner'),email:v('kMail'),phone:v('kPhone'),whatsapp:v('kWa'),street:v('kStreet'),zip:v('kZip'),
     city:v('kCity'),notes:v('kNotes'),tags:v('kTags').split(',').map(function(t){return t.trim()}).filter(Boolean)};
@@ -1699,7 +1722,9 @@ function openBookDetail(id){
   renderBe();renderRider();renderPlan();
   var docs=CACHE.documents.filter(function(d){return d.booking_id===id});
   document.getElementById('bdDocs').innerHTML=docs.map(function(d){
-    return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+euro(d.total_gross)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
+    /* Bei Zahlbelegen zaehlt der offene Betrag: die Schlussrechnung stand hier mit der
+       vollen Auftragssumme, obwohl der Abschlag laengst bezahlt war. */
+    return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+docOffenText(d)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
   }).join('')||'Noch keine Dokumente – erzeuge oben ein Angebot oder eine Rechnung.';
   showPage('bookd');
 }
@@ -1712,7 +1737,7 @@ function renderBe(){
       return '<tr><td>'+esc(eq.name||'?')+'</td><td class="num">'+x.qty+'</td><td class="num">'+euro(price)+'</td>'+
       '<td><input type="checkbox" style="width:auto" '+(x.out_done?'checked':'')+' onchange="beFlag(\''+x.id+'\',\'out_done\',this.checked)"></td>'+
       '<td><input type="checkbox" style="width:auto" '+(x.back_done?'checked':'')+' onchange="beFlag(\''+x.id+'\',\'back_done\',this.checked)"></td>'+
-      '<td><a onclick="beDel(\''+x.id+'\')" style="color:var(--red)">✕</a></td></tr>';
+      '<td><a onclick="beDel(\''+x.id+'\')" style="color:var(--redl)">✕</a></td></tr>';
     }).join('')+'</tbody></table>'):'Keine Technik zugeordnet.';
 }
 function rentDays(b){
@@ -2354,6 +2379,26 @@ function printEventPlan(){
 }
 
 /* ===== Dokumente (Angebote & Rechnungen) ===== */
+/* Was von einem Beleg noch offen ist. Ohne den Abzug stand die Schlussrechnung beim
+   Kunden mit der vollen Auftragssumme da. */
+function docOffenText(d){
+  var offen=Number(d.total_gross)-Number(d.deposit_deducted||0);
+  return euro(offen)+(istZahlbeleg(d.doc_type)&&Number(d.deposit_deducted)
+    ? ' <span class="mut">(von '+euro(d.total_gross)+', Abschlag abgezogen)</span>':'');
+}
+/* Namen zerlegen wie der Server (splitPersonName in api.php): "Familie Kettner" bleibt
+   ganz, sonst wuerde die Anrede "Hallo Familie," lauten. Dasselbe gilt fuer "Herr" und
+   "Frau" sowie fuer Paare ("Lena und Tobias Vogt"). */
+function namensTeile(name){
+  name=String(name||'').trim().replace(/\s+/g,' ');
+  if(!name)return ['',''];
+  var w=name.split(' ');
+  if(/^(Familie|Fam\.|Eheleute|Herr|Frau|Herrn)\b/i.test(name))return [name,''];
+  if(/\s(und|&|\+)\s/i.test(name)&&w.length>2)
+    return [w.slice(0,-1).join(' '),w[w.length-1]];
+  if(w.length===1)return [name,''];
+  return [w[0],w.slice(1).join(' ')];
+}
 function docTypeName(t){return {angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'}[t]||t}
 /* Angebot und Auftragsbestätigung sind keine Zahlungsaufforderungen - sie haben kein
    Fälligkeitsdatum, keine Mahnung und keinen Bezahlt-Status. */
@@ -2452,7 +2497,7 @@ function docCustChanged(){
 document.getElementById('docBook').addEventListener('change',function(){
   var id=this.value;
   fillEventFromBooking((CACHE.bookings||[]).find(function(x){return x.id===id}),true);
-  renderDocExtraBtns();
+  renderDocExtraBtns();renderEventHint();
 });
 function refreshBookOpts(){
   var custId=document.getElementById('docCust').value;
@@ -2683,7 +2728,7 @@ function itemRowHtml(it,i,posLabel,locked,sml){
     '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
     '<input type="number" step="0.01" value="'+it.unit_price+'" placeholder="Einzelpreis" title="Einzelpreis brutto" oninput="itSet('+i+',\'unit_price\',this.value)">'+
     '<input value="'+euro(sum)+'" disabled class="num" title="Gesamt" data-sum="'+i+'">'+
-    (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)" title="Stufe löschen">✕</a>')+'</div>';
+    (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--redl)" title="Stufe löschen">✕</a>')+'</div>';
   }
   return '<div class="it-row" style="margin-bottom:3px">'+
   '<div'+(locked?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':'grab')+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked?'':'<span style="opacity:.55">⠿</span>')+posLabel+'</div>'+
@@ -2692,7 +2737,7 @@ function itemRowHtml(it,i,posLabel,locked,sml){
   '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
   '<input type="number" step="0.01" value="'+it.unit_price+'" placeholder="Einzelpreis" title="Einzelpreis brutto" oninput="itSet('+i+',\'unit_price\',this.value)">'+
   '<input value="'+euro(sum)+'" disabled class="num" title="Gesamt" data-sum="'+i+'">'+
-  (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)" title="Position löschen">✕</a>')+'</div>'+
+  (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--redl)" title="Position löschen">✕</a>')+'</div>'+
   '<div style="padding-left:42px;padding-right:34px;display:flex;gap:6px">'+
   '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Erklärung für das Kundenportal (erscheint beim Drüberfahren) – optional" style="font-size:10px;padding:5px 8px;color:var(--gll)">'+
   '<input type="number" step="0.01" value="'+(it.discount_value||0)+'" oninput="itSet('+i+',\'discount_value\',this.value)" title="Rabatt auf diese Position" style="width:74px;font-size:10px;padding:5px 8px" placeholder="Rabatt">'+
@@ -2708,7 +2753,7 @@ function headerRowHtml(it,i,posLabel,locked){
   '<input value="Stückpreis" disabled>'+
   '<input value="'+euro(it.unit_price)+' /Tag" disabled>'+
   '<input value="siehe unten" disabled class="num" style="color:var(--gll)">'+
-  (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--red)" title="Ganze Position (inkl. Rabattstaffel) löschen">✕</a>')+'</div>'+
+  (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--redl)" title="Ganze Position (inkl. Rabattstaffel) löschen">✕</a>')+'</div>'+
   '<div style="padding-left:36px;padding-right:24px;margin-bottom:2px">'+
   '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Erklärung für das Kundenportal (erscheint beim Drüberfahren) – optional" style="font-size:9px;padding:3px 6px;color:var(--gll);width:100%">'+
   '</div>';
@@ -3034,10 +3079,13 @@ function renderEventHint(){
 /* Kalenderprüfung direkt beim Eintippen des Datums: sonst faellt eine Doppelbelegung
    erst auf, wenn das Angebot schon beim Kunden liegt. Die eigene Veranstaltung zaehlt
    dabei natuerlich nicht als Konflikt. */
-function konflikteAm(datum,ausser){
+function konflikteAm(datum,ausser,eigenerKunde){
   if(!datum)return [];
   return (CACHE.bookings||[]).filter(function(b){
     if(b.id===ausser||b.status==='storniert'||!b.event_date)return false;
+    /* Die Veranstaltung, um die es hier gerade geht, ist kein Konflikt mit sich selbst -
+       auch dann nicht, wenn sie noch nicht verknuepft ist. Erkannt ueber Kunde + Datum. */
+    if(eigenerKunde&&b.customer_id===eigenerKunde&&datum>=b.event_date&&datum<=(b.end_date||b.event_date))return false;
     return datum>=b.event_date&&datum<=(b.end_date||b.event_date);
   }).map(function(b){return calLabel(b)+' ('+b.status+')'})
   .concat((CACHE.blocks||[]).filter(function(c){
@@ -3049,7 +3097,10 @@ function konflikteAm(datum,ausser){
 function renderDateCheck(datum){
   var el=document.getElementById('evDateCheck');if(!el)return;
   if(!datum){el.innerHTML='';return}
-  var konf=konflikteAm(datum,curDoc&&curDoc.booking_id);
+  /* Massgeblich ist, was im Auswahlfeld steht - curDoc.booking_id wird erst beim
+     Speichern gesetzt. Zusaetzlich der Kunde des Belegs: seine eigene Feier am selben
+     Tag ist kein Konflikt, sonst warnt fast jedes Angebot aus einer Anfrage. */
+  var konf=konflikteAm(datum,v('docBook')||(curDoc&&curDoc.booking_id),v('docCust'));
   el.innerHTML=konf.length
     ? '<span style="color:var(--yel)">Achtung, an dem Tag steht schon etwas im Kalender: '+esc(konf.join(' · '))+'</span>'
     : '<span style="color:var(--grn)">Der Tag ist im Kalender noch frei.</span>';
@@ -5764,7 +5815,7 @@ function renderForms(){
     '<td style="white-space:nowrap">'+
     (f.status==='beantwortet'?'<button class="btn sm" onclick="viewFormAnswers(\''+f.id+'\')">Antworten</button> ':
       '<button class="btn g sm" onclick="copyFormLink(\''+f.token+'\')">Link</button>')+
-    '<a onclick="delRow(\'forms\',\''+f.id+'\',reloadForms)" style="color:var(--red)">✕</a></td></tr>';
+    '<a onclick="delRow(\'forms\',\''+f.id+'\',reloadForms)" style="color:var(--redl)">✕</a></td></tr>';
   }).join('')||'<tr><td colspan="5" class="mut">Noch keine Fragebögen verschickt.</td></tr>';
   document.getElementById('ftList').innerHTML=(CACHE.formTpls||[]).map(function(t){
     return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openFtModal(\''+t.id+'\')">'+esc(t.name)+'</a> <span class="mut">'+(t.fields||[]).length+' Fragen</span></div>';
@@ -6139,7 +6190,7 @@ function renderPartners(){
     return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+
     '<div><b>'+esc(pt.name)+'</b> <span class="mut">'+(KIND[pt.kind]||pt.kind)+(pt.company?' · '+esc(pt.company):'')+' · '+esc(pt.email||'')+'</span> '+
     (pt.status==='freigeschaltet'?'<span class="b green">freigeschaltet</span>':'<span class="b gold">beantragt – vorläufig schon Partnerpreise</span>')+
-    ' <a onclick="delRow(\'partners\',\''+pt.id+'\',reloadPartners)" style="color:var(--red)">✕</a></div>'+
+    ' <a onclick="delRow(\'partners\',\''+pt.id+'\',reloadPartners)" style="color:var(--redl)">✕</a></div>'+
     '<div style="margin-top:5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
     (pt.status!=='freigeschaltet'?'<button class="btn sm" onclick="approvePartner(\''+pt.id+'\')">Freischalten (allgemeiner Rabatt)</button>':'')+
     '<label class="sml mut" style="margin:0;text-transform:none;letter-spacing:0">Individueller Rabatt %<input type="number" min="0" max="100" step="1" value="'+(pt.discount_pct!=null?pt.discount_pct:'')+'" placeholder="leer = allgemein" style="width:80px;display:inline-block;margin:0 0 0 6px" onchange="setPartnerDiscount(\''+pt.id+'\',this.value)"></label>'+
@@ -6186,7 +6237,7 @@ function campCardRow(i,card){
     '<div class="grid3"><div><label>Icon</label><select data-ci>'+CAMP_ICONS.map(function(k){return '<option'+(card.icon===k?' selected':'')+'>'+k+'</option>'}).join('')+'</select></div>'+
     '<div style="grid-column:span 2"><label>Überschrift der Karte</label><input data-ct value="'+esc(card.title||'')+'"></div></div>'+
     '<label>Text</label><textarea data-cx rows="4">'+esc(card.text||'')+'</textarea>'+
-    '<a onclick="this.parentNode.remove()" style="color:var(--red);font-size:12px">Karte entfernen</a></div>';
+    '<a onclick="this.parentNode.remove()" style="color:var(--redl);font-size:12px">Karte entfernen</a></div>';
 }
 function campAddCard(){
   var wrap=document.getElementById('campCards');
@@ -6355,7 +6406,7 @@ function insertUpsell(id){
 
 /* Antwort aus Anfrage verfassen */
 function fillTpl(text,i){
-  var parts=(i.name||'').trim().split(/\s+/);
+  var parts=namensTeile(i.name);
   var rv=(CACHE.content&&CACHE.content.reviews)||{};
   var links=rv.google_url||'';
   var map={

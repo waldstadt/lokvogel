@@ -1204,7 +1204,7 @@ function splitPersonName(string $name): array {
   if ($name === '') return ['', ''];
   $words = explode(' ', $name);
   $last = end($words);
-  if (preg_match('/^(Familie|Fam\.|Eheleute)\b/iu', $name))
+  if (preg_match('/^(Familie|Fam\.|Eheleute|Herr|Herrn|Frau)\b/iu', $name))
     return [$name, ''];   // Anrede "Hallo Familie Brinkmann," - der Nachname steckt schon drin
   if (preg_match('/\s(und|&|\+)\s/iu', $name) && count($words) > 2)
     return [implode(' ', array_slice($words, 0, -1)), $last];  // "Lena und Tobias" / "Vogt"
@@ -1215,7 +1215,11 @@ function splitPersonName(string $name): array {
 function autoInquiryPlanner(PDO $p, array $row): void {
   if (empty($row['email'])) return;
   $email = mb_substr(strtolower(trim((string)$row['email'])), 0, 160);
-  $st = $p->prepare('select id from customers where lower(email) = ? limit 1');
+  /* Zwei Kunden mit derselben Adresse sind moeglich (von Hand doppelt angelegt). Ohne
+     feste Reihenfolge entscheidet der Zufall, an welchem die Anfrage haengt - deshalb
+     gewinnt der mit Portal-Konto, sonst der aeltere. */
+  $st = $p->prepare("select id from customers where lower(email) = ?
+    order by (portal_hash is not null) desc, coalesce(created_at,'') asc limit 1");
   $st->execute([$email]);
   $custId = $st->fetchColumn();
   if (!$custId) {
@@ -2825,7 +2829,8 @@ function workshopInvoice(PDO $p, string $signupId): array {
   $comp = $get('company'); $defs = $get('defaults');
 
   /* Kunde finden oder anlegen */
-  $cst = $p->prepare('select id, zip from customers where email = ? limit 1');
+  $cst = $p->prepare("select id, zip from customers where email = ?
+    order by (portal_hash is not null) desc, coalesce(created_at,'') asc limit 1");
   $cst->execute([$s['email']]);
   $cust = $cst->fetch();
   $parts = preg_split('/\s+/', trim($s['name']), 2);
@@ -3105,7 +3110,8 @@ function handlePortal(string $path, string $method, $body): never {
   if ($path === 'portal/account/login' && $method === 'POST') {
     $email = strtolower(trim((string)($body['email'] ?? '')));
     $pass = (string)($body['password'] ?? '');
-    $st = $p->prepare('select * from customers where lower(email) = ? and portal_hash is not null');
+    $st = $p->prepare("select * from customers where lower(email) = ? and portal_hash is not null
+      order by coalesce(created_at,'') asc limit 1");
     $st->execute([$email]);
     $c = $st->fetch();
     if (!$c || !password_verify($pass, (string)$c['portal_hash'])) { usleep(500000); fail('E-Mail oder Passwort falsch.', 401); }
@@ -3121,7 +3127,8 @@ function handlePortal(string $path, string $method, $body): never {
     if ($name === '' || $email === '') fail('Name und E-Mail erforderlich.');
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) fail('Bitte eine gültige E-Mail-Adresse angeben.');
     if (strlen($pass) < 8) fail('Passwort bitte mit mindestens 8 Zeichen.');
-    $st = $p->prepare('select id, portal_hash from customers where lower(email) = ?');
+    $st = $p->prepare("select id, portal_hash from customers where lower(email) = ?
+      order by (portal_hash is not null) desc, coalesce(created_at,'') asc limit 1");
     $st->execute([$email]);
     $existing = $st->fetch();
     if ($existing && $existing['portal_hash'] !== null) fail('Für diese E-Mail existiert bereits ein Konto – bitte einloggen.', 409);
@@ -3197,7 +3204,8 @@ function handlePortal(string $path, string $method, $body): never {
   }
   if ($path === 'portal/account/forgot' && $method === 'POST') {
     $email = strtolower(trim((string)($body['email'] ?? '')));
-    $st = $p->prepare('select * from customers where lower(email) = ? and portal_hash is not null');
+    $st = $p->prepare("select * from customers where lower(email) = ? and portal_hash is not null
+      order by coalesce(created_at,'') asc limit 1");
     $st->execute([$email]);
     $c = $st->fetch();
     /* Gleiche Bremse wie bei der Registrierung: kein Mail-Bombardement auf fremde

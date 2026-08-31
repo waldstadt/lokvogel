@@ -23,7 +23,8 @@
   --bg:#0f1012; --bg2:#15161a; --card:#1a1c21; --line:#282b32;
   --acc:#ff6f5b; --acc2:#ff8d7c; --txt:#f2f0ec; --mut:#a3a29b; --mut2:#8f8e88;
 }
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;scroll-padding-top:88px}/* scroll-padding-top: sonst beginnt ein angesprungener Abschnitt unter der
+   fest stehenden Menueleiste. */
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased}
 h1,h2,h3,h4,.gro{font-family:'Space Grotesk',sans-serif;letter-spacing:-.01em}
 a{color:var(--acc);text-decoration:none}
@@ -270,7 +271,7 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
       <svg viewBox="0 0 32 32" aria-hidden="true"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>
       <span class="wm">lauschgift<i>.</i></span>
     </a>
-    <button class="burger" onclick="document.getElementById('nl').classList.toggle('open')">☰</button>
+    <button class="burger" onclick="navToggle()" aria-label="Menü">☰</button>
     <div class="nav-links" id="nl">
       <a href="#ueber">Über mich</a>
       <a href="#leistungen">Leistungen</a>
@@ -622,6 +623,15 @@ function setHeroHeadline(txt,id){
     el.appendChild(node);
   });
 }
+/* Menue auf dem Handy: nach dem Antippen eines Punktes wieder schliessen. Ohne das
+   bleibt es offen ueber dem Ziel liegen - der Besucher springt zum Formular und sieht
+   das Menue statt des Formulars. */
+function navToggle(){document.getElementById('nl').classList.toggle('open')}
+function navClose(){var n=document.getElementById('nl');if(n)n.classList.remove('open')}
+document.addEventListener('click',function(e){
+  var a=e.target.closest?e.target.closest('#nl a'):null;
+  if(a)navClose();
+});
 function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
