@@ -620,6 +620,22 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div class="card"><h3>Freunde &amp; Empfehlungen <button class="btn sm" style="float:right" onclick="openFriendModal()">+ Empfehlung</button></h3>
           <div class="mut sml" style="margin-bottom:8px">Fotografen, Musiker, Planer, Kollegen – erscheinen auf der DJ-Homepage. Gegenseitige Verlinkung hilft beim Google-Ranking. Reihenfolge per Ziehen am ⠿-Griff ändern.</div>
           <div id="friendAdminList" class="sml"></div></div>
+        <div class="card"><h3>Logos: Netzwerke &amp; Bewertungen <button class="btn sm" style="float:right" onclick="openBadgeModal('mitglied')">+ Logo</button></h3>
+          <div class="mut sml" style="margin-bottom:8px">Verbände, Agenturen und Portale, in denen du gelistet bist – DJ Bande, DJ Allianz, Google, Trustpilot. Erscheinen als kleine Logo-Leiste. Reihenfolge per Ziehen am ⠿-Griff ändern. <b>Wichtig:</b> Fremde Logos nur verwenden, wenn du sie verwenden darfst – bei Portalen wie Google gibt es Vorgaben zur Darstellung.</div>
+          <div class="grid2"><div><label>Überschrift</label><input id="cBadgeMTitle"></div>
+          <div><label>Kurztext darunter</label><input id="cBadgeMText"></div></div>
+          <label style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cBadgeMOn" style="width:auto;margin-right:6px">Auf der DJ-Startseite anzeigen</label>
+          <label style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cBadgeMTech" style="width:auto;margin-right:6px">Auch auf der Technik-Seite anzeigen</label>
+          <div style="margin:10px 0"><button class="btn sm" onclick="saveBadgeSec()">Texte &amp; Anzeige speichern</button></div>
+          <div id="badgeListMitglied" class="sml"></div></div>
+        <div class="card"><h3>Logos: Technik, mit der ich arbeite <button class="btn sm" style="float:right" onclick="openBadgeModal('technik')">+ Logo</button></h3>
+          <div class="mut sml" style="margin-bottom:8px">Marken aus deinem Lager – Seeburg, Pioneer und so weiter. Zeigt auf einen Blick, womit du unterwegs bist.</div>
+          <div class="grid2"><div><label>Überschrift</label><input id="cBadgeTTitle"></div>
+          <div><label>Kurztext darunter</label><input id="cBadgeTText"></div></div>
+          <label style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cBadgeTOn" style="width:auto;margin-right:6px">Auf der DJ-Startseite anzeigen</label>
+          <label style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cBadgeTTech" style="width:auto;margin-right:6px">Auch auf der Technik-Seite anzeigen</label>
+          <div style="margin:10px 0"><button class="btn sm" onclick="saveBadgeSec()">Texte &amp; Anzeige speichern</button></div>
+          <div id="badgeListTechnik" class="sml"></div></div>
         <div class="card"><h3>Bewertungen <button class="btn sm" style="float:right" onclick="openRevModal()">+ Bewertung</button></h3>
           <label>Google-Bewertungslink (am besten der „Rezension schreiben“-Link – wird auch in Mails verwendet)</label><input id="cRevGoogle" placeholder="https://g.page/r/…">
           <label>DJ-Bande-Profil (URL, nur zum Lesen verlinkt – Bewertungen sammelt die Agentur selbst)</label><input id="cRevBande" placeholder="https://www.dj-bande.de/…">
@@ -3720,7 +3736,7 @@ function renderCms(){
   document.getElementById('themeRowTech').innerHTML=THEMES.map(function(t){
     return '<span class="theme-sw'+(tt.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+t.n+'" onclick="pickTheme(\'technik\',\''+t.n+'\')"></span>';
   }).join('')+'<span class="sml mut" style="margin-left:8px">Preset wählen oder Farben frei einstellen</span>';
-  renderPackAdmin();renderFaqAdmin();reloadLocs();reloadFriends();
+  renderPackAdmin();renderFaqAdmin();reloadLocs();reloadFriends();reloadBadges();renderBadgeSec();
   renderSectionsCard();renderInstagram();loadVersions();
 }
 function pickTheme(target,name){
@@ -3925,7 +3941,8 @@ var DD_LISTS={
   faq:{tbl:'faq',cache:'faq',render:function(){renderFaqAdmin()}},
   locations:{tbl:'locations',cache:'locations',render:function(){renderLocAdmin()}},
   friends:{tbl:'friends',cache:'friends',render:function(){renderFriendAdmin()}},
-  reviews:{tbl:'reviews',cache:'reviews',render:function(){renderRevAdmin()}}
+  reviews:{tbl:'reviews',cache:'reviews',render:function(){renderRevAdmin()}},
+  badges:{tbl:'badges',cache:'badges',render:function(){renderBadgeAdmin()}}
 };
 function pubSwitch(name,id,isPub){
   return '<span class="b '+(isPub?'green':'grey')+'" style="cursor:pointer" title="Klicken zum Ein-/Ausschalten" '+
@@ -4146,6 +4163,108 @@ function saveFriend(id){
     .then(function(){closeModal();toast('Gespeichert ✓');reloadFriends()}).catch(function(e){toast(e.message,1)});
 }
 function reloadFriends(){api('friends?select=*&order=sort').then(function(r){CACHE.friends=r||[];renderFriendAdmin()})}
+
+/* ===== Logo-Leisten (Netzwerke/Bewertungen und Technikmarken) ===== */
+var BADGE_KINDS={mitglied:['M','badgeListMitglied'],technik:['T','badgeListTechnik']};
+function badgeSecCfg(){return (CACHE.content&&CACHE.content.badges_sec)||{}}
+function renderBadgeSec(){
+  var cfg=badgeSecCfg();
+  Object.keys(BADGE_KINDS).forEach(function(kind){
+    var pre='cBadge'+BADGE_KINDS[kind][0],c=cfg[kind]||{};
+    var t=document.getElementById(pre+'Title');if(!t)return;
+    t.value=c.title||'';
+    document.getElementById(pre+'Text').value=c.text||'';
+    document.getElementById(pre+'On').checked=c.enabled!==false;
+    document.getElementById(pre+'Tech').checked=c.show_tech!==false;
+  });
+  renderBadgeAdmin();
+}
+function saveBadgeSec(){
+  var cfg=JSON.parse(JSON.stringify(badgeSecCfg()));
+  Object.keys(BADGE_KINDS).forEach(function(kind){
+    var pre='cBadge'+BADGE_KINDS[kind][0];
+    if(!document.getElementById(pre+'Title'))return;
+    cfg[kind]={title:v(pre+'Title'),text:v(pre+'Text'),
+      enabled:document.getElementById(pre+'On').checked,
+      show_tech:document.getElementById(pre+'Tech').checked};
+  });
+  api('site_content?key=eq.badges_sec',{method:'PATCH',body:{value:cfg}})
+    .then(function(){CACHE.content.badges_sec=cfg;toast('Gespeichert ✓')})
+    .catch(function(e){toast(e.message,1)});
+}
+function renderBadgeAdmin(){
+  Object.keys(BADGE_KINDS).forEach(function(kind){
+    var el=document.getElementById(BADGE_KINDS[kind][1]);if(!el)return;
+    var list=(CACHE.badges||[]).filter(function(b){return (b.kind||'mitglied')===kind});
+    el.innerHTML=list.map(function(b){
+      var i=(CACHE.badges||[]).indexOf(b);
+      return '<div'+ddAttrs('badges',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
+      (b.image_url?'<img src="'+esc(b.image_url)+'" alt="" style="height:22px;max-width:70px;object-fit:contain'+(b.light_bg?';background:#fff;padding:2px;border-radius:2px':'')+'">':'<span class="mut sml">ohne Logo</span>')+
+      '<a onclick="openBadgeModal(\''+kind+'\',\''+b.id+'\')" style="flex:1">'+esc(b.name)+'</a>'+
+      pubSwitch('badges',b.id,!!b.public)+'</div>';
+    }).join('')||'<span class="mut">Noch keine Logos.</span>';
+  });
+}
+function openBadgeModal(kind,id){
+  var b=id?(CACHE.badges||[]).find(function(x){return x.id===id}):{};b=b||{};
+  openModal(id?'Logo bearbeiten':'Neues Logo',
+    '<div class="grid2"><div><label>Name *</label><input id="bgName" value="'+esc(b.name||'')+'" placeholder="z. B. DJ Bande"></div>'+
+    '<div><label>Zusatz <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="bgSub" value="'+esc(b.subtitle||'')+'" placeholder="z. B. Mitglied seit 2019"></div></div>'+
+    '<label>Logo <span class="mut sml" style="text-transform:none;letter-spacing:0">(PNG mit transparentem Hintergrund sieht am besten aus)</span></label>'+
+    '<input type="hidden" id="bgImg" value="'+esc(b.image_url||'')+'">'+
+    '<div style="display:flex;gap:8px"><input type="file" accept="image/*" style="display:none" id="bgImgUp" onchange="bgImgUpload(this)">'+
+    '<button class="btn g sm" onclick="document.getElementById(\'bgImgUp\').click()">Hochladen</button>'+
+    '<button class="btn g sm" onclick="bgImgFromPool()">Aus Pool</button>'+
+    (b.image_url?'<button class="btn g sm" onclick="bgImgRemove()">Entfernen</button>':'')+'</div>'+
+    '<div id="bgPrev" style="margin-top:10px">'+badgePreview(b.image_url,!!b.light_bg,b.name||'')+'</div>'+
+    '<label style="margin-top:10px;text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="bgLight" style="width:auto;margin-right:6px" '+(b.light_bg?'checked':'')+' onchange="bgPrevUpdate()">Helle Fläche hinter das Logo legen (für dunkle Logos)</label>'+
+    '<label>Link <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional, z. B. dein Profil dort)</span></label><input id="bgWeb" value="'+esc(b.website||'')+'" placeholder="https://…">'+
+    '<label style="margin-top:12px"><input type="checkbox" id="bgPub" style="width:auto;margin-right:6px" '+(b.public!==false&&b.public!==0?'checked':'')+'>Auf der Homepage anzeigen</label>'+
+    SORT_HINT+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveBadge(\''+kind+'\',\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delRow(\'badges\',\''+id+'\',reloadBadges)">Löschen</button>':'')+'</div>');
+}
+/* Vorschau auf dem echten Seitenhintergrund - so sieht Markus sofort, ob ein dunkles Logo
+   die helle Flaeche braucht, statt es erst auf der Homepage zu merken. */
+function badgePreview(url,light,name){
+  var inner=url?'<img src="'+esc(url)+'" alt="" style="max-height:36px;max-width:148px;object-fit:contain;display:block">'
+    :'<span style="font-size:14px;font-weight:600;color:'+(light?'#16181c':'var(--wh)')+'">'+esc(name||'ohne Logo')+'</span>';
+  return '<div style="background:var(--bg,#0f1012);padding:16px;border-radius:5px;display:flex">'+
+    '<div style="display:flex;align-items:center;justify-content:center;min-height:66px;padding:12px 20px;border-radius:5px;'+
+    (light?'background:#fff;border:1px solid rgba(0,0,0,.08)':'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09)')+'">'+inner+'</div></div>';
+}
+function bgPrevUpdate(){
+  document.getElementById('bgPrev').innerHTML=
+    badgePreview(v('bgImg'),document.getElementById('bgLight').checked,v('bgName'));
+}
+function bgImgUpload(inp){
+  var f=inp.files[0];if(!f)return;
+  var name=Date.now()+'-'+f.name.toLowerCase().replace(/[^a-z0-9.]+/g,'-');
+  fetch(API+'/storage/'+encodeURIComponent(name),{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:f})
+    .then(function(r){if(!r.ok)throw new Error('Upload fehlgeschlagen ('+r.status+')');return r.json()})
+    .then(function(j){document.getElementById('bgImg').value=j.url;bgPrevUpdate();
+      toast('Logo hochgeladen ✓ – „Speichern" nicht vergessen.');})
+    .catch(function(e){toast(e.message,1)});
+  inp.value='';
+}
+function bgImgFromPool(){
+  openMediaPicker(function(urls){
+    if(!urls||!urls[0])return;
+    document.getElementById('bgImg').value=urls[0];bgPrevUpdate();
+  });
+}
+function bgImgRemove(){document.getElementById('bgImg').value='';bgPrevUpdate()}
+function saveBadge(kind,id){
+  if(!v('bgName')){toast('Name fehlt.',1);return}
+  var body={kind:kind,name:v('bgName'),subtitle:v('bgSub'),website:v('bgWeb'),
+    image_url:v('bgImg'),light_bg:document.getElementById('bgLight').checked,
+    public:document.getElementById('bgPub').checked};
+  if(!id)body.sort=(CACHE.badges||[]).length;
+  (id?api('badges?id=eq.'+id,{method:'PATCH',body:body}):api('badges',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Gespeichert ✓');reloadBadges()}).catch(function(e){toast(e.message,1)});
+}
+function reloadBadges(){api('badges?select=*&order=sort').then(function(r){CACHE.badges=r||[];renderBadgeAdmin()})}
+
 
 /* ===== Kundenportal-Verwaltung ===== */
 function renderCdPortal(){

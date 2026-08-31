@@ -152,6 +152,19 @@ footer a:hover{color:var(--acc)}
 .rent .old{color:var(--mut2);text-decoration:line-through;font-weight:400;font-size:12px;margin-right:6px}
 .rent .addon{font-size:11px;color:var(--mut2);margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
 .rent .addon b{color:var(--acc);font-weight:600}
+.lg-row{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch;margin-top:26px}
+.lg{display:flex;align-items:center;justify-content:center;min-height:66px;padding:12px 20px;
+  background:var(--card);border:1px solid var(--line);border-radius:5px;text-decoration:none;
+  transition:border-color .25s,transform .25s}
+.lg.light{background:#fff;border-color:rgba(0,0,0,.08)}
+a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
+.lg img{max-height:36px;max-width:148px;width:auto;height:auto;object-fit:contain;display:block}
+.lg .lgt{font-size:14px;font-weight:600;color:var(--wh);letter-spacing:.01em}
+.lg.light .lgt{color:#16181c}
+.lg .lgs{display:block;font-size:11.5px;font-weight:400;color:var(--mut);margin-top:3px}
+.lg.light .lgs{color:#55595f}
+.lg-grp+.lg-grp{margin-top:46px}
+@media(max-width:600px){.lg{min-height:58px;padding:10px 15px}.lg img{max-height:30px;max-width:112px}}
 </style>
 </head>
 <body>
@@ -351,6 +364,27 @@ footer a:hover{color:var(--acc)}
       <h3>So kommst du an die Partnerpreise</h3>
       <p style="font-size:14px;color:var(--mut)">Leg dir im Vermietkatalog ein Konto an und setz beim Registrieren den Haken „DJ/Band/Musiker:in – Partner-Konditionen". Die Partnerpreise gelten dann sofort, vorläufig unter Vorbehalt – ich prüfe den Antrag kurz danach und schalte dein Konto endgültig frei.</p>
       <div style="margin-top:14px"><a href="mieten.html" class="btn g">Zum Vermietkatalog</a></div>
+    </div>
+  </div>
+</section>
+
+<section id="logos" style="display:none">
+  <div class="wrap">
+    <div class="lg-grp" id="lgGrpMitglied" style="display:none">
+      <div class="reveal vis">
+        <div class="kicker" id="lgKickMitglied">Netzwerke</div>
+        <h2 id="lgTitleMitglied"></h2>
+        <p class="lead" id="lgTextMitglied"></p>
+      </div>
+      <div class="lg-row" id="lgRowMitglied"></div>
+    </div>
+    <div class="lg-grp" id="lgGrpTechnik" style="display:none">
+      <div class="reveal vis">
+        <div class="kicker" id="lgKickTechnik">Technik</div>
+        <h2 id="lgTitleTechnik"></h2>
+        <p class="lead" id="lgTextTechnik"></p>
+      </div>
+      <div class="lg-row" id="lgRowTechnik"></div>
     </div>
   </div>
 </section>
@@ -818,6 +852,49 @@ document.addEventListener('keydown',function(e){
   if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
 });
+
+var IS_TECH_PAGE=true,BADGE_SEC='logos';
+/* Logo-Leisten: Netzwerke/Bewertungsportale und Technikmarken. Beide Gruppen sind einzeln
+   ein- und ausschaltbar; ist keine einzige Gruppe befuellt, bleibt die Sektion weg -
+   eine Ueberschrift ueber einer leeren Reihe waere schlimmer als gar nichts. */
+function renderBadges(rows,cfg,techSeite){
+  var any=false;
+  ['mitglied','technik'].forEach(function(kind){
+    var c=cfg[kind]||{},list=rows.filter(function(b){return (b.kind||'mitglied')===kind});
+    var an=c.enabled!==false&&list.length&&(!techSeite||c.show_tech!==false);
+    var grp=document.getElementById('lgGrp'+kind.charAt(0).toUpperCase()+kind.slice(1));
+    if(!grp)return;
+    if(!an){grp.style.display='none';return}
+    var suf=kind.charAt(0).toUpperCase()+kind.slice(1);
+    if(c.title)document.getElementById('lgTitle'+suf).textContent=c.title;
+    var tx=document.getElementById('lgText'+suf);
+    if(c.text)tx.textContent=c.text;else tx.style.display='none';
+    document.getElementById('lgRow'+suf).innerHTML=list.map(function(b){
+      var inner=b.image_url
+        ? '<img src="'+esc(b.image_url)+'" alt="'+esc(b.name)+'" loading="lazy" onerror="this.parentNode.innerHTML=\'<span class=&quot;lgt&quot;>'+esc(b.name).replace(/'/g,'')+'</span>\'">'
+        : '<span class="lgt">'+esc(b.name)+(b.subtitle?'<span class="lgs">'+esc(b.subtitle)+'</span>':'')+'</span>';
+      var cls='lg'+(b.light_bg?' light':'');
+      var t=b.subtitle?(b.name+' – '+b.subtitle):b.name;
+      return b.website
+        ? '<a class="'+cls+'" href="'+esc(b.website)+'" target="_blank" rel="noopener noreferrer" title="'+esc(t)+'">'+inner+'</a>'
+        : '<div class="'+cls+'" title="'+esc(t)+'">'+inner+'</div>';
+    }).join('');
+    grp.style.display='';any=true;
+  });
+  var sec=document.getElementById(BADGE_SEC);
+  if(any&&sec){
+    if(typeof showSection==='function')showSection(BADGE_SEC);
+    else sec.style.display='';
+  }
+}
+Promise.all([
+  sfetch('badges?select=*&public=eq.true&order=sort'),
+  sfetch('site_content?key=eq.badges_sec')
+]).then(function(r){
+  var rows=r[0]||[];if(!rows.length)return;
+  var cfg=(r[1]&&r[1][0]&&r[1][0].value)||{};
+  renderBadges(rows,cfg,IS_TECH_PAGE);
+}).catch(function(){});
 </script>
 <div class="reg-overlay" id="regOverlay" role="dialog" aria-modal="true" aria-labelledby="regOverlayTitle">
   <div class="reg-card">

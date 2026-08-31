@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 69;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 70;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -172,7 +172,7 @@ const JSON_COLS = [
   'campaign_pages' => ['cards', 'features', 'form_cfg'],
 ];
 const BOOL_COLS = [
-  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'],
+  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'], 'badges' => ['public','light_bg'],
   'workshop_events' => ['public'],
   'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
   'bookings' => ['review_requested','open_ended'],
@@ -186,11 +186,11 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
-const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items','campaign_pages'];
+const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items','campaign_pages','badges'];
 const INQUIRY_FIELDS = ['name','email','phone','event_type','event_date','location','guests','message'];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -632,6 +632,15 @@ function upgrade(PDO $p): void {
         and intro_text like 'vielen Dank für deine Anmeldung zum Workshop%'");
   } catch (PDOException $e) {}
   if ($v < 69) try { campaignTechCheckBruttoUpdate($p); } catch (PDOException $e) {}
+  if ($v < 70) try {
+    $p->exec(badgesDdl());
+    /* Abschnittstexte nur anlegen, wenn es sie noch nicht gibt - eigene Formulierungen
+       von Markus dürfen dabei nicht überschrieben werden. */
+    $st = $p->query("select count(*) from site_content where key='badges_sec'");
+    if (!(int)$st->fetchColumn())
+      $p->prepare('insert into site_content (key,value,updated_at) values (?,?,?)')
+        ->execute(['badges_sec', '{"mitglied": {"enabled": true, "show_tech": true, "title": "Wo ich mitmache", "text": "Netzwerke und Portale, in denen ich gelistet bin – wer mag, schaut dort nach, was andere über meine Arbeit schreiben."}, "technik": {"enabled": true, "show_tech": true, "title": "Womit ich arbeite", "text": "Die Technik, die bei mir im Wagen liegt. Keine Werbung, sondern eine ehrliche Auskunft darüber, was ich mitbringe."}}', now()]);
+  } catch (PDOException $e) {}
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1253,6 +1262,17 @@ function friendsDdl(): string {
   return "create table if not exists friends (id text primary key, sort integer default 0,
     name text not null, category text, description text, website text,
     image_url text, image_focal text default '50% 50%',
+    public integer default 1, created_at text)";
+}
+
+/* Logo-Leisten: kind "mitglied" = Netzwerke, Verbände, Bewertungsportale · kind "technik" =
+   Marken, mit denen Markus arbeitet. Eine Tabelle mit kind-Spalte statt zweier gleicher.
+   light_bg: dunkle Logos brauchen auf dem dunklen Seitenhintergrund eine helle Fläche,
+   sonst sind sie schlicht nicht zu erkennen. */
+function badgesDdl(): string {
+  return "create table if not exists badges (id text primary key, kind text default 'mitglied',
+    sort integer default 0, name text not null, subtitle text, website text,
+    image_url text, light_bg integer default 0,
     public integer default 1, created_at text)";
 }
 
@@ -1944,6 +1964,7 @@ create table document_items (id text primary key,
 SQL);
   $p->exec(rentalContractsDdl());
   $p->exec(friendsDdl());
+  $p->exec(badgesDdl());
   foreach (workshopsDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
   foreach (portalAccountDdl() as $sql) $p->exec($sql);
@@ -1991,6 +2012,7 @@ function seed(PDO $p): void {
     ['reviews', '{"google_url":"","djbande_url":"","tagline":""}'],
     ['loc_section', '{"title":"Orte, an denen ich besonders gerne auflege","text":"Deutschlandweit gibt es Locations, mit denen die Zusammenarbeit einfach herausragend läuft – eingespielte Teams, gute Technik-Bedingungen, tolle Räume. Diese Häuser empfehle ich aus voller Überzeugung."}'],
     ['gallery', '{"title":"So sieht\'s bei mir aus","images":["img/IMG_4061.png","img/IMG_4086.png","img/IMG_3296.png","img/IMG_9059.png","img/IMG_3591.png","img/spiegelkugel mittig.jpg","img/IMG_0850.png"]}'],
+    ['badges_sec', '{"mitglied": {"enabled": true, "show_tech": true, "title": "Wo ich mitmache", "text": "Netzwerke und Portale, in denen ich gelistet bin – wer mag, schaut dort nach, was andere über meine Arbeit schreiben."}, "technik": {"enabled": true, "show_tech": true, "title": "Womit ich arbeite", "text": "Die Technik, die bei mir im Wagen liegt. Keine Werbung, sondern eine ehrliche Auskunft darüber, was ich mitbringe."}}'],
     ['seo', '{"title":"DJ Lauschgift – Hochzeits-DJ & Event-DJ | Deutschlandweit","description":"DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer."}'],
     ['legal', json_encode([
       'impressum' => "Angaben gemäß § 5 DDG\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\n\nTelefon: 01523 6439373\nE-Mail: lauschgiftmarkus@gmail.com\n\nVerantwortlich für den Inhalt: Markus Jankowski (Anschrift wie oben)\n\nVerbraucherstreitbeilegung: Ich bin nicht verpflichtet und nicht bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen (§ 36 VSBG).",
