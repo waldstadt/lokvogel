@@ -99,7 +99,12 @@ var qs=new URLSearchParams(location.search);
 var OFFER=qs.get('a'),FORM=qs.get('f'),MV=qs.get('mv'),INVITE=qs.get('einladung');
 var REGISTER=qs.get('register'),PREFILL_EMAIL=qs.get('email')||'',PREFILL_NAME=qs.get('name')||'';
 var PLZ=sessionStorage.getItem('portal_plz')||'';
-function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML}
+/* Anfuehrungszeichen und Apostrophe mitmaskieren: innerHTML alleine ersetzt nur & < >,
+   damit liesse sich aus einem Attribut ausbrechen (style, onfocus und so weiter). */
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);
+  return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+/* Nur echte Web-Adressen verlinken - javascript: im Feld waere sonst ausfuehrbar. */
+function safeUrl(u){u=String(u==null?'':u).trim();return /^https?:\/\//i.test(u)?u:''}
 function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
 function dt(d){if(!d)return '–';return new Date(d).toLocaleDateString('de-DE')}
 function rentalPeriodLabel(from,to){
@@ -254,7 +259,7 @@ function renderOffer(){
       return '<div class="card" style="padding:16px 24px;font-size:13px;color:var(--mut)">'+
         (rv.tagline?'<b style="color:var(--txt)">'+esc(rv.tagline)+'</b> – ':'')+
         'Ihr wollt wissen, wie andere ihre Feier mit mir erlebt haben? '+
-        '<a href="'+esc(rv.google_url)+'" target="_blank" rel="noopener">★ Google-Bewertungen ↗</a></div>';
+        '<a href="'+esc(safeUrl(rv.google_url))+'" target="_blank" rel="noopener noreferrer">★ Google-Bewertungen ↗</a></div>';
     })()+
     '<div class="card" id="actionCard">'+
     (decided?
@@ -717,7 +722,10 @@ function loadAccount(){
 var PLAN_STATE={};
 function fmtPlaylists(list){
   if(!Array.isArray(list)||!list.length)return '';
-  return list.map(function(pl){return '<a href="'+esc(pl.url)+'" target="_blank" rel="noopener">'+esc(pl.label||pl.url)+'</a>'}).join('<br>');
+  return list.map(function(pl){
+    var u=safeUrl(pl.url),txt=esc(pl.label||pl.url);
+    return u?('<a href="'+esc(u)+'" target="_blank" rel="noopener noreferrer">'+txt+'</a>'):txt;
+  }).join('<br>');
 }
 function parsePlaylists(text){
   return (text||'').split('\n').map(function(l){return l.trim()}).filter(Boolean).map(function(l){

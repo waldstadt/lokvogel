@@ -673,7 +673,7 @@ function loadWorkshops(){
       var full=w.free<=0;
       var aud=w.audience==='dj'?'DJs & Alleinunterhalter':(w.audience==='live'?'Livemusik':'');
       return '<div style="background:var(--card);border:1px solid var(--line);border-radius:5px;padding:22px 20px">'+
-        (w.image_url?'<img src="'+esc(w.image_url)+'" alt="" style="width:100%;aspect-ratio:4/3;object-fit:cover;object-position:'+cssUrl(w.image_focal||'50% 50%')+';border-radius:4px;margin-bottom:14px">':'')+
+        (w.image_url?'<img src="'+esc(w.image_url)+'" alt="" style="width:100%;aspect-ratio:4/3;object-fit:cover;object-position:'+cssUrl(w.image_focal||'50% 50%')+';border-radius:4px;margin-bottom:14px" onerror="this.remove()">':'')+
         '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:6px">'+wsDate(w)+'</div>'+
         (aud?'<div style="display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:3px;padding:3px 10px;color:var(--mut);margin-bottom:8px">'+aud+'</div>':'')+
         '<h4 style="font-size:16px;margin-bottom:6px'+(w.image_url?'':';font-weight:800')+'">'+esc(w.title)+'</h4>'+
@@ -712,7 +712,7 @@ function openWsDetail(i){
   var aud=w.audience==='dj'?'DJs & Alleinunterhalter':(w.audience==='live'?'Livemusik':'');
   document.getElementById('wsDetailTitle').textContent=w.title;
   document.getElementById('wsDetailBody').innerHTML=
-    (w.image_url?'<img src="'+esc(w.image_url)+'" alt="" style="width:100%;aspect-ratio:16/9;object-fit:cover;object-position:'+cssUrl(w.image_focal||'50% 50%')+';border-radius:4px;margin-bottom:14px">':'')+
+    (w.image_url?'<img src="'+esc(w.image_url)+'" alt="" style="width:100%;aspect-ratio:16/9;object-fit:cover;object-position:'+cssUrl(w.image_focal||'50% 50%')+';border-radius:4px;margin-bottom:14px" onerror="this.remove()">':'')+
     '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:8px">'+wsDate(w)+'</div>'+
     (aud?'<div style="display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:3px;padding:3px 10px;color:var(--mut);margin-bottom:10px">'+aud+'</div>':'')+
     (w.description?'<p style="font-size:14px;color:var(--mut);margin-bottom:10px">'+esc(w.description)+'</p>':'')+

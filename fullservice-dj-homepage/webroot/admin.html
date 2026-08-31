@@ -3923,7 +3923,7 @@ function focalWidget(imgUrl,focal,focalId,ratio){
     return '<div id="'+focalId+'-wrap" class="mut sml" style="margin-top:10px">Bildausschnitt: erst ein Foto hochladen oder aus dem Pool wählen.</div>'+
       '<input type="hidden" id="'+focalId+'" value="'+esc(focal)+'">';
   return '<label style="margin-top:10px">Bildausschnitt <span class="mut sml" style="text-transform:none;letter-spacing:0">(aufs Vorschaubild klicken, um z. B. ein Gesicht im Ausschnitt zu halten)</span></label>'+
-    '<div id="'+focalId+'-box" onclick="setFocal(event,\''+focalId+'\')" style="position:relative;width:180px;aspect-ratio:'+ratio+';border-radius:8px;overflow:hidden;border:1px solid var(--line);cursor:crosshair;background-color:var(--card);background-size:cover;background-repeat:no-repeat;background-position:'+fx+'% '+fy+'%;background-image:url(\''+cssUrl(imgUrl)+'\')">'+
+    '<div id="'+focalId+'-box" onclick="setFocal(event,\''+focalId+'\')" style="position:relative;width:180px;aspect-ratio:'+ratio+';border-radius:8px;overflow:hidden;border:1px solid var(--line);cursor:crosshair;background-color:var(--card,#20232a);background-size:cover;background-repeat:no-repeat;background-position:'+fx+'% '+fy+'%;background-image:url(\''+cssUrl(imgUrl)+'\')">'+
     '<div id="'+focalId+'-marker" style="position:absolute;left:'+fx+'%;top:'+fy+'%;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.5);pointer-events:none"></div></div>'+
     '<input type="hidden" id="'+focalId+'" value="'+esc(focal)+'">';
 }
