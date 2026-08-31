@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 73;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 74;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -674,6 +674,16 @@ function upgrade(PDO $p): void {
         ->execute(['pack_sec', '{"images":true}', now()]);
   } catch (PDOException $e) {}
   if ($v < 73) try { $p->exec(eventReportsDdl()); } catch (PDOException $e) {}
+  if ($v < 74) try {
+    /* Einleitung fuer die neue Auftragsbestaetigung - nur ergaenzen, nie ueberschreiben. */
+    $st = $p->query("select value from settings where key='defaults'");
+    $defs = json_decode((string)$st->fetchColumn() ?: '{}', true) ?: [];
+    if (!isset($defs['confirm_intro'])) {
+      $defs['confirm_intro'] = 'schön, dass ihr euch entschieden habt. Hiermit bestätige ich euch den Auftrag verbindlich – der Termin ist ab jetzt für euch reserviert.';
+      $p->prepare("update settings set value = ? where key = 'defaults'")
+        ->execute([json_encode($defs, JSON_UNESCAPED_UNICODE)]);
+    }
+  } catch (PDOException $e) {}
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -897,7 +907,7 @@ function docAudit(PDO $p, ?string $docId, string $action, string $detail = ''): 
 
 /* Festgeschrieben = Rechnungsartige Dokumente, die den Entwurfsstatus verlassen haben */
 function docLockedRow(array $d): bool {
-  return !in_array($d['doc_type'] ?? '', ['angebot', 'lieferschein'])
+  return !in_array($d['doc_type'] ?? '', ['angebot', 'bestaetigung', 'lieferschein'])
     && ($d['status'] ?? 'entwurf') !== 'entwurf';
 }
 /* Positionen dürfen nur geändert werden, solange das zugehörige Dokument nicht festgeschrieben ist */
@@ -2058,7 +2068,7 @@ function seed(PDO $p): void {
     ['company', '{"name":"DJ Lauschgift","owner":"Markus Jankowski","street":"Büttmecker Weg 35c","zip_city":"58675 Hemer","phone":"01523 6439373","email":"lauschgiftmarkus@gmail.com","website":"https://lauschgift.net","tax_id":"","vat_id":"","iban":"","bic":"","bank":"","small_business":false}'],
     ['numbering', '{"angebot":{"prefix":"AN-","next":1},"rechnung":{"prefix":"RE-","next":1},"lieferschein":{"prefix":"LS-","next":1},"year_in_number":true}'],
     ['rental_contract', json_encode(['text' => rentalContractDefault()], JSON_UNESCAPED_UNICODE)],
-    ['defaults', '{"tax_rate":19,"payment_days":14,"quote_valid_days":30,"quote_intro":"vielen Dank für eure Anfrage. Gerne biete ich euch an:","invoice_outro":"Bitte überweist den Betrag unter Angabe der Rechnungsnummer auf das unten genannte Konto."}'],
+    ['defaults', '{"tax_rate":19,"payment_days":14,"quote_valid_days":30,"quote_intro":"vielen Dank für eure Anfrage. Gerne biete ich euch an:","confirm_intro":"schön, dass ihr euch entschieden habt. Hiermit bestätige ich euch den Auftrag verbindlich – der Termin ist ab jetzt für euch reserviert.","invoice_outro":"Bitte überweist den Betrag unter Angabe der Rechnungsnummer auf das unten genannte Konto."}'],
   ] as [$k, $v]) $p->prepare('insert into settings (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
 
   foreach ([
@@ -2978,7 +2988,7 @@ function dailyDigest(): array {
     $parts[] = 'Anfrage wartet seit ' . max(1, (int)floor((time() - strtotime((string)$i['created_at'])) / 86400)) .
       ' Tag(en) auf Antwort: ' . $i['name'] . ($i['event_type'] ? ' (' . $i['event_type'] . ')' : '');
   $od = $p->query("select count(*) c, coalesce(sum(total_gross - coalesce(deposit_deducted,0)),0) s from documents
-    where doc_type not in ('angebot','lieferschein') and status = 'versendet' and due_date < '$today'")->fetch();
+    where doc_type not in ('angebot','bestaetigung','lieferschein') and status = 'versendet' and due_date < '$today'")->fetch();
   if ((int)$od['c']) $parts[] = $od['c'] . ' überfällige Rechnung(en), zusammen ' . number_format((float)$od['s'], 2, ',', '.') . ' € – Zahlungserinnerung im Backoffice.';
   $wt = $p->query("select c.first_name, c.last_name, c.company, max(d.paid_at) lastpaid from document_items i
     join documents d on d.id = i.document_id join customers c on c.id = d.customer_id

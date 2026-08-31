@@ -308,8 +308,8 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <a onclick="showPage('cust')">← Kunden</a>
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="cdName"></div><div class="ps" id="cdSub"></div></div>
       <div><button class="btn g sm" onclick="openCustModal(curCust)">Bearbeiten</button>
-      <button class="btn g sm" onclick="openTechCheck()">Technik-Check</button>
-      <button class="btn sm" onclick="newBookingFor(curCust.id)">+ Buchung</button></div></div>
+      <button class="btn g sm" onclick="newBookingFor(curCust.id)">+ Buchung</button>
+      <button class="btn sm" onclick="newDocFor('angebot')">+ Angebot</button></div></div>
     <div class="grid2" style="gap:16px;align-items:start">
       <div>
         <div class="card"><h3>Kommunikation <button class="btn sm" style="float:right" onclick="openCommModal()">+ Eintrag</button></h3>
@@ -320,7 +320,11 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div class="card"><h3>Kunden-Backoffice <button class="btn sm" style="float:right" onclick="portalInvite()">Einladungslink</button></h3>
           <div id="cdPortal" class="sml mut">–</div></div>
         <div class="card"><h3>Buchungen</h3><div id="cdBookings" class="sml mut">–</div></div>
-        <div class="card"><h3>Dokumente</h3><div id="cdDocs" class="sml mut">–</div></div>
+        <div class="card"><h3>Belege <span style="float:right;display:flex;gap:6px">
+          <button class="btn g sm" onclick="newDocFor('angebot')">+ Angebot</button>
+          <button class="btn g sm" onclick="newDocFor('rechnung')">+ Rechnung</button></span></h3>
+          <div class="mut sml" style="margin-bottom:6px">Reihenfolge: Angebot → Auftragsbestätigung → Abschlagsrechnung → Rechnung. Die nächsten Schritte stehen jeweils im Beleg selbst.</div>
+          <div id="cdDocs" class="sml mut">–</div></div>
       </div>
     </div>
   </div>
@@ -348,6 +352,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="bdTitle"></div><div class="ps" id="bdSub"></div></div>
       <div><button class="btn g sm" onclick="openBookModal(curBook)">Bearbeiten</button>
       <button class="btn g sm" onclick="createDocFromBooking('angebot')">→ Angebot</button>
+      <button class="btn g sm" onclick="createDocFromBooking('bestaetigung')">→ Auftragsbestätigung</button>
       <button class="btn g sm" onclick="createDocFromBooking('abschlag')">→ Abschlagsrechnung</button>
       <button class="btn sm" onclick="createDocFromBooking('rechnung')">→ Rechnung</button>
       <button class="btn g sm" onclick="printPackliste()">Packliste</button>
@@ -434,7 +439,8 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       </div>
       <div class="grid4">
         <div><label>Typ</label><select id="docType">
-          <option value="angebot">Angebot</option><option value="rechnung">Rechnung</option>
+          <option value="angebot">Angebot</option><option value="bestaetigung">Auftragsbestätigung</option>
+          <option value="rechnung">Rechnung</option>
           <option value="abschlag">Abschlagsrechnung</option><option value="schluss">Schlussrechnung</option>
           <option value="lieferschein">Lieferschein</option></select></div>
         <div><label>USt. %</label><input type="number" id="docTax" step="0.1" value="19"></div>
@@ -785,6 +791,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <div class="grid2">
             <div><label>Angebots-Präfix</label><input id="sQPre"></div>
             <div><label>Nächste Angebots-Nr.</label><input type="number" id="sQNext"></div>
+          </div>
+          <div class="grid2">
+            <div><label>Präfix Auftragsbestätigung</label><input id="sBPre"></div>
+            <div><label>Nächste Auftragsbest.-Nr.</label><input type="number" id="sBNext"></div>
           </div>
           <div class="grid2">
             <div><label>Rechnungs-Präfix</label><input id="sIPre"></div>
@@ -1398,7 +1408,11 @@ function openCustDetail(id){
     row('E-Mail',c.email)+row('Telefon',c.phone)+row('WhatsApp',c.whatsapp)+
     row('Adresse',[c.street,[c.zip,c.city].filter(Boolean).join(' ')].filter(Boolean).join(', '))+
     row('Tags',(c.tags||[]).join(', '))+row('Notizen',c.notes)+
-    (c.tech_check&&c.tech_check.date?row('Technik-Check',dt(c.tech_check.date)+' – '+(c.tech_check.recommendation||'')):'');
+    (c.tech_check&&c.tech_check.date?row('Technik-Check',dt(c.tech_check.date)+' – '+(c.tech_check.recommendation||'')):'')+
+    /* Der Technik-Check betrifft nur wenige Kunden - deshalb hier als kleiner Link
+       statt als Knopf neben "Bearbeiten". */
+    '<div style="margin-top:10px"><a class="sml" onclick="openTechCheck()">'+
+    (c.tech_check&&c.tech_check.date?'Technik-Check ansehen oder ergänzen':'Technik-Check erfassen')+'</a></div>';
   renderCdPortal();
   var books=CACHE.bookings.filter(function(b){return b.customer_id===id});
   document.getElementById('cdBookings').innerHTML=books.map(function(b){
@@ -1825,6 +1839,23 @@ function beDel(id){api('booking_equipment?id=eq.'+id,{method:'DELETE'}).then(fun
   api('booking_equipment?select=*').then(function(r){CACHE.be=r||[];renderBe();renderEq()})})}
 
 function newBookingFor(custId){openBookModal(null,custId)}
+/* Beleg aus dem Kunden heraus anlegen. Bewusst derselbe Editor wie unter "Angebote" bzw.
+   "Rechnungen" - es gibt nur eine Belegmaske, hier ist lediglich der Kunde schon gesetzt
+   und eine vorhandene Buchung vorausgewaehlt. */
+function newDocFor(type){
+  var c=curCust;if(!c)return;
+  openDocEditor(null,type||'angebot');
+  setTimeout(function(){
+    document.getElementById('docCust').value=c.id;
+    refreshBookOpts();
+    /* Hat der Kunde genau eine offene Buchung, gleich verknuepfen - spart einen Griff
+       und sorgt dafuer, dass Abschlag und Schlussrechnung spaeter zusammenfinden. */
+    var offen=(CACHE.bookings||[]).filter(function(b){
+      return b.customer_id===c.id&&['anfrage','angebot','gebucht'].indexOf(b.status)>=0});
+    if(offen.length===1)document.getElementById('docBook').value=offen[0].id;
+    renderTotals();
+  },30);
+}
 function openBookModal(b,presetCust){
   b=b||{};
   var custOpts=CACHE.customers.map(function(c){return '<option value="'+c.id+'"'+((b.customer_id||presetCust)===c.id?' selected':'')+'>'+esc(custName(c))+'</option>'}).join('');
@@ -2187,10 +2218,15 @@ function printEventPlan(){
 }
 
 /* ===== Dokumente (Angebote & Rechnungen) ===== */
-function docTypeName(t){return {angebot:'Angebot',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'}[t]||t}
+function docTypeName(t){return {angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'}[t]||t}
+/* Angebot und Auftragsbestätigung sind keine Zahlungsaufforderungen - sie haben kein
+   Fälligkeitsdatum, keine Mahnung und keinen Bezahlt-Status. */
+function istZahlbeleg(t){return t!=='angebot'&&t!=='bestaetigung'&&t!=='lieferschein'}
 function docBadge(st){return {entwurf:'grey',versendet:'blue',angenommen:'green',abgelehnt:'red',bezahlt:'green',ueberfaellig:'red',storniert:'red'}[st]||'grey'}
 function renderQuotes(){
-  var list=CACHE.documents.filter(function(d){return d.doc_type==='angebot'});
+  /* Auftragsbestätigungen stehen mit in der Angebotsliste - sie gehören zur selben
+     Phase und sollen nicht zwischen den Rechnungen untergehen. */
+  var list=CACHE.documents.filter(function(d){return d.doc_type==='angebot'||d.doc_type==='bestaetigung'});
   var sent=list.filter(function(d){return ['versendet','angenommen','abgelehnt'].indexOf(d.status)>=0});
   var acc=list.filter(function(d){return d.status==='angenommen'});
   document.getElementById('qStats').textContent=sent.length?('Annahmequote: '+Math.round(acc.length/sent.length*100)+' % ('+acc.length+'/'+sent.length+')'):'Noch keine versendeten Angebote';
@@ -2201,7 +2237,7 @@ function renderQuotes(){
   }).join('')||'<tr><td colspan="6" class="mut">Noch keine Angebote.</td></tr>';
 }
 function renderInv(){
-  var list=CACHE.documents.filter(function(d){return d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'});
+  var list=CACHE.documents.filter(function(d){return istZahlbeleg(d.doc_type)});
   document.getElementById('invRows').innerHTML=applySort(list,'invoices').map(function(d){
     return '<tr class="click" onclick="openDocEditor(\''+d.id+'\')"><td><b>'+esc(d.number)+'</b></td><td>'+docTypeName(d.doc_type)+'</td><td>'+dt(d.doc_date)+'</td>'+
     '<td>'+esc(custName(d.customers))+'</td><td class="num">'+euro(Number(d.total_gross)-Number(d.deposit_deducted||0))+'</td><td>'+dt(d.due_date)+'</td>'+
@@ -2217,8 +2253,10 @@ function renderInv(){
 var curDoc=null,curItems=[];
 function nextNumber(type){
   var n=S.numbering||{angebot:{prefix:'AN-',next:1},rechnung:{prefix:'RE-',next:1},year_in_number:true};
-  var kind=type==='angebot'?'angebot':(type==='lieferschein'?'lieferschein':'rechnung');
-  if(!n[kind])n[kind]={prefix:type==='lieferschein'?'LS-':'RE-',next:1};
+  var kind=type==='angebot'?'angebot'
+    :(type==='bestaetigung'?'bestaetigung'
+    :(type==='lieferschein'?'lieferschein':'rechnung'));
+  if(!n[kind])n[kind]={prefix:type==='bestaetigung'?'AB-':(type==='lieferschein'?'LS-':'RE-'),next:1};
   var cfg=n[kind];
   var num=cfg.prefix+(n.year_in_number?new Date().getFullYear()+'-':'')+String(cfg.next).padStart(4,'0');
   return {number:num,commit:function(){
@@ -2242,7 +2280,9 @@ function openDocEditor(id,newType){
       doc_date:new Date().toISOString().slice(0,10),
       tax_rate:(S.company&&S.company.small_business)?0:(defs.tax_rate!=null?defs.tax_rate:19),
       is_small_business:!!(S.company&&S.company.small_business),
-      intro_text:newType==='angebot'?(defs.quote_intro||''):'',outro_text:newType==='angebot'?'':(defs.invoice_outro||''),
+      intro_text:newType==='angebot'?(defs.quote_intro||'')
+        :(newType==='bestaetigung'?(defs.confirm_intro||''):''),
+      outro_text:istZahlbeleg(newType)?(defs.invoice_outro||''):'',
       deposit_deducted:0,customer_id:'',booking_id:null,rental_from:null,rental_to:null,
       price_mode:'brutto',discount_value:0,discount_type:'pct'};
     var days=newType==='angebot'?(defs.quote_valid_days||30):(defs.payment_days||14);
@@ -2291,7 +2331,7 @@ function fillDocForm(){
   refreshBookOpts();
   document.getElementById('docBook').value=d.booking_id||'';
   document.getElementById('docDate').value=d.doc_date||'';
-  document.getElementById('docDate2').value=d.doc_type==='angebot'?(d.valid_until||''):(d.due_date||'');
+  document.getElementById('docDate2').value=istZahlbeleg(d.doc_type)?(d.due_date||''):(d.valid_until||'');
   document.getElementById('docTax').value=d.is_small_business?0:d.tax_rate;
   document.getElementById('docNetto').checked=(d.price_mode==='netto');
   document.getElementById('docDiscVal').value=d.discount_value||0;
@@ -2309,7 +2349,7 @@ function showAcceptSig(){
   openModal('Unterschrift – '+esc(curDoc.number)+' · '+esc(curDoc.accepted_name||''),
     '<img src="'+esc(curDoc.accept_signature)+'" style="background:#fff;border-radius:8px;max-width:100%;max-height:180px;display:block">');
 }
-function docLockedJs(d){return !!(d&&d.id&&['angebot','lieferschein'].indexOf(d.doc_type)<0&&d.status!=='entwurf')}
+function docLockedJs(d){return !!(d&&d.id&&istZahlbeleg(d.doc_type)&&d.status!=='entwurf')}
 function applyDocLock(){
   var locked=docLockedJs(curDoc);
   ['docType','docCust','docBook','docDate','docDate2','docTax','docNetto','docRentFrom','docRentTo','docDiscVal','docDiscType','docDep','docTotalOverride','docIntro','docOutro']
@@ -2356,13 +2396,16 @@ function renderStatusBtns(){
   if(d.status==='entwurf')btns+='<button class="btn g sm" onclick="setDocStatus(\'versendet\')">→ Versendet</button>';
   if(d.doc_type==='angebot'&&d.status==='versendet')
     btns+='<button class="btn g sm" onclick="setDocStatus(\'angenommen\')">✓ Angenommen</button> <button class="btn g sm" onclick="setDocStatus(\'abgelehnt\')">✕ Abgelehnt</button>';
-  if(d.doc_type!=='angebot'&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
+  if(istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
     btns+='<button class="btn g sm" onclick="setDocStatus(\'bezahlt\')">€ Bezahlt</button> ';
   if(d.doc_type==='angebot'&&d.status==='angenommen')
+    btns+='<button class="btn sm" onclick="docToInvoice(\'bestaetigung\')">→ Auftragsbestätigung</button> '+
+      '<button class="btn g sm" onclick="docToInvoice(\'abschlag\')">→ Abschlag</button> <button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button>';
+  if(d.doc_type==='bestaetigung'&&d.status!=='storniert')
     btns+='<button class="btn g sm" onclick="docToInvoice(\'abschlag\')">→ Abschlag</button> <button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button>';
   if(d.doc_type==='abschlag'&&d.status==='bezahlt')
     btns+='<button class="btn g sm" onclick="docToInvoice(\'schluss\')">→ Schlussrechnung</button>';
-  if(d.doc_type!=='angebot'&&d.doc_type!=='lieferschein'&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
+  if(istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
     btns+='<button class="btn g sm" onclick="composeReminderMail()">Zahlungserinnerung</button>';
   if(d.status!=='storniert')btns+='<button class="btn g sm" onclick="setDocStatus(\'storniert\')">Storno</button> ';
   document.getElementById('docStatusBtns').innerHTML=btns;
@@ -2631,7 +2674,7 @@ function saveDoc(){
     rental_from:v('docRentFrom')||null,rental_to:v('docRentTo')||null,
     price_mode:docModeVal(),discount_value:c.discVal,discount_type:c.discType,parent_id:curDoc.parent_id||null,
     total_net:c.net,total_tax:c.tax,total_gross:c.gross,total_override:c.override,deposit_deducted:type==='schluss'?c.dep:0};
-  body[type==='angebot'?'valid_until':'due_date']=v('docDate2')||null;
+  body[istZahlbeleg(type)?'due_date':'valid_until']=v('docDate2')||null;
   var p;
   if(curDoc.id){p=api('documents?id=eq.'+curDoc.id,{method:'PATCH',prefer:'return=representation',body:body})}
   else{
@@ -3237,7 +3280,7 @@ function printDoc(){
   '<div style="margin-bottom:30px">'+esc(custName(cust))+'<br>'+esc(cust.street||'')+'<br>'+esc([cust.zip,cust.city].filter(Boolean).join(' '))+'</div>'+
   '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px">'+
   '<div style="font-size:17px;font-weight:700">'+docTypeName(type)+' '+esc(d.number)+'</div>'+
-  '<div style="text-align:right;color:#555">Datum: '+dt(v('docDate'))+(v('docDate2')?('<br>'+(type==='angebot'?'Gültig bis: ':'Zahlbar bis: ')+dt(v('docDate2'))):'')+(rentalPeriodLabel(v('docRentFrom'),v('docRentTo'))?'<br>'+rentalPeriodLabel(v('docRentFrom'),v('docRentTo')):'')+'</div></div>'+
+  '<div style="text-align:right;color:#555">Datum: '+dt(v('docDate'))+(v('docDate2')?('<br>'+(istZahlbeleg(type)?'Zahlbar bis: ':'Gültig bis: ')+dt(v('docDate2'))):'')+(rentalPeriodLabel(v('docRentFrom'),v('docRentTo'))?'<br>'+rentalPeriodLabel(v('docRentFrom'),v('docRentTo')):'')+'</div></div>'+
   (v('docIntro')?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(v('docIntro'))+'</p>':'')+
   '<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2">'+
   '<th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Beschreibung</th><th style="padding:6px;text-align:right">Menge</th><th style="padding:6px;text-align:right">Einzel'+(brutto?' brutto':' netto')+'</th><th style="padding:6px;text-align:right">Gesamt'+(brutto?' brutto':' netto')+'</th></tr></thead>'+
@@ -5156,6 +5199,8 @@ function renderSet(){
   document.getElementById('sPaypal').value=c.paypal||'';
   document.getElementById('sQPre').value=(n.angebot&&n.angebot.prefix)||'AN-';
   document.getElementById('sQNext').value=(n.angebot&&n.angebot.next)||1;
+  document.getElementById('sBPre').value=(n.bestaetigung&&n.bestaetigung.prefix)||'AB-';
+  document.getElementById('sBNext').value=(n.bestaetigung&&n.bestaetigung.next)||1;
   document.getElementById('sIPre').value=(n.rechnung&&n.rechnung.prefix)||'RE-';
   document.getElementById('sINext').value=(n.rechnung&&n.rechnung.next)||1;
   document.getElementById('sPayDays').value=d.payment_days!=null?d.payment_days:14;
@@ -5191,7 +5236,13 @@ function saveCompany(){
     .then(function(){S.company=val;toast('Firmendaten gespeichert ✓')}).catch(function(e){toast(e.message,1)});
 }
 function saveNumbering(){
-  var n={angebot:{prefix:v('sQPre'),next:Number(v('sQNext'))||1},rechnung:{prefix:v('sIPre'),next:Number(v('sINext'))||1},year_in_number:true};
+  /* Vorhandene Kreise erhalten: nextNumber() legt bei Bedarf weitere an (Lieferschein),
+     die hier sonst beim Speichern verloren gingen und wieder bei 1 anfangen wuerden. */
+  var n=Object.assign({},S.numbering||{});
+  n.angebot={prefix:v('sQPre'),next:Number(v('sQNext'))||1};
+  n.bestaetigung={prefix:v('sBPre')||'AB-',next:Number(v('sBNext'))||1};
+  n.rechnung={prefix:v('sIPre'),next:Number(v('sINext'))||1};
+  n.year_in_number=true;
   var d=S.defaults||{};d.payment_days=Number(v('sPayDays'))||14;d.quote_valid_days=Number(v('sValidDays'))||30;
   d.plan_lock_days=Number(v('sPlanLock'))||0;
   d.tax_rate=Number(v('sTaxRate'))||19;d.partner_discount_pct=Number(v('sPartnerPct'))||20;

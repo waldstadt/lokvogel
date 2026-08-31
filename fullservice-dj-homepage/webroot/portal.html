@@ -706,7 +706,7 @@ function doForgot(){
       m.textContent='Wenn zu dieser Adresse ein Zugang existiert, ist gerade eine E-Mail mit einem Link unterwegs.'});
 }
 function logout(){CTOK='';localStorage.removeItem('cust_tok');renderLogin()}
-var TYPE_LABEL={angebot:'Angebot',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'};
+var TYPE_LABEL={angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'};
 function loadAccount(){
   cfetch('portal/account/me').then(function(r){
     if(r.status===401){renderLogin();return null}
