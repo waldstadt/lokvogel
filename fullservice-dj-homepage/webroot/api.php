@@ -3940,7 +3940,10 @@ function mediaVerweiseUmschreiben(PDO $p, string $alt, string $neu): int {
   $paare = [[$alt, $neu]];
   $altJ = str_replace('/', '\\/', $alt);
   if ($altJ !== $alt) $paare[] = [$altJ, str_replace('/', '\\/', $neu)];
+  /* Das Aenderungsprotokoll bleibt aussen vor: was dort steht, ist ein Protokoll und
+     kein Verweis - nachtraeglich umgeschriebene Protokolleintraege waeren wertlos. */
   foreach (TABLES as $t) {
+    if ($t === 'doc_audit') continue;
     try {
       $cols = $p->query("PRAGMA table_info(\"$t\")")->fetchAll();
     } catch (PDOException $e) { continue; }
