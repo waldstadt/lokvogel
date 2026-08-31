@@ -628,6 +628,8 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <label>Überschrift</label><textarea id="cHeroTitle" style="min-height:62px" placeholder="Volle Tanzfläche.&#10;*Ohne Schnickschnack.*"></textarea>
           <div class="mut sml" style="margin-top:4px">Jede Zeile hier wird auch auf der Seite eine eigene Zeile – eine reicht, mehr gehen auch. Setzt du eine Zeile in *Sternchen*, erscheint sie in der Akzentfarbe. Leer lassen behält die aktuelle Überschrift.</div>
           <label style="margin-top:12px">Unterzeile (Kicker)</label><input id="cHeroSub">
+          <label style="margin-top:12px">Merkmale unter dem Hero <span class="mut sml" style="text-transform:none;letter-spacing:0">(max. 4)</span></label>
+          <div class="mut sml" style="margin:2px 0 8px">Die drei bis vier kurzen Zahlen unter dem Hero. Große Zeile in Akzentfarbe, kleine Zeile darunter in Großbuchstaben. Leere Zeilen werden weggelassen – wer nur zwei will, füllt nur zwei aus.</div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cHeroBadge1v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cHeroBadge1l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cHeroBadge2v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cHeroBadge2l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cHeroBadge3v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cHeroBadge3l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cHeroBadge4v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cHeroBadge4l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div>
           <label>Text</label><textarea id="cHeroText"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cHeroText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Button-Text</label><input id="cHeroCta">
@@ -659,6 +661,8 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <label>Hero-Überschrift</label><textarea id="cThTitle" style="min-height:62px" placeholder="Jedes Wort verständlich.&#10;*Auch in der schwierigsten Location.*"></textarea>
           <div class="mut sml" style="margin-top:4px">Jede Zeile hier wird auch auf der Seite eine eigene Zeile – eine reicht, mehr gehen auch. Setzt du eine Zeile in *Sternchen*, erscheint sie in der Akzentfarbe. Leer lassen behält die aktuelle Überschrift.</div>
           <label style="margin-top:12px">Hero-Unterzeile</label><input id="cThSub">
+          <label style="margin-top:12px">Merkmale unter dem Hero <span class="mut sml" style="text-transform:none;letter-spacing:0">(max. 4)</span></label>
+          <div class="mut sml" style="margin:2px 0 8px">Die drei bis vier kurzen Zahlen unter dem Hero. Große Zeile in Akzentfarbe, kleine Zeile darunter in Großbuchstaben. Leere Zeilen werden weggelassen – wer nur zwei will, füllt nur zwei aus.</div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cThBadge1v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cThBadge1l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cThBadge2v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cThBadge2l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cThBadge3v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cThBadge3l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div><div class="grid2" style="gap:8px;margin-bottom:6px"><div><input id="cThBadge4v" placeholder="Große Zeile, z. B. 23" maxlength="14"></div><div><input id="cThBadge4l" placeholder="Kleine Zeile, z. B. Jahre hinter den Decks" maxlength="40"></div></div>
           <label>Hero-Hintergrundbild <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional)</span></label>
           <div style="display:flex;gap:8px"><input id="cThImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upThHero" onchange="uploadImg(this,'cThImg','cThFocal')"><button class="btn g sm" onclick="document.getElementById('upThHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cThImg','cThFocal','21/9')">Aus Pool</button></div>
           <div id="cThFocalWrap"></div>
@@ -4150,6 +4154,7 @@ function renderCms(){
   var c=CACHE.content||{};
   function g(k,f){return (c[k]&&c[k][f])||''}
   document.getElementById('cHeroTitle').value=g('hero','headline');
+  fillBadgeFields('cHeroBadge',g('hero','badges'));
   document.getElementById('cHeroSub').value=g('hero','subtitle');
   document.getElementById('cHeroText').value=g('hero','text');
   document.getElementById('cHeroCta').value=g('hero','cta');
@@ -4167,6 +4172,7 @@ function renderCms(){
   document.getElementById('cSeoTitle').value=g('seo','title');
   document.getElementById('cSeoDesc').value=g('seo','description');
   document.getElementById('cThTitle').value=g('tech_hero','headline');
+  fillBadgeFields('cThBadge',g('tech_hero','badges'));
   document.getElementById('cThSub').value=g('tech_hero','subtitle');
   document.getElementById('cThImg').value=g('tech_hero','image');
   document.getElementById('cThFocalWrap').innerHTML=focalWidget(g('tech_hero','image'),g('tech_hero','image_focal'),'cThFocal','21/9');
@@ -4239,7 +4245,7 @@ function saveTheme(){
 /* Baut den Wert eines site_content-Keys aus dem aktuellen Formularstand –
    genutzt von saveContent (live speichern) UND von den Versionen (Entwurf sichern). */
 function buildContentVal(key){
-  if(key==='hero')return {title:'DJ Lauschgift',headline:v('cHeroTitle'),subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal'),video:v('cHeroVid')};
+  if(key==='hero')return {title:'DJ Lauschgift',headline:v('cHeroTitle'),badges:badgeFields('cHeroBadge'),subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal'),video:v('cHeroVid')};
   if(key==='about')return {title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg'),image_focal:v('cAboutFocal'),
     gear:v('cAboutGear').split(',').map(function(s){return s.trim()}).filter(Boolean)};
   if(key==='contact')return {title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
@@ -4262,7 +4268,7 @@ function buildContentVal(key){
 }
 function saveContent(key){
   if(key==='tech'){
-    upsertContent('tech_hero',{headline:v('cThTitle'),subtitle:v('cThSub'),text:v('cThText'),image:v('cThImg'),image_focal:v('cThFocal'),video:v('cThVid'),enabled:document.getElementById('cThEnabled').checked});
+    upsertContent('tech_hero',{headline:v('cThTitle'),badges:badgeFields('cThBadge'),subtitle:v('cThSub'),text:v('cThText'),image:v('cThImg'),image_focal:v('cThFocal'),video:v('cThVid'),enabled:document.getElementById('cThEnabled').checked});
     upsertContent('rental',{title:v('cThRentTitle'),text:v('cThRentText')});
     upsertContent('tech_teaser',{title:v('cThTeaTitle'),text:v('cThTeaText')});
     return;
@@ -6745,12 +6751,31 @@ function delVersion(key){
       renderVersionBars(false);toast('Version gelöscht ✓');
     }).catch(function(e){toast(e.message,1)});
 }
+/* Die vier Merkmal-Zeilen unter dem Hero: leere Zeilen fallen raus, damit auf der Seite
+   keine Luecke entsteht. Eine Zeile ohne grosse Zeile ergibt kein Merkmal. */
+function badgeFields(prefix){
+  var out=[];
+  for(var i=1;i<=4;i++){
+    var val=(v(prefix+i+'v')||'').trim(),lab=(v(prefix+i+'l')||'').trim();
+    if(val)out.push({value:val,label:lab});
+  }
+  return out;
+}
+function fillBadgeFields(prefix,list){
+  list=Array.isArray(list)?list:[];
+  for(var i=1;i<=4;i++){
+    var b=list[i-1]||{};
+    var ev=document.getElementById(prefix+i+'v'),el=document.getElementById(prefix+i+'l');
+    if(ev)ev.value=b.value||'';
+    if(el)el.value=b.label||'';
+  }
+}
 /* Füllt NUR die Formularfelder eines Keys (Sandbox – speichert nichts) */
 function fillContent(key,val){
   val=val||{};
   function set(id,x){var el=document.getElementById(id);if(el)el.value=x==null?'':x}
   if(key==='hero'){
-    set('cHeroTitle',val.headline);set('cHeroSub',val.subtitle);set('cHeroText',val.text);set('cHeroCta',val.cta);set('cHeroImg',val.image);set('cHeroVid',val.video||'');heroVidHint();
+    set('cHeroTitle',val.headline);fillBadgeFields('cHeroBadge',val.badges);set('cHeroSub',val.subtitle);set('cHeroText',val.text);set('cHeroCta',val.cta);set('cHeroImg',val.image);set('cHeroVid',val.video||'');heroVidHint();
     document.getElementById('cHeroFocalWrap').innerHTML=focalWidget(val.image,val.image_focal,'cHeroFocal','21/9');
   }
   if(key==='about'){

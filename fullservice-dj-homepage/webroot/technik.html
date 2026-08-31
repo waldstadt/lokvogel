@@ -587,6 +587,25 @@ function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:
 /* Ueberschrift aus dem Backoffice: eine Zeile pro Zeile, *Sternchen* faerbt eine Zeile
    in der Akzentfarbe ein. Bewusst ueber DOM-Knoten gebaut - eingegebener Text darf nie
    als Markup landen. */
+/* Merkmale unter dem Hero aus dem Backoffice. Wieder ueber DOM-Knoten: die Werte sind
+   frei eingegeben und duerfen nie als Markup landen. Leere Liste laesst die Seite so,
+   wie sie im HTML steht. */
+function setHeroBadges(list){
+  var box=document.querySelector('.badges');
+  if(!box||!Array.isArray(list))return;
+  var gueltig=list.filter(function(b){return b&&String(b.value||'').trim()!==''});
+  if(!gueltig.length){box.style.display='none';return}
+  box.style.display='';
+  box.textContent='';
+  gueltig.slice(0,4).forEach(function(b){
+    var d=document.createElement('div');d.className='badge';
+    var v=document.createElement('b');v.textContent=String(b.value).trim();d.appendChild(v);
+    if(String(b.label||'').trim()!==''){
+      var l=document.createElement('span');l.textContent=String(b.label).trim();d.appendChild(l);
+    }
+    box.appendChild(d);
+  });
+}
 function setHeroHeadline(txt,id){
   var el=document.getElementById(id||'heroTitle');
   if(!el||!txt||!String(txt).trim())return;
@@ -628,6 +647,7 @@ sfetch('site_content?select=key,value').then(function(rows){
     }
     setHeroVideo(c.tech_hero.video);
     setHeroHeadline(c.tech_hero.headline);
+    setHeroBadges(c.tech_hero.badges);
     if(c.tech_hero.subtitle)document.getElementById('heroKick').textContent=c.tech_hero.subtitle;
     if(c.tech_hero.text)document.getElementById('heroText').textContent=c.tech_hero.text;
   }
