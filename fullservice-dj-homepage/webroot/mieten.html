@@ -655,7 +655,7 @@ function setItemsOf(s){
 /* Set-Hauptbild fürs Produktfenster - eigene Auszeichnung unabhängig von .rent (Kachel). */
 function setImageAreaModal(s){
   if(s.image_url)
-    return '<div class="pm-main"><img src="'+esc(s.image_url)+'" alt="'+esc(s.name)+'" style="object-position:'+esc(s.image_focal||'50% 50%')+'" onerror="this.remove()"></div>';
+    return '<div class="pm-main"><img src="'+esc(s.image_url)+'" alt="'+esc(s.name)+'" style="object-position:'+cssUrl(s.image_focal||'50% 50%')+'" onerror="this.remove()"></div>';
   var imgs=setItemImages(s).slice(0,4);
   if(!imgs.length)return '<div class="pm-main"><span class="pm-fallback">'+catIcon('')+'</span></div>';
   return '<div class="pm-main pm-collage n'+imgs.length+'">'+imgs.map(function(u){

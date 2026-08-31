@@ -218,7 +218,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
 .blk-med.c4{grid-template-columns:repeat(4,1fr)}
 @media(max-width:900px){.blk-med.c3,.blk-med.c4{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.blk-med.c2,.blk-med.c3,.blk-med.c4{grid-template-columns:1fr}}
-.blk h2,.rep h4,.rep-box h3{overflow-wrap:anywhere}
+.blk h2,.rep h4,.rep-box h3,.rep p,.rep-box .rep-text,
+.blk-med figcaption,.blk-solo figcaption,.rep-box .rep-fotos figcaption{overflow-wrap:anywhere}
 .blk-med figure{margin:0}
 .blk-med img,.blk-med video{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:5px;
   border:1px solid var(--line);display:block;background:var(--card)}
@@ -667,7 +668,7 @@ function renderPacks(list){
     var price=p.price_from?('<div class="price">'+esc(p.price_note||'ab')+' '+euro(p.price_from)+' <small>inkl. MwSt., zzgl. Anfahrt</small></div>')
       :'<div class="price" style="font-size:14px;color:var(--mut);font-weight:400">Preis richtet sich nach Aufwand &amp; Dauer – im kostenlosen Kennenlerngespräch gibt es ein klares Angebot</div>';
     var bild=(zeigeBilder&&p.image_url)
-      ? '<img class="pack-img" src="'+esc(p.image_url)+'" alt="" loading="lazy" style="object-position:'+esc(p.image_focal||'50% 50%')+'" onerror="this.remove()">'
+      ? '<img class="pack-img" src="'+esc(p.image_url)+'" alt="" loading="lazy" style="object-position:'+cssUrl(p.image_focal||'50% 50%')+'" onerror="this.remove()">'
       : '';
     return '<div class="pack reveal vis">'+bild+'<div class="pack-in"><h3>'+esc(p.title)+'</h3><div class="psub">'+esc(p.subtitle||'')+'</div><ul>'+feats+'</ul>'+price+'</div></div>';
   }).join('');
