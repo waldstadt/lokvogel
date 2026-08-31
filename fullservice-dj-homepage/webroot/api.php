@@ -26,7 +26,7 @@ const UPLOAD_DIR = __DIR__ . '/uploads';
 const DB_FILE    = DATA_DIR . '/dj.sqlite';
 const TOKEN_TTL  = 60 * 60 * 12; // 12 h
 const MAX_UPLOAD = 8 * 1024 * 1024;
-const SCHEMA_VERSION = 67;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 68;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -622,6 +622,14 @@ function upgrade(PDO $p): void {
           'Damit ich euch nicht irgendwelche, sondern wirklich passende DJs vorschlagen kann, beantwortet mir bitte kurz diese Fragen – dauert keine 5 Minuten. Die Vorschläge bekommt ihr danach direkt von mir. Und keine Sorge: Ihr bucht hier noch nichts. Vor einer Buchung führt ihr mit eurem Wunsch-DJ in Ruhe ein persönliches Infogespräch – das solltet ihr auch unbedingt tun. Dort klärt ihr alle Details wie Preis, Ablauf und Technik direkt miteinander.',
           $row['id']]);
     }
+  } catch (PDOException $e) {}
+  if ($v < 68) try {
+    /* Automatisch erzeugte Workshop-Rechnungen wurden ohne price_mode angelegt und lagen
+       damit auf dem alten Spalten-Standard 'netto'. Nur genau diese Zeilen umstellen -
+       bewusst netto gesetzte Belege bleiben unangetastet. */
+    $p->exec("update documents set price_mode = 'brutto'
+      where price_mode = 'netto'
+        and intro_text like 'vielen Dank für deine Anmeldung zum Workshop%'");
   } catch (PDOException $e) {}
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -1866,7 +1874,7 @@ create table booking_equipment (id text primary key,
   qty integer default 1, price_override real, out_done integer default 0,
   back_done integer default 0, notes text);
 create table documents (id text primary key, share_token text, doc_type text not null, number text unique not null,
-  price_mode text default 'netto', discount_value real default 0, discount_type text default 'pct',
+  price_mode text default 'brutto', discount_value real default 0, discount_type text default 'pct',
   customer_id text not null references customers(id) on delete restrict,
   booking_id text references bookings(id) on delete set null,
   parent_id text, status text default 'entwurf', doc_date text, valid_until text, due_date text,
@@ -2699,11 +2707,14 @@ function workshopInvoice(PDO $p, string $signupId): array {
     $wDateDe = $s['w_date'] ? date('d.m.Y', strtotime((string)$s['w_date'])) : '';
     $dTitle = $s['w_title'] . ($wDateDe ? ' am ' . $wDateDe : '');
     $docId = uuid(); $token = bin2hex(random_bytes(24));
+    /* price_mode ausdruecklich mitgeben: ohne den Wert greift der alte Spalten-Standard
+       'netto', und die Workshop-Rechnung stuende als einzige netto da, obwohl alle Preise
+       brutto gepflegt und ausgewiesen werden. */
     $p->prepare('insert into documents (id, share_token, doc_type, number, customer_id, status, doc_date, due_date,
-        tax_rate, is_small_business, intro_text, outro_text, total_net, total_tax, total_gross, created_at)
-        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        tax_rate, is_small_business, price_mode, intro_text, outro_text, total_net, total_tax, total_gross, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
       ->execute([$docId, $token, 'rechnung', $number, $cid, 'entwurf', gmdate('Y-m-d'), $due,
-        $rate, $small ? 1 : 0,
+        $rate, $small ? 1 : 0, 'brutto',
         'vielen Dank für deine Anmeldung zum Workshop „' . $s['w_title'] . '“. Mit Zahlungseingang ist dein Platz verbindlich reserviert.',
         (string)($defs['invoice_outro'] ?? ''), $net, $tax, $gross, now()]);
     $p->prepare('insert into document_items (id, document_id, pos, description, qty, unit, unit_price)

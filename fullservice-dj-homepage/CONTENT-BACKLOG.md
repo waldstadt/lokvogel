@@ -285,13 +285,15 @@ alle tagsüber/unter der Woche (= Auslastungsziel):
   laufen nicht über das neue Kampagnenseiten-System.
 - **Event-Reviews** (echte Veranstaltungen mit Fotos und Geschichte statt
   erfundener Beispiele) - Markus' Idee, bewusst zurückgestellt.
-- **Umsatzsteuer auf Netto-Belegen (Geschäftskunden).** Deine Preise sind
-  brutto gepflegt, die Nettoansicht rechnet sie zurück. Dabei kann der
-  ausgewiesene Steuerbetrag nicht gleichzeitig (a) zu den Positionszeilen
-  passen und (b) exakt Netto mal Steuersatz sein - gemessen weichen 43 % der
-  Netto-Belege um mehr als einen Cent ab, im Extremfall um 0,36 €. Der Beleg
-  geht immer auf (Netto + USt. = Gesamt), nur die Probe "Netto mal 19 %"
-  stimmt nicht auf den Cent. Auflösen ließe sich das, indem ein Beleg in der
-  Nettoansicht seinen Gesamtbetrag aus Netto plus Steuer bildet - dann ändert
-  sich aber der zu zahlende Betrag um wenige Cent gegenüber der
-  Bruttoansicht. Das ist eine kaufmännische Entscheidung, keine technische.
+- **Preise werden brutto angezeigt (entschieden).** Alle Preise auf der
+  Homepage sind brutto, Angebote und Rechnungen weisen unten "darin enthaltene
+  USt." aus. Die Bruttoansicht geht rechnerisch überall exakt auf (über 1.200
+  Belege geprüft, keine Abweichung).
+  Die Nettoansicht bleibt als Schalter pro Beleg erhalten, ist aber vorerst
+  nicht im Einsatz. Falls sie später gebraucht wird: dort kann der
+  ausgewiesene Steuerbetrag nicht gleichzeitig zu den Positionszeilen passen
+  und exakt Netto mal Steuersatz sein, weil die Preise brutto gepflegt sind -
+  gemessen 43 % der Netto-Belege mit mehr als einem Cent Abweichung,
+  Maximum 0,36 €. Zu klären wäre dann, ob ein Netto-Beleg seinen Gesamtbetrag
+  aus Netto plus Steuer bilden soll; der zu zahlende Betrag weicht dann um
+  wenige Cent von der Bruttoansicht ab.
