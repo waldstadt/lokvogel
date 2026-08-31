@@ -566,6 +566,9 @@ function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:
 /* Bildpfade und Positionsangaben landen in CSS-Deklarationen. Anfuehrungszeichen,
    Klammern und Semikola dort erlauben es, die Deklaration zu verlassen und weitere
    Regeln unterzuschieben - deshalb fliegen sie raus. */
+/* Nur echte Web-Adressen verlinken - javascript: in einem gepflegten Linkfeld waere
+   sonst ausfuehrbar. */
+function safeUrl(u){u=String(u==null?'':u).trim();return /^https?:\/\//i.test(u)?u:''}
 function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
@@ -768,8 +771,8 @@ function applyContent(rows){
     REV_CFG=c.reviews;
     if(c.reviews.tagline)document.getElementById('revTagline').textContent=c.reviews.tagline;
     var links='';
-    if(c.reviews.google_url)links+='<a href="'+esc(c.reviews.google_url)+'" target="_blank" rel="noopener">★ Alle Google-Bewertungen lesen ↗</a>';
-    if(c.reviews.djbande_url)links+='<a href="'+esc(c.reviews.djbande_url)+'" target="_blank" rel="noopener">★ Bewertungen bei meiner Partner-Agentur ↗</a>';
+    if(safeUrl(c.reviews.google_url))links+='<a href="'+esc(safeUrl(c.reviews.google_url))+'" target="_blank" rel="noopener noreferrer">★ Alle Google-Bewertungen lesen ↗</a>';
+    if(safeUrl(c.reviews.djbande_url))links+='<a href="'+esc(safeUrl(c.reviews.djbande_url))+'" target="_blank" rel="noopener noreferrer">★ Bewertungen bei meiner Partner-Agentur ↗</a>';
     document.getElementById('revLinks').innerHTML=links;
     if(links)showSection('bewertungen');
   }
@@ -1062,7 +1065,7 @@ function renderLocations(){
     var icon=showImg?'':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
     var meta=[l.address,l.city,l.region].filter(Boolean).join(' · ');
     var links=[];
-    if(l.website)links.push('<a href="'+esc(l.website)+'" target="_blank" rel="noopener">Zur Location ↗</a>');
+    if(safeUrl(l.website))links.push('<a href="'+esc(safeUrl(l.website))+'" target="_blank" rel="noopener noreferrer">Zur Location ↗</a>');
     if(l.phone)links.push('<a href="tel:'+esc(l.phone.replace(/[^\d+]/g,''))+'">'+esc(l.phone)+'</a>');
     return '<div class="rent reveal vis"><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
       (meta?'<div class="rc">'+esc(meta)+'</div>':'')+
@@ -1085,7 +1088,7 @@ sfetch('friends?select=*&public=eq.true&order=sort').then(function(r){
     return '<div class="rent reveal vis">'+(f.image_url?'<div class="ri"'+img+'></div>':'')+'<div class="rb">'+
       (f.category?'<div class="rc">'+esc(f.category)+'</div>':'')+
       '<h4>'+esc(f.name)+'</h4><p>'+mdRender(f.description||'')+'</p>'+
-      (f.website?'<a href="'+esc(f.website)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600">Zur Website ↗</a>':'')+
+      (safeUrl(f.website)?'<a href="'+esc(safeUrl(f.website))+'" target="_blank" rel="noopener noreferrer" style="font-size:13px;font-weight:600">Zur Website ↗</a>':'')+
       '</div></div>';
   }).join('');
   showSection('freunde');

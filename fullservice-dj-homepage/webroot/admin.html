@@ -915,6 +915,9 @@ function toast(msg,err){
 }
 /* Bildpfade und Positionsangaben gehen in CSS-Deklarationen - Anfuehrungszeichen,
    Klammern und Semikola erlauben dort den Ausbruch aus der Deklaration. */
+/* Nur echte Web-Adressen verlinken - javascript: in einem gepflegten Linkfeld waere
+   sonst ausfuehrbar. */
+function safeUrl(u){u=String(u==null?'':u).trim();return /^https?:\/\//i.test(u)?u:''}
 function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 /* Sicher als JS-String-Literal in einem Inline-onclick="fn('…')": erst JS-escapen
@@ -1980,7 +1983,10 @@ function planSet(obj,path,val){
 }
 function fmtPlaylists(list){
   if(!Array.isArray(list)||!list.length)return '';
-  return list.map(function(pl){return '<a href="'+esc(pl.url)+'" target="_blank" rel="noopener">'+esc(pl.label||pl.url)+'</a>'}).join('<br>');
+  return list.map(function(pl){
+    var u=safeUrl(pl.url),txt=esc(pl.label||pl.url);
+    return u?('<a href="'+esc(u)+'" target="_blank" rel="noopener noreferrer">'+txt+'</a>'):txt;
+  }).join('<br>');
 }
 function parsePlaylists(text){
   return (text||'').split('\n').map(function(l){return l.trim()}).filter(Boolean).map(function(l){
@@ -2283,7 +2289,7 @@ function fillDocForm(){
 }
 function showAcceptSig(){
   openModal('Unterschrift – '+esc(curDoc.number)+' · '+esc(curDoc.accepted_name||''),
-    '<img src="'+curDoc.accept_signature+'" style="background:#fff;border-radius:8px;max-width:100%;max-height:180px;display:block">');
+    '<img src="'+esc(curDoc.accept_signature)+'" style="background:#fff;border-radius:8px;max-width:100%;max-height:180px;display:block">');
 }
 function docLockedJs(d){return !!(d&&d.id&&['angebot','lieferschein'].indexOf(d.doc_type)<0&&d.status!=='entwurf')}
 function applyDocLock(){
@@ -2854,6 +2860,15 @@ function docToInvoice(type){
     /* Herkunft festhalten: Über parent_id findet die Schlussrechnung später das
        ursprüngliche Angebot auch dann, wenn keine Buchung verknüpft ist. */
     curDoc.parent_id=src.id;
+    /* Steuersatz, Preisdarstellung und Kleinunternehmer-Kennzeichen mit uebernehmen -
+       ohne das wurde aus einem Netto-Angebot ueber 1.190 Euro brutto eine Rechnung ueber
+       1.000 Euro, weil der Editor stumm auf Brutto und den Standardsatz zuruecksprang. */
+    curDoc.tax_rate=src.tax_rate;
+    curDoc.price_mode=src.price_mode;
+    curDoc.is_small_business=src.is_small_business;
+    document.getElementById('docTax').value=src.is_small_business?0:src.tax_rate;
+    document.getElementById('docNetto').checked=(src.price_mode==='netto');
+    renderTotals();
     if(type==='abschlag'){
       curItems=[];renderItems();
       askAbschlag(srcGross,'Auftrag gemäß '+docTypeName(src.doc_type)+' '+src.number,function(amount,desc){
@@ -2970,7 +2985,7 @@ function printMietvertrag(rc){
   }).join('');
   var terms=snap?(snap.terms||''):((S.rental_contract&&S.rental_contract.text)||'');
   var mieterSig=rc&&rc.status==='unterschrieben'
-    ?'<div style="flex:1"><img src="'+rc.signature+'" style="max-height:60px;display:block;margin-bottom:2px"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">'+esc(rc.signed_name)+' – digital unterschrieben am '+dt(rc.signed_at)+' (Ausweiskopie liegt vor)</div></div>'
+    ?'<div style="flex:1"><img src="'+esc(rc.signature)+'" style="max-height:60px;display:block;margin-bottom:2px"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">'+esc(rc.signed_name)+' – digital unterschrieben am '+dt(rc.signed_at)+' (Ausweiskopie liegt vor)</div></div>'
     :'<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift Mieter</div></div>';
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:11px;line-height:1.55">'+
@@ -3023,7 +3038,7 @@ function showRentalModal(rc){
   }
   if(rc.status==='unterschrieben'){
     html+='<div style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px"> <b>Unterschrieben</b>am '+dt(rc.signed_at)+'von '+esc(rc.signed_name)+'</div>'+
-    '<img src="'+rc.signature+'" alt="Unterschrift" style="background:#fff;border-radius:8px;max-width:100%;max-height:110px;display:block;margin-bottom:12px">'+
+    '<img src="'+esc(rc.signature)+'" alt="Unterschrift" style="background:#fff;border-radius:8px;max-width:100%;max-height:110px;display:block;margin-bottom:12px">'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
     (rc.id_front?'<button class="btn g sm" onclick="viewIdFile(\''+rc.id_front+'\')">Ausweis Vorderseite</button>':'')+
     (rc.id_back?'<button class="btn g sm" onclick="viewIdFile(\''+rc.id_back+'\')">Ausweis Rückseite</button>':'')+
@@ -4788,7 +4803,7 @@ function printTechCheck(){
 function renderTechCheckPrint(t,comp,c,pr,scale,picUrls){
   var picHtml=picUrls.length?('<div style="font-weight:700;margin:16px 0 6px">Fotodokumentation</div>'+
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'+
-    picUrls.map(function(u){return '<img src="'+u+'" style="width:100%;border-radius:6px">'}).join('')+'</div>'):'';
+    picUrls.map(function(u){return '<img src="'+esc(u)+'" style="width:100%;border-radius:6px">'}).join('')+'</div>'):'';
   var personal=t.personal?('<div style="border-left:3px solid #111;padding:8px 0 8px 16px;margin:12px 0;font-size:12.5px"><b>Meine persönliche Empfehlung</b><br>'+esc(t.personal).replace(/\n/g,'<br>')+'</div>'):'';
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.6">'+

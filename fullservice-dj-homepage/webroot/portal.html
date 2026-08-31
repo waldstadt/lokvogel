@@ -259,7 +259,9 @@ function renderOffer(){
       return '<div class="card" style="padding:16px 24px;font-size:13px;color:var(--mut)">'+
         (rv.tagline?'<b style="color:var(--txt)">'+esc(rv.tagline)+'</b> – ':'')+
         'Ihr wollt wissen, wie andere ihre Feier mit mir erlebt haben? '+
-        '<a href="'+esc(safeUrl(rv.google_url))+'" target="_blank" rel="noopener noreferrer">★ Google-Bewertungen ↗</a></div>';
+        (safeUrl(rv.google_url)
+          ? '<a href="'+esc(safeUrl(rv.google_url))+'" target="_blank" rel="noopener noreferrer">★ Google-Bewertungen ↗</a>'
+          : '')+'</div>';
     })()+
     '<div class="card" id="actionCard">'+
     (decided?
