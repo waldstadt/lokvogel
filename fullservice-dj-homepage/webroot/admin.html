@@ -218,7 +218,13 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .theme-sw{display:inline-block;width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;margin-right:6px;vertical-align:middle}
 /* Schriftauswahl: jede Kachel zeigt denselben Satz in der jeweiligen Schrift - so sieht
    man die Wirkung, statt sie aus dem Namen erraten zu muessen. */
-.font-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin:6px 0 4px}
+/* Im Formular nur eine Zeile: aktuelle Schrift als Probe plus Knopf. Die Kachelwand
+   steckt im Auswahlfenster - sie wird sehr selten gebraucht. */
+.font-pick{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 4px;
+  background:var(--cd2);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px}
+.font-pick .fp-demo{font-size:20px;font-weight:700;color:var(--wh);line-height:1.2;overflow-wrap:anywhere}
+.font-pick .fp-name{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gll)}
+.font-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin:2px 0 4px}
 .font-sw{text-align:left;background:var(--cd2);border:1px solid var(--bdr);border-radius:8px;padding:9px 11px;cursor:pointer;color:var(--wh);width:100%;font:inherit}
 .font-sw:hover{border-color:var(--gl)}
 .font-sw.sel{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
@@ -615,7 +621,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       </div>
       <label style="margin-top:16px">Schriftstil <span class="mut sml" style="text-transform:none;letter-spacing:0">(Überschriften, gilt für alle Seiten)</span></label>
       <input type="hidden" id="thFont" value="grotesk">
-      <div id="fontRow" class="font-row"></div>
+      <div id="fontPick" class="font-pick"></div>
       <div style="margin-top:8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
         <button class="btn sm" onclick="saveTheme()">Design speichern</button>
         <span class="mut sml">Alle Schriften liegen fest auf dem eigenen Server (kein Google Fonts). DJ-Seite und Technik-Seite haben getrennte Farbpaletten, Halloween (Orange) behält bewusst ihre eigene Farbwelt.</span>
@@ -4237,18 +4243,31 @@ var FONT_CHOICES=[
   {id:'anton',      name:'Extra-fett',    css:"'Anton',sans-serif"}
 ];
 var FONT_DEMO='Volle Tanzfläche. 23';
+function fontById(id){
+  return FONT_CHOICES.find(function(f){return f.id===id})||FONT_CHOICES[0];
+}
 function renderFontRow(){
-  var row=document.getElementById('fontRow');if(!row)return;
+  var box=document.getElementById('fontPick');if(!box)return;
+  var f=fontById(v('thFont')||'grotesk');
+  box.innerHTML='<div style="flex:1;min-width:180px">'+
+    '<div class="fp-name">'+esc(f.name)+'</div>'+
+    '<div class="fp-demo" style="font-family:'+f.css+'">'+esc(FONT_DEMO)+'</div></div>'+
+    '<button class="btn g sm" type="button" onclick="openFontModal()">Andere Schrift wählen</button>';
+}
+function openFontModal(){
   var cur=v('thFont')||'grotesk';
-  row.innerHTML=FONT_CHOICES.map(function(f){
-    return '<button type="button" class="font-sw'+(f.id===cur?' sel':'')+'" onclick="pickFont(\''+f.id+'\')">'+
-      '<span class="fs-name">'+esc(f.name)+'</span>'+
-      '<span class="fs-demo" style="font-family:'+f.css+'">'+esc(FONT_DEMO)+'</span></button>';
-  }).join('');
+  openModal('Schriftstil wählen',
+    '<div class="mut sml" style="margin-bottom:10px">Gilt für die Überschriften auf allen Seiten. Der Fließtext bleibt in jedem Fall die gut lesbare Grundschrift.</div>'+
+    '<div class="font-row">'+FONT_CHOICES.map(function(f){
+      return '<button type="button" class="font-sw'+(f.id===cur?' sel':'')+'" onclick="pickFont(\''+f.id+'\')">'+
+        '<span class="fs-name">'+esc(f.name)+'</span>'+
+        '<span class="fs-demo" style="font-family:'+f.css+'">'+esc(FONT_DEMO)+'</span></button>';
+    }).join('')+'</div>'+
+    '<div class="mut sml" style="margin-top:10px">Die Auswahl wird erst mit „Design speichern" übernommen.</div>');
 }
 function pickFont(id){
   document.getElementById('thFont').value=id;
-  renderFontRow();
+  closeModal();renderFontRow();
 }
 function pickTheme(target,name){
   var t=THEMES.find(function(x){return x.n===name});
