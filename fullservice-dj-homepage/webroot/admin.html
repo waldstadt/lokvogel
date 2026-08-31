@@ -528,6 +528,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <button class="btn" onclick="openModulModal()">+ Modul</button></div>
     <div class="mut sml" style="margin-bottom:12px">Jedes Modul hängt hinter einem festen Bereich. Reihenfolge innerhalb desselben Ankers per Ziehen am ⠿-Griff, Klick aufs Badge schaltet live/aus. Ist der Bereich davor ausgeschaltet, wird das Modul mit ausgeblendet.</div>
     <div id="blockList" class="sml"></div>
+
+    <div class="card" style="margin-top:22px"><h3>Veranstaltungsberichte <button class="btn sm" style="float:right" onclick="openReportModal()">+ Bericht</button></h3>
+      <div class="mut sml" style="margin-bottom:8px">Echte Feiern mit kurzem Text und Fotos. Auf der Seite erscheinen nur Kacheln – der ganze Text steht erst im Detailfenster, damit die Startseite kompakt bleibt. Angezeigt werden sie über ein Modul der Art „Veranstaltungsberichte". Reihenfolge per Ziehen am ⠿-Griff.</div>
+      <div id="reportList" class="sml"></div></div>
   </div>
 
   <!-- CMS -->
@@ -1007,7 +1011,8 @@ function loadAll(){
     api('event_plan_changes?select=*&order=created_at.desc'),
     api('rental_contracts?select=*'),
     api('campaign_pages?select=*&order=sort'),
-    api('blocks?select=*&order=anchor,sort')
+    api('blocks?select=*&order=anchor,sort'),
+    api('event_reports?select=*&order=sort')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -1019,7 +1024,7 @@ function loadAll(){
     CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
     CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];CACHE.blocks=r[23]||[];
     CACHE.quoteTpls=r[24]||[];CACHE.planChanges=r[25]||[];CACHE.rentalContracts=r[26]||[];
-    CACHE.campaigns=r[27]||[];CACHE.module=r[28]||[];
+    CACHE.campaigns=r[27]||[];CACHE.module=r[28]||[];CACHE.reports=r[29]||[];
     applyBrand();
     renderAll();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
@@ -1035,7 +1040,7 @@ function applyBrand(){
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
   renderEq();renderSetsAdmin();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
-  renderProducts();renderPartners();renderWsAdmin();renderCampaigns();renderModulAdmin();
+  renderProducts();renderPartners();renderWsAdmin();renderCampaigns();renderModulAdmin();renderReportAdmin();
   initSort();
 }
 /* ===== Workshop-Termine & Anmeldungen ===== */
@@ -4015,7 +4020,8 @@ var DD_LISTS={
   friends:{tbl:'friends',cache:'friends',render:function(){renderFriendAdmin()}},
   reviews:{tbl:'reviews',cache:'reviews',render:function(){renderRevAdmin()}},
   badges:{tbl:'badges',cache:'badges',render:function(){renderBadgeAdmin()}},
-  blocks:{tbl:'blocks',cache:'module',render:function(){renderModulAdmin()}}
+  blocks:{tbl:'blocks',cache:'module',render:function(){renderModulAdmin()}},
+  reports:{tbl:'event_reports',cache:'reports',render:function(){renderReportAdmin()}}
 };
 function pubSwitch(name,id,isPub){
   return '<span class="b '+(isPub?'green':'grey')+'" style="cursor:pointer" title="Klicken zum Ein-/Ausschalten" '+
@@ -4378,7 +4384,7 @@ function reloadBadges(){api('badges?select=*&order=sort').then(function(r){CACHE
 /* ===== Module (Baukasten) ===== */
 var BLOCK_TYPES=[['kacheln','Kachel-Raster (Fotos/Videos)'],['foto','Einzelnes Foto, groß'],
   ['video','Einzelnes Video, groß'],['text_bild','Text neben Bild oder Video'],
-  ['instagram','Instagram-Feed']];
+  ['instagram','Instagram-Feed'],['berichte','Veranstaltungsberichte']];
 var BLOCK_ANCHORS=[['ueber','hinter „Über mich"'],['leistungen','hinter „Leistungen"'],
   ['ablauf','hinter „So läuft\'s"'],['galerie','hinter der Galerie'],['bewertungen','hinter den Bewertungen'],
   ['garantie','hinter der Garantie'],['technik','hinter dem Technik-Teaser'],['locations','hinter den Locations'],
@@ -4456,6 +4462,13 @@ function blockTypeChanged(){
     mw.innerHTML='<div class="mut sml" style="margin-top:10px">Zeigt die Bilder, die unter „Inhalte → Instagram-Galerie" gespiegelt werden. Sind dort keine Bilder, bleibt das Modul unsichtbar.</div>';
     return;
   }
+  if(t==='berichte'){
+    lw.style.display='none';
+    mw.innerHTML='<div class="mut sml" style="margin-top:10px">Zeigt die Berichte aus der Liste weiter unten auf dieser Seite. Sind dort keine eingeschalteten Berichte, bleibt das Modul unsichtbar.</div>'+
+      '<label style="margin-top:12px">Wie viele Berichte anzeigen</label>'+
+      '<input type="number" min="1" max="24" id="blkAnzahl" value="'+(Number(v('blkLayout'))||6)+'">';
+    return;
+  }
   renderBlockMedia();
 }
 function blockMax(){var t=v('blkType');return (t==='foto'||t==='video'||t==='text_bild')?1:24}
@@ -4506,17 +4519,98 @@ function blockMedUpload(inp){
 }
 function saveModul(id){
   var t=v('blkType');
-  if(t!=='instagram'&&!curBlockMedia.length){toast('Für dieses Modul fehlt noch mindestens ein Foto oder Video.',1);return}
+  if(t!=='instagram'&&t!=='berichte'&&!curBlockMedia.length){toast('Für dieses Modul fehlt noch mindestens ein Foto oder Video.',1);return}
   var body={page:'start',type:t,anchor:v('blkAnchor'),
     kicker:v('blkKicker'),title:v('blkTitle'),text:v('blkText'),
-    layout:(t==='foto'||t==='video')?'3':v('blkLayout'),
-    media:t==='instagram'?[]:curBlockMedia,
+    layout:t==='berichte'?String(Math.max(1,Math.min(24,Number(v('blkAnzahl'))||6)))
+      :((t==='foto'||t==='video')?'3':v('blkLayout')),
+    media:(t==='instagram'||t==='berichte')?[]:curBlockMedia,
     public:document.getElementById('blkPub').checked};
   if(!id)body.sort=(CACHE.module||[]).length;
   (id?api('blocks?id=eq.'+id,{method:'PATCH',body:body}):api('blocks',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');reloadModule()}).catch(function(e){toast(e.message,1)});
 }
 function reloadModule(){api('blocks?select=*&order=anchor,sort').then(function(r){CACHE.module=r||[];renderModulAdmin()})}
+
+/* ===== Veranstaltungsberichte ===== */
+var curReportMedia=[];
+function renderReportAdmin(){
+  var el=document.getElementById('reportList');if(!el)return;
+  el.innerHTML=(CACHE.reports||[]).map(function(r,i){
+    var med=Array.isArray(r.media)?r.media:[];
+    return '<div'+ddAttrs('reports',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
+    (med[0]&&med[0].url?'<img src="'+esc(med[0].url)+'" alt="" style="width:44px;height:32px;object-fit:cover;border-radius:3px">':'<span class="mut sml">ohne Foto</span>')+
+    '<a onclick="openReportModal(\''+r.id+'\')" style="flex:1">'+esc(r.title)+'</a>'+
+    '<span class="mut sml">'+esc(r.meta||'')+' · '+med.length+(med.length===1?' Foto':' Fotos')+'</span>'+
+    pubSwitch('event_reports',r.id,!!r.public)+'</div>';
+  }).join('')||'<span class="mut">Noch keine Berichte. Über „+ Bericht" legst du den ersten an.</span>';
+}
+function openReportModal(id){
+  var r=id?(CACHE.reports||[]).find(function(x){return x.id===id}):{};r=r||{};
+  curReportMedia=Array.isArray(r.media)?JSON.parse(JSON.stringify(r.media)):[];
+  openModal(id?'Bericht bearbeiten':'Neuer Bericht',
+    '<label>Überschrift *</label><input id="repTitleF" value="'+esc(r.title||'')+'" placeholder="z. B. Hochzeit im Gutshof">'+
+    '<label>Zeile darüber <span class="mut sml" style="text-transform:none;letter-spacing:0">(Anlass, Ort, Monat)</span></label><input id="repMetaF" value="'+esc(r.meta||'')+'" placeholder="z. B. Hochzeit · Hemer · Juni 2026">'+
+    '<label>Kurzfassung für die Kachel <span class="mut sml" style="text-transform:none;letter-spacing:0">(zwei bis drei Sätze)</span></label><textarea id="repTeaserF" style="min-height:70px">'+esc(r.teaser||'')+'</textarea>'+edBtn('repTeaserF')+
+    '<label>Ganzer Text <span class="mut sml" style="text-transform:none;letter-spacing:0">(erscheint erst im Detailfenster)</span></label><textarea id="repTextF" style="min-height:140px">'+esc(r.text||'')+'</textarea>'+edBtn('repTextF')+
+    '<div id="repMediaWrap"></div>'+
+    '<label style="margin-top:12px"><input type="checkbox" id="repPubF" style="width:auto;margin-right:6px" '+(r.public!==false&&r.public!==0?'checked':'')+'>Auf der Homepage anzeigen</label>'+
+    SORT_HINT+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveReport(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delRow(\'event_reports\',\''+id+'\',reloadReports)">Löschen</button>':'')+'</div>');
+  renderReportMedia();
+}
+function renderReportMedia(){
+  var mw=document.getElementById('repMediaWrap');if(!mw)return;
+  var rows=curReportMedia.map(function(m,i){
+    return '<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+
+      '<img src="'+esc(m.url)+'" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:3px">'+
+      '<input value="'+esc(m.caption||'')+'" placeholder="Bildunterschrift (optional)" oninput="repMedSet('+i+',this.value)" style="flex:1;margin:0">'+
+      (i===0?'<span class="b green" title="Dieses Foto steht auf der Kachel">Titelbild</span>':'<button class="btn g sm" onclick="repMedUp('+i+')" title="nach oben">↑</button>')+
+      '<button class="btn r sm" onclick="repMedDel('+i+')">Weg</button></div>';
+  }).join('');
+  mw.innerHTML='<label style="margin-top:12px">Fotos <span class="mut sml" style="text-transform:none;letter-spacing:0">(das erste ist das Titelbild der Kachel)</span></label>'+
+    (rows||'<div class="mut sml">Noch keine Fotos.</div>')+
+    '<div style="display:flex;gap:8px;margin-top:10px">'+
+    '<input type="file" accept="image/*" multiple style="display:none" id="repUp" onchange="repMedUpload(this)">'+
+    '<button class="btn g sm" onclick="document.getElementById(\'repUp\').click()">Hochladen</button>'+
+    '<button class="btn g sm" onclick="repMedPool()">Aus Pool</button></div>';
+}
+function repMedSet(i,val){if(curReportMedia[i])curReportMedia[i].caption=val}
+function repMedDel(i){curReportMedia.splice(i,1);renderReportMedia()}
+function repMedUp(i){if(i<1)return;var m=curReportMedia.splice(i,1)[0];curReportMedia.splice(i-1,0,m);renderReportMedia()}
+function repMedPool(){
+  openMediaPicker(function(urls){
+    (urls||[]).forEach(function(u){curReportMedia.push({url:u,caption:''})});
+    renderReportMedia();
+  },true);
+}
+function repMedUpload(inp){
+  var files=Array.prototype.slice.call(inp.files||[]);inp.value='';
+  if(!files.length)return;
+  toast(files.length>1?(files.length+' Fotos werden hochgeladen …'):'Foto wird hochgeladen …');
+  var reihe=Promise.resolve();
+  files.forEach(function(f){
+    reihe=reihe.then(function(){
+      var name=Date.now()+'-'+f.name.toLowerCase().replace(/[^a-z0-9.]+/g,'-');
+      return fetch(API+'/storage/'+encodeURIComponent(name),{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:f})
+        .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||('Upload fehlgeschlagen ('+r.status+')'));return j})})
+        .then(function(j){curReportMedia.push({url:j.url,caption:''});renderReportMedia()})
+        .catch(function(e){toast(f.name+': '+e.message,1)});
+    });
+  });
+  reihe.then(function(){toast('Fertig ✓ – „Speichern" nicht vergessen.')});
+}
+function saveReport(id){
+  if(!v('repTitleF')){toast('Überschrift fehlt.',1);return}
+  var body={title:v('repTitleF'),meta:v('repMetaF'),teaser:v('repTeaserF'),text:v('repTextF'),
+    media:curReportMedia,public:document.getElementById('repPubF').checked};
+  if(!id)body.sort=(CACHE.reports||[]).length;
+  (id?api('event_reports?id=eq.'+id,{method:'PATCH',body:body}):api('event_reports',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Gespeichert ✓');reloadReports()}).catch(function(e){toast(e.message,1)});
+}
+function reloadReports(){api('event_reports?select=*&order=sort').then(function(r){CACHE.reports=r||[];renderReportAdmin()})}
+
 
 
 

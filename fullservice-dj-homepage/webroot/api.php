@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 72;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 73;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -174,9 +174,10 @@ const JSON_COLS = [
   'equipment' => ['addon_ids', 'images', 'fits_ids'],
   'campaign_pages' => ['cards', 'features', 'form_cfg'],
   'blocks' => ['media'],
+  'event_reports' => ['media'],
 ];
 const BOOL_COLS = [
-  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'], 'badges' => ['public','light_bg'], 'blocks' => ['public'],
+  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'], 'badges' => ['public','light_bg'], 'blocks' => ['public'], 'event_reports' => ['public'],
   'workshop_events' => ['public'],
   'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
   'bookings' => ['review_requested','open_ended'],
@@ -190,11 +191,11 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
-const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items','campaign_pages','badges','blocks'];
+const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items','campaign_pages','badges','blocks','event_reports'];
 const INQUIRY_FIELDS = ['name','email','phone','event_type','event_date','location','guests','message'];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -672,6 +673,7 @@ function upgrade(PDO $p): void {
       $p->prepare('insert into site_content (key,value,updated_at) values (?,?,?)')
         ->execute(['pack_sec', '{"images":true}', now()]);
   } catch (PDOException $e) {}
+  if ($v < 73) try { $p->exec(eventReportsDdl()); } catch (PDOException $e) {}
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1303,6 +1305,15 @@ function friendsDdl(): string {
 /* Frei platzierbare Inhaltsmodule ("Baukasten"). Die festen Bereiche der Seite bleiben,
    Module haengen sich per anchor hinter einen davon - so laesst sich die Seite erweitern,
    ohne sie neu zu bauen. type bestimmt die Darstellung, media haelt Bilder/Videos als JSON. */
+/* Veranstaltungsberichte: echte Feiern mit kurzem Text und Fotos. Bewusst eigene Tabelle
+   statt eines Moduls je Bericht - so bleiben sie zentral pflegbar und die Seite kompakt:
+   das Modul zeigt Kacheln, der ganze Text steht erst im Detailfenster. */
+function eventReportsDdl(): string {
+  return "create table if not exists event_reports (id text primary key, sort integer default 0,
+    title text not null, meta text, teaser text, text text,
+    media text default '[]', public integer default 1, created_at text)";
+}
+
 function blocksDdl(): string {
   return "create table if not exists blocks (id text primary key,
     page text default 'start', anchor text default 'ende', sort integer default 0,
@@ -2010,6 +2021,7 @@ SQL);
   $p->exec(friendsDdl());
   $p->exec(badgesDdl());
   $p->exec(blocksDdl());
+  $p->exec(eventReportsDdl());
   /* Instagram-Modul gleich anlegen, aber ausgeschaltet - so ist der frische Stand
      derselbe wie nach der Migration bestehender Installationen. */
   $p->prepare('insert into blocks (id,page,anchor,sort,type,kicker,title,media,layout,public,created_at)

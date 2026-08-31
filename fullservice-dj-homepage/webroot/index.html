@@ -233,6 +233,25 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
 .blk-split figcaption{font-size:13px;color:var(--mut);margin-top:8px;line-height:1.5}
 @media(max-width:760px){.blk{padding:52px 0}.blk-split{grid-template-columns:1fr;gap:24px}
   .blk-split.rechts .blk-split-med{order:0}}
+/* Veranstaltungsberichte */
+.rep-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;margin-top:34px}
+.rep{background:var(--card);border:1px solid var(--line);border-radius:5px;overflow:hidden;
+  display:flex;flex-direction:column;text-align:left;cursor:pointer;padding:0;color:inherit;
+  font:inherit;transition:border-color .25s,transform .25s}
+.rep:hover{border-color:rgba(255,111,91,.5);transform:translateY(-3px)}
+.rep img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;border-bottom:1px solid var(--line)}
+.rep-in{padding:20px 20px 22px;display:flex;flex-direction:column;flex:1}
+.rep-meta{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:7px}
+.rep h4{font-size:18px;font-weight:700;margin-bottom:8px;line-height:1.25}
+.rep p{font-size:14px;color:var(--mut);line-height:1.6;flex:1}
+.rep .mehr{font-size:13px;font-weight:600;color:var(--acc);margin-top:14px}
+.rep-ovl{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:200;display:none;overflow-y:auto;padding:40px 18px}
+.rep-box{background:var(--card);border:1px solid var(--line);border-radius:6px;max-width:760px;margin:0 auto;padding:34px 32px}
+.rep-box h3{font-size:25px;font-weight:700;margin-bottom:6px}
+.rep-box .rep-text{color:var(--mut);font-size:15.5px;line-height:1.8;margin-top:16px;white-space:pre-line}
+.rep-box .rep-fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:24px}
+.rep-box .rep-fotos img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:5px;border:1px solid var(--line)}
+@media(max-width:560px){.rep-box{padding:24px 18px}.rep-ovl{padding:20px 12px}}
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
 .reveal.vis{opacity:1;transform:none}
 </style>
@@ -548,7 +567,7 @@ var DAY_SEED=Math.floor(Date.now()/864e5);
 var VISIT_SEED=Math.floor(Math.random()*1e9);
 
 /* Vom CMS ausgeblendete Sektionen (site_content key "sections" → {hidden:[...]}) */
-var HIDDEN_SECTIONS=[],CONTENT={},CONTENT_FERTIG=false,PACK_ROWS=null;
+var HIDDEN_SECTIONS=[],CONTENT={},CONTENT_FERTIG=false,PACK_ROWS=null,EVENT_REPORTS=[];
 /* Optionales Header-Video. Bewusst zurueckhaltend:
    - kein Ton, Endlosschleife, laeuft im Hintergrund hinter dem Text
    - wer "Bewegung reduzieren" eingestellt hat, bekommt nur das Standbild
@@ -792,6 +811,64 @@ function openLegal(key){
 }
 function closeLegal(){document.getElementById('legalBg').style.display='none';document.body.style.overflow=''}
 
+
+/* ===== Veranstaltungsberichte =====
+   Auf der Seite stehen nur Kacheln; der ganze Text erscheint erst im Detailfenster.
+   So bleibt die Startseite kompakt, auch wenn irgendwann zwanzig Berichte drin sind. */
+var REPORTS=[];
+function renderReports(rows,box,max){
+  REPORTS=rows||[];
+  var liste=REPORTS.slice(0,max||6);
+  if(!liste.length)return false;
+  var grid=document.createElement('div');
+  grid.className='rep-grid';
+  liste.forEach(function(r,i){
+    var karte=document.createElement('button');
+    karte.type='button';karte.className='rep';
+    karte.addEventListener('click',function(){openReport(i)});
+    var med=Array.isArray(r.media)?r.media:[];
+    if(med.length&&med[0]&&med[0].url){
+      var img=document.createElement('img');
+      img.src=med[0].url;img.alt='';img.loading='lazy';
+      img.addEventListener('error',function(){img.remove()});
+      karte.appendChild(img);
+    }
+    var innen=document.createElement('div');innen.className='rep-in';
+    if(r.meta){var m=document.createElement('div');m.className='rep-meta';m.textContent=r.meta;innen.appendChild(m)}
+    var h=document.createElement('h4');h.textContent=r.title||'';innen.appendChild(h);
+    if(r.teaser){var t=document.createElement('p');t.textContent=r.teaser;innen.appendChild(t)}
+    var mehr=document.createElement('div');mehr.className='mehr';mehr.textContent='Mehr dazu';
+    innen.appendChild(mehr);
+    karte.appendChild(innen);
+    grid.appendChild(karte);
+  });
+  box.appendChild(grid);
+  return true;
+}
+function openReport(i){
+  var r=REPORTS[i];if(!r)return;
+  document.getElementById('repMeta').textContent=r.meta||'';
+  document.getElementById('repTitle').textContent=r.title||'';
+  document.getElementById('repText').textContent=r.text||r.teaser||'';
+  var fo=document.getElementById('repFotos');fo.innerHTML='';
+  (Array.isArray(r.media)?r.media:[]).forEach(function(m){
+    if(!m||!m.url)return;
+    var img=document.createElement('img');
+    img.src=m.url;img.alt=m.caption||'';img.loading='lazy';
+    img.addEventListener('error',function(){img.remove()});
+    fo.appendChild(img);
+  });
+  document.getElementById('repOvl').style.display='block';
+  document.body.style.overflow='hidden';
+}
+function closeReport(){
+  document.getElementById('repOvl').style.display='none';
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&document.getElementById('repOvl').style.display==='block')closeReport();
+});
+
 /* ===== Inhaltsmodule (Baukasten) =====
    Die festen Bereiche der Seite bleiben stehen; Module haengen sich hinter einen davon.
    Alles wird als echte Knoten gebaut, nie als HTML-Text zusammengesetzt - Bildunterschriften
@@ -846,6 +923,11 @@ function buildBlock(b){
   blockKopf(b,kopf);
   if(kopf.childNodes.length)wrap.appendChild(kopf);
 
+  if(b.type==='berichte'){
+    /* Die Berichte kommen aus ihrer eigenen Liste, nicht aus dem Modul. */
+    if(!renderReports(EVENT_REPORTS,wrap,Number(b.layout)||6))return null;
+    return sec;
+  }
   if(b.type==='instagram'){
     var igs=(CONTENT.instagram_feed&&CONTENT.instagram_feed.images)||[];
     if(!igs.length)return null;
@@ -930,7 +1012,10 @@ function renderBlocks(rows){
 }
 
 sfetch('site_content?select=key,value').then(applyContent).then(function(){
-  return sfetch('blocks?select=*&public=eq.true&page=eq.start&order=anchor,sort').then(renderBlocks);
+  return sfetch('event_reports?select=*&public=eq.true&order=sort')
+    .then(function(r){EVENT_REPORTS=r||[]}).catch(function(){EVENT_REPORTS=[]})
+    .then(function(){return sfetch('blocks?select=*&public=eq.true&page=eq.start&order=anchor,sort')})
+    .then(renderBlocks);
 }).catch(function(){});
 PACK_ROWS=null;
 sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){
@@ -1151,6 +1236,15 @@ document.addEventListener('keydown',function(e){
       <a class="btn" id="regOverlayLink" href="portal.html">Jetzt kostenlos registrieren</a>
       <button type="button" class="btn ghost" onclick="closeRegOverlay()">Vielleicht später</button>
     </div>
+  </div>
+</div>
+<div class="rep-ovl" id="repOvl" onclick="if(event.target===this)closeReport()">
+  <div class="rep-box">
+    <button class="btn ghost" style="float:right;padding:6px 14px;font-size:13px" onclick="closeReport()">Schließen</button>
+    <div class="rep-meta" id="repMeta"></div>
+    <h3 id="repTitle"></h3>
+    <div class="rep-text" id="repText"></div>
+    <div class="rep-fotos" id="repFotos"></div>
   </div>
 </div>
 </body>
