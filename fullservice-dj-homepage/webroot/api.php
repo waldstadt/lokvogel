@@ -3901,7 +3901,10 @@ function mediaName(string $name): string {
 /* Ordnernamen bewusst eng: Kleinbuchstaben, Ziffern, Bindestrich. Reicht zum Sortieren
    und kann nirgends ausbrechen. */
 function mediaFolderSlug(string $f): string {
-  $f = strtolower(trim($f));
+  /* Umlaute ausschreiben statt wegwerfen - aus "Oeffentlich" wuerde sonst
+     "ffentlich". */
+  $f = strtr(trim($f), ['ä'=>'ae','ö'=>'oe','ü'=>'ue','Ä'=>'ae','Ö'=>'oe','Ü'=>'ue','ß'=>'ss']);
+  $f = strtolower($f);
   $f = preg_replace('/[^a-z0-9-]+/', '-', $f);
   return trim((string)$f, '-');
 }

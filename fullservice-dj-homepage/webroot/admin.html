@@ -6546,6 +6546,11 @@ function mpUpload(inp){
    Verweise auf der Seite mit, das Archivieren bewusst nicht - siehe api.php. */
 var MEDIA_PG_LIST=[],MEDIA_ORDNER=[],MEDIA_ARCHIV_N=0;
 var MP_ORDNER='',MP_SUCHE='',MP_ART='alle',MP_ARCHIV=false,MP_SEL={};
+/* Bei vielen Dateien wird die Kachelwand lang: Liste als kompakte Alternative und
+   nachladen statt alles auf einmal. Die Ansicht merkt sich der Browser. */
+var MP_SEITE=48;
+function mpAnsicht(){try{return localStorage.getItem('mp_ansicht')==='liste'?'liste':'kacheln'}catch(e){return 'kacheln'}}
+function mpAnsichtSetzen(a){try{localStorage.setItem('mp_ansicht',a)}catch(e){}MP_SEITE=48;renderMediaPage()}
 function loadMediaPage(){
   document.getElementById('mediaPgGrid').textContent='Lade Medien \u2026';
   fetch(API+'/media/list'+(MP_ARCHIV?'?archiv=1':''),{headers:{Authorization:'Bearer '+TOKEN}})
@@ -6589,12 +6594,13 @@ function mpGefiltert(){
   });
 }
 function mpSetzen(feld,wert){
+  MP_SEITE=48;
   if(feld==='ordner')MP_ORDNER=wert;
   if(feld==='art')MP_ART=wert;
   if(feld==='archiv'){MP_ARCHIV=!!wert;MP_SEL={};loadMediaPage();return}
   MP_SEL={};renderMediaPage();
 }
-function mpSuche(el){MP_SUCHE=el.value;renderMediaPage()}
+function mpSuche(el){MP_SUCHE=el.value;MP_SEITE=48;renderMediaPage()}
 function mpArten(){
   var vorhanden={};
   MEDIA_PG_LIST.forEach(function(m){if(m.ext)vorhanden[m.ext]=true});
@@ -6616,6 +6622,8 @@ function renderMediaBar(){
     '<select style="width:auto;min-width:140px" onchange="mpSetzen(\'art\',this.value)">'+artOpts+'</select>'+
     '<input type="text" placeholder="Nach Dateiname suchen \u2026" value="'+esc(MP_SUCHE)+'" oninput="mpSuche(this)" style="width:auto;flex:1;min-width:180px">'+
     '<button class="btn g sm" onclick="mpAlle()">Alle ausw\u00e4hlen</button>'+
+    '<button class="btn g sm" onclick="mpAnsichtSetzen(\''+(mpAnsicht()==='liste'?'kacheln':'liste')+'\')">'+
+      (mpAnsicht()==='liste'?'Kacheln':'Liste')+'</button>'+
     (MP_ARCHIV?'':'<button class="btn g sm" onclick="mpSetzen(\'archiv\',true)">Archiv ('+MEDIA_ARCHIV_N+')</button>')+
     '</div>';
 }
@@ -6646,6 +6654,69 @@ function renderMediaSel(){
         '<button class="btn sm r" onclick="mpArchivieren()">Ins Archiv</button>')+
     '<a class="sml" onclick="MP_SEL={};renderMediaPage()">Auswahl aufheben</a>';
 }
+function mpKachel(m,i){
+  var vid=m.kind==='video',k=mpKey(m),an=!!MP_SEL[k];
+  var wo=MP_ARCHIV?[]:mediaUsage(m.url);
+  return '<div class="card" style="padding:8px;position:relative'+(an?';outline:2px solid var(--acc)':'')+'">'+
+    mpHaken(k,an,'position:absolute;top:12px;left:12px;z-index:2')+
+    '<div onclick="mpGross('+i+')" style="cursor:zoom-in">'+
+    (vid
+      ? '<video src="'+esc(m.url)+'" muted loop autoplay playsinline preload="metadata" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px;background:#000"></video>'
+      : '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px">')+
+    '</div>'+
+    '<div class="mut sml" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
+    '<div class="mut sml" style="margin-bottom:8px">'+mpInfo(m)+'</div>'+
+    (wo.length?'<div class="sml" style="color:var(--yel);margin-bottom:6px">In Verwendung: '+esc(wo.join(', '))+'</div>':'')+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+mpAktionen(m,i,vid)+'</div></div>';
+}
+function mpZeile(m,i){
+  var vid=m.kind==='video',k=mpKey(m),an=!!MP_SEL[k];
+  var wo=MP_ARCHIV?[]:mediaUsage(m.url);
+  return '<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.05)'+(an?';background:rgba(255,111,91,.09)':'')+'">'+
+    mpHaken(k,an,'')+
+    '<div onclick="mpGross('+i+')" style="cursor:zoom-in;flex:none">'+
+    (vid
+      ? '<video src="'+esc(m.url)+'" muted preload="metadata" style="width:54px;height:38px;object-fit:cover;border-radius:4px;background:#000"></video>'
+      : '<img src="'+esc(m.url)+'" loading="lazy" style="width:54px;height:38px;object-fit:cover;border-radius:4px">')+
+    '</div>'+
+    '<div style="flex:1;min-width:0">'+
+      '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--wh)" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
+      '<div class="mut sml">'+mpInfo(m)+
+        (wo.length?' \u00b7 <span style="color:var(--yel)">in Verwendung: '+esc(wo.join(', '))+'</span>':'')+'</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;flex:none">'+mpAktionen(m,i,vid)+'</div></div>';
+}
+function mpHaken(k,an,stil){
+  return '<label style="'+stil+';background:rgba(0,0,0,.6);border-radius:4px;padding:3px;margin:0;cursor:pointer;flex:none">'+
+    '<input type="checkbox" style="width:16px;height:16px;margin:0" '+(an?'checked':'')+
+    ' onchange="mpToggle(\''+k.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',this.checked)"></label>';
+}
+function mpInfo(m){
+  return mpKb(m.size)+' \u00b7 .'+esc(m.ext||'')+
+    (m.folder&&!MP_ARCHIV?' \u00b7 '+esc(m.folder):'')+
+    (MP_ARCHIV&&m.herkunft?' \u00b7 aus \u201e'+esc(m.herkunft)+'\u201c':'');
+}
+function mpAktionen(m,i,vid){
+  return MP_ARCHIV
+    ? '<button class="btn g sm" onclick="mpWiederherstellen('+i+')">Zur\u00fcckholen</button>'+
+      '<button class="btn sm r" onclick="mpEndgueltig('+i+')">L\u00f6schen</button>'
+    : '<button class="btn g sm" onclick="mediaPgCopy('+i+')">URL kopieren</button>'+
+      (vid?'':'<button class="btn g sm" onclick="mediaPgToGallery('+i+')">Zur Galerie</button>')+
+      '<button class="btn g sm" onclick="mpUmbenennen('+i+')">Umbenennen</button>'+
+      '<button class="btn sm r" onclick="mpArchivieren('+i+')">Ins Archiv</button>';
+}
+/* Originalgroesse ansehen - im Raster ist ja alles auf Kachelmass beschnitten. */
+function mpGross(i){
+  var m=MEDIA_PG_LIST[i];if(!m)return;
+  openOvl2(esc(m.name),
+    (m.kind==='video'
+      ? '<video src="'+esc(m.url)+'" controls autoplay style="max-width:100%;max-height:70vh;display:block;margin:0 auto;background:#000"></video>'
+      : '<img src="'+esc(m.url)+'" style="max-width:100%;max-height:70vh;display:block;margin:0 auto">')+
+    '<div class="mut sml" style="margin-top:10px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">'+
+      '<span>'+mpInfo(m)+'</span>'+
+      '<a href="'+esc(m.url)+'" target="_blank" rel="noopener">In neuem Tab \u00f6ffnen</a>'+
+      '<a onclick="closeOvl2();mediaPgCopy('+i+')">URL kopieren</a></div>');
+}
 function renderMediaPage(){
   renderMediaBar();renderMediaSel();
   var g=document.getElementById('mediaPgGrid');if(!g)return;
@@ -6656,36 +6727,53 @@ function renderMediaPage(){
       :(MP_ARCHIV?'Das Archiv ist leer.':'Noch nichts im Pool \u2013 \u00fcber \u201eHochladen\u201c landen die ersten Dateien hier.'))+'</span>';
     return;
   }
-  g.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px">'+
-    liste.map(function(m){
-      var i=MEDIA_PG_LIST.indexOf(m),vid=m.kind==='video',k=mpKey(m),an=!!MP_SEL[k];
-      var wo=MP_ARCHIV?[]:mediaUsage(m.url);
-      return '<div class="card" style="padding:8px;position:relative'+(an?';outline:2px solid var(--acc)':'')+'">'+
-      '<label style="position:absolute;top:12px;left:12px;z-index:2;background:rgba(0,0,0,.6);border-radius:4px;padding:3px;margin:0;cursor:pointer">'+
-        '<input type="checkbox" style="width:16px;height:16px;margin:0" '+(an?'checked':'')+' onchange="mpToggle(\''+k.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',this.checked)"></label>'+
-      (vid
-        ? '<video src="'+esc(m.url)+'" muted loop autoplay playsinline preload="metadata" controls style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px;background:#000"></video>'
-        : '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px">')+
-      '<div class="mut sml" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
-      '<div class="mut sml" style="margin-bottom:8px">'+mpKb(m.size)+' \u00b7 .'+esc(m.ext||'')+
-        (m.folder&&!MP_ARCHIV?' \u00b7 '+esc(m.folder):'')+
-        (MP_ARCHIV&&m.herkunft?' \u00b7 aus \u201e'+esc(m.herkunft)+'\u201c':'')+'</div>'+
-      (wo.length?'<div class="sml" style="color:var(--yel);margin-bottom:6px">In Verwendung: '+esc(wo.join(', '))+'</div>':'')+
-      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-      (MP_ARCHIV
-        ? '<button class="btn g sm" onclick="mpWiederherstellen('+i+')">Zur\u00fcckholen</button>'+
-          '<button class="btn sm r" onclick="mpEndgueltig('+i+')">L\u00f6schen</button>'
-        : '<button class="btn g sm" onclick="mediaPgCopy('+i+')">URL kopieren</button>'+
-          (vid?'':'<button class="btn g sm" onclick="mediaPgToGallery('+i+')">Zur Galerie</button>')+
-          '<button class="btn g sm" onclick="mpUmbenennen('+i+')">Umbenennen</button>'+
-          '<button class="btn sm r" onclick="mpArchivieren('+i+')">Ins Archiv</button>')+
-      '</div></div>';
-    }).join('')+'</div>';
+  var teil=liste.slice(0,MP_SEITE),liste_=liste;
+  var inhalt=mpAnsicht()==='liste'
+    ? '<div class="card" style="padding:2px 10px">'+teil.map(function(m){return mpZeile(m,MEDIA_PG_LIST.indexOf(m))}).join('')+'</div>'
+    : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px">'+
+      teil.map(function(m){return mpKachel(m,MEDIA_PG_LIST.indexOf(m))}).join('')+'</div>';
+  g.innerHTML=inhalt+
+    '<div class="mut sml" style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+
+    '<span>'+teil.length+' von '+liste_.length+' angezeigt</span>'+
+    (teil.length<liste_.length
+      ? '<button class="btn g sm" onclick="MP_SEITE+=48;renderMediaPage()">Weitere anzeigen</button>'+
+        '<a onclick="MP_SEITE='+liste_.length+';renderMediaPage()">alle anzeigen</a>'
+      : '')+'</div>';
+}
+/* Der Server stutzt den Ordnernamen auf Kleinbuchstaben, Ziffern und Bindestrich.
+   Genau dieselbe Regel hier, damit direkt im Feld steht, wie der Ordner heissen wird -
+   frueher sah man das erst hinterher. */
+function mpSlug(n){
+  var um={'\u00e4':'ae','\u00f6':'oe','\u00fc':'ue','\u00c4':'ae','\u00d6':'oe','\u00dc':'ue','\u00df':'ss'};
+  return String(n||'').replace(/[\u00e4\u00f6\u00fc\u00c4\u00d6\u00dc\u00df]/g,function(c){return um[c]})
+    .toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'');
+}
+function mpSlugVorschau(){
+  var el=document.getElementById('mpOrdnerVor');if(!el)return;
+  var slug=mpSlug(v('mpOrdnerName'));
+  var da=MEDIA_ORDNER.indexOf(slug)>=0;
+  el.innerHTML=!slug
+    ? 'Bitte einen Namen eingeben.'
+    : (da?'<span style="color:var(--yel)">Den Ordner \u201e'+esc(slug)+'\u201c gibt es schon.</span>'
+        :'Der Ordner hei\u00dft dann: <b style="color:var(--wh)">'+esc(slug)+'</b>');
 }
 function mpNeuerOrdner(){
-  var n=prompt('Name des neuen Ordners (Kleinbuchstaben, Ziffern, Bindestrich):');
-  if(!n)return;
-  mpApi('media/folder',{name:n}).then(function(j){toast('Ordner \u201e'+j.name+'\u201c angelegt \u2713');MP_ORDNER=j.name;loadMediaPage()})
+  openModal('Neuer Ordner',
+    '<label for="mpOrdnerName">Name</label>'+
+    '<input id="mpOrdnerName" placeholder="z. B. Logos 2026" oninput="mpSlugVorschau()">'+
+    '<div class="mut sml" id="mpOrdnerVor" style="margin-top:6px"></div>'+
+    '<div class="mut sml" style="margin-top:8px">Erlaubt sind Kleinbuchstaben, Ziffern und Bindestriche \u2013 alles andere wird ersetzt, Umlaute werden ausgeschrieben.</div>'+
+    '<div style="margin-top:16px"><button class="btn" onclick="mpOrdnerAnlegen()">Ordner anlegen</button></div>');
+  var inp=document.getElementById('mpOrdnerName');
+  inp.focus();
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter')mpOrdnerAnlegen()});
+  mpSlugVorschau();
+}
+function mpOrdnerAnlegen(){
+  var slug=mpSlug(v('mpOrdnerName'));
+  if(!slug){toast('Bitte einen Namen eingeben.',1);return}
+  mpApi('media/folder',{name:slug})
+    .then(function(j){closeModal();toast('Ordner \u201e'+j.name+'\u201c angelegt \u2713');MP_ORDNER=j.name;loadMediaPage()})
     .catch(function(e){toast(e.message,1)});
 }
 function mpOrdnerLoeschen(){
