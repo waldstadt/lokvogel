@@ -509,10 +509,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 
   <!-- MEDIEN-POOL -->
   <div class="pg" id="pg-media">
-    <div class="phead"><div><div class="pt">Medien-Pool</div><div class="ps">Alle hochgeladenen Bilder an einem Ort – hochladen und direkt verteilen</div></div>
-      <div><input type="file" accept="image/*" multiple style="display:none" id="mediaPgUp" onchange="mediaPgUpload(this)">
-      <button class="btn" onclick="document.getElementById('mediaPgUp').click()">Bilder hochladen</button></div></div>
-    <div id="mediaPgGrid" class="mut sml">Lade Bilder …</div>
+    <div class="phead"><div><div class="pt">Medien-Pool</div><div class="ps">Alle hochgeladenen Bilder und Videos an einem Ort – hochladen und direkt verteilen</div></div>
+      <div><input type="file" accept="image/*,video/mp4,video/webm" multiple style="display:none" id="mediaPgUp" onchange="mediaPgUpload(this)">
+      <button class="btn" onclick="document.getElementById('mediaPgUp').click()">Hochladen</button></div></div>
+    <div id="mediaPgGrid" class="mut sml">Lade Medien …</div>
   </div>
 
   <!-- AKTIONSSEITEN -->
@@ -597,6 +597,13 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div class="card"><h3>Technik-Seite (technik.html)</h3>
           <label style="margin-bottom:12px"><input type="checkbox" id="cThEnabled" style="width:auto;margin-right:6px" checked><b>Technik-Seite online</b> – ausschalten zeigt Besuchern nur einen Hinweis „gerade nicht verfügbar" statt der Seite</label>
           <label>Hero-Unterzeile</label><input id="cThSub">
+          <label>Hero-Hintergrundbild <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional)</span></label>
+          <div style="display:flex;gap:8px"><input id="cThImg" placeholder="URL oder hochladen →"><input type="file" accept="image/*" style="display:none" id="upThHero" onchange="uploadImg(this,'cThImg','cThFocal')"><button class="btn g sm" onclick="document.getElementById('upThHero').click()">Hochladen</button><button class="btn g sm" onclick="poolPick('cThImg','cThFocal')">Aus Pool</button></div>
+          <div id="cThFocalWrap"></div>
+          <label style="margin-top:12px">Hero-Hintergrundvideo <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional, mp4 oder webm, max. 24 MB)</span></label>
+          <div style="display:flex;gap:8px"><input id="cThVid" placeholder="leer lassen für nur Bild"><input type="file" accept="video/mp4,video/webm" style="display:none" id="upThVid" onchange="uploadThVideo(this)"><button class="btn g sm" onclick="document.getElementById('upThVid').click()">Hochladen</button><button class="btn g sm" onclick="document.getElementById('cThVid').value='';thVidHint()">Entfernen</button></div>
+          <div class="mut sml" style="margin-top:6px">Läuft stumm in Endlosschleife hinter der Überschrift. Das Bild bleibt Standbild und ersetzt das Video bei „Bewegung reduzieren" oder im Mobilfunknetz.</div>
+          <div id="cThVidHint" class="sml" style="margin-top:6px"></div>
           <label>Hero-Text</label><textarea id="cThText"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cThText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Mietpark-Titel</label><input id="cThRentTitle">
@@ -614,7 +621,8 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('contact')">Speichern</button></div></div>
     <div class="sec-label">Sammlungen &amp; Listen</div>
         <div class="card"><h3>Leistungspakete <button class="btn sm" style="float:right" onclick="openPackModal()">+ Paket</button></h3>
-          <div class="mut sml" style="margin-bottom:8px">Reihenfolge per Ziehen am ⠿-Griff ändern – Klick aufs Badge schaltet live/aus.</div>
+          <label style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cPackImgs" style="width:auto;margin-right:6px" onchange="savePackSec()">Bilder in den Paketkacheln anzeigen</label>
+          <div class="mut sml" style="margin-bottom:8px">Ohne Haken sehen die Kacheln aus wie bisher – nützlich, solange noch nicht jedes Paket ein Bild hat. Reihenfolge per Ziehen am ⠿-Griff ändern, Klick aufs Badge schaltet live/aus.</div>
           <div id="packList" class="sml"></div></div>
         <div class="card"><h3>FAQ <span style="float:right;display:flex;gap:6px"><button class="btn g sm" id="faqAiBtn" onclick="suggestFaq()">KI-Vorschlag</button><button class="btn sm" onclick="openFaqModal()">+ Frage</button></span></h3>
           <div class="mut sml" style="margin-bottom:8px">Reihenfolge per Ziehen am ⠿-Griff ändern – Klick aufs Badge schaltet live/aus.</div>
@@ -3711,6 +3719,9 @@ function renderCms(){
   document.getElementById('cSeoTitle').value=g('seo','title');
   document.getElementById('cSeoDesc').value=g('seo','description');
   document.getElementById('cThSub').value=g('tech_hero','subtitle');
+  document.getElementById('cThImg').value=g('tech_hero','image');
+  document.getElementById('cThFocalWrap').innerHTML=focalWidget(g('tech_hero','image'),g('tech_hero','image_focal'),'cThFocal','21/9');
+  document.getElementById('cThVid').value=g('tech_hero','video')||'';thVidHint();
   document.getElementById('cThText').value=g('tech_hero','text');
   document.getElementById('cThEnabled').checked=(c.tech_hero&&c.tech_hero.enabled)!==false;
   document.getElementById('cThRentTitle').value=g('rental','title');
@@ -3752,6 +3763,8 @@ function renderCms(){
   document.getElementById('themeRowTech').innerHTML=THEMES.map(function(t){
     return '<span class="theme-sw'+(tt.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+t.n+'" onclick="pickTheme(\'technik\',\''+t.n+'\')"></span>';
   }).join('')+'<span class="sml mut" style="margin-left:8px">Preset wählen oder Farben frei einstellen</span>';
+  var pi=document.getElementById('cPackImgs');
+  if(pi)pi.checked=!((CACHE.content.pack_sec||{}).images===false);
   renderPackAdmin();renderFaqAdmin();reloadLocs();reloadFriends();reloadBadges();renderBadgeSec();
   renderSectionsCard();renderInstagram();loadVersions();
 }
@@ -3800,7 +3813,7 @@ function buildContentVal(key){
 }
 function saveContent(key){
   if(key==='tech'){
-    upsertContent('tech_hero',{subtitle:v('cThSub'),text:v('cThText'),enabled:document.getElementById('cThEnabled').checked});
+    upsertContent('tech_hero',{subtitle:v('cThSub'),text:v('cThText'),image:v('cThImg'),image_focal:v('cThFocal'),video:v('cThVid'),enabled:document.getElementById('cThEnabled').checked});
     upsertContent('rental',{title:v('cThRentTitle'),text:v('cThRentText')});
     upsertContent('tech_teaser',{title:v('cThTeaTitle'),text:v('cThTeaText')});
     return;
@@ -3828,6 +3841,26 @@ function uploadHeroVideo(inp){
       toast('Video hochgeladen ✓ – „Speichern" nicht vergessen.');})
     .catch(function(e){toast(e.message,1)});
   inp.value='';
+}
+function uploadThVideo(inp){
+  var f=inp.files[0];if(!f)return;
+  if(f.size>24*1024*1024){
+    toast('Das Video ist '+(f.size/1048576).toFixed(1)+' MB groß – maximal 24 MB.',1);inp.value='';return;
+  }
+  toast('Video wird hochgeladen …');
+  var name=Date.now()+'-'+f.name.toLowerCase().replace(/[^a-z0-9.]+/g,'-');
+  fetch(API+'/storage/'+encodeURIComponent(name),{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:f})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||('Upload fehlgeschlagen ('+r.status+')'));return j})})
+    .then(function(j){document.getElementById('cThVid').value=j.url;thVidHint();
+      toast('Video hochgeladen ✓ – „Speichern" nicht vergessen.');})
+    .catch(function(e){toast(e.message,1)});
+  inp.value='';
+}
+function thVidHint(){
+  var el=document.getElementById('cThVidHint');if(!el)return;
+  var u=v('cThVid');
+  el.innerHTML=u?('<video src="'+esc(u)+'" muted loop autoplay playsinline style="max-width:280px;width:100%;border-radius:4px;display:block"></video>')
+    :'<span class="mut">Kein Video hinterlegt – der Header zeigt nur das Bild.</span>';
 }
 function heroVidHint(){
   var el=document.getElementById('cHeroVidHint');if(!el)return;
@@ -4035,6 +4068,13 @@ function openPackModal(id){
     '<div class="grid2"><div><label>Preis (€)</label><input type="number" id="pPrice" value="'+(p.price_from||'')+'"></div>'+
     '<div><label>Zusatz (ab/pauschal)</label><input id="pNote" value="'+esc(p.price_note||'ab')+'"></div></div>'+
     '<label>Leistungen (eine pro Zeile)</label><textarea id="pFeat" style="min-height:100px">'+esc((p.features||[]).join('\n'))+'</textarea>'+
+    '<label style="margin-top:12px">Bild <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional, erscheint oben auf der Kachel)</span></label>'+
+    '<input type="hidden" id="pImg" value="'+esc(p.image_url||'')+'">'+
+    '<div style="display:flex;gap:8px"><input type="file" accept="image/*" style="display:none" id="pImgUp" onchange="pImgUpload(this)">'+
+    '<button class="btn g sm" onclick="document.getElementById(\'pImgUp\').click()">Hochladen</button>'+
+    '<button class="btn g sm" onclick="pImgFromPool()">Aus Pool</button>'+
+    (p.image_url?'<button class="btn g sm" onclick="pImgRemove()">Entfernen</button>':'')+'</div>'+
+    '<div id="pImgFocalWrap">'+focalWidget(p.image_url,p.image_focal,'pFocal','16/10')+'</div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="pPub" style="width:auto;margin-right:6px" '+(p.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
     SORT_HINT+
     '<div style="margin-top:14px"><button class="btn" onclick="savePack(\''+(id||'')+'\')">Speichern</button>'+
@@ -4043,10 +4083,40 @@ function openPackModal(id){
 function savePack(id){
   var body={title:v('pTitle'),subtitle:v('pSub'),price_from:v('pPrice')?Number(v('pPrice')):null,price_note:v('pNote'),
     features:v('pFeat').split('\n').map(function(s){return s.trim()}).filter(Boolean),
+    image_url:v('pImg'),image_focal:v('pFocal'),
     public:document.getElementById('pPub').checked};
   if(!id)body.sort=(CACHE.packages||[]).length;
   (id?api('packages?id=eq.'+id,{method:'PATCH',body:body}):api('packages',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');renderCmsReload()}).catch(function(e){toast(e.message,1)});
+}
+function pImgUpload(inp){
+  var f=inp.files[0];if(!f)return;
+  var name=Date.now()+'-'+f.name.toLowerCase().replace(/[^a-z0-9.]+/g,'-');
+  fetch(API+'/storage/'+encodeURIComponent(name),{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:f})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||('Upload fehlgeschlagen ('+r.status+')'));return j})})
+    .then(function(j){
+      document.getElementById('pImg').value=j.url;
+      document.getElementById('pImgFocalWrap').innerHTML=focalWidget(j.url,'50% 50%','pFocal','16/10');
+      toast('Bild hochgeladen ✓ – „Speichern" nicht vergessen.');
+    }).catch(function(e){toast(e.message,1)});
+  inp.value='';
+}
+function pImgFromPool(){
+  openMediaPicker(function(urls){
+    if(!urls||!urls[0])return;
+    document.getElementById('pImg').value=urls[0];
+    document.getElementById('pImgFocalWrap').innerHTML=focalWidget(urls[0],'50% 50%','pFocal','16/10');
+  });
+}
+function pImgRemove(){
+  document.getElementById('pImg').value='';
+  document.getElementById('pImgFocalWrap').innerHTML=focalWidget('','50% 50%','pFocal','16/10');
+}
+function savePackSec(){
+  var cfg={images:document.getElementById('cPackImgs').checked};
+  api('site_content?key=eq.pack_sec',{method:'PATCH',body:{value:cfg}})
+    .then(function(){CACHE.content.pack_sec=cfg;toast('Gespeichert ✓')})
+    .catch(function(e){toast(e.message,1)});
 }
 function renderFaqAdmin(){
   document.getElementById('faqAdminList').innerHTML=(CACHE.faq||[]).map(function(f,i){
@@ -5633,11 +5703,11 @@ function openMediaPicker(cb,multi){
   MEDIA_CB=cb;MEDIA_MULTI=!!multi;MEDIA_SEL=[];MEDIA_LIST=[];
   openOvl2('Medien-Pool',
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">'+
-    '<input type="file" accept="image/*" multiple style="display:none" id="mpUp" onchange="mpUpload(this)">'+
+    '<input type="file" accept="image/*,video/mp4,video/webm" multiple style="display:none" id="mpUp" onchange="mpUpload(this)">'+
     '<button class="btn g sm" onclick="document.getElementById(\'mpUp\').click()">Hochladen</button>'+
     (MEDIA_MULTI?'<button class="btn sm" onclick="mpApply()">Übernehmen (<span id="mpCnt">0</span>)</button>':'')+
     '<span class="mut sml">'+(MEDIA_MULTI?'Bilder anklicken zum Auswählen, dann „Übernehmen".':'Bild anklicken zum Übernehmen.')+'</span></div>'+
-    '<div id="mpGrid" class="sml mut">Lade Bilder …</div>');
+    '<div id="mpGrid" class="sml mut">Lade Medien …</div>');
   mpLoad();
 }
 function mpLoad(){
@@ -5649,12 +5719,15 @@ function mpLoad(){
 function mpKb(n){n=Number(n)||0;return n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB'}
 function mpRenderGrid(){
   var g=document.getElementById('mpGrid');if(!g)return;
-  if(!MEDIA_LIST.length){g.innerHTML='<span class="mut">Noch keine Bilder im Pool – über „Hochladen" landen die ersten hier.</span>';return}
+  if(!MEDIA_LIST.length){g.innerHTML='<span class="mut">Noch nichts im Pool – über „Hochladen" landen die ersten Dateien hier.</span>';return}
   g.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">'+
     MEDIA_LIST.map(function(m,i){
       var sel=MEDIA_SEL.indexOf(m.url)>=0;
       return '<div onclick="mpPick('+i+')" style="cursor:pointer;position:relative">'+
-      '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:2px solid '+(sel?'var(--acc)':'var(--bdr)')+'">'+
+      (m.kind==='video'
+        ? '<video src="'+esc(m.url)+'" muted loop playsinline preload="metadata" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:2px solid '+(sel?'var(--acc)':'var(--bdr)')+';background:#000"></video>'
+        : '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:2px solid '+(sel?'var(--acc)':'var(--bdr)')+'">')+
+      (m.kind==='video'?'<span style="position:absolute;bottom:34px;left:6px;background:rgba(0,0,0,.65);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px">Video</span>':'')+
       (sel?'<span style="position:absolute;top:6px;right:6px;background:var(--acc);color:#141414;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:0;width:12px;height:12px"><polyline points="20 6 9 17 4 12"/></svg></span>':'')+
       '<div class="mut" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
       '<div class="mut" style="font-size:10px">'+mpKb(m.size)+(m.source==='instagram'?' · Instagram':'')+'</div></div>';
@@ -5678,13 +5751,13 @@ function mpApply(){
   if(cb)cb(sel);
 }
 function mpUpload(inp){
-  uploadFilesSeq(inp.files,null,function(urls){toast(urls.length+' Bild(er) hochgeladen ✓');mpLoad()});
+  uploadFilesSeq(inp.files,null,function(urls){toast(urls.length+' Datei(en) hochgeladen ✓');mpLoad()});
   inp.value='';
 }
 /* ===== Medien-Pool als eigene Seite (Hochladen + Verteilen an gängige Bildfelder) ===== */
 var MEDIA_PG_LIST=[];
 function loadMediaPage(){
-  document.getElementById('mediaPgGrid').textContent='Lade Bilder …';
+  document.getElementById('mediaPgGrid').textContent='Lade Medien …';
   fetch(API+'/media/list',{headers:{Authorization:'Bearer '+TOKEN}})
     .then(function(r){if(!r.ok)throw new Error('list');return r.json()})
     .then(function(list){MEDIA_PG_LIST=Array.isArray(list)?list:[];renderMediaPage()})
@@ -5696,16 +5769,20 @@ function mediaPgUpload(inp){
 }
 function renderMediaPage(){
   var g=document.getElementById('mediaPgGrid');if(!g)return;
-  if(!MEDIA_PG_LIST.length){g.innerHTML='<span class="mut">Noch keine Bilder im Pool – über „Bilder hochladen" landen die ersten hier.</span>';return}
+  if(!MEDIA_PG_LIST.length){g.innerHTML='<span class="mut">Noch nichts im Pool – über „Hochladen" landen die ersten Dateien hier.</span>';return}
   g.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px">'+
     MEDIA_PG_LIST.map(function(m,i){
+      var vid=m.kind==='video';
       return '<div class="card" style="padding:8px">'+
-      '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px">'+
+      (vid
+        ? '<video src="'+esc(m.url)+'" muted loop playsinline preload="metadata" controls style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px;background:#000"></video>'
+        : '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px">')+
       '<div class="mut sml" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
-      '<div class="mut sml" style="margin-bottom:8px">'+mpKb(m.size)+(m.source==='instagram'?' · Instagram':'')+'</div>'+
+      '<div class="mut sml" style="margin-bottom:8px">'+mpKb(m.size)+(vid?' · Video':'')+(m.source==='instagram'?' · Instagram':'')+'</div>'+
       '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
       '<button class="btn g sm" onclick="mediaPgCopy('+i+')">URL kopieren</button>'+
-      '<button class="btn g sm" onclick="mediaPgToGallery('+i+')">Zur Galerie</button>'+
+      /* Videos gehoeren nicht in die Fotogalerie - die zeigt nur Bilder. */
+      (vid?'':'<button class="btn g sm" onclick="mediaPgToGallery('+i+')">Zur Galerie</button>')+
       '</div></div>';
     }).join('')+'</div>';
 }

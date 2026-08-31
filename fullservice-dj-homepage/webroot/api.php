@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 71;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 72;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -659,6 +659,18 @@ function upgrade(PDO $p): void {
         ->execute([uuid(), 'start', 'galerie', 0, 'instagram', 'Frisch aus Instagram', '', '[]', '4',
           $hat ? 1 : 0, now()]);
     }
+  } catch (PDOException $e) {}
+  if ($v < 72) try {
+    /* Bild je Leistungspaket - die Kacheln waren der einzige Bereich, in dem die
+       Kaufentscheidung faellt und trotzdem nur Text stand. */
+    $p->exec("alter table packages add column image_url text");
+    $p->exec("alter table packages add column image_focal text default '50% 50%'");
+  } catch (PDOException $e) {}
+  if ($v < 72) try {
+    $st = $p->query("select count(*) from site_content where key='pack_sec'");
+    if (!(int)$st->fetchColumn())
+      $p->prepare('insert into site_content (key,value,updated_at) values (?,?,?)')
+        ->execute(['pack_sec', '{"images":true}', now()]);
   } catch (PDOException $e) {}
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -1897,6 +1909,7 @@ create table settings (key text primary key, value text not null default '{}', u
 create table site_content (key text primary key, value text not null default '{}', updated_at text);
 create table packages (id text primary key, sort integer default 0, title text not null, subtitle text,
   description text, price_from real, price_note text, features text default '[]',
+  image_url text, image_focal text default '50% 50%',
   public integer default 1, created_at text);
 create table faq (id text primary key, sort integer default 0, question text not null,
   answer text not null, public integer default 1);
@@ -2049,6 +2062,7 @@ function seed(PDO $p): void {
     ['reviews', '{"google_url":"","djbande_url":"","tagline":""}'],
     ['loc_section', '{"title":"Orte, an denen ich besonders gerne auflege","text":"Deutschlandweit gibt es Locations, mit denen die Zusammenarbeit einfach herausragend läuft – eingespielte Teams, gute Technik-Bedingungen, tolle Räume. Diese Häuser empfehle ich aus voller Überzeugung."}'],
     ['gallery', '{"title":"So sieht\'s bei mir aus","images":["img/IMG_4061.png","img/IMG_4086.png","img/IMG_3296.png","img/IMG_9059.png","img/IMG_3591.png","img/spiegelkugel mittig.jpg","img/IMG_0850.png"]}'],
+    ['pack_sec', '{"images":true}'],
     ['badges_sec', '{"mitglied": {"enabled": true, "show_tech": true, "title": "Wo ich mitmache", "text": "Netzwerke und Portale, in denen ich gelistet bin – wer mag, schaut dort nach, was andere über meine Arbeit schreiben."}, "technik": {"enabled": true, "show_tech": true, "title": "Womit ich arbeite", "text": "Die Technik, die bei mir im Wagen liegt. Keine Werbung, sondern eine ehrliche Auskunft darüber, was ich mitbringe."}}'],
     ['seo', '{"title":"DJ Lauschgift – Hochzeits-DJ & Event-DJ | Deutschlandweit","description":"DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer."}'],
     ['legal', json_encode([
@@ -3875,14 +3889,18 @@ try {
     handleRest($m[1], $method, $q, $body, $prefer);
   }
   if (preg_match('#^storage/(.+)$#', $path, $m) && $method === 'POST') handleUpload($m[1]);
-  /* Medienpool: alle Bilder im uploads-Ordner (inkl. gespiegelter Instagram-Bilder) – nur angemeldet */
+  /* Medienpool: Bilder und Videos im uploads-Ordner (inkl. gespiegelter Instagram-Bilder) – nur angemeldet */
   if ($path === 'media/list' && $method === 'GET') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
     $files = [];
     $scan = function (string $dir, string $prefix, string $source) use (&$files) {
-      foreach (glob($dir . '/*.{jpg,jpeg,png,webp,gif}', GLOB_BRACE) ?: [] as $f)
-        if (is_file($f)) $files[] = ['name' => basename($f), 'url' => $prefix . basename($f),
-          'size' => filesize($f), 'mtime' => filemtime($f), 'source' => $source];
+      foreach (glob($dir . '/*.{jpg,jpeg,png,webp,gif,mp4,webm}', GLOB_BRACE) ?: [] as $f)
+        if (is_file($f)) {
+          $ext = strtolower(pathinfo($f, PATHINFO_EXTENSION));
+          $files[] = ['name' => basename($f), 'url' => $prefix . basename($f),
+            'kind' => in_array($ext, ['mp4','webm']) ? 'video' : 'bild',
+            'size' => filesize($f), 'mtime' => filemtime($f), 'source' => $source];
+        }
     };
     $scan(UPLOAD_DIR, 'uploads/', 'upload');
     $scan(UPLOAD_DIR . '/instagram', 'uploads/instagram/', 'instagram');

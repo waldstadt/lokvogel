@@ -66,6 +66,12 @@ nav.scrolled{border-bottom-color:var(--line)}
 
 .hero{min-height:84vh;display:flex;align-items:center;position:relative;overflow:hidden;padding-top:90px}
 .hero-bg{position:absolute;inset:0;background:var(--bg);border-bottom:1px solid var(--line)}
+.hero-img{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.20;transition:opacity .6s ease}
+.hero-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.20;pointer-events:none}
+/* Wie auf der Startseite: ohne Abdunkler wird die Ueberschrift ueber hellen Motiven zu blass. */
+.hero-scrim{position:absolute;inset:0;background:rgba(0,0,0,.30);pointer-events:none;display:none}
+.hero.hat-medien .hero-scrim{display:block}
+.hero-in{position:relative;z-index:2}
 .hero-in{position:relative;z-index:2}
 .hero h1{font-size:clamp(38px,6.4vw,68px);font-weight:700;line-height:1.06;letter-spacing:-.03em;margin-bottom:20px}
 .hero h1 em{font-style:normal;color:var(--acc)}
@@ -192,6 +198,9 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
 
 <header class="hero" id="top">
   <div class="hero-bg"></div>
+  <div class="hero-img" id="heroImg"></div>
+  <div id="heroVid"></div>
+  <div class="hero-scrim"></div>
   <div class="wrap hero-in">
     <div class="kicker" id="heroKick">Lauschgift Veranstaltungstechnik · Hemer</div>
     <h1 id="heroTitle">Jedes Wort verständlich.<br><em>Auch in der schwierigsten Location.</em></h1>
@@ -588,6 +597,13 @@ sfetch('site_content?select=key,value').then(function(rows){
     return;
   }
   if(c.tech_hero){
+    if(c.tech_hero.image){var hi=document.getElementById('heroImg');
+      hi.style.backgroundImage='url("'+c.tech_hero.image+'")';
+      hi.style.backgroundPosition=c.tech_hero.image_focal||'center';}
+    if(c.tech_hero.image||c.tech_hero.video){
+      var th=document.querySelector('.hero');if(th)th.classList.add('hat-medien');
+    }
+    setHeroVideo(c.tech_hero.video);
     if(c.tech_hero.subtitle)document.getElementById('heroKick').textContent=c.tech_hero.subtitle;
     if(c.tech_hero.text)document.getElementById('heroText').textContent=c.tech_hero.text;
   }
@@ -921,6 +937,43 @@ Promise.all([
   var cfg=(r[1]&&r[1][0]&&r[1][0].value)||{};
   renderBadges(rows,cfg,IS_TECH_PAGE);
 }).catch(function(){});
+
+/* Optionales Header-Video. Bewusst zurueckhaltend:
+   - kein Ton, Endlosschleife, laeuft im Hintergrund hinter dem Text
+   - wer "Bewegung reduzieren" eingestellt hat, bekommt nur das Standbild
+   - ueber Mobilfunk (falls der Browser das meldet) ebenfalls nur das Standbild,
+     ein Header-Clip ist kein Grund, jemandem das Datenvolumen zu verbrauchen
+   - klappt das Laden nicht, bleibt schlicht das Bild stehen */
+function setHeroVideo(url){
+  var box=document.getElementById('heroVid');
+  if(!box||!url)return;
+  try{
+    if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    var con=navigator.connection;
+    if(con&&(con.saveData||/^([23]g|slow-2g)$/.test(String(con.effectiveType||''))))return;
+  }catch(e){}
+  var v=document.createElement('video');
+  v.className='hero-vid';
+  v.muted=true;v.defaultMuted=true;v.loop=true;v.autoplay=true;v.playsInline=true;
+  v.setAttribute('muted','');v.setAttribute('playsinline','');
+  v.setAttribute('aria-hidden','true');v.tabIndex=-1;
+  v.preload='auto';
+  v.addEventListener('error',function(){v.remove()});
+  v.src=url;
+  box.appendChild(v);
+  v.addEventListener('playing',function(){
+    var bild=document.getElementById('heroImg');
+    if(bild)bild.style.opacity='0';
+  });
+  v.addEventListener('error',function(){
+    var bild=document.getElementById('heroImg');
+    if(bild)bild.style.opacity='';
+  });
+  var pl=v.play();
+  if(pl&&pl.catch)pl.catch(function(){v.remove();
+    var bild=document.getElementById('heroImg');if(bild)bild.style.opacity='';});
+}
+
 </script>
 <div class="reg-overlay" id="regOverlay" role="dialog" aria-modal="true" aria-labelledby="regOverlayTitle">
   <div class="reg-card">

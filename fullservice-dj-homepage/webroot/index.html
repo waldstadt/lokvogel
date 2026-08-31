@@ -86,7 +86,9 @@ nav.scrolled{border-bottom-color:var(--line)}
 /* PACKAGES */
 #ablauf{background:var(--bg2)}
 .pack-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:44px}
-.pack{background:var(--card);border:1px solid var(--line);border-radius:5px;padding:34px 30px;display:flex;flex-direction:column;transition:border-color .25s,transform .25s}
+.pack{background:var(--card);border:1px solid var(--line);border-radius:5px;display:flex;flex-direction:column;overflow:hidden;transition:border-color .25s,transform .25s}
+.pack-in{padding:34px 30px;display:flex;flex-direction:column;flex:1}
+.pack-img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;border-bottom:1px solid var(--line);background:var(--bg2)}
 .pack:hover{border-color:rgba(255,111,91,.5);transform:translateY(-4px)}
 .pack h3{font-size:22px;font-weight:700;margin-bottom:4px}
 .pack .psub{font-size:13px;color:var(--mut);margin-bottom:18px}
@@ -546,7 +548,7 @@ var DAY_SEED=Math.floor(Date.now()/864e5);
 var VISIT_SEED=Math.floor(Math.random()*1e9);
 
 /* Vom CMS ausgeblendete Sektionen (site_content key "sections" → {hidden:[...]}) */
-var HIDDEN_SECTIONS=[],CONTENT={};
+var HIDDEN_SECTIONS=[],CONTENT={},CONTENT_FERTIG=false,PACK_ROWS=null;
 /* Optionales Header-Video. Bewusst zurueckhaltend:
    - kein Ton, Endlosschleife, laeuft im Hintergrund hinter dem Text
    - wer "Bewegung reduzieren" eingestellt hat, bekommt nur das Standbild
@@ -632,11 +634,16 @@ function mdRender(t){
 }
 
 function renderPacks(list){
+  /* Bilder sind im Backoffice abschaltbar - ohne Bilder sehen die Kacheln aus wie vorher. */
+  var zeigeBilder=!(CONTENT.pack_sec&&CONTENT.pack_sec.images===false);
   document.getElementById('packGrid').innerHTML=list.map(function(p){
     var feats=(p.features||[]).map(function(f){return '<li>'+esc(f)+'</li>'}).join('');
     var price=p.price_from?('<div class="price">'+esc(p.price_note||'ab')+' '+euro(p.price_from)+' <small>inkl. MwSt., zzgl. Anfahrt</small></div>')
       :'<div class="price" style="font-size:14px;color:var(--mut);font-weight:400">Preis richtet sich nach Aufwand &amp; Dauer – im kostenlosen Kennenlerngespräch gibt es ein klares Angebot</div>';
-    return '<div class="pack reveal vis"><h3>'+esc(p.title)+'</h3><div class="psub">'+esc(p.subtitle||'')+'</div><ul>'+feats+'</ul>'+price+'</div>';
+    var bild=(zeigeBilder&&p.image_url)
+      ? '<img class="pack-img" src="'+esc(p.image_url)+'" alt="" loading="lazy" style="object-position:'+esc(p.image_focal||'50% 50%')+'" onerror="this.remove()">'
+      : '';
+    return '<div class="pack reveal vis">'+bild+'<div class="pack-in"><h3>'+esc(p.title)+'</h3><div class="psub">'+esc(p.subtitle||'')+'</div><ul>'+feats+'</ul>'+price+'</div></div>';
   }).join('');
 }
 function renderFaq(list){
@@ -660,7 +667,10 @@ function sfetch(path){
     .then(function(r){if(!r.ok)throw new Error(r.status);return r.json()});
 }
 function applyContent(rows){
-  var c={};rows.forEach(function(r){c[r.key]=r.value});CONTENT=c;
+  var c={};rows.forEach(function(r){c[r.key]=r.value});CONTENT=c;CONTENT_FERTIG=true;
+  /* Die Paketkacheln kennen ihren Bild-Schalter erst jetzt - je nachdem, was zuerst
+     geladen ist, zeichnet die eine oder die andere Seite. */
+  if(PACK_ROWS&&PACK_ROWS.length)renderPacks(PACK_ROWS);
   if(c.sections&&c.sections.hidden&&c.sections.hidden.length)HIDDEN_SECTIONS=c.sections.hidden;
   if(c.tech_hero&&c.tech_hero.enabled===false){
     if(HIDDEN_SECTIONS.indexOf('technik')<0)HIDDEN_SECTIONS.push('technik');
@@ -922,7 +932,10 @@ function renderBlocks(rows){
 sfetch('site_content?select=key,value').then(applyContent).then(function(){
   return sfetch('blocks?select=*&public=eq.true&page=eq.start&order=anchor,sort').then(renderBlocks);
 }).catch(function(){});
-sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderPacks(r)}).catch(function(){});
+PACK_ROWS=null;
+sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){
+  PACK_ROWS=r;if(r.length&&CONTENT_FERTIG)renderPacks(r);
+}).catch(function(){});
 sfetch('faq?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderFaq(r)}).catch(function(){});
 var SRC_NAME={google:'Google-Bewertung','dj-bande':'Bewertung über die Partner-Agentur',direkt:'Kundenstimme'};
 /* Daten und CMS-Konfiguration können in beliebiger Reihenfolge eintreffen –
