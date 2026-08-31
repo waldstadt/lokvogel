@@ -177,6 +177,14 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .it-row{display:grid;grid-template-columns:36px 1fr 70px 100px 90px 90px 28px;gap:6px;align-items:center;margin-bottom:6px}
 .it-row input{padding:6px 8px;font-size:11px}
 .it-row.sml{grid-template-columns:30px 1fr 56px 84px 70px 70px 20px;gap:4px;margin-bottom:2px}
+/* Auf dem Handy passen sieben feste Spalten nicht nebeneinander (450px Mindestbreite) -
+   dort untereinander, damit der Belegeditor nicht waagerecht scrollt. */
+@media(max-width:560px){
+  .it-row,.it-row.sml{grid-template-columns:28px 1fr;gap:5px;row-gap:4px;
+    padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .it-row>*:nth-child(n+3){grid-column:2}
+  .it-row input{font-size:13px;padding:8px}
+}
 .it-row.sml input,.it-row.sml select{padding:2px 5px;font-size:10px}
 .it-row.sml>div:first-child{padding:2px 0;font-size:9px;min-height:0}
 .it-head{font-size:9px;color:var(--gl);text-transform:uppercase}
@@ -2307,6 +2315,12 @@ function korrekturDoc(){
   curDoc.customer_id=src.customer_id;curDoc.booking_id=src.booking_id;
   curDoc.parent_id=src.id;
   curDoc.tax_rate=src.tax_rate;curDoc.price_mode=src.price_mode;
+  /* Pauschalpreis, verrechnete Abschlaege und das Kleinunternehmer-Kennzeichen mit
+     uebernehmen: ohne sie wurde aus einer Schlussrechnung ueber 600 Euro Restbetrag eine
+     Korrektur ueber 1.190 Euro, und ein 19-Prozent-Beleg konnte zur 0-Prozent-Korrektur werden. */
+  curDoc.total_override=src.total_override;
+  curDoc.deposit_deducted=src.deposit_deducted;
+  curDoc.is_small_business=src.is_small_business;
   curDoc.discount_value=src.discount_value;curDoc.discount_type=src.discount_type;
   curDoc.intro_text='Korrektur zur Rechnung '+src.number+'. '+(src.intro_text||'');
   curDoc.outro_text=src.outro_text;
@@ -3523,7 +3537,7 @@ function openEqModal(id){
     '<label style="margin-top:10px">Passend für („passend für" – bis zu 5, z. B. Kabel/Stativ zu einem Gerät)</label>'+
     eqRelSelects('eFits',e.fits_ids||[],e.id)+'</div></div>'+
     '<div class="grid2"><div><label>Produktlink (Hersteller/Händler – Nachbestellung, techn. Daten)</label><input id="eThomann" value="'+esc(e.thomann_url||'')+'" placeholder="https://…">'+
-    (e.thomann_url?'<a href="'+esc(e.thomann_url)+'" target="_blank" rel="noopener" class="mut sml">Produktseite ansehen ↗</a>':'')+'</div>'+
+    (safeUrl(e.thomann_url)?'<a href="'+esc(safeUrl(e.thomann_url))+'" target="_blank" rel="noopener noreferrer" class="mut sml">Produktseite ansehen ↗</a>':'')+'</div>'+
     '<div style="display:flex;align-items:flex-end"><label style="margin:0"><input type="checkbox" id="eOnReq" style="width:auto;margin-right:6px" '+(e.on_request?'checked':'')+'>Nur auf Anfrage verfügbar – Kunde kann in den Tourcase legen, Bestätigung machst du manuell</label></div></div>'+
     (id?('<label>Einkaufsbeleg (für Garantiefälle)</label><div style="display:flex;gap:8px;align-items:center">'+
       (e.invoice_name?'<a class="mut sml" onclick="openEqInvoice(\''+id+'\')">'+esc(e.invoice_name)+' ansehen ↗</a>':'<span class="mut sml">Noch kein Beleg hinterlegt.</span>')+
