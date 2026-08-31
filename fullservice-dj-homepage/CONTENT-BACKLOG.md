@@ -306,3 +306,13 @@ alle tagsüber/unter der Woche (= Auslastungsziel):
   Maximum 0,36 €. Zu klären wäre dann, ob ein Netto-Beleg seinen Gesamtbetrag
   aus Netto plus Steuer bilden soll; der zu zahlende Betrag weicht dann um
   wenige Cent von der Bruttoansicht ab.
+
+## Kleinigkeiten, bewusst offen gelassen
+
+- `autoInquiryPlanner` speichert `event_plan` als `{"basics":[]}`, wenn eine Anfrage
+  einen Termin, aber sonst keine Angaben enthält (leeres Array statt leeres
+  Objekt). Backoffice und Portal verkraften das nachweislich fehlerfrei -
+  nicht angefasst, weil jede Änderung an dieser Stelle mehr Risiko als
+  Nutzen hätte.
+- Die Umbruchregel für die Knöpfe über den Belegpositionen greift bei genau
+  420 Pixeln Breite mit, nicht erst darunter. Ohne sichtbare Auswirkung.
