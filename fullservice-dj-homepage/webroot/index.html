@@ -202,6 +202,26 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
 .lg.light .lgs{color:#55595f}
 .lg-grp+.lg-grp{margin-top:46px}
 @media(max-width:600px){.lg{min-height:58px;padding:10px 15px}.lg img{max-height:30px;max-width:112px}}
+/* Inhaltsmodule (Baukasten) */
+.blk{padding:78px 0}
+.blk+.blk{padding-top:0}
+.blk-med{display:grid;gap:14px;margin-top:34px}
+.blk-med.c2{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.blk-med.c3{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.blk-med.c4{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.blk-med figure{margin:0}
+.blk-med img,.blk-med video{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:5px;
+  border:1px solid var(--line);display:block;background:var(--card)}
+.blk-med figcaption{font-size:13px;color:var(--mut);margin-top:8px;line-height:1.5}
+.blk-solo img,.blk-solo video{width:100%;max-height:76vh;object-fit:cover;border-radius:6px;
+  border:1px solid var(--line);display:block;margin-top:34px;background:var(--card)}
+.blk-solo figcaption{font-size:13.5px;color:var(--mut);margin-top:10px}
+.blk-split{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;margin-top:34px}
+.blk-split.rechts .blk-split-med{order:2}
+.blk-split img,.blk-split video{width:100%;border-radius:6px;border:1px solid var(--line);display:block;background:var(--card)}
+.blk-split p{color:var(--mut);font-size:15.5px;line-height:1.75}
+@media(max-width:760px){.blk{padding:52px 0}.blk-split{grid-template-columns:1fr;gap:24px}
+  .blk-split.rechts .blk-split-med{order:0}}
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
 .reveal.vis{opacity:1;transform:none}
 </style>
@@ -260,6 +280,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
     </div>
   </div>
 </section>
+<div id="blkslot-ueber"></div>
+
 
 <section id="leistungen">
   <div class="wrap">
@@ -271,6 +293,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
     <div class="pack-grid" id="packGrid"></div>
   </div>
 </section>
+<div id="blkslot-leistungen"></div>
+
 
 <section id="ablauf">
   <div class="wrap">
@@ -287,6 +311,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
     </div>
   </div>
 </section>
+<div id="blkslot-ablauf"></div>
+
 
 <section id="galerie" style="display:none">
   <div class="wrap">
@@ -295,12 +321,10 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
       <h2 id="galTitle">So sieht's bei mir aus</h2>
     </div>
     <div class="gal-grid" id="galGrid" style="margin-top:44px"></div>
-    <div id="igBlock" style="display:none;margin-top:52px">
-      <div class="kicker"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:6px"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><line x1="17.5" y1="6.5" x2="17.5" y2="6.5"/></svg>Frisch aus Instagram</div>
-      <div class="gal-grid" id="igGrid"></div>
-    </div>
   </div>
 </section>
+<div id="blkslot-galerie"></div>
+
 
 <section id="bewertungen" style="display:none;background:var(--bg2)">
   <div class="wrap">
@@ -313,6 +337,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
     <div class="rev-links" id="revLinks"></div>
   </div>
 </section>
+<div id="blkslot-bewertungen"></div>
+
 
 <section id="garantie">
   <div class="wrap">
@@ -325,6 +351,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
     </div>
   </div>
 </section>
+<div id="blkslot-garantie"></div>
+
 
 <section id="technik">
   <div class="wrap">
@@ -338,6 +366,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
     </div>
   </div>
 </section>
+<div id="blkslot-technik"></div>
+
 
 <section id="locations" style="display:none">
   <div class="wrap">
@@ -349,6 +379,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
     <div class="rent-grid" id="locGrid"></div>
   </div>
 </section>
+<div id="blkslot-locations"></div>
+
 
 <section id="freunde" style="display:none">
   <div class="wrap">
@@ -360,6 +392,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
     <div class="rent-grid" id="friendGrid"></div>
   </div>
 </section>
+<div id="blkslot-freunde"></div>
+
 
 <section id="partner" style="display:none">
   <div class="wrap">
@@ -381,6 +415,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
     </div>
   </div>
 </section>
+<div id="blkslot-partner"></div>
+
 
 <section id="faq">
   <div class="wrap">
@@ -391,6 +427,10 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
     <div class="faq-list" id="faqList"></div>
   </div>
 </section>
+<div id="blkslot-faq"></div>
+
+
+<div id="blkslot-ende"></div>
 
 <section id="anfrage">
   <div class="wrap">
@@ -496,7 +536,7 @@ var DAY_SEED=Math.floor(Date.now()/864e5);
 var VISIT_SEED=Math.floor(Math.random()*1e9);
 
 /* Vom CMS ausgeblendete Sektionen (site_content key "sections" → {hidden:[...]}) */
-var HIDDEN_SECTIONS=[];
+var HIDDEN_SECTIONS=[],CONTENT={};
 /* Optionales Header-Video. Bewusst zurueckhaltend:
    - kein Ton, Endlosschleife, laeuft im Hintergrund hinter dem Text
    - wer "Bewegung reduzieren" eingestellt hat, bekommt nur das Standbild
@@ -527,14 +567,13 @@ function showSection(id){
   var el=document.getElementById(id);if(!el)return;
   el.style.display=HIDDEN_SECTIONS.indexOf(id)>=0?'none':'';
 }
-/* Blendet die Galerie-Sektion aus, wenn nach fehlgeschlagenen Bildern weder eigene
-   Fotos noch Instagram-Bilder übrig sind - keine leere Überschrift stehen lassen. */
+/* Blendet die Galerie-Sektion aus, wenn nach fehlgeschlagenen Bildern kein Foto uebrig
+   bleibt - keine leere Ueberschrift stehen lassen. Instagram ist seit dem Baukasten ein
+   eigenes Modul und raeumt sich selbst auf. */
 function galCleanup(){
-  var gal=document.getElementById('galGrid'),ig=document.getElementById('igGrid');
-  if((!gal||!gal.querySelector('img'))&&(!ig||!ig.querySelector('img'))){
+  var gal=document.getElementById('galGrid');
+  if(!gal||!gal.querySelector('img')){
     var sec=document.getElementById('galerie');if(sec)sec.style.display='none';
-  } else if(ig&&!ig.querySelector('img')){
-    var b=document.getElementById('igBlock');if(b)b.style.display='none';
   }
 }
 
@@ -602,7 +641,7 @@ function sfetch(path){
     .then(function(r){if(!r.ok)throw new Error(r.status);return r.json()});
 }
 function applyContent(rows){
-  var c={};rows.forEach(function(r){c[r.key]=r.value});
+  var c={};rows.forEach(function(r){c[r.key]=r.value});CONTENT=c;
   if(c.sections&&c.sections.hidden&&c.sections.hidden.length)HIDDEN_SECTIONS=c.sections.hidden;
   if(c.tech_hero&&c.tech_hero.enabled===false){
     if(HIDDEN_SECTIONS.indexOf('technik')<0)HIDDEN_SECTIONS.push('technik');
@@ -699,17 +738,6 @@ function applyContent(rows){
     if(c.loc_section.title)document.getElementById('locTitle').textContent=c.loc_section.title;
     if(c.loc_section.text)document.getElementById('locText').innerHTML=mdRender(c.loc_section.text);
   }
-  if(c.instagram_feed&&c.instagram_feed.images&&c.instagram_feed.images.length){
-    document.getElementById('igGrid').innerHTML=c.instagram_feed.images.map(function(im){
-      if(!im||!im.file)return '';
-      var img='<img src="'+esc(im.file)+'" alt="'+esc(im.caption||'Instagram-Beitrag')+'" loading="lazy" onerror="(this.closest(\'a\')||this).remove();galCleanup()">';
-      if(im.permalink&&/^https?:\/\//i.test(im.permalink))
-        return '<a href="'+esc(im.permalink)+'" target="_blank" rel="noopener">'+img+'</a>';
-      return img;
-    }).join('');
-    document.getElementById('igBlock').style.display='';
-    showSection('galerie');
-  }
   renderLocations();renderReviews();
   HIDDEN_SECTIONS.forEach(function(id){
     var el=document.getElementById(id);if(el)el.style.display='none';
@@ -731,7 +759,128 @@ function openLegal(key){
   document.body.style.overflow='hidden';
 }
 function closeLegal(){document.getElementById('legalBg').style.display='none';document.body.style.overflow=''}
-sfetch('site_content?select=key,value').then(applyContent).catch(function(){});
+
+/* ===== Inhaltsmodule (Baukasten) =====
+   Die festen Bereiche der Seite bleiben stehen; Module haengen sich hinter einen davon.
+   Alles wird als echte Knoten gebaut, nie als HTML-Text zusammengesetzt - Bildunterschriften
+   und Titel kommen aus dem Backoffice und duerfen nirgends als Markup wirken. */
+function blockMediaEl(m,solo){
+  var url=String(m&&m.url||'');
+  if(!url)return null;
+  var vid=/\.(mp4|webm)(\?|$)/i.test(url);
+  var el=document.createElement(vid?'video':'img');
+  el.src=url;
+  if(vid){
+    el.muted=true;el.defaultMuted=true;el.loop=true;el.autoplay=true;el.playsInline=true;
+    el.setAttribute('muted','');el.setAttribute('playsinline','');
+    el.preload='metadata';
+    var pl=el.play();if(pl&&pl.catch)pl.catch(function(){});
+  }else{
+    el.loading='lazy';el.alt=m.caption||'';
+    if(m.focal)el.style.objectPosition=m.focal;
+  }
+  el.addEventListener('error',function(){
+    var f=el.closest('figure');(f||el).remove();
+  });
+  return el;
+}
+function blockFigure(m,solo){
+  var med=blockMediaEl(m,solo);
+  if(!med)return null;
+  var fig=document.createElement('figure');
+  fig.appendChild(med);
+  if(m.caption){
+    var cap=document.createElement('figcaption');
+    cap.textContent=m.caption;fig.appendChild(cap);
+  }
+  return fig;
+}
+function blockKopf(b,wrap){
+  if(b.kicker){var k=document.createElement('div');k.className='kicker';k.textContent=b.kicker;wrap.appendChild(k)}
+  if(b.title){var h=document.createElement('h2');h.textContent=b.title;wrap.appendChild(h)}
+  if(b.text){var p=document.createElement('p');p.className='lead';p.innerHTML=mdRender(b.text);wrap.appendChild(p)}
+}
+function buildBlock(b){
+  var med=Array.isArray(b.media)?b.media:[];
+  var sec=document.createElement('section');
+  sec.className='blk';
+  var wrap=document.createElement('div');wrap.className='wrap';
+  sec.appendChild(wrap);
+  var kopf=document.createElement('div');kopf.className='reveal vis';
+  blockKopf(b,kopf);
+  if(kopf.childNodes.length)wrap.appendChild(kopf);
+
+  if(b.type==='instagram'){
+    var igs=(CONTENT.instagram_feed&&CONTENT.instagram_feed.images)||[];
+    if(!igs.length)return null;
+    var gridI=document.createElement('div');
+    gridI.className='blk-med c'+(b.layout||'4');
+    igs.forEach(function(im){
+      if(!im||!im.file)return;
+      var fig=blockFigure({url:im.file,caption:im.caption||''},false);
+      if(!fig)return;
+      if(im.permalink&&/^https?:\/\//i.test(im.permalink)){
+        var a=document.createElement('a');
+        a.href=im.permalink;a.target='_blank';a.rel='noopener noreferrer';
+        a.appendChild(fig.firstChild);
+        fig.insertBefore(a,fig.firstChild);
+      }
+      gridI.appendChild(fig);
+    });
+    if(!gridI.childNodes.length)return null;
+    wrap.appendChild(gridI);
+    return sec;
+  }
+
+  if(b.type==='foto'||b.type==='video'){
+    var fig1=blockFigure(med[0]||{},true);
+    if(!fig1)return null;
+    fig1.className='blk-solo';
+    wrap.appendChild(fig1);
+    return sec;
+  }
+
+  if(b.type==='text_bild'){
+    if(!med.length)return null;
+    var split=document.createElement('div');
+    split.className='blk-split'+(b.layout==='rechts'?' rechts':'');
+    var mbox=document.createElement('div');mbox.className='blk-split-med';
+    var m1=blockMediaEl(med[0],false);
+    if(!m1)return null;
+    mbox.appendChild(m1);
+    var tbox=document.createElement('div');
+    blockKopf(b,tbox);
+    /* Kopf steht hier neben dem Bild, nicht darueber */
+    if(kopf.parentNode)wrap.removeChild(kopf);
+    split.appendChild(mbox);split.appendChild(tbox);
+    wrap.appendChild(split);
+    return sec;
+  }
+
+  /* Standard: Kacheln */
+  if(!med.length)return null;
+  var grid=document.createElement('div');
+  grid.className='blk-med c'+(b.layout||'3');
+  med.forEach(function(m){var f=blockFigure(m,false);if(f)grid.appendChild(f)});
+  if(!grid.childNodes.length)return null;
+  wrap.appendChild(grid);
+  return sec;
+}
+function renderBlocks(rows){
+  (rows||[]).forEach(function(b){
+    var slot=document.getElementById('blkslot-'+(b.anchor||'ende'));
+    if(!slot)slot=document.getElementById('blkslot-ende');
+    if(!slot)return;
+    /* Ein Modul hinter einem ausgeblendeten Bereich wuerde in der Luft haengen. */
+    if(b.anchor&&b.anchor!=='ende'&&HIDDEN_SECTIONS.indexOf(b.anchor)>=0)return;
+    var el=buildBlock(b);
+    if(el)slot.appendChild(el);
+  });
+}
+
+sfetch('site_content?select=key,value').then(applyContent).then(function(){
+  return sfetch('blocks?select=*&public=eq.true&page=eq.start&order=anchor,sort').then(renderBlocks);
+}).catch(function(){});
 sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderPacks(r)}).catch(function(){});
 sfetch('faq?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderFaq(r)}).catch(function(){});
 var SRC_NAME={google:'Google-Bewertung','dj-bande':'Bewertung über die Partner-Agentur',direkt:'Kundenstimme'};

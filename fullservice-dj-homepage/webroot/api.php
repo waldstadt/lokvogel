@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 70;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 71;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -173,9 +173,10 @@ const JSON_COLS = [
   'customers' => ['tags', 'tech_check'],
   'equipment' => ['addon_ids', 'images', 'fits_ids'],
   'campaign_pages' => ['cards', 'features', 'form_cfg'],
+  'blocks' => ['media'],
 ];
 const BOOL_COLS = [
-  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'], 'badges' => ['public','light_bg'],
+  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'], 'badges' => ['public','light_bg'], 'blocks' => ['public'],
   'workshop_events' => ['public'],
   'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
   'bookings' => ['review_requested','open_ended'],
@@ -189,11 +190,11 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
-const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items','campaign_pages','badges'];
+const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items','campaign_pages','badges','blocks'];
 const INQUIRY_FIELDS = ['name','email','phone','event_type','event_date','location','guests','message'];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -643,6 +644,21 @@ function upgrade(PDO $p): void {
     if (!(int)$st->fetchColumn())
       $p->prepare('insert into site_content (key,value,updated_at) values (?,?,?)')
         ->execute(['badges_sec', '{"mitglied": {"enabled": true, "show_tech": true, "title": "Wo ich mitmache", "text": "Netzwerke und Portale, in denen ich gelistet bin – wer mag, schaut dort nach, was andere über meine Arbeit schreiben."}, "technik": {"enabled": true, "show_tech": true, "title": "Womit ich arbeite", "text": "Die Technik, die bei mir im Wagen liegt. Keine Werbung, sondern eine ehrliche Auskunft darüber, was ich mitbringe."}}', now()]);
+  } catch (PDOException $e) {}
+  if ($v < 71) try {
+    $p->exec(blocksDdl());
+    /* Instagram war bisher fest in die Galerie eingebaut. Damit die Seite danach genauso
+       aussieht wie vorher, wird daraus ein eingeschaltetes Modul direkt hinter der Galerie -
+       aber nur, wenn ueberhaupt Instagram-Bilder gespiegelt sind. */
+    $st = $p->query("select count(*) from blocks where type='instagram'");
+    if (!(int)$st->fetchColumn()) {
+      $feed = json_decode((string)$p->query("select value from site_content where key='instagram_feed'")->fetchColumn() ?: '{}', true) ?: [];
+      $hat = !empty($feed['images']);
+      $p->prepare('insert into blocks (id,page,anchor,sort,type,kicker,title,media,layout,public,created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([uuid(), 'start', 'galerie', 0, 'instagram', 'Frisch aus Instagram', '', '[]', '4',
+          $hat ? 1 : 0, now()]);
+    }
   } catch (PDOException $e) {}
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -1272,6 +1288,18 @@ function friendsDdl(): string {
    Marken, mit denen Markus arbeitet. Eine Tabelle mit kind-Spalte statt zweier gleicher.
    light_bg: dunkle Logos brauchen auf dem dunklen Seitenhintergrund eine helle Fläche,
    sonst sind sie schlicht nicht zu erkennen. */
+/* Frei platzierbare Inhaltsmodule ("Baukasten"). Die festen Bereiche der Seite bleiben,
+   Module haengen sich per anchor hinter einen davon - so laesst sich die Seite erweitern,
+   ohne sie neu zu bauen. type bestimmt die Darstellung, media haelt Bilder/Videos als JSON. */
+function blocksDdl(): string {
+  return "create table if not exists blocks (id text primary key,
+    page text default 'start', anchor text default 'ende', sort integer default 0,
+    type text not null default 'kacheln',
+    kicker text, title text, text text,
+    media text default '[]', layout text default '3',
+    public integer default 1, created_at text)";
+}
+
 function badgesDdl(): string {
   return "create table if not exists badges (id text primary key, kind text default 'mitglied',
     sort integer default 0, name text not null, subtitle text, website text,
@@ -1968,6 +1996,12 @@ SQL);
   $p->exec(rentalContractsDdl());
   $p->exec(friendsDdl());
   $p->exec(badgesDdl());
+  $p->exec(blocksDdl());
+  /* Instagram-Modul gleich anlegen, aber ausgeschaltet - so ist der frische Stand
+     derselbe wie nach der Migration bestehender Installationen. */
+  $p->prepare('insert into blocks (id,page,anchor,sort,type,kicker,title,media,layout,public,created_at)
+    values (?,?,?,?,?,?,?,?,?,?,?)')
+    ->execute([uuid(), 'start', 'galerie', 0, 'instagram', 'Frisch aus Instagram', '', '[]', '4', 0, now()]);
   foreach (workshopsDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
   foreach (portalAccountDdl() as $sql) $p->exec($sql);
