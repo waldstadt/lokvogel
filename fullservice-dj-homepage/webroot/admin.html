@@ -583,8 +583,9 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 
   <!-- MIET-PARTNER -->
   <div class="pg" id="pg-partners">
-    <div class="pt">Miet-Partner</div><div class="ps">DJs, Bands, Musiker:innen &amp; Techniker mit vergünstigten Mietpreisen</div>
-    <div class="card"><h3>Anträge &amp; freigeschaltete Partner <span class="mut sml" style="font-weight:400">– Registrierung über den Vermietkatalog; ab Antrag gelten vorläufig schon die Partnerpreise</span></h3><div id="partnerList" class="sml"></div></div>
+    <div class="phead"><div><div class="pt">Miet-Partner</div><div class="ps">DJs, Bands, Musiker:innen &amp; Techniker mit vergünstigten Mietpreisen</div></div>
+      <div><button class="btn" onclick="openPartnerModal()">+ Neuer Partner</button></div></div>
+    <div class="card"><h3>Anträge &amp; freigeschaltete Partner <span class="mut sml" style="font-weight:400">– Registrierung über den Vermietkatalog oder direkt hier angelegt; ab Antrag gelten vorläufig schon die Partnerpreise</span></h3><div id="partnerList" class="sml"></div></div>
   </div>
 
   <!-- MEDIEN-POOL -->
@@ -6405,7 +6406,7 @@ function renderPartners(){
   var KIND={dj:'DJ',band:'Band',musiker:'Musiker',techniker:'Techniker'};
   el.innerHTML=(CACHE.partners||[]).map(function(pt){
     return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+
-    '<div><b>'+esc(pt.name)+'</b> <span class="mut">'+(KIND[pt.kind]||pt.kind)+(pt.company?' · '+esc(pt.company):'')+' · '+esc(pt.email||'')+'</span> '+
+    '<div><a onclick="openPartnerModal(\''+pt.id+'\')"><b>'+esc(pt.name)+'</b></a> <span class="mut">'+(KIND[pt.kind]||pt.kind)+(pt.company?' · '+esc(pt.company):'')+' · '+esc(pt.email||'')+'</span> '+
     (pt.status==='freigeschaltet'?'<span class="b green">freigeschaltet</span>':'<span class="b gold">beantragt – vorläufig schon Partnerpreise</span>')+
     ' <a onclick="delRow(\'partners\',\''+pt.id+'\',reloadPartners)" style="color:var(--redl)">✕</a></div>'+
     '<div style="margin-top:5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
@@ -6426,6 +6427,32 @@ function setPartnerDiscount(id,val){
     .catch(function(e){toast(e.message,1)});
 }
 function reloadPartners(){api('partners?select=*&order=created_at.desc').then(function(r){CACHE.partners=r||[];renderPartners()})}
+/* Direktes Anlegen durch Markus - genau wie bei Kunden (openCustModal), nicht nur ueber
+   die Selbstregistrierung im Vermietkatalog. Selbst angelegte Partner starten gleich
+   freigeschaltet, er buergt ja schon dafuer. */
+function openPartnerModal(id){
+  var pt=id?(CACHE.partners||[]).find(function(x){return x.id===id}):{};pt=pt||{};
+  openModal(id?'Partner bearbeiten':'Neuer Miet-Partner',
+    '<div class="grid2"><div><label>Name *</label><input id="ptName" value="'+esc(pt.name||'')+'"></div>'+
+    '<div><label>Art</label><select id="ptKind"><option value="dj">DJ</option><option value="band">Band</option><option value="musiker">Musiker</option><option value="techniker">Techniker</option></select></div></div>'+
+    '<div class="grid2"><div><label>Firma (optional)</label><input id="ptComp" value="'+esc(pt.company||'')+'"></div>'+
+    '<div><label>Status</label><select id="ptStatus"><option value="freigeschaltet">Freigeschaltet</option><option value="beantragt">Beantragt (vorläufig)</option></select></div></div>'+
+    '<div class="grid2"><div><label>E-Mail</label><input id="ptMail" value="'+esc(pt.email||'')+'"></div>'+
+    '<div><label>Telefon</label><input id="ptPhone" value="'+esc(pt.phone||'')+'"></div></div>'+
+    '<label>Individueller Rabatt % <span class="mut sml" style="text-transform:none;letter-spacing:0">– leer = allgemeiner Partner-Rabatt aus den Einstellungen</span></label>'+
+    '<input type="number" min="0" max="100" step="1" id="ptDisc" value="'+(pt.discount_pct!=null?pt.discount_pct:'')+'" placeholder="leer = allgemein" style="max-width:160px">'+
+    '<div style="margin-top:14px"><button class="btn" onclick="savePartner(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delRow(\'partners\',\''+id+'\',reloadPartners)">Löschen</button>':'')+'</div>');
+  if(pt.kind)document.getElementById('ptKind').value=pt.kind;
+  if(pt.status)document.getElementById('ptStatus').value=pt.status;
+}
+function savePartner(id){
+  if(!v('ptName')){toast('Name fehlt.',1);return}
+  var body={name:v('ptName'),kind:v('ptKind'),company:v('ptComp')||'',status:v('ptStatus'),
+    email:v('ptMail')||null,phone:v('ptPhone')||null,discount_pct:v('ptDisc')!==''?Number(v('ptDisc')):null};
+  (id?api('partners?id=eq.'+id,{method:'PATCH',body:body}):api('partners',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Gespeichert ✓');reloadPartners()}).catch(function(e){toast(e.message,1)});
+}
 
 /* ===== Aktionsseiten (Kampagnen-Landingpages) ===== */
 var CAMP_ICONS=['mic','music','users','money','shield','chat','sun','home','cloud','gear','zap','light','monitor','cart','calendar','check','doc','search','clock'];
