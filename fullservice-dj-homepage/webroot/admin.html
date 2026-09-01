@@ -6813,7 +6813,11 @@ function mpUpload(inp){
    Archiv, endgueltig geloescht wird erst dort. Verschieben und Umbenennen ziehen die
    Verweise auf der Seite mit, das Archivieren bewusst nicht - siehe api.php. */
 var MEDIA_PG_LIST=[],MEDIA_ORDNER=[],MEDIA_ARCHIV_N=0;
-var MP_ORDNER='',MP_SUCHE='',MP_ART='alle',MP_ARCHIV=false,MP_SEL={};
+/* '__alle__' zeigt alle Ordner zusammen - das ist bewusst der Startzustand, sonst
+   verschwinden einsortierte Dateien scheinbar spurlos aus dem Pool, sobald man sie
+   in einen Ordner gelegt hat (der Filter "Ohne Ordner" faengt dann naemlich nichts
+   mehr ein). */
+var MP_ORDNER='__alle__',MP_SUCHE='',MP_ART='alle',MP_ARCHIV=false,MP_SEL={};
 /* Bei vielen Dateien wird die Kachelwand lang: Liste als kompakte Alternative und
    nachladen statt alles auf einmal. Die Ansicht merkt sich der Browser. */
 var MP_SEITE=48;
@@ -6833,7 +6837,7 @@ function loadMediaPage(){
     .catch(function(){MEDIA_PG_LIST=[];renderMediaPage()});
 }
 function mediaPgUpload(inp){
-  var ziel=MP_ORDNER;
+  var ziel=MP_ORDNER==='__alle__'?'':MP_ORDNER;
   uploadFilesSeq(inp.files,null,function(urls){
     if(ziel&&urls.length)
       mpApi('media/move',{target:ziel,items:urls.map(function(u){return {folder:'',name:u.split('/').pop()}})})
@@ -6853,7 +6857,7 @@ function mpApi(pfad,body){
 function mpGefiltert(){
   var q=MP_SUCHE.toLowerCase();
   return MEDIA_PG_LIST.filter(function(m){
-    if(!MP_ARCHIV&&(m.folder||'')!==MP_ORDNER)return false;
+    if(!MP_ARCHIV&&MP_ORDNER!=='__alle__'&&(m.folder||'')!==MP_ORDNER)return false;
     if(MP_ART==='bild'&&m.kind!=='bild')return false;
     if(MP_ART==='video'&&m.kind!=='video')return false;
     if(MP_ART!=='alle'&&MP_ART!=='bild'&&MP_ART!=='video'&&m.ext!==MP_ART)return false;
@@ -6876,7 +6880,8 @@ function mpArten(){
 }
 function renderMediaBar(){
   var el=document.getElementById('mediaPgBar');if(!el)return;
-  var ordnerOpts='<option value="">Ohne Ordner</option>'+
+  var ordnerOpts='<option value="__alle__"'+(MP_ORDNER==='__alle__'?' selected':'')+'>Alle Ordner</option>'+
+    '<option value="">Ohne Ordner</option>'+
     MEDIA_ORDNER.map(function(o){return '<option value="'+esc(o)+'"'+(o===MP_ORDNER?' selected':'')+'>'+esc(o)+'</option>'}).join('');
   var artOpts=[['alle','Alle Dateien'],['bild','Nur Bilder'],['video','Nur Videos']]
     .concat(mpArten().map(function(e){return [e,'Nur .'+e]}))
@@ -6886,7 +6891,7 @@ function renderMediaBar(){
       ? '<button class="btn g sm" onclick="mpSetzen(\'archiv\',false)">\u2190 Zur\u00fcck zum Pool</button>'+
         '<b style="color:var(--wh)">Archiv</b>'
       : '<select style="width:auto;min-width:170px" onchange="mpSetzen(\'ordner\',this.value)">'+ordnerOpts+'</select>'+
-        (MP_ORDNER?'<button class="btn g sm" onclick="mpOrdnerLoeschen()">Ordner l\u00f6schen</button>':''))+
+        (MP_ORDNER&&MP_ORDNER!=='__alle__'?'<button class="btn g sm" onclick="mpOrdnerLoeschen()">Ordner l\u00f6schen</button>':''))+
     '<select style="width:auto;min-width:140px" onchange="mpSetzen(\'art\',this.value)">'+artOpts+'</select>'+
     '<input type="text" placeholder="Nach Dateiname suchen \u2026" value="'+esc(MP_SUCHE)+'" oninput="mpSuche(this)" style="width:auto;flex:1;min-width:180px">'+
     '<button class="btn g sm" onclick="mpAlle()">Alle ausw\u00e4hlen</button>'+
