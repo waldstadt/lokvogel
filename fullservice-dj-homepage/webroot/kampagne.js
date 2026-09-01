@@ -5,6 +5,11 @@
 (function(){
 var API='api.php';
 var SLUG=(location.pathname.split('/').pop()||'').replace(/\.html$/,'');
+/* Betreiber-Basisdaten aus dem Backoffice (public/company): Marke, Inhaber, Telefon,
+   WhatsApp - nichts davon steht mehr fest im Code. */
+var CO={};
+function coCity(){return String(CO.zip_city||'').replace(/^\d{4,5}\s*/,'')}
+function coWordmark(){var h=String(CO.website||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'').replace(/^www\./,'');return h?h.replace(/\.[a-z]+$/i,''):(CO.name||'')}
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 /* Nur für die Preis-Notiz: erlaubt [Text](seite.html) als internen Link, sonst reiner Text */
@@ -66,14 +71,15 @@ function render(pg){
     :'';
   var homeHref=pg.footer_target==='technik'?'technik.html':'index.html';
   var homeLabel=pg.footer_target==='technik'?'Zur Technik-Seite':'Zur Hauptseite';
-  var brand=pg.footer_target==='technik'?'DJ Lauschgift Veranstaltungstechnik':'DJ Lauschgift';
-  var wa=cfg.wa_text||'Hallo Markus, ';
+  var brand=CO.name||'';
+  var wa=(cfg.wa_text||'Hallo {inhaber}, ').replace(/\{inhaber\}/g,CO.owner_first||'').replace(/^Hallo\s*,/,'Hallo,');
+  var waDigits=CO.whatsapp_digits||'',tel=CO.phone||'';
 
   document.getElementById('app').innerHTML=
   '<nav><div class="nav-in">'+
     '<a class="logo" href="'+homeHref+'" aria-label="'+esc(brand)+'">'+
       '<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>'+
-      '<span class="wm">lauschgift<i>.</i></span></a>'+
+      '<span class="wm">'+esc(coWordmark())+'<i>.</i></span></a>'+
     '<a href="#anfrage" class="btn" style="padding:9px 18px;font-size:12px">Anfragen</a>'+
   '</div></nav>'+
 
@@ -124,13 +130,13 @@ function render(pg){
         '<input type="text" id="cpWebsite" tabindex="-1" autocomplete="off"></div>'+
       '<button class="btn" type="submit" id="sendBtn">Anfrage senden</button>'+
     '</form>'+
-    '<div style="margin-top:18px;font-size:13px;color:var(--mut2)">Lieber direkt schreiben? '+
-      '<a href="https://wa.me/4915236439373?text='+encodeURIComponent(wa)+'" target="_blank" rel="noopener">'+ic('chat')+'WhatsApp</a>'+
-      ' &nbsp;·&nbsp; <a href="tel:+4915236439373">01523 6439373</a></div>'+
+    ((waDigits||tel)?'<div style="margin-top:18px;font-size:13px;color:var(--mut2)">Lieber direkt schreiben? '+
+      (waDigits?'<a href="https://wa.me/'+waDigits+'?text='+encodeURIComponent(wa)+'" target="_blank" rel="noopener">'+ic('chat')+'WhatsApp</a>':'')+
+      (waDigits&&tel?' &nbsp;·&nbsp; ':'')+(tel?'<a href="tel:'+esc(tel.replace(/[^\d+]/g,''))+'">'+esc(tel)+'</a>':'')+'</div>':'')+
   '</div></section>'+
 
   '<footer><div class="wrap">'+
-    '<div>'+esc(brand)+' · Markus Jankowski · Hemer</div>'+
+    '<div>'+esc([brand,CO.owner,coCity()].filter(Boolean).join(' · '))+'</div>'+
     '<div><a href="index.html?legal=impressum">Impressum</a> &nbsp;·&nbsp; <a href="index.html?legal=datenschutz">Datenschutz</a> &nbsp;·&nbsp; <a href="'+homeHref+'">'+esc(homeLabel)+'</a></div>'+
   '</div></footer>';
 
@@ -186,7 +192,7 @@ function render(pg){
       showRegHint(data);
     }).catch(function(){
       msg.className='form-msg err';
-      msg.textContent='Senden fehlgeschlagen – bitte versucht es später erneut oder ruft direkt an: 01523 6439373.';
+      msg.textContent='Senden fehlgeschlagen – bitte versucht es später erneut'+(CO.phone?' oder ruft direkt an: '+CO.phone:'')+'.';
     }).finally(function(){btn.disabled=false;btn.textContent='Anfrage senden'});
   });
 }
@@ -213,9 +219,11 @@ navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{
 
 Promise.all([
   fetch(API+'/rest/campaign_pages?slug=eq.'+encodeURIComponent(SLUG)).then(function(r){return r.json()}),
-  fetch(API+'/rest/site_content?select=key,value').then(function(r){return r.json()}).catch(function(){return[]})
+  fetch(API+'/rest/site_content?select=key,value').then(function(r){return r.json()}).catch(function(){return[]}),
+  fetch(API+'/public/company').then(function(r){return r.json()}).catch(function(){return{}})
 ]).then(function(res){
   var rows=res[0]||[],pg=rows[0];
+  CO=res[2]||{};
   if(!pg||!Number(pg.enabled)){location.replace('index.html');return}
   (res[1]||[]).forEach(function(row){
     if(row.key==='theme'&&row.value&&FONT_HEADS[row.value.font]&&row.value.font!=='grotesk'){

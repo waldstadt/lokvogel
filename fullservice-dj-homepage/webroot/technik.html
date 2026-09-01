@@ -545,7 +545,7 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
       <svg viewBox="0 0 32 32" aria-hidden="true"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>
       <span class="wm" style="font-size:15px">lauschgift<i>.</i><small>Veranstaltungstechnik</small></span>
     </a>
-    <div>© <span id="year"></span> Markus Jankowski · Hemer &nbsp;·&nbsp; <a href="index.html">Zur DJ-Seite: DJ Lauschgift</a></div>
+    <div>© <span id="year"></span> <span id="footOwner">Markus Jankowski · Hemer</span> &nbsp;·&nbsp; <a href="index.html">Zur DJ-Seite</a></div>
     <div><a href="#" onclick="openLegal('impressum');return false">Impressum</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('datenschutz');return false">Datenschutz</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('agb');return false">AGB</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('widerrufsformular');return false">Widerrufsformular</a></div>
   </div>
 </footer>
@@ -574,6 +574,26 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
 <script>
 var API='api.php';
 document.getElementById('year').textContent=new Date().getFullYear();
+var WA_THEMA='zur Technik';
+/* Betreiber-Basisdaten (Name, Inhaber, Telefon, WhatsApp, Anschrift) aus den Einstellungen
+   des Backoffice - die festen Werte im HTML sind nur der Rueckfall fuer den ersten Aufbau. */
+var CO={};
+function coCity(){return String(CO.zip_city||'').replace(/^\d{4,5}\s*/,'')}
+function coWaHref(text){var d=CO.whatsapp_digits||'';return d?'https://wa.me/'+d+'?text='+encodeURIComponent(text):null}
+function coWaText(thema){return 'Hallo'+(CO.owner_first?' '+CO.owner_first:'')+', ich habe eine Frage '+thema+': '}
+function applyCompany(co){
+  CO=co||{};
+  var fo=document.getElementById('footOwner');
+  if(fo&&(CO.owner||coCity()))fo.textContent=[CO.owner,coCity()].filter(Boolean).join(' · ');
+  var ph=document.getElementById('cPhone');
+  if(ph&&CO.phone){ph.textContent=CO.phone;ph.href='tel:'+CO.phone.replace(/[^\d+]/g,'')}
+  var wa=document.getElementById('cWa'),h=coWaHref(coWaText(WA_THEMA));
+  if(wa&&h)wa.href=h;
+  var ad=document.getElementById('cAddr');
+  if(ad&&(CO.street||CO.zip_city))ad.textContent=[CO.street,CO.zip_city].filter(Boolean).join(', ');
+}
+fetch(API+'/public/company').then(function(r){return r.json()}).then(applyCompany).catch(function(){});
+
 window.addEventListener('scroll',function(){
   document.getElementById('nav').classList.toggle('scrolled',window.scrollY>30);
 });
@@ -683,7 +703,7 @@ sfetch('site_content?select=key,value').then(function(rows){
     if(c.contact.phone){document.getElementById('cPhone').textContent=c.contact.phone;
       document.getElementById('cPhone').href='tel:'+c.contact.phone.replace(/[^\d+]/g,'');
       var wd=c.contact.phone.replace(/\D/g,'');if(wd.charAt(0)==='0')wd='49'+wd.slice(1);
-      var wa=document.getElementById('cWa');if(wa)wa.href='https://wa.me/'+wd+'?text='+'Hallo%20Markus%2C%20ich%20habe%20eine%20Frage%20zur%20Technik%3A%20'}
+      var wa=document.getElementById('cWa');if(wa)wa.href=coWaHref(coWaText(WA_THEMA))||('https://wa.me/'+wd+'?text='+encodeURIComponent(coWaText(WA_THEMA)))}
     if(c.contact.email){document.getElementById('cMailWrap').style.display='';
       document.getElementById('cMail').textContent=c.contact.email;
       document.getElementById('cMail').href='mailto:'+c.contact.email}
@@ -761,12 +781,13 @@ function loadWorkshops(){
     var ld=document.createElement('script');ld.type='application/ld+json';
     ld.textContent=JSON.stringify(list.map(function(w){
       return {'@context':'https://schema.org','@type':'Event','name':w.title,
-        description:w.description||'Tontechnik-Workshop bei Lauschgift Veranstaltungstechnik',
+        description:w.description||('Tontechnik-Workshop'+(CO.name?' bei '+CO.name:'')),
         startDate:w.event_date+(w.start_time?'T'+w.start_time.slice(0,5):''),
         eventAttendanceMode:'https://schema.org/OfflineEventAttendanceMode',
-        location:{'@type':'Place',name:w.location||'Lager Hemer',
-          address:{'@type':'PostalAddress',addressLocality:'Hemer',postalCode:'58675',addressCountry:'DE'}},
-        organizer:{'@type':'Organization',name:'Lauschgift Veranstaltungstechnik',url:'https://lauschgift.net/technik.html'},
+        /* Ort und Veranstalter aus den Firmendaten (public/company), nicht fest im Code */
+        location:{'@type':'Place',name:w.location||('Lager'+(coCity()?' '+coCity():'')),
+          address:{'@type':'PostalAddress',streetAddress:CO.street||'',addressLocality:coCity(),postalCode:(String(CO.zip_city||'').match(/^\d{4,5}/)||[''])[0],addressCountry:'DE'}},
+        organizer:{'@type':'Organization',name:CO.name||'',url:location.origin+location.pathname},
         offers:{'@type':'Offer',price:w.price_net!=null?String(w.price_net):'',priceCurrency:'EUR',
           availability:w.free>0?'https://schema.org/InStock':'https://schema.org/SoldOut'}};
     }));

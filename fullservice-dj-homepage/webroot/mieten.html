@@ -267,7 +267,7 @@ footer a:hover{color:var(--acc)}
       <svg viewBox="0 0 32 32" aria-hidden="true"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>
       <span class="wm" style="font-size:15px">lauschgift<i>.</i><small>Veranstaltungstechnik</small></span>
     </a>
-    <div>© <span id="year"></span> Markus Jankowski · Hemer &nbsp;·&nbsp; <a href="technik.html">Zur Technik-Seite</a></div>
+    <div>© <span id="year"></span> <span id="footOwner">Markus Jankowski · Hemer</span> &nbsp;·&nbsp; <a href="technik.html">Zur Technik-Seite</a></div>
     <div><a href="#" onclick="openLegal('impressum');return false">Impressum</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('datenschutz');return false">Datenschutz</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('agb');return false">AGB</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('widerrufsformular');return false">Widerrufsformular</a></div>
   </div>
 </footer>
@@ -322,6 +322,26 @@ footer a:hover{color:var(--acc)}
 <script>
 var API='api.php';
 document.getElementById('year').textContent=new Date().getFullYear();
+var WA_THEMA='zur Technik';
+/* Betreiber-Basisdaten (Name, Inhaber, Telefon, WhatsApp, Anschrift) aus den Einstellungen
+   des Backoffice - die festen Werte im HTML sind nur der Rueckfall fuer den ersten Aufbau. */
+var CO={};
+function coCity(){return String(CO.zip_city||'').replace(/^\d{4,5}\s*/,'')}
+function coWaHref(text){var d=CO.whatsapp_digits||'';return d?'https://wa.me/'+d+'?text='+encodeURIComponent(text):null}
+function coWaText(thema){return 'Hallo'+(CO.owner_first?' '+CO.owner_first:'')+', ich habe eine Frage '+thema+': '}
+function applyCompany(co){
+  CO=co||{};
+  var fo=document.getElementById('footOwner');
+  if(fo&&(CO.owner||coCity()))fo.textContent=[CO.owner,coCity()].filter(Boolean).join(' · ');
+  var ph=document.getElementById('cPhone');
+  if(ph&&CO.phone){ph.textContent=CO.phone;ph.href='tel:'+CO.phone.replace(/[^\d+]/g,'')}
+  var wa=document.getElementById('cWa'),h=coWaHref(coWaText(WA_THEMA));
+  if(wa&&h)wa.href=h;
+  var ad=document.getElementById('cAddr');
+  if(ad&&(CO.street||CO.zip_city))ad.textContent=[CO.street,CO.zip_city].filter(Boolean).join(', ');
+}
+fetch(API+'/public/company').then(function(r){return r.json()}).then(applyCompany).catch(function(){});
+
 try{var _tp=JSON.stringify({p:location.pathname.split('/').pop()||'mieten.html',r:document.referrer||''});
 navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 
@@ -912,7 +932,7 @@ function renderCartAuth(){
   var el=document.getElementById('cartAuth');
   if(!CART.length){el.innerHTML='';el.removeAttribute('data-mode');return}
   if(CUST){
-    var partnerNote=PARTNER?(' · <span style="color:var(--acc)">Partnerpreise aktiv'+(PARTNER.provisional?' (vorläufig, bis zur Prüfung durch Markus)':'')+'</span>'):'';
+    var partnerNote=PARTNER?(' · <span style="color:var(--acc)">Partnerpreise aktiv'+(PARTNER.provisional?' (vorläufig, bis zur Prüfung durch '+(CO.owner_first||'den Vermieter')+')':'')+'</span>'):'';
     el.innerHTML='<div class="sml" style="color:var(--mut);font-size:13px">Eingeloggt als <b style="color:var(--txt)">'+esc(CUST.name)+'</b>'+partnerNote+' · <a onclick="custLogout()">abmelden</a></div>';
     return;
   }

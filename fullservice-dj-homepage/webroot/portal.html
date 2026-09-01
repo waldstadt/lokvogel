@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Kundenkonto – lauschgift.net</title>
+<title>Kundenkonto</title>
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23ff6f5b'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
 <link href="fonts.css" rel="stylesheet">
@@ -92,7 +92,7 @@ footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
 <div class="wrap">
   <div class="logo">
     <svg viewBox="0 0 32 32"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>
-    <a href="portal.html" style="display:flex;align-items:center;gap:9px;color:inherit"><b>lauschgift<i>.</i></b>&nbsp;<span class="sub">Kundenkonto</span></a>
+    <a href="portal.html" style="display:flex;align-items:center;gap:9px;color:inherit"><b id="hdBrand"><i>.</i></b>&nbsp;<span class="sub">Kundenkonto</span></a>
   </div>
   <div id="app"><div class="card"><div class="sub">Wird geladen …</div></div></div>
   <footer id="foot"></footer>
@@ -105,6 +105,22 @@ var qs=new URLSearchParams(location.search);
 var OFFER=qs.get('a'),FORM=qs.get('f'),MV=qs.get('mv'),INVITE=qs.get('einladung');
 var REGISTER=qs.get('register'),PREFILL_EMAIL=qs.get('email')||'',PREFILL_NAME=qs.get('name')||'';
 var PLZ=sessionStorage.getItem('portal_plz')||'';
+/* Betreiber-Basisdaten (public/company): Marke im Kopf, Telefon in Hinweisen, Vorname des
+   Inhabers fuer "… prüft das". Im Angebot liefert DOC.company dieselben Felder mit. */
+var CO={};
+fetch(API+'/public/company').then(function(r){return r.json()}).then(function(co){
+  CO=co||{};
+  var h=String(CO.website||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'').replace(/^www\./,'');
+  var wm=h?h.replace(/\.[a-z]+$/i,''):(CO.name||'');
+  var b=document.getElementById('hdBrand');if(b&&wm)b.innerHTML=esc(wm)+'<i>.</i>';
+  if(CO.name)document.title='Kundenkonto – '+CO.name;
+  var ph=document.getElementById('coPhoneHint');if(ph)ph.innerHTML=phoneHint();
+}).catch(function(){});
+function coOf(){return (DOC&&DOC.company)||CO||{}}
+/* "Alex prüft das" - ohne Inhaber der Firmenname, ohne beides neutral. */
+function ownerFirstPub(){var c=coOf();return c.owner_first||c.name||'der Veranstalter'}
+function phoneHint(){var p=(coOf().phone||'');return p?' Oder ruft mich einfach an: <a href="tel:'+esc(p.replace(/[^\d+]/g,''))+'">'+esc(p)+'</a>.':''}
+function agencyOn(){var c=coOf();return !!c.agency_enabled&&!!c.agency_name}
 /* Anfuehrungszeichen und Apostrophe mitmaskieren: innerHTML alleine ersetzt nur & < >,
    damit liesse sich aus einem Attribut ausbrechen (style, onfocus und so weiter). */
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);
@@ -262,7 +278,7 @@ function renderOffer(){
   var d=DOC.doc,items=DOC.items;
   var brutto=d.price_mode==='brutto'&&!d.is_small_business;
   var f=brutto?1:(Number(d.tax_rate)?1/(1+Number(d.tax_rate)/100):1);
-  document.getElementById('foot').innerHTML=esc(DOC.company.name||'DJ Lauschgift')+' · '+esc(DOC.company.owner||'')+
+  document.getElementById('foot').innerHTML=esc(DOC.company.name||'')+' · '+esc(DOC.company.owner||'')+
     (DOC.company.phone?' · '+esc(DOC.company.phone):'');
   var rows=docRowsHtml(items,f);
   var totals='';
@@ -345,7 +361,7 @@ function renderOffer(){
     '<div class="card" id="actionCard">'+
     (konflikt?konfliktCard():decided?
       (DOC.bande&&istAngebot&&d.status==='abgelehnt'?bandeDoneHtml():'')+
-      (nachAblauf?'<div class="msg warn">Danke – das Angebot war allerdings schon abgelaufen (gültig bis '+dt(d.valid_until)+'). Markus prüft es jetzt persönlich und meldet sich kurz – der Termin ist bis dahin noch nicht fest.</div>':'')+
+      (nachAblauf?'<div class="msg warn">Danke – das Angebot war allerdings schon abgelaufen (gültig bis '+dt(d.valid_until)+'). '+esc(ownerFirstPub())+' prüft es jetzt persönlich und meldet sich kurz – der Termin ist bis dahin noch nicht fest.</div>':'')+
       '<p class="sub">'+(!istAngebot?('Fragen zu'+(d.doc_type==='bestaetigung'?'r Auftragsbestätigung':'r Rechnung')+'? Schreibt mir einfach hier, ich melde mich:')
         :(d.status==='angenommen'?(nachAblauf?'Wenn euch bis dahin noch etwas einfällt, schreibt mir hier:':'Ich melde mich zeitnah bei euch mit den nächsten Schritten. Wenn euch noch etwas einfällt, schreibt mir hier:'):'Ihr habt Fragen oder wollt doch nochmal sprechen? Schreibt mir gerne:'))+'</p>'+
       '<div class="msg" id="aMsg"></div>'+
@@ -354,7 +370,7 @@ function renderOffer(){
       :
       '<h3 style="margin-bottom:6px">Wie möchtet ihr weitermachen?</h3>'+
       '<p class="sub">Alles unverbindlich bis zur Annahme – und Fragen kosten nichts.</p>'+
-      (abgelaufen?'<div class="msg warn" id="expiredHint">Dieses Angebot ist seit dem '+dt(d.valid_until)+' abgelaufen – annehmen geht trotzdem, Markus prüft es dann nochmal.</div>':'')+
+      (abgelaufen?'<div class="msg warn" id="expiredHint">Dieses Angebot ist seit dem '+dt(d.valid_until)+' abgelaufen – annehmen geht trotzdem, '+esc(ownerFirstPub())+' prüft es dann nochmal.</div>':'')+
       '<div class="msg" id="aMsg"></div>'+
       '<div class="actions" style="margin-top:16px">'+
       '<button class="btn green" onclick="confirmAccept()">✓ Angebot annehmen</button>'+
@@ -362,7 +378,7 @@ function renderOffer(){
       '<button class="btn g" onclick="toggle(\'cbBox\')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Rückruf wünschen</button>'+
       '<button class="btn g" onclick="toggle(\'declBox\')">Eher nicht …</button></div>'+
       '<div id="accBox" class="hidden"><h3 style="font-size:16px;margin:8px 0 4px">Verbindlich beauftragen</h3>'+
-      '<p class="sub" style="font-size:13px">'+(abgelaufen?'Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an – weil es schon abgelaufen ist, schaut Markus danach noch einmal drüber und meldet sich bei euch.':'Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an – danach ist euer Termin fest reserviert und ihr bekommt eine Bestätigung.')+'</p>'+
+      '<p class="sub" style="font-size:13px">'+(abgelaufen?'Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an – weil es schon abgelaufen ist, schaut '+esc(ownerFirstPub())+' danach noch einmal drüber und meldet sich bei euch.':'Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an – danach ist euer Termin fest reserviert und ihr bekommt eine Bestätigung.')+'</p>'+
       '<label for="accName">Vor- und Nachname</label><input id="accName" autocomplete="name">'+
       '<label>Unterschrift (mit Finger oder Maus)</label>'+
       '<canvas id="accSig" style="width:100%;height:150px;background:#fff;border-radius:4px;touch-action:none;cursor:crosshair"></canvas>'+
@@ -375,22 +391,26 @@ function renderOffer(){
       '<div id="declBox" class="hidden">'+
       '<label for="declMsg">Mögt ihr kurz sagen, woran es liegt? (optional)</label><textarea id="declMsg" placeholder="z. B. Budget, anderer Stil, Termin geändert …" style="min-height:70px"></textarea>'+
       bandeOptHtml()+
-      '<div style="margin-top:10px"><button class="btn" onclick="decline()">Absagen'+' &amp; ggf. Vorschläge erhalten</button></div></div>'
+      '<div style="margin-top:10px"><button class="btn" onclick="decline()">Absagen'+(agencyOn()?' &amp; ggf. Vorschläge erhalten':'')+'</button></div></div>'
     )+'</div>');
 }
 /* Einwilligung zur DJ-Vermittlung - dieselbe Formulierung bei der Absage und beim
    Terminkonflikt, damit der Kunde in beiden Faellen genau dasselbe zusagt. */
 function bandeOptHtml(){
-  return '<label class="chk"><input type="checkbox" id="bandeOpt"><span><b style="color:var(--txt)">Trotzdem einen richtig guten DJ finden – kostenlos.</b> Ich wähle persönlich bis zu fünf passende Kollegen aus meinem Partner-Netzwerk aus, die zu eurer Feier und eurem Budget passen – die Vorschläge bekommt ihr direkt von mir. Mit dem Haken willigt ihr ein, dass ich eure Eckdaten dafür an meine Partner-Agentur (DJ Bande, Münster) weitergebe.</span></label>';
+  /* Ohne eingerichtete Partner-Agentur (Backoffice -> Einstellungen -> Betreiber) gibt es
+     keine Vermittlung - dann erscheint der Haken gar nicht erst. */
+  if(!agencyOn())return '';
+  var c=coOf(),ag=c.agency_name+(c.agency_city?', '+c.agency_city:'');
+  return '<label class="chk"><input type="checkbox" id="bandeOpt"><span><b style="color:var(--txt)">Trotzdem einen richtig guten DJ finden – kostenlos.</b> Ich wähle persönlich bis zu fünf passende Kollegen aus meinem Partner-Netzwerk aus, die zu eurer Feier und eurem Budget passen – die Vorschläge bekommt ihr direkt von mir. Mit dem Haken willigt ihr ein, dass ich eure Eckdaten dafür an meine Partner-Agentur ('+esc(ag)+') weitergebe.</span></label>';
 }
 /* Der Kunde wollte annehmen, aber der Termin ist seit dem Angebot anderweitig fest
    geworden - ehrlich sagen und gleich die Vermittlung anbieten, statt nur "storniert". */
 function konfliktCard(){
   var phone=DOC.company&&DOC.company.phone;
   return '<h3 style="margin-bottom:6px">Ups – der Termin ist inzwischen leider vergeben</h3>'+
-    '<p class="sub">Ihr wolltet gerade annehmen, aber seit dem Angebot ist bei mir an dem Tag eine andere Feier fest geworden. Das tut mir wirklich leid – so kann ich das Angebot nicht mehr erfüllen. Allein lasse ich euch damit aber nicht: Über mein Partner-Netzwerk finde ich euch gern einen richtig guten DJ.</p>'+
+    '<p class="sub">Ihr wolltet gerade annehmen, aber seit dem Angebot ist bei mir an dem Tag eine andere Feier fest geworden. Das tut mir wirklich leid – so kann ich das Angebot nicht mehr erfüllen.'+(agencyOn()?' Allein lasse ich euch damit aber nicht: Über mein Partner-Netzwerk finde ich euch gern einen richtig guten DJ.':'')+'</p>'+
     '<div class="msg" id="aMsg"></div>'+
-    (DOC.bande
+    (!agencyOn()?'':DOC.bande
       ?bandeDoneHtml()
       :'<div id="bandeBox">'+bandeOptHtml()+'<div style="margin-top:10px"><button class="btn" onclick="bandeRequest()">Vorschläge anfordern</button></div></div>')+
     '<p class="sub" style="margin-top:14px">Oder ruft mich einfach an'+(phone?': '+esc(phone):'')+' – wir finden eine Lösung.</p>';
@@ -450,7 +470,7 @@ function doAccept(){
   }).catch(function(e){showMsg('aMsg','err',e.message||'Senden fehlgeschlagen – bitte erneut versuchen.')});
 }
 function decline(){
-  var opt=document.getElementById('bandeOpt').checked;
+  var optEl=document.getElementById('bandeOpt'),opt=!!(optEl&&optEl.checked);
   /* Erst das Opt-in melden, dann neu laden: Sonst kommt die Seite ohne den frisch
      angelegten Vorauswahl-Bogen zurueck. */
   /* bande:true sagt dem Server, dass gleich die Vermittlungs-Mail folgt - dann verschickt
@@ -544,7 +564,7 @@ function downloadPdf(){
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-family:Inter,Arial,sans-serif;font-size:12px;line-height:1.55;color:#111">'+
   '<div style="display:flex;justify-content:space-between;margin-bottom:36px"><div>'+
-  '<div style="font-size:20px;font-weight:700">'+esc(c.name||'DJ Lauschgift')+'</div>'+
+  '<div style="font-size:20px;font-weight:700">'+esc(c.name||'')+'</div>'+
   '<div style="color:#555">'+esc(c.owner||'')+'</div></div>'+
   '<div style="text-align:right;color:#555">'+esc(c.street||'')+'<br>'+esc(c.zip_city||'')+'<br>'+esc(c.phone||'')+'<br>'+esc(c.email||'')+'</div></div>'+
   '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px">'+
@@ -570,7 +590,7 @@ var FDEF=null;
 function loadForm(){
   fetch(API+'/portal/form/'+FORM).then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
-      if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte meldet euch kurz bei mir: 01523 6439373.')+'</p></div>');return}
+      if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte meldet euch kurz bei mir'+(CO.phone?': '+CO.phone:'')+'.')+'</p></div>');return}
       FDEF=res.j;renderForm();
     });
 }
@@ -1159,8 +1179,7 @@ else if(INVITE)renderSetPw();
 else if(LEER.length)
   app('<div class="card"><h1>Der Link ist unvollständig</h1>'+
     '<p class="sub">Da fehlt das Stück hinter dem Gleichheitszeichen – beim Kopieren aus einer E-Mail geht das leicht verloren. '+
-    'Kopier den Link bitte noch einmal komplett, oder melde dich kurz bei mir: '+
-    '<a href="tel:+4915236439373">01523 6439373</a>.</p>'+
+    'Kopier den Link bitte noch einmal komplett.<span id="coPhoneHint"></span></p>'+
     '<p class="sub" style="margin-top:14px">Du hast ein Kundenkonto? <a href="portal.html">Hier geht es zur Anmeldung.</a></p></div>');
 else if(CTOK)loadAccount();
 else renderLogin();

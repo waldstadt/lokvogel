@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>lauschgift.net · Backoffice</title>
+<title>Backoffice</title>
 <link href="fonts.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -318,7 +318,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
 <!-- ===== LOGIN ===== -->
 <div class="login" id="loginView">
   <form class="lb" id="loginForm">
-    <h1 id="liBrand">lauschgift.net</h1>
+    <h1 id="liBrand">Backoffice</h1>
     <div style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);font-weight:700;margin:2px 0 10px">Backoffice</div>
     <div class="s">Fullservice DJ Homepage · Verwaltung</div>
     <label>E-Mail</label><input type="email" id="liEmail" autocomplete="username" required>
@@ -333,11 +333,11 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
 <div class="app" id="appView">
   <div class="mtopbar">
     <button onclick="toggleMobileNav()" aria-label="Menü öffnen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px;margin:0"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-    <span class="mtb"><b id="mtbBrand">lauschgift.net</b></span>
+    <span class="mtb"><b id="mtbBrand">Backoffice</b></span>
   </div>
   <div class="mnavBg" id="mnavBg" onclick="closeMobileNav()"></div>
   <div class="side" id="side">
-    <div class="slogo"><span id="sbBrand">lauschgift.net</span><div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);margin-top:2px">Backoffice</div></div>
+    <div class="slogo"><span id="sbBrand">Backoffice</span><div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);margin-top:2px">Backoffice</div></div>
     <div class="sn" id="nav">
       <a data-pg="dash" class="a"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
       <div class="grp">Vertrieb</div>
@@ -844,7 +844,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div class="mut sml" style="margin-bottom:8px">Fotografen, Musiker, Planer, Kollegen – erscheinen auf der DJ-Homepage. Gegenseitige Verlinkung hilft beim Google-Ranking. Reihenfolge per Ziehen am ⠿-Griff ändern.</div>
           <div id="friendAdminList" class="sml"></div></div>
         <div class="card"><h3>Logos: Netzwerke &amp; Bewertungen <button class="btn sm" style="float:right" onclick="openBadgeModal('mitglied')">+ Logo</button></h3>
-          <div class="mut sml" style="margin-bottom:8px">Verbände, Agenturen und Portale, in denen du gelistet bist – DJ Bande, DJ Allianz, Google, Trustpilot. Erscheinen als kleine Logo-Leiste. Reihenfolge per Ziehen am ⠿-Griff ändern. <b>Wichtig:</b> Fremde Logos nur verwenden, wenn du sie verwenden darfst – bei Portalen wie Google gibt es Vorgaben zur Darstellung.</div>
+          <div class="mut sml" style="margin-bottom:8px">Verbände, Agenturen und Portale, in denen du gelistet bist – Partner-Agentur, Verband, Google, Trustpilot. Erscheinen als kleine Logo-Leiste. Reihenfolge per Ziehen am ⠿-Griff ändern. <b>Wichtig:</b> Fremde Logos nur verwenden, wenn du sie verwenden darfst – bei Portalen wie Google gibt es Vorgaben zur Darstellung.</div>
           <div class="grid2"><div><label>Überschrift</label><input id="cBadgeMTitle"></div>
           <div><label>Kurztext darunter</label><input id="cBadgeMText"></div></div>
           <label style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cBadgeMOn" style="width:auto;margin-right:6px">Leiste verwenden (aus = auf keiner Seite sichtbar)</label>
@@ -861,7 +861,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div id="badgeListTechnik" class="sml"></div></div>
         <div class="card"><h3>Bewertungen <button class="btn sm" style="float:right" onclick="openRevModal()">+ Bewertung</button></h3>
           <label>Google-Bewertungslink (am besten der „Rezension schreiben“-Link – wird auch in Mails verwendet)</label><input id="cRevGoogle" placeholder="https://g.page/r/…">
-          <label>DJ-Bande-Profil (URL, nur zum Lesen verlinkt – Bewertungen sammelt die Agentur selbst)</label><input id="cRevBande" placeholder="https://www.dj-bande.de/…">
+          <label>Profil bei der Partner-Agentur (URL, nur zum Lesen verlinkt – Bewertungen sammelt die Agentur selbst)</label><input id="cRevBande" placeholder="https://…">
           <label>Kurzfazit (z. B. „Ø 5,0 ★ aus 87 Bewertungen“)</label><input id="cRevTagline">
           <div class="grid2"><div><label>Maximal angezeigte Bewertungen (0 = alle)</label><input type="number" min="0" id="cRevMax"></div>
           <div style="align-self:end"><label style="margin:0 0 12px;text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cRevRotate" style="width:auto;margin-right:6px">Rotierend wechseln (täglich)</label></div></div>
@@ -913,7 +913,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cLegImp')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Datenschutzerklärung</label><textarea id="cLegDs" style="min-height:90px"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cLegDs')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
-          <label>AGB (inkl. Vermittlungsklausel DJ Bande)</label><textarea id="cLegAgb" style="min-height:90px"></textarea>
+          <label>AGB <span class="mut sml" style="text-transform:none;letter-spacing:0">(bei aktiver DJ-Vermittlung inkl. Vermittlungsklausel für die Partner-Agentur)</span></label><textarea id="cLegAgb" style="min-height:90px"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cLegAgb')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label style="margin-top:12px"><input type="checkbox" id="cLegReviewed" style="width:auto;margin-right:6px"><b>Rechtstexte anwaltlich/steuerlich geprüft</b> – ohne Haken erscheint ein Hinweis im Dashboard</label>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('legal')">Speichern</button></div>
@@ -954,6 +954,20 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
         <label style="margin-top:12px"><input type="checkbox" id="sSmall" style="width:auto;margin-right:6px"><b>Umsatzsteuer AUS</b> – Kleinunternehmer nach §19 UStG: Dokumente werden ohne USt. erstellt, inkl. Pflichthinweis</label>
         <div style="margin-top:12px"><button class="btn sm" onclick="saveCompany()">Speichern</button></div>
       </div>
+        <div class="card" id="set-operator"><h3>Betreiber &amp; Vermittlung</h3>
+          <div class="sml mut" style="margin-bottom:8px">Diese Angaben ersetzen alle früher fest eingebauten Namen: Sie erscheinen in Kundenmails ({inhaber}, {firma}, {agentur}), auf der Website (WhatsApp-Link, Fußzeile) und im Kundenportal.</div>
+          <div class="grid2">
+            <div><label>WhatsApp-Nummer <span class="mut sml" style="text-transform:none;letter-spacing:0">– leer = Telefonnummer</span></label><input id="sWhatsapp" placeholder="z. B. 0170 1234567"></div>
+            <div><label>Hoster <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional, nur zur Erinnerung)</span></label><input id="sHoster" placeholder="z. B. All-Inkl, Hetzner, IONOS"></div>
+          </div>
+          <label style="margin-top:12px"><input type="checkbox" id="sAgencyOn" style="width:auto;margin-right:6px" onchange="toggleAgencyFields()"><b>DJ-Vermittlung über eine Partner-Agentur anbieten</b></label>
+          <div class="mut sml" style="margin:2px 0 8px">Wenn an: Bei Absagen und belegten Terminen bietet das Portal dem Kunden an, über die Agentur einen anderen DJ zu finden (mit Einwilligung zur Datenweitergabe). Wenn aus: Alle Vermittlungs-Texte, -Vorlagen und -Knöpfe bleiben ausgeblendet.</div>
+          <div class="grid2" id="sAgencyFields">
+            <div><label>Name der Partner-Agentur</label><input id="sAgencyName" placeholder="z. B. DJ-Agentur Muster"></div>
+            <div><label>Ort der Agentur <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="sAgencyCity" placeholder="z. B. Münster"></div>
+          </div>
+          <div style="margin-top:12px"><button class="btn sm" onclick="saveOperator()">Speichern</button></div>
+        </div>
         <div class="card" id="set-bank"><h3>Bankverbindung</h3>
           <label>Bank</label><input id="sBank">
           <label>IBAN</label><input id="sIban">
@@ -1286,10 +1300,11 @@ function loadAll(){
 /* Markenname aus den Einstellungen (Website-Domain, sonst Firmenname) im Kopf & Titel */
 function applyBrand(){
   var c=S.company||{};
-  var b=String(c.website||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'')||c.name||'lauschgift.net';
-  var el=document.getElementById('sbBrand');if(el)el.textContent=b;
-  var el2=document.getElementById('mtbBrand');if(el2)el2.textContent=b;
-  document.title=b+' \u00b7 Backoffice';
+  var b=String(c.website||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'')||c.name||'';
+  var el=document.getElementById('sbBrand');if(el)el.textContent=b||'Backoffice';
+  var el2=document.getElementById('mtbBrand');if(el2)el2.textContent=b||'Backoffice';
+  var el3=document.getElementById('liBrand');if(el3)el3.textContent=b||'Backoffice';
+  document.title=b?b+' \u00b7 Backoffice':'Backoffice';
 }
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderDocsPage();
@@ -1336,7 +1351,7 @@ function openWsModal(id){
     '<div><label>Ende</label><input type="time" id="wEnd" value="'+(w.end_time||'')+'"></div></div>'+
     '<div class="grid3"><div><label>Preis p. P. brutto (€)</label><input type="number" step="0.01" id="wPrice" value="'+(w.price_net!=null?w.price_net:'')+'"></div>'+
     '<div><label>Plätze</label><input type="number" id="wCap" value="'+(w.capacity||8)+'"></div>'+
-    '<div><label>Ort</label><input id="wLoc" value="'+esc(w.location||'Lager Hemer, Büttmecker Weg 35c')+'"></div></div>'+
+    '<div><label>Ort</label><input id="wLoc" value="'+esc(w.location||(companyAddress()?'Lager, '+companyAddress():''))+'" placeholder="z. B. Lager, Musterweg 1, 12345 Musterstadt"></div></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="wPub" style="width:auto;margin-right:6px" '+(w.public?'checked':'')+'>Auf der Technik-Seite buchbar anzeigen</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveWs(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'workshop_events\',\''+id+'\',reloadWs)">Löschen</button>':'')+'</div>');
@@ -1577,7 +1592,7 @@ function renderDash(){
   document.getElementById('dashOpenInv').innerHTML=openInv.slice(0,6).map(function(d){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> <span class="mut">'+esc(custName(d.customers))+' · '+euro(d.total_gross)+(d.due_date?' · fällig '+dt(d.due_date):'')+'</span></div>';
   }).join('')||'Alles bezahlt.';
-  var EV_LBL={accept:'Angenommen',decline:'Abgelehnt',comment:'Kommentar',callback:'Rückruf-Wunsch',bande:'DJ-Bande-Opt-in',konflikt:'Annahme bei belegtem Termin'};
+  var EV_LBL={accept:'Angenommen',decline:'Abgelehnt',comment:'Kommentar',callback:'Rückruf-Wunsch',bande:'Vermittlungs-Opt-in',konflikt:'Annahme bei belegtem Termin'};
   var unseen=(CACHE.docEvents||[]).filter(function(e){return !e.seen});
   document.getElementById('dashPortal').innerHTML=unseen.slice(0,8).map(function(e){
     var d=CACHE.documents.find(function(x){return x.id===e.document_id});
@@ -1778,6 +1793,10 @@ function replyTplOptions(preselect){
   return list.map(function(t){return '<option value="'+t.id+'"'+(sel&&sel.id===t.id?' selected':'')+'>'+esc(t.name)+'</option>'}).join('');
 }
 function agencyEnabled(){return !!(S.company&&S.company.agency_enabled)}
+function agencyName(){var c=S.company||{};var n=String(c.agency_name||'').trim();if(!n)return '';return c.agency_city?n+' ('+c.agency_city+')':n}
+function ownerName(){var c=S.company||{};return String(c.owner||'').trim()||String(c.name||'').trim()}
+function ownerFirst(){var o=String((S.company||{}).owner||'').trim();return o?o.split(/\s+/)[0]:(String((S.company||{}).name||'').trim()||'dein Team')}
+function companyAddress(){var c=S.company||{};return [c.street,c.zip_city].filter(function(x){return String(x||'').trim()}).join(', ')}
 function setInqStatus(id,st){api('inquiries?id=eq.'+id,{method:'PATCH',body:{status:st}}).then(function(){closeModal();loadAll()})}
 /* Die Veranstaltung, die automatisch zu dieser Anfrage angelegt wurde (gleicher Kunde,
    gleiches Datum, noch nicht fest). */
@@ -1870,7 +1889,7 @@ function openCustDetail(id){
     row('Adresse',[c.street,[c.zip,c.city].filter(Boolean).join(' ')].filter(Boolean).join(', '))+
     row('Tags',(c.tags||[]).join(', '))+row('Notizen',c.notes)+
     /* DJ-Vermittlung: 'angefragt' setzt das Portal beim Opt-in, 'vermittelt' Markus von Hand */
-    (c.referral_status?'<div style="padding:3px 0"><span class="mut" style="display:inline-block;width:90px">DJ-Vermittlung</span>'+
+    ((c.referral_status&&agencyEnabled())?'<div style="padding:3px 0"><span class="mut" style="display:inline-block;width:90px">DJ-Vermittlung</span>'+
       '<span class="b '+(c.referral_status==='vermittelt'?'green':'gold')+'">'+(c.referral_status==='vermittelt'?'vermittelt':'angefragt')+'</span>'+
       (c.referral_at?' <span class="mut sml">seit '+dt(c.referral_at.slice(0,10))+'</span>':'')+
       (c.referral_status!=='vermittelt'?' <button class="btn g sm" style="margin-left:8px" onclick="markReferred()">Als vermittelt markieren</button>':'')+'</div>':'')+
@@ -1904,7 +1923,7 @@ function markReferred(){
   var now=new Date().toISOString();
   api('customers?id=eq.'+c.id,{method:'PATCH',body:{referral_status:'vermittelt',referral_at:now}})
     .then(function(){return api('communications',{method:'POST',body:{customer_id:c.id,channel:'note',direction:'out',
-      subject:'An Partner-DJ vermittelt',content:'DJ-Vermittlung abgeschlossen – der Kunde wurde an einen Partner-DJ (DJ Bande) vermittelt.',occurred_at:now}})})
+      subject:'An Partner-DJ vermittelt',content:'DJ-Vermittlung abgeschlossen – der Kunde wurde an einen Partner-DJ'+(agencyName()?' ('+agencyName()+')':'')+' vermittelt.',occurred_at:now}})})
     .then(function(){c.referral_status='vermittelt';c.referral_at=now;toast('Als vermittelt markiert ✓');return refreshComms()})
     .then(function(){openCustDetail(c.id)}).catch(function(e){toast(e.message,1)});
 }
@@ -3341,9 +3360,10 @@ function composeReminderMail(){
   var cust=CACHE.customers.find(function(c){return c.id===d.customer_id})||{};
   var tpl=(CACHE.tpls||[]).find(function(t){return /zahlungserinnerung/i.test(t.name)})||{subject:'Kleine Erinnerung: Rechnung {nr}',body:''};
   var link=portalUrl('a',d.share_token);
-  var map={'{vorname}':cust.first_name||'','{name}':custName(cust),'{nr}':d.number,
-    '{betrag}':euro(d.total_gross),'{faellig}':dt(d.due_date),'{link}':link,'{datum}':dt(d.due_date)};
-  var fill=function(s){return (s||'').replace(/\{vorname\}|\{name\}|\{nr\}|\{betrag\}|\{faellig\}|\{link\}|\{datum\}/g,function(m){return map[m]!==undefined?map[m]:m})};
+  var map={'{vorname}':cust.first_name||'','{name}':custName(cust),'{nr}':d.number,'{nummer}':d.number,
+    '{betrag}':euro(d.total_gross),'{faellig}':dt(d.due_date),'{link}':link,'{datum}':dt(d.due_date),
+    '{telefon}':(S.company&&S.company.phone)||'','{inhaber}':ownerName(),'{firma}':(S.company&&S.company.name)||''};
+  var fill=function(s){return (s||'').replace(/\{vorname\}|\{name\}|\{nr\}|\{nummer\}|\{betrag\}|\{faellig\}|\{link\}|\{datum\}|\{telefon\}|\{inhaber\}|\{firma\}/g,function(m){return map[m]!==undefined?map[m]:m})};
   var subj=fill(tpl.subject),body=fill(tpl.body);
   openModal('Zahlungserinnerung – '+esc(d.number),
     '<label>An</label><input id="remTo" value="'+esc(cust.email||'')+'">'+
@@ -4488,7 +4508,7 @@ function buildDocHtml(){
   return '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
   '<div style="display:flex;justify-content:space-between;margin-bottom:36px"><div>'+
   (comp.logo_url?'<img src="'+esc(comp.logo_url)+'" style="max-height:48px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block">':'')+
-  '<div style="font-size:20px;font-weight:700">'+esc(comp.name||'DJ Lauschgift')+'</div>'+
+  '<div style="font-size:20px;font-weight:700">'+esc(comp.name||'')+'</div>'+
   '<div style="color:#555">'+esc(comp.owner||'')+'</div></div>'+
   '<div style="text-align:right;color:#555">'+esc(comp.street||'')+'<br>'+esc(comp.zip_city||'')+'<br>'+esc(comp.phone||'')+'<br>'+esc(comp.email||'')+'</div></div>'+
   '<div style="font-size:9px;color:#888;border-bottom:1px solid #ccc;padding-bottom:2px;margin-bottom:8px">'+esc(comp.name||'')+' · '+esc(comp.street||'')+' · '+esc(comp.zip_city||'')+'</div>'+
@@ -5392,7 +5412,7 @@ function saveTheme(){
 /* Baut den Wert eines site_content-Keys aus dem aktuellen Formularstand –
    genutzt von saveContent (live speichern) UND von den Versionen (Entwurf sichern). */
 function buildContentVal(key){
-  if(key==='hero')return {title:'DJ Lauschgift',headline:v('cHeroTitle'),badges:badgeFields('cHeroBadge'),scrim:scrimVal('cHeroScrim'),subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal'),video:v('cHeroVid')};
+  if(key==='hero')return {title:(S.company&&S.company.name)||'',headline:v('cHeroTitle'),badges:badgeFields('cHeroBadge'),scrim:scrimVal('cHeroScrim'),subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal'),video:v('cHeroVid')};
   if(key==='about')return {title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg'),image_focal:v('cAboutFocal'),
     gear:v('cAboutGear').split(',').map(function(s){return s.trim()}).filter(Boolean)};
   if(key==='contact')return {title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
@@ -5938,7 +5958,7 @@ function renderBadgeAdmin(){
 function openBadgeModal(kind,id){
   var b=id?(CACHE.badges||[]).find(function(x){return x.id===id}):{};b=b||{};
   openModal(id?'Logo bearbeiten':'Neues Logo',
-    '<div class="grid2"><div><label>Name *</label><input id="bgName" value="'+esc(b.name||'')+'" placeholder="z. B. DJ Bande"></div>'+
+    '<div class="grid2"><div><label>Name *</label><input id="bgName" value="'+esc(b.name||'')+'" placeholder="z. B. Partner-Agentur, Verband"></div>'+
     '<div><label>Zusatz <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="bgSub" value="'+esc(b.subtitle||'')+'" placeholder="z. B. Mitglied seit 2019"></div></div>'+
     '<label>Logo <span class="mut sml" style="text-transform:none;letter-spacing:0">(PNG mit transparentem Hintergrund sieht am besten aus)</span></label>'+
     '<input type="hidden" id="bgImg" value="'+esc(b.image_url||'')+'">'+
@@ -6780,6 +6800,12 @@ function renderSet(){
   document.getElementById('sTaxId').value=c.tax_id||'';
   document.getElementById('sVatId').value=c.vat_id||'';
   document.getElementById('sSmall').checked=!!c.small_business;
+  document.getElementById('sWhatsapp').value=c.whatsapp||'';
+  document.getElementById('sHoster').value=c.hoster_name||'';
+  document.getElementById('sAgencyOn').checked=!!c.agency_enabled;
+  document.getElementById('sAgencyName').value=c.agency_name||'';
+  document.getElementById('sAgencyCity').value=c.agency_city||'';
+  toggleAgencyFields();
   document.getElementById('sTaxRate').value=d.tax_rate!=null?d.tax_rate:19;
   document.getElementById('sPartnerPct').value=d.partner_discount_pct!=null?d.partner_discount_pct:20;
   document.getElementById('sTierWeek').value=d.tier_week_pct!=null?d.tier_week_pct:30;
@@ -6839,11 +6865,21 @@ function sLogoFromPool(){
 }
 function sLogoRemove(){sLogoUrl='';renderSLogoPrev()}
 function saveCompany(){
-  var val={name:v('sName'),owner:v('sOwner'),street:v('sStreet'),zip_city:v('sZip'),phone:v('sPhone'),email:v('sMail'),
+  /* Bestehende Schluessel (Betreiber-Karte, Website) bleiben erhalten - vorher ueberschrieb
+     jedes Speichern der Firmendaten den kompletten Datensatz. */
+  var val=Object.assign({},S.company||{},{name:v('sName'),owner:v('sOwner'),street:v('sStreet'),zip_city:v('sZip'),phone:v('sPhone'),email:v('sMail'),
     legal_form:v('sLegal'),tax_id:v('sTaxId'),vat_id:v('sVatId'),small_business:document.getElementById('sSmall').checked,
-    bank:v('sBank'),iban:v('sIban'),bic:v('sBic'),paypal:v('sPaypal'),website:(S.company&&S.company.website)||'',logo_url:sLogoUrl};
+    bank:v('sBank'),iban:v('sIban'),bic:v('sBic'),paypal:v('sPaypal'),website:(S.company&&S.company.website)||'',logo_url:sLogoUrl});
   api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'company',value:val}})
-    .then(function(){S.company=val;toast('Firmendaten gespeichert ✓')}).catch(function(e){toast(e.message,1)});
+    .then(function(){S.company=val;applyBrand();renderSetupCard();toast('Firmendaten gespeichert ✓')}).catch(function(e){toast(e.message,1)});
+}
+function toggleAgencyFields(){var on=document.getElementById('sAgencyOn').checked;var f=document.getElementById('sAgencyFields');if(f)f.style.opacity=on?'1':'.45'}
+function saveOperator(){
+  var on=document.getElementById('sAgencyOn').checked;
+  if(on&&!v('sAgencyName')){toast('Bitte den Namen der Partner-Agentur eintragen – oder die Vermittlung ausschalten.',1);return}
+  var val=Object.assign({},S.company||{},{whatsapp:v('sWhatsapp'),hoster_name:v('sHoster'),agency_enabled:on,agency_name:v('sAgencyName'),agency_city:v('sAgencyCity')});
+  api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'company',value:val}})
+    .then(function(){S.company=val;renderSetupCard();renderTpls();toast('Betreiber-Angaben gespeichert ✓')}).catch(function(e){toast(e.message,1)});
 }
 function saveNumbering(){
   /* Vorhandene Kreise erhalten: nextNumber() legt bei Bedarf weitere an (Lieferschein),
@@ -6909,14 +6945,14 @@ function docSendMail(mode){
     var tpl;
     if(mode==='nachfassen'){
       tpl=(CACHE.tpls||[]).find(function(t){return /nachfassen zum angebot/i.test(t.name)})
-        ||{subject:'Kurze Frage zu eurem Angebot {nummer}',body:'Hallo {vorname},\n\nich wollte einmal kurz nachhören: Ist mein Angebot {nummer} bei euch angekommen und passt es soweit? Falls etwas unklar ist, sagt einfach Bescheid.\n\nDas Angebot findet ihr weiterhin hier (Login ist eure Postleitzahl):\n{link}\n\nGültig ist es bis {gueltig}, bis dahin halte ich euch den Termin frei.\n\nViele Grüße\nMarkus'};
+        ||{subject:'Kurze Frage zu eurem Angebot {nummer}',body:'Hallo {vorname},\n\nich wollte einmal kurz nachhören: Ist mein Angebot {nummer} bei euch angekommen und passt es soweit? Falls etwas unklar ist, sagt einfach Bescheid.\n\nDas Angebot findet ihr weiterhin hier (Login ist eure Postleitzahl):\n{link}\n\nGültig ist es bis {gueltig}, bis dahin halte ich euch den Termin frei.\n\nViele Grüße\n{inhaber}'};
     }else if(d.doc_type==='angebot'){
       tpl=(CACHE.tpls||[]).find(function(t){return /angebots-begleitmail/i.test(t.name)})
-        ||{subject:'Euer Angebot {nummer} ist fertig',body:'Hallo {vorname},\n\neuer Angebot {nummer} ist fertig und wartet hier auf euch:\n{link}\n\nLogin ist eure Postleitzahl. Wenn euch etwas nicht passt: sagt es mir einfach.\n\nViele Grüße\nMarkus'};
+        ||{subject:'Euer Angebot {nummer} ist fertig',body:'Hallo {vorname},\n\neuer Angebot {nummer} ist fertig und wartet hier auf euch:\n{link}\n\nLogin ist eure Postleitzahl. Wenn euch etwas nicht passt: sagt es mir einfach.\n\nViele Grüße\n{inhaber}'};
     }else if(d.doc_type==='bestaetigung'){
-      tpl={subject:'Auftragsbestätigung {nummer}',body:'Hallo {vorname},\n\nhier ist eure Auftragsbestätigung {nummer} – damit ist der Termin am {datum} fest bei mir eingetragen:\n{link}\n\nLogin ist eure Postleitzahl. Bei Fragen einfach melden.\n\nViele Grüße\nMarkus'};
+      tpl={subject:'Auftragsbestätigung {nummer}',body:'Hallo {vorname},\n\nhier ist eure Auftragsbestätigung {nummer} – damit ist der Termin am {datum} fest bei mir eingetragen:\n{link}\n\nLogin ist eure Postleitzahl. Bei Fragen einfach melden.\n\nViele Grüße\n{inhaber}'};
     }else{
-      tpl={subject:docTypeName(d.doc_type)+' {nummer}',body:'Hallo {vorname},\n\nhier ist eure '+docTypeName(d.doc_type)+' {nummer} über {betrag}'+(d.due_date?' (zahlbar bis {faellig})':'')+':\n{link}\n\nLogin ist eure Postleitzahl. Dort könnt ihr das Dokument ansehen und als PDF speichern.\n\nViele Grüße\nMarkus'};
+      tpl={subject:docTypeName(d.doc_type)+' {nummer}',body:'Hallo {vorname},\n\nhier ist eure '+docTypeName(d.doc_type)+' {nummer} über {betrag}'+(d.due_date?' (zahlbar bis {faellig})':'')+':\n{link}\n\nLogin ist eure Postleitzahl. Dort könnt ihr das Dokument ansehen und als PDF speichern.\n\nViele Grüße\n{inhaber}'};
     }
     var i={name:custName(cust),email:cust.email,customer_id:cust.id,booking_id:d.booking_id||null,event_date:b.event_date||null,
       location:b.venue_name||'',event_type:b.event_type||b.title||'',
@@ -7565,7 +7601,7 @@ function openRevModal(id){
     '<div><label>Anlass</label><input id="rvType" value="'+esc(r.event_type||'')+'" placeholder="Hochzeit"></div>'+
     '<div><label>Sterne (1–5)</label><input type="number" min="1" max="5" id="rvRating" value="'+(r.rating||5)+'"></div></div>'+
     '<label>Text *</label><textarea id="rvText" style="min-height:90px">'+esc(r.text||'')+'</textarea>'+
-    '<div class="grid2"><div><label>Quelle</label><select id="rvSource"><option value="google">Google</option><option value="dj-bande">Partner-Agentur (DJ Bande)</option><option value="direkt">Direkt / E-Mail</option></select></div>'+
+    '<div class="grid2"><div><label>Quelle</label><select id="rvSource"><option value="google">Google</option><option value="dj-bande">Partner-Agentur</option><option value="direkt">Direkt / E-Mail</option></select></div>'+
     '<div><label>Datum (z. B. „Juli 2026“)</label><input id="rvDate" value="'+esc(r.review_date||'')+'"></div></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="rvPub" style="width:auto;margin-right:6px" '+(r.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
     SORT_HINT+
@@ -7659,9 +7695,13 @@ function fillTpl(text,i){
     /* Dokument-Mails (docSendMail): Portal-Link, Belegnummer, Betrag, Faelligkeit */
     '{link}':i._link||'','{nummer}':i._nummer||'','{nr}':i._nummer||'',
     '{betrag}':i._betrag||'','{faellig}':i._faellig||'','{gueltig}':i._gueltig||'',
-    '{telefon}':(S.company&&S.company.phone)||''
+    '{telefon}':(S.company&&S.company.phone)||'',
+    /* Betreiber-Platzhalter - dieselben wie tplMap() in api.php, damit Vorlagen ohne
+       festen Namen auskommen und fuer jeden Betreiber passen. */
+    '{inhaber}':ownerName(),'{firma}':(S.company&&S.company.name)||'','{agentur}':agencyName(),
+    '{adresse}':companyAddress(),'{firmenort}':String((S.company||{}).zip_city||'').replace(/^\d{4,5}\s*/,'')
   };
-  return (text||'').replace(/\{vorname\}|\{name\}|\{datum\}|\{anlass\}|\{ort\}|\{bewertungen\}|\{link\}|\{nummer\}|\{nr\}|\{betrag\}|\{faellig\}|\{gueltig\}|\{telefon\}/g,function(m){return map[m]});
+  return (text||'').replace(/\{vorname\}|\{name\}|\{datum\}|\{anlass\}|\{ort\}|\{bewertungen\}|\{link\}|\{nummer\}|\{nr\}|\{betrag\}|\{faellig\}|\{gueltig\}|\{telefon\}|\{inhaber\}|\{firma\}|\{agentur\}|\{adresse\}|\{firmenort\}/g,function(m){return map[m]});
 }
 function composeReply(inqId){
   var i=CACHE.inquiries.find(function(x){return x.id===inqId});if(!i)return;
@@ -7736,7 +7776,7 @@ function openCompose(i,t,formLink,onSent){
 function composeSwitchTpl(){
   var ctx=window._composeCtx;if(!ctx)return;
   var id=v('rTpl'),t=id?(CACHE.tpls||[]).find(function(x){return x.id===id}):window._composeBuiltin;
-  if(!t){t={subject:'',body:'Hallo {vorname},\n\n\n\nViele Grüße\nMarkus'}}
+  if(!t){t={subject:'',body:'Hallo {vorname},\n\n\n\nViele Grüße\n{inhaber}'}}
   var body=fillTpl(t.body,ctx.i);
   if(ctx.formLink)body=body.replace(/\{fragebogen\}/g,ctx.formLink);
   document.getElementById('rSubject').value=fillTpl(t.subject,ctx.i);
@@ -7750,7 +7790,7 @@ function custComposeMail(){
     .sort(function(x,y){return x.event_date<y.event_date?1:-1})[0]||{};
   openCompose({name:custName(c),email:c.email,customer_id:c.id,booking_id:b.id||null,event_date:b.event_date||null,
     location:b.venue_name||'',event_type:b.event_type||b.title||'',_title:'E-Mail an '+esc(custName(c)),_doc:true},
-    {subject:'',body:'Hallo {vorname},\n\n\n\nViele Grüße\nMarkus'},null,null);
+    {subject:'',body:'Hallo {vorname},\n\n\n\nViele Grüße\n{inhaber}'},null,null);
 }
 function adminSendMail(to,subject,body,custId,cb,bookingId){
   fetch('api.php/sendmail',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
