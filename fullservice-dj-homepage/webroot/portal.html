@@ -123,7 +123,10 @@ function showMsg(id,cls,txt){var m=document.getElementById(id);m.className='msg 
 /* ===================== ANGEBOT ===================== */
 var DOC=null;
 function loadOffer(){
-  fetch(API+'/portal/offer/'+OFFER+'?plz='+encodeURIComponent(PLZ))
+  /* Wer schon ein Kundenkonto hat (CTOK gesetzt), schickt den Login-Token mit -
+     dann prueft der Server die Identitaet darueber und die PLZ-Frage entfaellt. */
+  var headers=CTOK?{Authorization:'Bearer '+CTOK}:{};
+  fetch(API+'/portal/offer/'+OFFER+'?plz='+encodeURIComponent(PLZ),{headers:headers})
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
       if(res.s===401){renderPlzGate();return}
@@ -292,6 +295,9 @@ function renderOffer(){
     (statusLine?'<div style="margin-top:12px">'+statusLine+'</div>':'')+
     (d.intro_text?'<p style="margin-top:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
     '</div>'+
+    (!DOC.has_account?
+      '<div class="card" style="padding:14px 24px"><p class="sub" style="margin:0">Noch keinen Zugang zu deinem Kundenkonto? '+
+      '<a href="portal.html?register=1">Leg dir kostenlos einen an</a> – dann musst du dich beim nächsten Mal nicht mehr mit der Postleitzahl ausweisen und hast alle Unterlagen an einem Ort.</p></div>':'')+
     '<div class="card"><table><thead><tr><th class="num">#</th><th>Leistung</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead>'+
     '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>'+
     '<p class="hint">Tipp: Tippt auf eine Position mit dem <b style="color:var(--acc)">i</b> – dort erkläre ich, was genau dahintersteckt.</p></div>'+

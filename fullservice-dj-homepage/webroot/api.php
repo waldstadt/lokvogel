@@ -2715,11 +2715,15 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
 function portalDoc(string $token, string $plz): array {
   $p = db();
   if (!preg_match('/^[a-f0-9]{24,64}$/', $token)) fail('Ungültiger Link.', 404);
-  $st = $p->prepare('select d.*, c.first_name, c.last_name, c.company, c.street, c.zip, c.city
+  $st = $p->prepare('select d.*, c.first_name, c.last_name, c.company, c.street, c.zip, c.city, c.portal_hash
     from documents d join customers c on c.id = d.customer_id where d.share_token = ?');
   $st->execute([$token]);
   $d = $st->fetch();
   if (!$d) fail('Dieses Angebot wurde nicht gefunden oder der Link ist abgelaufen.', 404);
+  /* Wer schon ein Kundenkonto hat und eingeloggt ist, hat seine Identitaet damit
+     schon bestaetigt - die PLZ-Abfrage ist dann eine unnoetige zusaetzliche Huerde. */
+  $me = custAuth();
+  if ($me && $me['id'] === $d['customer_id']) return $d;
   if (trim((string)$d['zip']) === '')
     fail('Zu diesem Vorgang ist bei mir noch keine Postleitzahl hinterlegt – deshalb kann ich den Zugang nicht prüfen. Melde dich kurz bei mir (01523 6439373), dann schalte ich dich frei.', 409);
   if (trim($plz) === '' || trim($plz) !== trim((string)$d['zip'])) {
@@ -3497,6 +3501,9 @@ function handlePortal(string $path, string $method, $body): never {
          das SQL oben nur die PLZ (fuer die Zugangspruefung) mitgeladen hat. */
       'customer_address' => (trim((string)$d['street']) !== '' || trim((string)$d['city']) !== '')
         ? ['street' => $d['street'], 'zip' => $d['zip'], 'city' => $d['city']] : null,
+      /* Fuer die Erinnerung "leg dir ein Kundenkonto an" im Angebot - ohne Konto
+         muss beim naechsten Besuch wieder die PLZ eingetippt werden. */
+      'has_account' => !empty($d['portal_hash']),
       'items' => $it->fetchAll(),
       'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city','iban','bic','bank','tax_id'])),
       'upsells' => $ups,
