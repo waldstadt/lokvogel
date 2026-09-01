@@ -913,8 +913,11 @@ function planCard(b,i){
 function renderAccount(){
   var me=ME;
   var docs=me.documents.map(function(d){
+    /* Termin dazu, wenn erkennbar: bei mehreren Buchungen sonst nicht zu sehen,
+       zu welcher Veranstaltung ein Beleg gehoert. */
+    var termin=d.event_date?' · Termin '+dt(d.event_date):'';
     return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap">'+
-    '<div><b>'+(TYPE_LABEL[d.doc_type]||d.doc_type)+' '+esc(d.number)+'</b> <span style="color:var(--mut);font-size:13px">· '+dt(d.doc_date)+' · '+d.status+'</span></div>'+
+    '<div><b>'+(TYPE_LABEL[d.doc_type]||d.doc_type)+' '+esc(d.number)+'</b> <span style="color:var(--mut);font-size:13px">· '+dt(d.doc_date)+termin+' · '+d.status+'</span></div>'+
     '<a href="?a='+d.token+'">Ansehen / PDF →</a></div>';
   }).join('')||'<p class="sub">Noch keine Unterlagen.</p>';
   var rentals=(me.rentals||[]).map(function(r){

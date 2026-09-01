@@ -3301,7 +3301,13 @@ function handlePortal(string $path, string $method, $body): never {
         'event_plan' => json_decode((string)($b['event_plan'] ?? ''), true) ?: (object)[],
         'plan_locked' => $locked];
       }, $bk->fetchAll());
-      $dq = $p->prepare("select id, share_token, doc_type, number, status, doc_date, total_gross
+      /* Termin je Buchung fuer die Beleg-Zuordnung: hat der Kunde mehrere Buchungen,
+         war in "Meine Unterlagen" bisher nicht zu erkennen, welcher Beleg zu welchem
+         Termin gehoert - alle Belege standen dort in einem ununterscheidbaren Topf. */
+      $bd = $p->prepare('select id, event_date from bookings where customer_id = ?');
+      $bd->execute([$me['id']]);
+      $bookingDates = array_column($bd->fetchAll(), 'event_date', 'id');
+      $dq = $p->prepare("select id, share_token, doc_type, number, status, doc_date, total_gross, booking_id
         from documents where customer_id = ? and status != 'entwurf' order by doc_date desc, created_at desc");
       $dq->execute([$me['id']]);
       $docs = [];
@@ -3311,7 +3317,8 @@ function handlePortal(string $path, string $method, $body): never {
           $p->prepare('update documents set share_token = ? where id = ?')->execute([$d['share_token'], $d['id']]);
         }
         $docs[] = ['number' => $d['number'], 'doc_type' => $d['doc_type'], 'status' => $d['status'],
-          'doc_date' => $d['doc_date'], 'total_gross' => $d['total_gross'], 'token' => $d['share_token']];
+          'doc_date' => $d['doc_date'], 'total_gross' => $d['total_gross'], 'token' => $d['share_token'],
+          'event_date' => $d['booking_id'] ? ($bookingDates[$d['booking_id']] ?? null) : null];
       }
       $rc = $p->prepare("select r.token, r.status, r.signed_at, b.event_date from rental_contracts r
         join bookings b on b.id = r.booking_id where b.customer_id = ?");

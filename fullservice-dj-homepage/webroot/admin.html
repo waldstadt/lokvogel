@@ -2555,7 +2555,12 @@ function renderDocList(filterFn){
   return docs.map(function(d){
     /* Bei Zahlbelegen zaehlt der offene Betrag: die Schlussrechnung stand hier mit der
        vollen Auftragssumme, obwohl der Abschlag laengst bezahlt war. */
-    return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+docOffenText(d)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
+    /* Datum + Termin dazu: hat ein Kunde mehrere Buchungen, sah man in dieser Liste
+       bisher nicht, welcher Beleg zu welchem Termin gehoert - alles wirkte wie ein
+       einziger, undurchsichtiger Topf. */
+    var buchung=d.booking_id?(CACHE.bookings||[]).find(function(b){return b.id===d.booking_id}):null;
+    var termin=buchung?' · Termin '+dt(buchung.event_date):'';
+    return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+dt(d.doc_date)+termin+' · '+docOffenText(d)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
   }).join('');
 }
 function renderDocsPage(){
@@ -2651,9 +2656,18 @@ function docCustChanged(){
   refreshBookOpts();
 }
 document.getElementById('docBook').addEventListener('change',function(){
-  var id=this.value;
-  fillEventFromBooking((CACHE.bookings||[]).find(function(x){return x.id===id}),true);
-  renderDocExtraBtns();renderEventHint();
+  var id=this.value,b=(CACHE.bookings||[]).find(function(x){return x.id===id});
+  /* Wird die verknuepfte Buchung hier bewusst gewechselt (z.B. falsche Buchung
+     korrigiert, oder Beleg fuer ein zweites Event desselben Kunden umgehaengt),
+     sollen Termin/Ort/Gaeste/Mietzeitraum auf dem Beleg auch wirklich zur neuen
+     Buchung passen - nicht nur die Luecken auffuellen (nurLeere=false), sonst
+     bleiben Alt-Angaben der vorherigen Buchung unbemerkt stehen. */
+  fillEventFromBooking(b,false);
+  if(b&&(b.kind==='technik'||b.kind==='dj_technik')){
+    document.getElementById('docRentFrom').value=b.event_date||'';
+    document.getElementById('docRentTo').value=(b.end_date&&b.end_date>b.event_date)?b.end_date:'';
+  }
+  renderDocExtraBtns();renderEventHint();renderRentalHint();renderTotals();
 });
 function refreshBookOpts(){
   var custId=document.getElementById('docCust').value;
