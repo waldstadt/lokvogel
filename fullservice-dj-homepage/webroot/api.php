@@ -30,6 +30,11 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
 const SCHEMA_VERSION = 82;   // frisches Schema in migrate() muss diesem Stand entsprechen
+/* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
+   auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
+   immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
+   Einstellungen (Schluessel "notify") Bot-Token und Chat-ID hinterlegt sind. */
+if (!defined('TELEGRAM_API_BASE')) define('TELEGRAM_API_BASE', 'https://api.telegram.org');
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -3127,12 +3132,101 @@ function workshopInvoice(PDO $p, string $signupId): array {
   return ['ok' => true, 'number' => $number, 'mailed' => $mailed, 'portal' => $portal];
 }
 
-/* Benachrichtigung an den Inhaber (Firmen-E-Mail aus den Einstellungen) */
+/* ---------- Telegram (Benachrichtigungen aufs Handy) ----------
+   Einstellungen liegen in settings.notify: {telegram_enabled, telegram_token, telegram_chat_id}.
+   Telegram kommt immer ZUSAETZLICH zur E-Mail an Markus - nie stattdessen. Ein Fehler beim
+   Senden darf die eigentliche Aktion (Anfrage, Annahme, Anmeldung ...) nie scheitern lassen,
+   deshalb wirft hier nichts; der letzte Fehler landet in data/telegram.json und wird in den
+   Einstellungen angezeigt. */
+function telegramConfig(): array {
+  $cfg = json_decode((string)db()->query("select value from settings where key='notify'")->fetchColumn() ?: '{}', true) ?: [];
+  return [
+    'enabled' => !empty($cfg['telegram_enabled']),
+    'token'   => trim((string)($cfg['telegram_token'] ?? '')),
+    'chat_id' => trim((string)($cfg['telegram_chat_id'] ?? '')),
+  ];
+}
+/* Merkt sich letzten Fehler / letzten Erfolg (kein Datenbankzugriff, damit es auch im
+   Fehlerfall einer Transaktion nichts stoert). Ohne $set: nur lesen. */
+function telegramState(?array $set = null): array {
+  $file = DATA_DIR . '/telegram.json';
+  $st = is_file($file) ? (json_decode((string)@file_get_contents($file), true) ?: []) : [];
+  if ($set !== null) {
+    $st = array_merge($st, $set);
+    @file_put_contents($file, json_encode($st, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
+  }
+  return ['last_error' => $st['last_error'] ?? null, 'last_error_at' => $st['last_error_at'] ?? null, 'last_ok_at' => $st['last_ok_at'] ?? null];
+}
+/* Ruft eine Bot-API-Methode auf. Rueckgabe: ['ok'=>bool, 'result'=>mixed, 'error'=>string].
+   curl wenn vorhanden (All-Inkl hat es), sonst file_get_contents. Kurzer Timeout, damit ein
+   haengendes Telegram keinen Kundenvorgang ausbremst. */
+function telegramApi(string $token, string $apiMethod, array $params, int $timeout = 6): array {
+  $url = rtrim(TELEGRAM_API_BASE, '/') . '/bot' . $token . '/' . $apiMethod;
+  $payload = http_build_query($params);
+  $resp = false; $status = 0; $err = '';
+  try {
+    if (function_exists('curl_init')) {
+      $ch = curl_init($url);
+      curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $payload, CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => $timeout,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded']]);
+      $resp = curl_exec($ch);
+      $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+      if ($resp === false) $err = curl_error($ch) ?: 'Verbindung fehlgeschlagen';
+      curl_close($ch);
+    } else {
+      $ctx = stream_context_create(['http' => ['method' => 'POST', 'content' => $payload, 'timeout' => $timeout, 'ignore_errors' => true,
+        'header' => "Content-Type: application/x-www-form-urlencoded\r\n"]]);
+      $resp = @file_get_contents($url, false, $ctx);
+      foreach ((array)($http_response_header ?? []) as $h) { if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $sm)) $status = (int)$sm[1]; }
+      if ($resp === false) $err = 'Verbindung fehlgeschlagen';
+    }
+  } catch (\Throwable $e) { return ['ok' => false, 'result' => null, 'error' => 'Telegram nicht erreichbar: ' . $e->getMessage()]; }
+  if ($resp === false) return ['ok' => false, 'result' => null, 'error' => 'Telegram nicht erreichbar: ' . $err];
+  $j = json_decode((string)$resp, true);
+  if ($status === 200 && is_array($j) && !empty($j['ok'])) return ['ok' => true, 'result' => $j['result'] ?? null, 'error' => ''];
+  $desc = is_array($j) ? (string)($j['description'] ?? '') : '';
+  if ($desc === '') $desc = 'unerwartete Antwort' . (trim((string)$resp) !== '' ? ': ' . mb_substr(trim(strip_tags((string)$resp)), 0, 120) : '');
+  return ['ok' => false, 'result' => null, 'error' => 'HTTP ' . $status . ' – ' . $desc];
+}
+/* Schickt eine Klartext-Nachricht an den hinterlegten Chat. Kein parse_mode, also muss
+   nichts maskiert werden. true = Telegram hat mit ok:true geantwortet. */
+function sendTelegram(string $text): bool {
+  try {
+    $c = telegramConfig();
+    if ($c['token'] === '' || $c['chat_id'] === '') return false;
+    $text = trim($text);
+    if (mb_strlen($text) > 3500) $text = mb_substr($text, 0, 3500) . ' …';
+    $r = telegramApi($c['token'], 'sendMessage', ['chat_id' => $c['chat_id'], 'text' => $text, 'disable_web_page_preview' => 'true']);
+    if ($r['ok']) telegramState(['last_ok_at' => now(), 'last_error' => null, 'last_error_at' => null]);
+    else telegramState(['last_error' => $r['error'], 'last_error_at' => now()]);
+    return $r['ok'];
+  } catch (\Throwable $e) {
+    try { telegramState(['last_error' => $e->getMessage(), 'last_error_at' => now()]); } catch (\Throwable) {}
+    return false;
+  }
+}
+
+/* Benachrichtigung an den Inhaber: E-Mail an die Firmen-E-Mail aus den Einstellungen,
+   zusaetzlich (wenn eingeschaltet) eine kurze Telegram-Nachricht aufs Handy. Rueckgabe
+   bleibt das Mail-Ergebnis - Telegram aendert daran nichts und blockiert nichts.
+   Fuers Handy nur Betreff plus die ersten Zeilen: Kundendaten in voller Laenge gehoeren
+   ins Backoffice, nicht in einen Messenger. */
 function notifyOwner(string $subject, string $body): bool {
   $comp = json_decode(db()->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
   $to = trim((string)($comp['email'] ?? ''));
-  if ($to === '') return false;
-  return sendMailSafe($to, $subject, $body . "\n\n– automatische Benachrichtigung deines Backoffice\n" . baseUrl() . "/admin.html");
+  $mailed = $to !== '' && sendMailSafe($to, $subject, $body . "\n\n– automatische Benachrichtigung deines Backoffice\n" . baseUrl() . "/admin.html");
+  try {
+    $tg = telegramConfig();
+    if ($tg['enabled'] && $tg['token'] !== '' && $tg['chat_id'] !== '') {
+      $lines = preg_split('/\r?\n/', trim($body)) ?: [];
+      $short = rtrim(implode("\n", array_slice($lines, 0, 6)));
+      $cut = count($lines) > 6 || mb_strlen($short) > 600;
+      if (mb_strlen($short) > 600) $short = rtrim(mb_substr($short, 0, 600));
+      sendTelegram($subject . "\n\n" . $short . ($cut ? "\n… Details im Backoffice" : ''));
+    }
+  } catch (\Throwable) { /* nie die eigentliche Aktion scheitern lassen */ }
+  return $mailed;
 }
 
 /* Bestaetigungsmail an den Kunden nach Annahme im Portal. Das Portal verspricht an der
@@ -4837,6 +4931,46 @@ try {
     }
     out(['provider' => $cfg['provider'] ?? 'openai', 'base_url' => $cfg['base_url'] ?? '', 'model' => $cfg['model'] ?? '',
       'style' => $cfg['style'] ?? '', 'workspace_id' => $cfg['workspace_id'] ?? '', 'has_key' => !empty($cfg['api_key'])]);
+  }
+  /* Telegram-Benachrichtigungen: Status, Testnachricht und Chat-ID-Suche. Die Einstellungen
+     selbst (Token, Chat-ID, an/aus) speichert das Backoffice wie die Firmendaten ueber
+     rest/settings (Schluessel "notify", nur angemeldet). */
+  if ($path === 'telegram/status' && $method === 'GET') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $c = telegramConfig(); $st = telegramState();
+    out(['enabled' => $c['enabled'], 'configured' => $c['token'] !== '' && $c['chat_id'] !== '',
+      'token_set' => $c['token'] !== '', 'chat_id_set' => $c['chat_id'] !== '',
+      'last_error' => $st['last_error'], 'last_error_at' => $st['last_error_at'], 'last_ok_at' => $st['last_ok_at']]);
+  }
+  if ($path === 'telegram/test' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $c = telegramConfig();
+    if ($c['token'] === '') fail('Bitte zuerst den Bot-Token eintragen und speichern.', 400);
+    if ($c['chat_id'] === '') fail('Bitte zuerst die Chat-ID eintragen (oder automatisch holen) und speichern.', 400);
+    $ok = sendTelegram("Testnachricht aus dem Backoffice – wenn du das liest, klappt's.");
+    out(['ok' => $ok, 'error' => $ok ? null : (telegramState()['last_error'] ?? 'Senden fehlgeschlagen.')]);
+  }
+  /* Chat-ID automatisch holen: getUpdates liefert die letzten Nachrichten an den Bot -
+     nach einem "Start" von Markus steht darin sein Chat. Es wird nichts gespeichert, das
+     Backoffice fuellt nur das Feld; gespeichert wird erst per "Speichern". */
+  if ($path === 'telegram/discover' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $token = trim((string)($body['token'] ?? '')) ?: telegramConfig()['token'];
+    if ($token === '') fail('Bitte zuerst den Bot-Token eintragen.', 400);
+    $r = telegramApi($token, 'getUpdates', ['limit' => '50', 'allowed_updates' => '["message","my_chat_member","channel_post"]']);
+    if (!$r['ok']) fail('Telegram-Abfrage fehlgeschlagen: ' . $r['error'], 502);
+    $found = null;
+    foreach (array_reverse((array)$r['result']) as $u) {
+      $chat = $u['message']['chat'] ?? $u['my_chat_member']['chat'] ?? $u['channel_post']['chat'] ?? null;
+      if (is_array($chat) && isset($chat['id'])) {
+        $name = trim(trim((string)($chat['first_name'] ?? '')) . ' ' . trim((string)($chat['last_name'] ?? '')));
+        if ($name === '') $name = (string)($chat['title'] ?? $chat['username'] ?? '');
+        $found = ['chat_id' => (string)$chat['id'], 'name' => $name, 'type' => (string)($chat['type'] ?? '')];
+        break;
+      }
+    }
+    if (!$found) fail('Noch kein Chat gefunden – öffne deinen Bot in Telegram, tippe auf „Start" (oder schick ihm irgendeine Nachricht) und versuch es dann noch einmal.', 404);
+    out($found);
   }
   /* Automatische Fahrtstrecke: Konfiguration (OpenRouteService-API-Schlüssel) liegt in
      settings.routing - nur angemeldet, der Schlüssel selbst wird nie zurückgegeben. */

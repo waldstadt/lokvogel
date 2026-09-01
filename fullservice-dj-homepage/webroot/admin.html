@@ -876,6 +876,27 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <input id="sPaypal" placeholder="paypal.me/deinname oder E-Mail-Adresse">
           <div style="margin-top:12px"><button class="btn sm" onclick="saveCompany()">Speichern</button></div>
         </div>
+        <div class="card"><h3>Benachrichtigungen aufs Handy (Telegram)</h3>
+          <div class="sml mut" style="margin-bottom:8px">Neue Anfragen, Angebots-Reaktionen, Workshop-Anmeldungen und Co. landen zusätzlich als kurze Nachricht in Telegram. E-Mail-Benachrichtigungen bleiben immer an – Telegram kommt zusätzlich.</div>
+          <ol class="sml" style="margin:0 0 10px 18px;padding:0;line-height:1.7">
+            <li>Telegram auf dem Handy installieren (falls noch nicht drauf).</li>
+            <li>In Telegram den Chat mit „BotFather" öffnen, <code>/newbot</code> schicken, einen Namen vergeben und den angezeigten Token kopieren.</li>
+            <li>Token hier einfügen und speichern.</li>
+            <li>Deinem neuen Bot einmal „Start" schicken, dann „Chat-ID automatisch holen" klicken und „Testnachricht senden" drücken.</li>
+          </ol>
+          <label style="margin-bottom:8px"><input type="checkbox" id="tgEnabled" style="width:auto;margin-right:6px"><b>Telegram-Benachrichtigungen an</b></label>
+          <div class="grid2">
+            <div><label>Bot-Token <a class="sml" id="tgTokenToggle" onclick="tgToggleToken()" style="text-transform:none;letter-spacing:0;margin-left:6px">anzeigen</a></label><input id="tgToken" type="password" autocomplete="off" placeholder="123456789:AAH…"></div>
+            <div><label>Chat-ID</label><input id="tgChatId" placeholder="z. B. 123456789"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+            <button class="btn g sm" onclick="tgDiscover()">Chat-ID automatisch holen</button>
+            <button class="btn sm" onclick="saveTelegram()">Speichern</button>
+            <button class="btn g sm" onclick="tgTest()">Testnachricht senden</button>
+          </div>
+          <div id="tgStatus" class="sml" style="margin-top:8px"></div>
+          <div class="sml mut" style="margin-top:6px">Datenschutz: Die Nachrichten bleiben kurz (Betreff plus ein paar Zeilen) – die Details stehen weiterhin nur im Backoffice.</div>
+        </div>
         <div class="card"><h3>Nummernkreise &amp; Vorgaben</h3>
           <div class="grid2">
             <div><label>Angebots-Präfix</label><input id="sQPre"></div>
@@ -5997,9 +6018,64 @@ function saveRoutingConfig(){
     }).catch(function(e){toast(e.message,1)});
 }
 
+/* Telegram-Benachrichtigungen: Einstellungen liegen wie die Firmendaten in settings
+   (Schluessel "notify"); Status/Test/Chat-ID-Suche laufen ueber eigene Endpunkte. */
+function renderTelegram(){
+  var n=S.notify||{};
+  document.getElementById('tgEnabled').checked=!!n.telegram_enabled;
+  document.getElementById('tgToken').value=n.telegram_token||'';
+  document.getElementById('tgChatId').value=n.telegram_chat_id||'';
+  loadTelegramStatus();
+}
+function tgToggleToken(){
+  var i=document.getElementById('tgToken'),a=document.getElementById('tgTokenToggle');
+  var show=i.type==='password';i.type=show?'text':'password';a.textContent=show?'verbergen':'anzeigen';
+}
+function loadTelegramStatus(){
+  fetch('api.php/telegram/status',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(c){
+    var el=document.getElementById('tgStatus');if(!c||!el)return;
+    var parts=[];
+    if(!c.token_set)parts.push('Kein Bot-Token hinterlegt.');
+    else if(!c.chat_id_set)parts.push('Token hinterlegt, Chat-ID fehlt noch.');
+    else parts.push(c.enabled?'Eingerichtet und aktiv.':'Eingerichtet, aber ausgeschaltet.');
+    if(c.last_ok_at)parts.push('Letzte Nachricht: '+dtt(c.last_ok_at)+'.');
+    el.innerHTML=esc(parts.join(' '))+(c.last_error?'<div style="color:var(--redl);margin-top:2px">Letzter Fehler'+(c.last_error_at?' ('+esc(dtt(c.last_error_at))+')':'')+': '+esc(c.last_error)+'</div>':'');
+  }).catch(function(){});
+}
+function saveTelegram(){
+  var val={telegram_enabled:document.getElementById('tgEnabled').checked,telegram_token:v('tgToken'),telegram_chat_id:v('tgChatId')};
+  if(val.telegram_enabled&&(!val.telegram_token||!val.telegram_chat_id)){toast('Zum Einschalten brauchst du Bot-Token und Chat-ID.',1);return}
+  return api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'notify',value:val}})
+    .then(function(){S.notify=val;toast('Telegram-Einstellungen gespeichert ✓');loadTelegramStatus()}).catch(function(e){toast(e.message,1)});
+}
+function tgDiscover(){
+  var tok=v('tgToken');
+  if(!tok){toast('Bitte zuerst den Bot-Token eintragen.',1);return}
+  fetch('api.php/telegram/discover',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify({token:tok})})
+    .then(function(r){return r.json()}).then(function(c){
+      if(c.error){toast(c.error,1);return}
+      document.getElementById('tgChatId').value=c.chat_id||'';
+      toast('Chat gefunden'+(c.name?': '+c.name:'')+' – jetzt noch speichern.');
+    }).catch(function(e){toast(e.message,1)});
+}
+function tgTest(){
+  var n=S.notify||{};
+  var dirty=v('tgToken')!==(n.telegram_token||'')||v('tgChatId')!==(n.telegram_chat_id||'')||document.getElementById('tgEnabled').checked!==!!n.telegram_enabled;
+  var pre=dirty?saveTelegram():Promise.resolve();
+  if(!pre)return;
+  pre.then(function(){
+    return fetch('api.php/telegram/test',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:'{}'})
+      .then(function(r){return r.json()}).then(function(c){
+        if(c.ok)toast('Testnachricht verschickt ✓ – schau aufs Handy.');
+        else toast('Testnachricht fehlgeschlagen: '+(c.error||'unbekannter Fehler'),1);
+        loadTelegramStatus();
+      });
+  }).catch(function(e){toast(e.message,1)});
+}
+
 /* ===== Einstellungen ===== */
 function renderSet(){
-  loadBackups();loadDeploy();loadIcal();loadAiConfig();loadRoutingConfig();renderPacking();
+  loadBackups();loadDeploy();loadIcal();loadAiConfig();loadRoutingConfig();renderTelegram();renderPacking();
   var c=S.company||{},n=S.numbering||{},d=S.defaults||{};
   document.getElementById('sName').value=c.name||'';
   document.getElementById('sOwner').value=c.owner||'';
