@@ -2789,6 +2789,8 @@ function openAuditModal(){
 function renderStatusBtns(){
   var d=curDoc,btns='';
   if(!d.id){document.getElementById('docStatusBtns').innerHTML='';return}
+  if(['angebot','bestaetigung','rechnung','abschlag','schluss'].indexOf(d.doc_type)>=0&&d.status!=='storniert')
+    btns+='<button class="btn g sm" onclick="docSendMail()">Per E-Mail senden</button> ';
   if(d.status==='entwurf')btns+='<button class="btn g sm" onclick="setDocStatus(\'versendet\')">→ Versendet</button>';
   if(d.doc_type==='angebot'&&d.status==='versendet')
     btns+='<button class="btn g sm" onclick="setDocStatus(\'angenommen\')">✓ Angenommen</button> <button class="btn g sm" onclick="setDocStatus(\'abgelehnt\')">✕ Abgelehnt</button>';
@@ -6078,24 +6080,56 @@ function saveNumbering(){
 /* ===== Kundenportal: Angebots-Link & Fragebögen ===== */
 function hexToken(){var b=new Uint8Array(16);crypto.getRandomValues(b);return Array.from(b).map(function(x){return x.toString(16).padStart(2,'0')}).join('')}
 function portalUrl(param,token){return location.origin+location.pathname.replace(/[^\/]*$/,'portal.html')+'?'+param+'='+token}
-function shareDoc(){
-  if(!curDoc.id){toast('Bitte erst speichern.',1);return}
+/* Sorgt dafuer, dass das aktuelle Dokument einen Portal-Link hat (PLZ am Kunden als
+   Login, Freigabe-Token am Dokument). Liefert {url,cust} - genutzt von "Kundenlink"
+   (kopieren) und "Per E-Mail senden" (Begleitmail), damit beide dieselbe Logik teilen. */
+function ensureDocShare(){
+  if(!curDoc.id)return Promise.reject(new Error('Bitte erst speichern.'));
   var cust=CACHE.customers.find(function(c){return c.id===curDoc.customer_id});
-  if(!cust){toast('Kunde nicht gefunden.',1);return}
+  if(!cust)return Promise.reject(new Error('Kunde nicht gefunden.'));
   var ensureZip=cust.zip?Promise.resolve():(function(){
     var z=prompt('Der Kunde hat noch keine PLZ hinterlegt – sie dient als Login fürs Portal.\nPLZ des Kunden:');
     if(!z)return Promise.reject(new Error('Ohne PLZ kein Kundenlink.'));
     return api('customers?id=eq.'+cust.id,{method:'PATCH',body:{zip:z.trim()}}).then(function(){cust.zip=z.trim()});
   })();
-  ensureZip.then(function(){
+  return ensureZip.then(function(){
     if(curDoc.share_token)return curDoc.share_token;
     var t=hexToken();
     return api('documents?id=eq.'+curDoc.id,{method:'PATCH',body:{share_token:t}}).then(function(){curDoc.share_token=t;
       var d=CACHE.documents.find(function(x){return x.id===curDoc.id});if(d)d.share_token=t;return t});
-  }).then(function(t){
-    var url=portalUrl('a',t);
-    navigator.clipboard.writeText(url).then(function(){toast('Kundenlink kopiert ✓ – Login: PLZ '+cust.zip)})
-      .catch(function(){prompt('Kundenlink (kopieren mit Strg+C):',url)});
+  }).then(function(t){return {url:portalUrl('a',t),cust:cust}});
+}
+function shareDoc(){
+  ensureDocShare().then(function(r){
+    navigator.clipboard.writeText(r.url).then(function(){toast('Kundenlink kopiert ✓ – Login: PLZ '+r.cust.zip)})
+      .catch(function(){prompt('Kundenlink (kopieren mit Strg+C):',r.url)});
+  }).catch(function(e){toast(e.message,1)});
+}
+/* Dokument direkt aus dem Editor per Mail an den Kunden: Portal-Link sicherstellen,
+   passende Vorlage vorbelegen und den vorhandenen Direktversand (openCompose ->
+   api.php/sendmail) nutzen. Erst wenn die Mail wirklich raus ist, wird ein Entwurf
+   auf "versendet" gesetzt - nichts geht ohne Klick auf "Direkt senden" los. */
+function docSendMail(){
+  ensureDocShare().then(function(r){
+    var d=curDoc,cust=r.cust;
+    if(!cust.email){toast('Der Kunde hat keine E-Mail-Adresse – bitte erst am Kunden eintragen.',1);return}
+    var b=(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id})||{};
+    var tpl;
+    if(d.doc_type==='angebot'){
+      tpl=(CACHE.tpls||[]).find(function(t){return /angebots-begleitmail/i.test(t.name)})
+        ||{subject:'Euer Angebot {nummer} ist fertig',body:'Hallo {vorname},\n\neuer Angebot {nummer} ist fertig und wartet hier auf euch:\n{link}\n\nLogin ist eure Postleitzahl. Wenn euch etwas nicht passt: sagt es mir einfach.\n\nViele Grüße\nMarkus'};
+    }else if(d.doc_type==='bestaetigung'){
+      tpl={subject:'Auftragsbestätigung {nummer}',body:'Hallo {vorname},\n\nhier ist eure Auftragsbestätigung {nummer} – damit ist der Termin am {datum} fest bei mir eingetragen:\n{link}\n\nLogin ist eure Postleitzahl. Bei Fragen einfach melden.\n\nViele Grüße\nMarkus'};
+    }else{
+      tpl={subject:docTypeName(d.doc_type)+' {nummer}',body:'Hallo {vorname},\n\nhier ist eure '+docTypeName(d.doc_type)+' {nummer} über {betrag}'+(d.due_date?' (zahlbar bis {faellig})':'')+':\n{link}\n\nLogin ist eure Postleitzahl. Dort könnt ihr das Dokument ansehen und als PDF speichern.\n\nViele Grüße\nMarkus'};
+    }
+    var i={name:custName(cust),email:cust.email,customer_id:cust.id,booking_id:d.booking_id||null,event_date:b.event_date||null,
+      location:b.venue_name||'',event_type:b.event_type||b.title||'',
+      _nummer:d.number,_link:r.url,_betrag:euro(d.total_gross),_faellig:dt(d.due_date),
+      _title:docTypeName(d.doc_type)+' '+esc(d.number)+' per E-Mail',_doc:true};
+    openCompose(i,tpl,null,function(){
+      if(curDoc&&curDoc.id===d.id&&curDoc.status==='entwurf')setDocStatus('versendet');
+    });
   }).catch(function(e){toast(e.message,1)});
 }
 
@@ -6810,9 +6844,12 @@ function fillTpl(text,i){
     '{vorname}':parts[0]||i.name||'','{name}':i.name||'',
     '{datum}':(i.event_date||i._datum)?dt(i.event_date||i._datum):'eurem Wunschtermin',
     '{anlass}':i.event_type||'eurer Feier','{ort}':i.location||'',
-    '{bewertungen}':links||'(Bewertungslinks unter Inhalte → Bewertungen eintragen)'
+    '{bewertungen}':links||'(Bewertungslinks unter Inhalte → Bewertungen eintragen)',
+    /* Dokument-Mails (docSendMail): Portal-Link, Belegnummer, Betrag, Faelligkeit */
+    '{link}':i._link||'','{nummer}':i._nummer||'','{nr}':i._nummer||'',
+    '{betrag}':i._betrag||'','{faellig}':i._faellig||''
   };
-  return (text||'').replace(/\{vorname\}|\{name\}|\{datum\}|\{anlass\}|\{ort\}|\{bewertungen\}/g,function(m){return map[m]});
+  return (text||'').replace(/\{vorname\}|\{name\}|\{datum\}|\{anlass\}|\{ort\}|\{bewertungen\}|\{link\}|\{nummer\}|\{nr\}|\{betrag\}|\{faellig\}/g,function(m){return map[m]});
 }
 function composeReply(inqId){
   var i=CACHE.inquiries.find(function(x){return x.id===inqId});if(!i)return;
@@ -6858,25 +6895,26 @@ function openCompose(i,t,formLink,onSent){
   /* Die Erstantwort-Vorlagen sagen "der Termin ist noch frei". Steht an dem Tag schon
      etwas im Kalender, wäre das eine Falschaussage an den Kunden - deshalb hier
      unübersehbar warnen, statt nur allgemein ans Prüfen zu erinnern. */
-  var konflikt=dateConflicts(i.event_date,i.customer_id);
+  var konflikt=i._doc?[]:dateConflicts(i.event_date,i.customer_id);
   var hinweis=konflikt.length
     ? '<div class="msg err" style="margin-bottom:12px"><b>Achtung: Am '+dt(i.event_date)+' steht schon etwas im Kalender</b>'+
       '<div class="sml" style="margin-top:4px">'+konflikt.map(esc).join('<br>')+'</div>'+
       '<div class="sml" style="margin-top:6px">Die Vorlage behauptet unten, der Termin sei frei. Text anpassen oder die Vorlage „Termin belegt“ nehmen.</div></div>'
     : '';
-  openModal('Antwort an '+esc(i.name)+(i.email?' <span class="mut sml">('+esc(i.email)+')</span>':''),
+  openModal((i._title||'Antwort an '+esc(i.name))+(i.email?' <span class="mut sml">('+esc(i.email)+')</span>':''),
     hinweis+
     '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
     '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+edBtn('rBody')+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
-    (i.email?'<button class="btn" onclick="adminSendMail(\''+jsq(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+jsq(i.customer_id||i.id||'')+'\',function(){composeSent();closeModal()})">Direkt senden</button>':'')+
+    (i.email?'<button class="btn" onclick="adminSendMail(\''+jsq(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+jsq(i.customer_id||i.id||'')+'\',function(){composeSent();closeModal()},\''+jsq(i.booking_id||'')+'\')">Direkt senden</button>':'')+
     '<button class="btn g" onclick="copyReply()">Text kopieren</button>'+
     (i.email?'<button class="btn g" onclick="mailReply(\''+jsq(i.email)+'\')">Im Mail-Programm öffnen</button>':'')+
-    '</div>'+(konflikt.length?'':'<div class="sml mut" style="margin-top:8px">Am '+(i.event_date?dt(i.event_date):'angefragten Termin')+' ist bei dir nichts eingetragen – die Vorlage passt.</div>'));
+    '</div>'+(konflikt.length||i._doc?'':'<div class="sml mut" style="margin-top:8px">Am '+(i.event_date?dt(i.event_date):'angefragten Termin')+' ist bei dir nichts eingetragen – die Vorlage passt.</div>'));
 }
-function adminSendMail(to,subject,body,custId,cb){
+function adminSendMail(to,subject,body,custId,cb,bookingId){
   fetch('api.php/sendmail',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
-    body:JSON.stringify({to:to,subject:subject,body:body,customer_id:custId&&custId.length>30?custId:null})})
+    body:JSON.stringify({to:to,subject:subject,body:body,customer_id:custId&&custId.length>30?custId:null,
+      booking_id:bookingId&&bookingId.length>30?bookingId:null})})
     .then(function(r){return r.json()}).then(function(j){
       if(j.mailed){toast('E-Mail versendet ✓ (in der Timeline protokolliert)');if(cb)cb()}
       else toast(j.error||'Direktversand fehlgeschlagen – Firmen-E-Mail in den Einstellungen prüfen oder „Im Mail-Programm öffnen" nutzen.',1);

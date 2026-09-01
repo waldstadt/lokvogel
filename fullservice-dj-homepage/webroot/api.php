@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 80;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 81;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -235,6 +235,9 @@ function db(): PDO {
 function upgrade(PDO $p): void {
   $v = (int)$p->query('PRAGMA user_version')->fetchColumn();
   if ($v >= SCHEMA_VERSION) return;
+  /* Neue Vorlage "Angebot angenommen – Bestaetigung" fuer bestehende Datenbanken
+     nachziehen (seedExtraTemplates legt nur an, was namentlich noch fehlt). */
+  if ($v < 81) seedExtraTemplates($p);
   if ($v < 80) {
     /* Technik-Check war bisher ein einzelnes JSON-Feld direkt am Kunden - ein Kunde
        konnte also nie mehr als einen Check je gehabt haben. Jetzt eine eigene Tabelle,
@@ -1008,6 +1011,10 @@ function seedExtraTemplates(PDO $p): void {
       "Hallo {vorname},\n\nich hoffe, es ist alles gut angekommen! Mir ist aufgefallen, dass die Rechnung {nr} über {betrag} (fällig am {faellig}) noch offen ist.\n\nBestimmt ist sie nur untergegangen – hier ist der Link zum Ansehen und als PDF:\n{link}\n\nFalls die Zahlung schon unterwegs ist: einfach ignorieren, dann hat sich das überschnitten.\n\nViele Grüße\nMarkus"],
     [91, 'Angebots-Begleitmail', 'Euer Angebot ist fertig',
       "Hallo {vorname},\n\ndanke für das gute Gespräch! Euer Angebot ist fertig und wartet hier auf euch:\n{link}\n\nIhr könnt es direkt online ansehen, Fragen zu einzelnen Positionen stellen oder mit einem Klick annehmen. Login ist eure Postleitzahl.\n\nWenn euch etwas nicht passt: sagt es mir einfach – wir biegen das hin.\n\nViele Grüße\nMarkus"],
+    /* Geht automatisch an den Kunden, sobald er ein Angebot im Portal annimmt - das Portal
+       verspricht ihm an der Stelle ausdruecklich eine Bestaetigung. */
+    [96, 'Angebot angenommen – Bestätigung', 'Angebot {nummer} angenommen – danke!',
+      "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen, damit ist {termin} fest bei mir reserviert.\n\nWie es weitergeht: Ihr bekommt von mir noch die Auftragsbestätigung und ggf. eine Abschlagsrechnung. Alles Weitere (Musikwünsche, Ablauf, Fragen) klären wir dann ganz entspannt bis zum Termin.\n\nEuer Angebot findet ihr jederzeit hier – Login ist eure Postleitzahl:\n{link}\n\nWenn euch vorher etwas einfällt: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
     [92, 'Workshop-Bestätigung (Zahlung eingegangen)', 'Dein Platz ist fix!',
       "Hallo {vorname},\n\ndeine Zahlung ist da – damit ist dein Workshop-Platz verbindlich reserviert!\n\nWann: {datum}\nWo: Lager Hemer, Büttmecker Weg 35c\n\nBring gern dein eigenes Equipment-Problem mit – wir schauen uns echte Fälle an. Getränke gehen auf mich.\n\nBis bald!\nMarkus"],
     /* Absage-Bausteine: Jede Absage soll persönlich klingen und möglichst in eine
@@ -3051,13 +3058,20 @@ function workshopInvoice(PDO $p, string $signupId): array {
     "Bis bald im Workshop!\n" . ($comp['owner'] ?? '') . "\n" . ($comp['name'] ?? '') .
     ($comp['phone'] ?? '' ? "\n" . $comp['phone'] : '');
   $mailed = sendMailSafe((string)$s['email'], "Rechnung $number – dein Workshop-Platz am " . $wDateDe, $bodyTxt);
-  $p->prepare('update documents set status = ?, sent_at = ? where id = ?')
-    ->execute([$mailed ? 'versendet' : 'entwurf', $mailed ? now() : null, $docId]);
-  $p->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, created_at)
-      values (?,?,?,?,?,?,?,?)')
+  /* Die Rechnung ist ausgestellt, sobald sie hier steht: Nummer ist vergeben, der Kunde hat
+     "Rechnung ist unterwegs" gelesen. Ein Mailfehler ist ein Zustellproblem, kein Grund,
+     sie als Entwurf zu verstecken - als Entwurf fehlte sie im Portal, in "Offene Rechnungen"
+     und im Mahnwesen und wurde schlicht vergessen. Deshalb immer 'versendet'; bei Mailfehler
+     eine Wiedervorlage auf heute, damit sie im Dashboard unter "Wiedervorlagen" auftaucht -
+     nachsenden geht im Dokument ueber "Per E-Mail senden". */
+  $p->prepare('update documents set status = ?, sent_at = ? where id = ?')->execute(['versendet', now(), $docId]);
+  $p->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
+      values (?,?,?,?,?,?,?,?,?)')
     ->execute([uuid(), $cid, $mailed ? 'email' : 'note', 'out',
-      'Workshop-Rechnung ' . $number . ($mailed ? ' automatisch versendet' : ' erstellt (Mailversand fehlgeschlagen – bitte manuell senden)'),
-      'Workshop: ' . $dTitle . ' · ' . $seats . ' Platz/Plätze · ' . number_format($gross, 2, ',', '.') . " €\nPortal-Link: $portal", now(), now()]);
+      'Workshop-Rechnung ' . $number . ($mailed ? ' automatisch versendet' : ' nicht zugestellt – bitte per E-Mail nachsenden'),
+      'Workshop: ' . $dTitle . ' · ' . $seats . ' Platz/Plätze · ' . number_format($gross, 2, ',', '.') . " €\nPortal-Link: $portal" .
+      ($mailed ? '' : "\n\nDer automatische Mailversand an " . $s['email'] . " ist fehlgeschlagen. Die Rechnung steht als 'versendet' im System (Nummer vergeben, Kunde informiert) – bitte im Dokument über „Per E-Mail senden“ nachschicken."),
+      now(), $mailed ? null : gmdate('Y-m-d'), now()]);
   return ['ok' => true, 'number' => $number, 'mailed' => $mailed, 'portal' => $portal];
 }
 
@@ -3067,6 +3081,54 @@ function notifyOwner(string $subject, string $body): bool {
   $to = trim((string)($comp['email'] ?? ''));
   if ($to === '') return false;
   return sendMailSafe($to, $subject, $body . "\n\n– automatische Benachrichtigung deines Backoffice\n" . baseUrl() . "/admin.html");
+}
+
+/* Bestaetigungsmail an den Kunden nach Annahme im Portal. Das Portal verspricht an der
+   Stelle "ihr bekommt eine Bestaetigung" - bisher ging nur die Nachricht an Markus.
+   Text kommt aus der Vorlage "Angebot angenommen – Bestätigung" (unter Vorlagen
+   anpassbar), ohne Vorlage greift ein eingebauter Text. Schlaegt der Versand fehl,
+   scheitert die Annahme nicht - Markus bekommt eine Timeline-Notiz und einen Hinweis
+   in seiner Benachrichtigung. Rueckgabe: true = raus, false = nicht zustellbar. */
+function acceptConfirmationMail(PDO $p, array $d): bool {
+  try {
+    $cst = $p->prepare('select email, first_name, last_name, company from customers where id = ?');
+    $cst->execute([$d['customer_id']]);
+    $c = $cst->fetch() ?: [];
+    $to = trim((string)($c['email'] ?? ''));
+    $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+    $link = baseUrl() . '/portal.html?a=' . $d['share_token'];
+    $termin = 'euer Termin';
+    if (!empty($d['booking_id'])) {
+      $bst = $p->prepare('select event_date, venue_name from bookings where id = ?');
+      $bst->execute([$d['booking_id']]);
+      if ($b = $bst->fetch()) {
+        if (!empty($b['event_date'])) $termin = 'der ' . date('d.m.Y', strtotime((string)$b['event_date']));
+        if (!empty($b['venue_name'])) $termin .= ($termin === 'euer Termin' ? ' in ' : ' – ') . $b['venue_name'];
+      }
+    }
+    $vorname = trim((string)($c['first_name'] ?? '')) ?: (trim((string)($c['company'] ?? '')) ?: 'zusammen');
+    $name = trim((string)($c['company'] ?? '')) ?: trim(($c['first_name'] ?? '') . ' ' . ($c['last_name'] ?? ''));
+    $map = ['{vorname}' => $vorname, '{name}' => $name, '{nummer}' => (string)$d['number'], '{nr}' => (string)$d['number'],
+      '{termin}' => $termin, '{link}' => $link, '{telefon}' => (string)($comp['phone'] ?? ''),
+      '{betrag}' => number_format((float)$d['total_gross'], 2, ',', '.') . ' €'];
+    $tst = $p->prepare('select subject, body from email_templates where name = ? limit 1');
+    $tst->execute(['Angebot angenommen – Bestätigung']);
+    $tpl = $tst->fetch();
+    $subject = $tpl ? (string)$tpl['subject'] : 'Angebot {nummer} angenommen – danke!';
+    $body = $tpl ? (string)$tpl['body'] :
+      "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen, damit ist {termin} fest bei mir reserviert.\n\nWie es weitergeht: Ihr bekommt von mir noch die Auftragsbestätigung und ggf. eine Abschlagsrechnung.\n\nEuer Angebot findet ihr jederzeit hier – Login ist eure Postleitzahl:\n{link}\n\nBei Fragen: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus";
+    $subject = strtr($subject, $map);
+    $body = strtr($body, $map);
+    $mailed = $to !== '' && sendMailSafe($to, $subject, $body);
+    $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
+        values (?,?,?,?,?,?,?,?,?,?)')
+      ->execute([uuid(), $d['customer_id'], $d['booking_id'] ?: null, $mailed ? 'email' : 'note', 'out',
+        $mailed ? $subject : 'Bestätigungsmail konnte nicht versendet werden – ' . $d['number'],
+        $mailed ? $body : "Der Kunde hat das Angebot " . $d['number'] . " im Portal angenommen, die automatische Bestätigung an " .
+          ($to !== '' ? $to : '(keine E-Mail-Adresse hinterlegt)') . " ist aber nicht rausgegangen. Bitte selbst bestätigen.\n\nVorgesehener Text:\n" . $body,
+        now(), $mailed ? null : gmdate('Y-m-d'), now()]);
+    return $mailed;
+  } catch (Throwable $e) { return false; }
 }
 
 /* ---------- Kalender-Feeds (iCal) ---------- */
@@ -3611,6 +3673,7 @@ function handlePortal(string $path, string $method, $body): never {
     }
     /* Annehmen/Ablehnen gibt es nur beim Angebot. Eine Rechnung ist keine Entscheidung,
        die der Kunde trifft - und sie ist ab "versendet" auch buchhalterisch festgeschrieben. */
+    $bestMail = null;   /* null = keine Bestaetigungsmail faellig, sonst true/false */
     if (in_array($kind, ['accept','decline'], true)) {
       if (($d['doc_type'] ?? '') !== 'angebot')
         fail('Das ist eine Rechnung – die kann man nicht annehmen oder ablehnen. Bei Fragen dazu schreib mir einfach über „Frage stellen“.', 409);
@@ -3628,6 +3691,7 @@ function handlePortal(string $path, string $method, $body): never {
       docAudit($p, $d['id'], 'angenommen', $d['number'] . ' – vom Kunden angenommen' . ($accName ? ' und unterschrieben: ' . $accName : '') . ' (Portal)');
       try { maybeAutoTechCheck($p, $d['id']); } catch (Throwable $e) {}
       syncBookingFromDoc($p, $d, 'angenommen');
+      $bestMail = acceptConfirmationMail($p, $d);
     }
     if ($kind === 'decline' && $d['status'] !== 'storniert') {
       $p->prepare("update documents set status='abgelehnt', updated_at=? where id=?")->execute([now(), $d['id']]);
@@ -3640,7 +3704,9 @@ function handlePortal(string $path, string $method, $body): never {
     notifyOwner($labels[$kind] . ': ' . $d['number'],
       'Kunde: ' . trim(($d['company'] ?: $d['first_name'] . ' ' . $d['last_name'])) .
       "\nDokument: " . $d['number'] . ' über ' . number_format((float)$d['total_gross'], 2, ',', '.') . ' €' .
-      ($msg !== '' ? "\n\nNachricht:\n$msg" : '') . ($phone !== '' ? "\nTelefon: $phone" : ''));
+      ($msg !== '' ? "\n\nNachricht:\n$msg" : '') . ($phone !== '' ? "\nTelefon: $phone" : '') .
+      ($bestMail === false ? "\n\nACHTUNG: Die Bestätigungsmail an den Kunden konnte nicht versendet werden – bitte selbst bestätigen (Timeline-Notiz vorhanden)." : '') .
+      ($bestMail === true ? "\n\nBestätigungsmail an den Kunden ist raus." : ''));
     out(['ok' => true], 201);
   }
   if (preg_match('#^portal/form/([a-f0-9]+)$#', $path, $m)) {
@@ -3799,7 +3865,7 @@ function handlePortal(string $path, string $method, $body): never {
         "Hallo " . (preg_split('/\s+/', $name, 2)[0] ?? $name) . ",\n\ndanke für dein Interesse am Workshop „" . $w['title'] . "“ am " . $w['event_date'] . "!\n\nDer Termin ist aktuell voll – du stehst jetzt auf der Warteliste. Sobald ein Platz frei wird, melde ich mich sofort persönlich bei dir. Bezahlt wird erst, wenn du wirklich einen Platz hast.\n\nBis hoffentlich bald!\nMarkus");
     notifyOwner(($status === 'warteliste' ? 'Warteliste' : 'Workshop-Buchung') . ': ' . $w['title'],
       "Name: $name ($seats Platz/Plätze)\nE-Mail: $email\nTermin: " . $w['event_date'] .
-      ($inv ? "\nRechnung: " . $inv['number'] . ($inv['mailed'] ? ' (automatisch gemailt)' : ' (Mailversand prüfen!)') : ''));
+      ($inv ? "\nRechnung: " . $inv['number'] . ($inv['mailed'] ? ' (automatisch gemailt)' : ' (Mail NICHT zugestellt – im Dokument per E-Mail nachsenden)') : ''));
     out(['ok' => true, 'status' => $status, 'invoice' => $inv,
       'free' => max(0, $free - ($status === 'angemeldet' ? $seats : 0))], 201);
   }
@@ -4545,9 +4611,10 @@ try {
     if ($to === '' || $subject === '' || trim($text) === '') fail('Empfänger, Betreff und Text erforderlich.');
     $mailed = sendMailSafe($to, $subject, $text);
     if ($mailed && !empty($body['customer_id'])) {
-      db()->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, created_at)
-          values (?,?,?,?,?,?,?,?)')
-        ->execute([uuid(), (string)$body['customer_id'], 'email', 'out', $subject, $text, now(), now()]);
+      db()->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, created_at)
+          values (?,?,?,?,?,?,?,?,?)')
+        ->execute([uuid(), (string)$body['customer_id'], !empty($body['booking_id']) ? (string)$body['booking_id'] : null,
+          'email', 'out', $subject, $text, now(), now()]);
     }
     out(['mailed' => $mailed]);
   }
