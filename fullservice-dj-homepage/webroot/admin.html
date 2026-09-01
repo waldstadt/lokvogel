@@ -2652,6 +2652,8 @@ function renderStatusBtns(){
     btns+='<button class="btn g sm" onclick="docToInvoice(\'abschlag\')">→ Abschlag</button> <button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button>';
   if(d.doc_type==='abschlag'&&d.status==='bezahlt')
     btns+='<button class="btn g sm" onclick="docToInvoice(\'schluss\')">→ Schlussrechnung</button>';
+  if(d.doc_type==='lieferschein')
+    btns+='<button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button>';
   if((d.doc_type==='rechnung'||d.doc_type==='schluss')&&['versendet','ueberfaellig','bezahlt'].indexOf(d.status)>=0)
     btns+='<button class="btn sm" onclick="docToInvoice(\'gutschrift\')">→ Gutschrift</button>';
   if(istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
@@ -3469,6 +3471,19 @@ function docToInvoice(type){
       else api('document_items?document_id=eq.'+basisDoc.id+'&order=pos')
         .then(function(r){fertig(r||[],basisDoc)})
         .catch(function(){fertig(items,src)});
+    }else if(src.doc_type==='lieferschein'){
+      /* Lieferschein-Positionen stehen mit unit_price:0 im Beleg (reine Mengen-
+         Dokumentation). Beim Wandeln in eine Rechnung erst die tatsaechlich fuer
+         diese Buchung gebuchten Preise nachladen (beruecksichtigt Partner-Rabatt/
+         Miettage), sonst den aktuellen Katalogpreis. */
+      var lsBook=src.booking_id?CACHE.bookings.find(function(b){return b.id===src.booking_id}):null;
+      var lsPriced=lsBook?bookEquipList(lsBook):[];
+      curItems=copyItems(items.map(function(it){
+        var match=lsPriced.find(function(p){return p.name===it.description});
+        var unit=match?(Number(match.price)/(Number(it.qty)||1)):0;
+        if(!unit){var cat=catalogFind(it.description);if(cat)unit=Number(cat.price)||0;}
+        return Object.assign({},it,{unit_price:unit});
+      }));
     }else if(type==='gutschrift'){
       /* Positionen mit umgekehrtem Vorzeichen uebernehmen - Markus kuerzt sie danach auf
          das, was tatsaechlich gutgeschrieben wird. Rabatt/Pauschalpreis bewusst NICHT
