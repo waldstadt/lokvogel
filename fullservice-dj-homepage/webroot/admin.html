@@ -293,7 +293,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <div class="grp">Vertrieb</div>
       <a data-pg="inq"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Anfragen <span class="cnt-b" id="inqBadge" style="display:none">0</span></a>
       <a data-pg="cust"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Kunden</a>
-      <a data-pg="book"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Buchungen</a>
+      <a data-pg="book"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Gigs</a>
       <a data-pg="tpl"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Vorlagen</a>
       <a data-pg="forms"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>Fragebögen</a>
       <div class="grp">Finanzen</div>
@@ -376,14 +376,14 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 
   <!-- BUCHUNGEN -->
   <div class="pg" id="pg-book">
-    <div class="phead"><div><div class="pt">Buchungen</div><div class="ps">Aufträge &amp; Kalender</div></div>
+    <div class="phead"><div><div class="pt">Gigs</div><div class="ps">Alle Gigs &amp; Kalender</div></div>
       <div><button class="btn g sm" onclick="calShift(-1)">‹</button> <span id="calTitle" style="font-weight:700;margin:0 6px"></span> <button class="btn g sm" onclick="calShift(1)">›</button>
       &nbsp;<button class="btn g" onclick="openBlockModal()">+ Blocken</button>
-      &nbsp;<button class="btn" onclick="openBookModal()">+ Neue Buchung</button></div></div>
+      &nbsp;<button class="btn" onclick="openBookModal()">+ Neuer Gig</button></div></div>
     <div class="card"><div class="cal" id="calGrid"></div>
       <div class="cal-legend" id="calLayers"></div>
     </div>
-    <div class="tbl-wrap card"><table><thead><tr><th>Datum</th><th>Titel / Kunde</th><th>Art</th><th>Location</th><th class="num">Auftragswert</th><th>Status</th></tr></thead><tbody id="bookRows"></tbody></table></div>
+    <div class="tbl-wrap card"><table><thead><tr><th>Datum</th><th>Titel / Kunde</th><th>Art</th><th>Location</th><th class="num">Gig-Wert</th><th>Status</th></tr></thead><tbody id="bookRows"></tbody></table></div>
   </div>
 
   <!-- BUCHUNG-DETAIL -->
@@ -398,7 +398,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <a onclick="closeBookMenu();openDigitalRental()">Mietvertrag digital</a>
           <a onclick="closeBookMenu();printMietvertrag()">Mietvertrag (Papier) drucken</a>
           <a onclick="closeBookMenu();printPackliste()">Packliste drucken</a>
-          <a class="r" onclick="closeBookMenu();openStornoModal()">Buchung stornieren</a>
+          <a class="r" onclick="closeBookMenu();openStornoModal()">Gig stornieren</a>
         </div>
       </div></div>
     <div class="grid2" style="gap:16px;align-items:start">
@@ -411,7 +411,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <div id="bdPlanChanges" class="sml" style="margin-top:10px"></div></div>
     <div class="card"><h3>Rider <span style="float:right"><a class="sml" onclick="printRider()">Drucken</a> <a class="sml" onclick="openRiderModal()">Öffnen</a></span></h3>
       <div id="bdRider" class="sml mut">–</div></div>
-    <div class="card"><h3>Dokumente dieser Buchung <button class="btn sm" style="float:right" onclick="newDocForBooking()">+ Neues Dokument</button></h3><div id="bdDocs" class="sml mut">–</div></div>
+    <div class="card"><h3>Dokumente dieses Gigs <button class="btn sm" style="float:right" onclick="newDocForBooking()">+ Neues Dokument</button></h3><div id="bdDocs" class="sml mut">–</div></div>
   </div>
 
   <!-- E-MAIL-VORLAGEN -->
@@ -481,7 +481,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <div id="docTplNameWrap" style="display:none"><label>Name der Vorlage *</label><input id="docTplName" placeholder="z. B. Hochzeit Standard"></div>
       <div class="grid4" id="docHeadGrid">
         <div><label>Kunde *</label><select id="docCust"></select></div>
-        <div><label>Buchung</label><select id="docBook"><option value="">–</option></select></div>
+        <div><label>Gig</label><select id="docBook"><option value="">–</option></select></div>
         <div><label>Datum</label><input type="date" id="docDate"></div>
         <div><label id="docDateLbl2">Fällig / gültig bis</label><input type="date" id="docDate2"></div>
       </div>
@@ -494,7 +494,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:normal;cursor:pointer;margin:0">
           <input type="checkbox" id="evShow" style="width:auto" onchange="renderEventHint()">
           <b style="color:var(--wh)">Eckdaten der Veranstaltung auf dem Beleg anzeigen</b></label>
-        <div class="mut sml" style="margin:6px 0 10px">Erscheint als kurze Infozeile unter der Belegnummer – im Ausdruck und in der Kundenansicht. Ist eine Buchung verknüpft, übernehme ich die Angaben von dort, du kannst sie aber jederzeit überschreiben: auf dem Beleg steht dann das, was ihr vereinbart habt.</div>
+        <div class="mut sml" style="margin:6px 0 10px">Erscheint als kurze Infozeile unter der Belegnummer – im Ausdruck und in der Kundenansicht. Ist ein Gig verknüpft, übernehme ich die Angaben von dort, du kannst sie aber jederzeit überschreiben: auf dem Beleg steht dann das, was ihr vereinbart habt.</div>
         <div class="grid4">
           <div><label>Art</label><select id="evKind"><option value="">–</option>
             <option value="dj">DJ</option><option value="technik">Technikvermietung</option>
@@ -548,7 +548,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <div class="tiles" id="statTiles"></div>
     <div class="card"><h3>Umsatz pro Monat (bezahlte Rechnungen, brutto)</h3><div id="statMonths"></div></div>
     <div class="grid2" style="gap:16px">
-      <div class="card"><h3>Aufträge nach Anlass</h3><div id="statTypes" class="sml"></div></div>
+      <div class="card"><h3>Gigs nach Anlass</h3><div id="statTypes" class="sml"></div></div>
       <div class="card"><h3>Anfrage-Quellen</h3><div id="statSources" class="sml"></div></div>
     </div>
     <div class="card"><h3>Website-Besucher <span class="mut sml" style="font-weight:400">(anonym gezählt – ohne Cookies, ohne IP-Speicherung)</span>
@@ -938,14 +938,14 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div class="card"><h3>Mietvertrag – Vertragsbedingungen</h3>
           <textarea id="sRental" style="min-height:160px;font-size:11px"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('sRental')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
-          <div class="mut sml" style="margin-top:6px">Erscheint auf jedem gedruckten Mietvertrag (Buchungs-Detail → „ Mietvertrag“). Vor Livegang anwaltlich prüfen lassen.</div>
+          <div class="mut sml" style="margin-top:6px">Erscheint auf jedem gedruckten Mietvertrag (Gig-Detail → „ Mietvertrag“). Vor Livegang anwaltlich prüfen lassen.</div>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveRental()">Speichern</button></div>
         </div>
     <div class="sec-label">Kalender &amp; Werkzeuge</div>
         <div class="card"><h3>Kalender-Abo (iCal) <span class="mut sml" style="font-weight:400">– Termine automatisch im Handy-/PC-Kalender</span></h3>
           <div class="sml mut" style="margin-bottom:8px">Diese URLs einmal als „Kalender abonnieren" ins Handy oder in Google/Apple/Outlook eintragen – drei Kalender in eigenen Farben, aktualisieren sich selbst. Nicht weitergeben (enthalten Kundendaten).</div>
           <label>Anfragen &amp; offene Angebote (vorläufig)</label><input id="icAnfragen"readonly onclick="this.select()" style="font-size:11px">
-          <label>Feste DJ-Buchungen</label><input id="icBuchungen"readonly onclick="this.select()" style="font-size:11px">
+          <label>Feste DJ-Gigs</label><input id="icBuchungen"readonly onclick="this.select()" style="font-size:11px">
           <label>Technikvermietung</label><input id="icTechnik"readonly onclick="this.select()" style="font-size:11px">
         </div>
         <div class="card"><h3>Packliste – Standard-Ausrüstung</h3>
@@ -953,7 +953,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
             <div><label>Immer dabei (eine Zeile je Position)</label><textarea id="pkAlways" style="min-height:110px;font-size:11px"></textarea></div>
             <div><label>Zusätzlich bei DJ-Auftritten</label><textarea id="pkDj" style="min-height:110px;font-size:11px"></textarea></div>
           </div>
-          <div class="mut sml" style="margin:6px 0">Erscheint auf jeder Packliste (Buchungs-Detail → „ Packliste") zusätzlich zur zugeordneten Technik des Auftrags.</div>
+          <div class="mut sml" style="margin:6px 0">Erscheint auf jeder Packliste (Gig-Detail → „ Packliste") zusätzlich zur zugeordneten Technik des Gigs.</div>
           <button class="btn sm" onclick="savePacking()">Speichern</button>
         </div>
     <div class="sec-label">System</div>
@@ -1329,7 +1329,7 @@ function renderDash(){
   var offeneInq=CACHE.inquiries.filter(function(i){return i.status==='neu'}).length;
   badge.style.display=offeneInq?'':'none';badge.textContent=offeneInq;
   document.getElementById('dashNext').innerHTML=upcoming.slice(0,6).map(function(b){
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Auftrag')+'</a> <span class="mut">'+esc(custName(b.customers))+'</span></div>';
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Gig')+'</a> <span class="mut">'+esc(custName(b.customers))+'</span></div>';
   }).join('')||'Keine anstehenden Termine.';
   var fups=CACHE.comms.filter(function(c){return c.followup_at&&!c.followup_done&&c.followup_at<=today});
   document.getElementById('dashFollow').innerHTML=fups.slice(0,6).map(function(c){
@@ -1368,7 +1368,7 @@ function renderDash(){
     return b.event_date<today&&!b.review_requested&&['gebucht','abgeschlossen'].indexOf(b.status)>=0;
   }).sort(function(a,b){return a.event_date<b.event_date?1:-1});
   document.getElementById('dashReviews').innerHTML=pastNoRev.slice(0,6).map(function(b){
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(b.title||b.event_type||'Auftrag')+' <span class="mut">'+dt(b.event_date)+' · '+esc(custName(b.customers))+'</span> '+
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(b.title||b.event_type||'Gig')+' <span class="mut">'+dt(b.event_date)+' · '+esc(custName(b.customers))+'</span> '+
     '<button class="btn sm" style="float:right" onclick="composeReviewMail(\''+b.id+'\')">Danke &amp; Bewertung</button></div>';
   }).join('')||'Alle vergangenen Feiern sind angeschrieben.';
   document.getElementById('dashMissing').innerHTML=computeMissingInfo().map(function(m){
@@ -1514,7 +1514,7 @@ function openCustDetail(id){
   var books=CACHE.bookings.filter(function(b){return b.customer_id===id})
     .sort(function(a,b){return a.event_date<b.event_date?1:-1});
   document.getElementById('cdBookings').innerHTML=books.map(function(b){
-    return '<div style="padding:4px 0"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Auftrag')+'</a> <span class="b '+bookBadge(b.status)+'">'+b.status+'</span></div>';
+    return '<div style="padding:4px 0"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Gig')+'</a> <span class="b '+bookBadge(b.status)+'">'+b.status+'</span></div>';
   }).join('')||'Noch keine – die erste entsteht, sobald du ein Angebot mit Datum speicherst.';
   document.getElementById('cdPlan').innerHTML=books.length?books.map(function(b){
     var pl=planOf(b),gefuellt=Object.keys(pl).length>0;
@@ -1618,7 +1618,7 @@ function saveCust(id){
     .catch(function(e){toast(e.message,1)});
 }
 function delCust(id){
-  if(!confirm('Kunden inkl. Timeline und Buchungen wirklich löschen? (Dokumente bleiben erhalten, wenn vorhanden – dann schlägt das Löschen fehl.)'))return;
+  if(!confirm('Kunden inkl. Timeline und Gigs wirklich löschen? (Dokumente bleiben erhalten, wenn vorhanden – dann schlägt das Löschen fehl.)'))return;
   api('customers?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();showPage('cust');loadAll()})
     .catch(function(){toast('Nicht möglich – es existieren Dokumente zu diesem Kunden.',1)});
 }
@@ -1631,11 +1631,11 @@ function renderBook(){
   var rows=CACHE.bookings.slice().sort(function(a,b){return a.event_date<b.event_date?1:-1});
   document.getElementById('bookRows').innerHTML=applySort(rows,'bookings').map(function(b){
     return '<tr class="click" onclick="openBookDetail(\''+b.id+'\')"><td>'+dt(b.event_date)+(b.end_date?' – '+dt(b.end_date):'')+'</td>'+
-    '<td><b>'+esc(b.title||b.event_type||'Auftrag')+'</b><br><span class="mut sml">'+esc(custName(b.customers))+'</span></td>'+
+    '<td><b>'+esc(b.title||b.event_type||'Gig')+'</b><br><span class="mut sml">'+esc(custName(b.customers))+'</span></td>'+
     '<td>'+({dj:'DJ',technik:'Technik',dj_technik:'DJ + Technik'}[b.kind]||b.kind)+'</td>'+
     '<td>'+esc(b.venue_name||'–')+'</td><td class="num">'+(bookingValue(b)?euro(bookingValue(b)):'–')+'</td>'+
     '<td><span class="b '+bookBadge(b.status)+'">'+b.status+'</span></td></tr>';
-  }).join('')||'<tr><td colspan="6" class="mut">Noch keine Buchungen.</td></tr>';
+  }).join('')||'<tr><td colspan="6" class="mut">Noch keine Gigs.</td></tr>';
 }
 /* Erst auf den Monatsersten setzen: sonst wird aus dem 31. August beim Weiterblaettern
    der 31. September, den es nicht gibt - und der Kalender springt auf Oktober. */
@@ -1739,14 +1739,14 @@ function reloadBlocks(){
 function openBookDetail(id){
   curBook=CACHE.bookings.find(function(b){return b.id===id});if(!curBook)return;
   var b=curBook;
-  document.getElementById('bdCrumb').innerHTML='<a onclick="showPage(\'book\')">Buchungen</a> · '+
-    '<a onclick="openCustDetail(\''+b.customer_id+'\')">'+esc(custName(b.customers))+'</a> › Buchung vom '+dt(b.event_date);
-  document.getElementById('bdTitle').textContent=b.title||b.event_type||'Auftrag';
+  document.getElementById('bdCrumb').innerHTML='<a onclick="showPage(\'book\')">Gigs</a> · '+
+    '<a onclick="openCustDetail(\''+b.customer_id+'\')">'+esc(custName(b.customers))+'</a> › Gig vom '+dt(b.event_date);
+  document.getElementById('bdTitle').textContent=b.title||b.event_type||'Gig';
   document.getElementById('bdSub').innerHTML=dt(b.event_date)+(b.end_date?' – '+dt(b.end_date):'')+' · <span class="b '+bookBadge(b.status)+'">'+b.status+'</span>';
   document.getElementById('bdData').innerHTML=
     row('Anlass',b.event_type)+row('Zeit',[b.start_time,b.end_time].filter(Boolean).join(' – '))+
     row('Location',b.venue_name)+row('Adresse',b.venue_address)+row('Gäste',b.guests)+
-    row('Auftragswert',bookingValue(b)?euro(bookingValue(b)):'')+row('Notizen',b.notes)+
+    row('Gig-Wert',bookingValue(b)?euro(bookingValue(b)):'')+row('Notizen',b.notes)+
     (b.customer_notes&&(b.customer_notes.schedule||b.customer_notes.music||b.customer_notes.agreements)
       ?'<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b style="color:var(--acc)">Vom Kunden gepflegt'+(b.customer_notes.updated_at?' ('+dt(b.customer_notes.updated_at)+')':'')+':</b>'+
        row('Programmablauf',b.customer_notes.schedule)+row('Musikwünsche',b.customer_notes.music)+row('Vereinbarungen',b.customer_notes.agreements)+'</div>':'');
@@ -2013,7 +2013,7 @@ function openBeModal(){
 function saveBe(){
   var eqId=v('beEq'),qty=Number(v('beQty'))||1;
   var av=eqAvailable(eqId,curBook);
-  if(qty>av&&!confirm('Achtung: Nur '+av+' Stück im Zeitraum verfügbar (Konflikt mit anderer Buchung). Trotzdem zuordnen?'))return;
+  if(qty>av&&!confirm('Achtung: Nur '+av+' Stück im Zeitraum verfügbar (Konflikt mit anderem Gig). Trotzdem zuordnen?'))return;
   api('booking_equipment',{method:'POST',body:{booking_id:curBook.id,equipment_id:eqId,qty:qty,
     price_override:v('bePrice')?Number(v('bePrice')):null,notes:v('beNote')}})
     .then(function(){closeModal();toast('Zugeordnet ✓');
@@ -2048,7 +2048,7 @@ function presetDocCust(custId){
 function openBookModal(b,presetCust){
   b=b||{};
   var custOpts=CACHE.customers.map(function(c){return '<option value="'+c.id+'"'+((b.customer_id||presetCust)===c.id?' selected':'')+'>'+esc(custName(c))+'</option>'}).join('');
-  openModal(b.id?'Buchung bearbeiten':'Neue Buchung',
+  openModal(b.id?'Gig bearbeiten':'Neuer Gig',
     '<label>Kunde *</label><select id="bCust">'+custOpts+'</select>'+
     '<div class="grid3"><div><label>Status</label><select id="bStatus"><option>anfrage</option><option>angebot</option><option>gebucht</option><option>abgeschlossen</option><option>storniert</option></select></div>'+
     '<div><label>Art</label><select id="bKind"><option value="dj">DJ</option><option value="technik">Technikverleih</option><option value="dj_technik">DJ + Technik</option></select></div>'+
@@ -2098,7 +2098,7 @@ function saveBook(id){
     .then(function(){closeModal();toast('Gespeichert ✓');loadAll();if(id)setTimeout(function(){openBookDetail(id)},400)})
     .catch(function(e){toast(e.message,1)});
 }
-function delBook(id){if(!confirm('Buchung löschen?'))return;
+function delBook(id){if(!confirm('Gig löschen?'))return;
   api('bookings?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();showPage('book');loadAll()}).catch(function(e){toast(e.message,1)})}
 
 /* ===== Rider / Einsatzblatt ===== */
@@ -2200,7 +2200,7 @@ function printRider(){
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
   '<div style="font-size:18px;font-weight:700">Einsatzblatt / Rider</div>'+
-  '<div style="color:#777;margin-bottom:16px">'+esc(b.title||b.event_type||'Auftrag')+' · '+dt(b.event_date)+(b.start_time?' · '+b.start_time.slice(0,5)+(b.end_time?'–'+b.end_time.slice(0,5):'')+' Uhr':'')+'</div>'+
+  '<div style="color:#777;margin-bottom:16px">'+esc(b.title||b.event_type||'Gig')+' · '+dt(b.event_date)+(b.start_time?' · '+b.start_time.slice(0,5)+(b.end_time?'–'+b.end_time.slice(0,5):'')+' Uhr':'')+'</div>'+
   '<table style="width:100%;border-collapse:collapse">'+
   pr('Kunde',custName(cust)+(cust.phone?' · '+cust.phone:''))+
   pr('Personen / Gäste',r.guests)+
@@ -2492,7 +2492,7 @@ function printEventPlan(){
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
   '<div style="font-size:18px;font-weight:700">Veranstaltungsplaner – Handout</div>'+
   '<div style="color:#777;margin-bottom:4px">Für den Notfall gedacht: falls ein Kollege einspringen muss, steht hier alles Wichtige zu diesem Job.</div>'+
-  '<div style="color:#777;margin-bottom:16px">'+esc(b.title||b.event_type||'Auftrag')+' · '+dt(b.event_date)+'</div>'+
+  '<div style="color:#777;margin-bottom:16px">'+esc(b.title||b.event_type||'Gig')+' · '+dt(b.event_date)+'</div>'+
   '<table style="width:100%;border-collapse:collapse">'+
   pr('Kunde',custName(cust)+(cust.phone?' · '+cust.phone:''))+
   pr('Partner/in',bas.partner_name)+pr('Anlass',bas.occasion)+
@@ -2673,7 +2673,7 @@ function refreshBookOpts(){
   var custId=document.getElementById('docCust').value;
   var books=CACHE.bookings.filter(function(b){return !custId||b.customer_id===custId});
   document.getElementById('docBook').innerHTML='<option value="">–</option>'+books.map(function(b){
-    return '<option value="'+b.id+'">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Auftrag')+'</option>'}).join('');
+    return '<option value="'+b.id+'">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Gig')+'</option>'}).join('');
 }
 document.getElementById('docCust').addEventListener('change',docCustChanged);
 document.getElementById('docType').addEventListener('change',function(){updateDocTypeUI(this.value)});
@@ -3329,7 +3329,7 @@ function renderDocExtraBtns(){
   var b=(CACHE.bookings||[]).find(function(x){return x.id===v('docBook')});
   var hatTechnik=b&&(CACHE.be||[]).some(function(x){return x.booking_id===b.id});
   var rd=b?riderOf(b):{},hatWeg=!!(rd&&rd.distance_km);
-  el.innerHTML=(hatTechnik?'<button class="btn g sm" onclick="addBookingEquip()">+ Technik aus der Buchung</button> ':'')+
+  el.innerHTML=(hatTechnik?'<button class="btn g sm" onclick="addBookingEquip()">+ Technik aus dem Gig</button> ':'')+
     (hatWeg?'<button class="btn g sm" onclick="addBookingTravel()">+ Anfahrt</button>':'');
 }
 function addBookingEquip(){
@@ -3347,12 +3347,12 @@ function addBookingEquip(){
     n++;
   });
   renderItems();renderTotals();
-  toast(n?(n+' Artikel aus der Buchung übernommen ✓ – Preise wie immer frei änderbar'):'Der Buchung ist keine Technik zugeordnet.',n?0:1);
+  toast(n?(n+' Artikel aus dem Gig übernommen ✓ – Preise wie immer frei änderbar'):'Dem Gig ist keine Technik zugeordnet.',n?0:1);
 }
 function addBookingTravel(){
   var b=(CACHE.bookings||[]).find(function(x){return x.id===v('docBook')});if(!b)return;
   var rd=riderOf(b),tc=rd.distance_km?travelCost(rd.distance_km):0;
-  if(!tc){toast('Im Rider der Buchung steht keine Strecke.',1);return}
+  if(!tc){toast('Im Rider des Gigs steht keine Strecke.',1);return}
   curItems.push({pos:curItems.length+1,description:'Anfahrt ('+rd.distance_km+' km einfache Strecke)',
     note:(travelFreeMode()==='schwelle'?'Ab '+travelFree()+' km Freigrenze wird die volle Strecke berechnet.':travelFree()+' Freikilometer bereits abgezogen.')+(travelRoundtrip()?' Hin- und Rückweg.':' Einfache Strecke.'),
     qty:1,unit:'pausch.',unit_price:tc});
@@ -3408,7 +3408,7 @@ function stornoMode(){
 function openStornoModal(){
   var b=curBook;if(!b)return;
   var today=new Date().toISOString().slice(0,10);
-  openModal('Storno abwickeln – '+esc(b.title||b.event_type||'Auftrag'),
+  openModal('Storno abwickeln – '+esc(b.title||b.event_type||'Gig'),
     '<div class="grid2"><div><label>Eingang der Absage</label><input type="date" id="stEingang" value="'+today+'" onchange="stornoRecalc()"></div>'+
     '<div><label>Vereinbarte Vergütung brutto (€)</label><input type="number" step="0.01" id="stBase" value="'+bookingBaseNet(b)+'" oninput="stornoRecalc()"></div></div>'+
     '<div class="sml mut" id="stInfo" style="margin:4px 0 10px"></div>'+
@@ -3429,8 +3429,8 @@ function openStornoModal(){
     '<div id="grpErsatz" style="display:none"><div class="grid2">'+
     '<div><label>Neuer Termin</label><input type="date" id="stNeu"></div>'+
     '<div><label>Umbuchungspauschale brutto (€) – Vorschlag: 50 % des Staffelbetrags</label><input type="number" step="0.01" id="stUmb"></div></div>'+
-    '<div class="sml mut" style="margin-bottom:6px">Faustregel: Fällt der neue Termin auf einen schwach nachgefragten Slot (Mo–Do, tagsüber, Nebensaison), kannst du die Pauschale senken oder erlassen – er blockiert kaum anderes Geschäft. Ein Samstag in der Hauptsaison blockiert dagegen einen vollen Buchungsplatz: Pauschale eher halten. Bei 0 € wird keine Rechnung erzeugt, sofern auch keine Kosten anfallen.</div></div>'+
-    '<label style="margin-top:8px"><input type="checkbox" id="stMark" style="width:auto;margin-right:6px" checked>Ursprüngliche Buchung auf „storniert“ setzen</label>'+
+    '<div class="sml mut" style="margin-bottom:6px">Faustregel: Fällt der neue Termin auf einen schwach nachgefragten Slot (Mo–Do, tagsüber, Nebensaison), kannst du die Pauschale senken oder erlassen – er blockiert kaum anderes Geschäft. Ein Samstag in der Hauptsaison blockiert dagegen einen kompletten Termin: Pauschale eher halten. Bei 0 € wird keine Rechnung erzeugt, sofern auch keine Kosten anfallen.</div></div>'+
+    '<label style="margin-top:8px"><input type="checkbox" id="stMark" style="width:auto;margin-right:6px" checked>Ursprünglichen Gig auf „storniert“ setzen</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="runStorno()">Abwickeln</button></div>');
   stornoRecalc();
 }
@@ -3457,7 +3457,7 @@ function runStorno(){
     if(!neu){toast('Bitte neuen Termin angeben.',1);return}
     newBookingP=api('bookings',{method:'POST',prefer:'return=representation',body:{
       customer_id:b.customer_id,status:'gebucht',kind:b.kind,event_type:b.event_type,
-      title:(b.title||b.event_type||'Auftrag')+' (Ersatztermin)',event_date:neu,
+      title:(b.title||b.event_type||'Gig')+' (Ersatztermin)',event_date:neu,
       start_time:b.start_time,end_time:b.end_time,venue_name:b.venue_name,venue_address:b.venue_address,
       guests:b.guests,notes:'Umbuchung – ursprünglicher Termin: '+dt(b.event_date)}}).then(function(r){return r[0]});
     jobs.push(stornoNote('Absage vom '+dt(v('stEingang'))+' ('+days+' Tage vorher). Umbuchung auf Ersatztermin '+dt(v('stNeu'))+' vereinbart; Umbuchungspauschale: '+euro(Number(v('stUmb'))||0)+' brutto.'));
@@ -3483,7 +3483,7 @@ function runStorno(){
     if(m==='kosten')intro='die Absage eurer Veranstaltung ('+label+') haben wir am '+dt(v('stEingang'))+' erhalten. '+
       'Aus Kulanz verzichten wir auf die Storno-Staffel unserer AGB und berechnen ausschließlich die tatsächlich bereits entstandenen Kosten:';
     if(kf>0)items.push({description:'Bereits entstandene Fahrt-/Vorbereitungskosten',note:'Diese Kosten sind vor der Absage tatsächlich angefallen.',qty:1,unit:'pausch.',unit_price:kf});
-    if(kh>0)items.push({description:'Nicht stornierbare Auslagen (z. B. Übernachtung)',note:'Diese Buchung konnte trotz Absage nicht mehr kostenfrei storniert werden.',qty:1,unit:'pausch.',unit_price:kh});
+    if(kh>0)items.push({description:'Nicht stornierbare Auslagen (z. B. Übernachtung)',note:'Dieser Gig konnte trotz Absage nicht mehr kostenfrei storniert werden.',qty:1,unit:'pausch.',unit_price:kh});
     if(ks>0)items.push({description:v('stKSonstTxt')||'Sonstige bereits entstandene Kosten',qty:1,unit:'pausch.',unit_price:ks});
   }
   if(m==='ersatz'){
@@ -3498,7 +3498,7 @@ function runStorno(){
 
   newBookingP.then(function(nb){
     if(!items.length){
-      Promise.all(jobs).then(function(){closeModal();toast(m==='ersatz'?'Umgebucht ✓ – neue Buchung angelegt, keine Rechnung.':'Abgewickelt ✓ – keine Rechnung erzeugt.');loadAll()});
+      Promise.all(jobs).then(function(){closeModal();toast(m==='ersatz'?'Umgebucht ✓ – neuer Gig angelegt, keine Rechnung.':'Abgewickelt ✓ – keine Rechnung erzeugt.');loadAll()});
       return;
     }
     Promise.all(jobs).then(function(){
@@ -3647,7 +3647,7 @@ function bookEquipList(b){
 }
 function createLieferschein(){
   var b=curBook,list=bookEquipList(b);
-  if(!list.length){toast('Keine Technik zugeordnet – erst Technik zum Auftrag hinzufügen.',1);return}
+  if(!list.length){toast('Keine Technik zugeordnet – erst Technik zum Gig hinzufügen.',1);return}
   var nn=nextNumber('lieferschein');
   api('documents',{method:'POST',prefer:'return=representation',body:{
     doc_type:'lieferschein',number:nn.number,customer_id:b.customer_id,booking_id:b.id,status:'versendet',
@@ -3692,7 +3692,7 @@ function printMietvertrag(rc){
   if(!rc)rc=(CACHE.rentalContracts||[]).find(function(x){return x.booking_id===b.id});
   var deposit=snap&&snap.deposit_amount!=null?snap.deposit_amount:(rc?rc.deposit_amount:null);
   var list=snap?snap.items:bookEquipList(b);
-  if(!list.length){toast('Keine Technik zugeordnet – der Mietvertrag listet die Mietsachen aus dem Auftrag.',1);return}
+  if(!list.length){toast('Keine Technik zugeordnet – der Mietvertrag listet die Mietsachen aus dem Gig.',1);return}
   var comp=S.company||{},cust=CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
   var days=snap?snap.days:rentDays(b);
   var total=list.reduce(function(s,it){return s+it.price},0);
@@ -3959,7 +3959,7 @@ function renderStats(){
   var qAcc=quotes.filter(function(d){return d.status==='angenommen'});
   var avg=paid.length?rev/paid.length:0;
   document.getElementById('statTiles').innerHTML=
-    tile(euro(rev),'Umsatz brutto')+tile(books.length,'Aufträge')+
+    tile(euro(rev),'Umsatz brutto')+tile(books.length,'Gigs')+
     tile(qSent.length?Math.round(qAcc.length/qSent.length*100)+' %':'–','Angebots-Annahme')+
     tile(euro(avg),'Ø Rechnungswert');
   var months=Array(12).fill(0);
@@ -4319,10 +4319,10 @@ function saveEq(id){
     .catch(function(e){toast(e.message,1)});
 }
 function delEq(id){
-  if(!confirm('Artikel löschen? (Nur möglich, wenn er keiner Buchung zugeordnet ist.)'))return;
+  if(!confirm('Artikel löschen? (Nur möglich, wenn er keinem Gig zugeordnet ist.)'))return;
   api('equipment?id=eq.'+id,{method:'DELETE'}).then(function(){closeModal();
     api('equipment?select=*&order=sort').then(function(r){CACHE.equipment=r||[];renderEq()})})
-    .catch(function(){toast('Nicht möglich – Artikel ist Buchungen zugeordnet.',1)});
+    .catch(function(){toast('Nicht möglich – Artikel ist Gigs zugeordnet.',1)});
 }
 
 /* ===== Technik-Sets ===== */
@@ -5795,11 +5795,11 @@ function printPackliste(){
   var sec=function(t,items){return items.length?('<div style="font-weight:700;margin:14px 0 4px">'+t+'</div>'+items.map(li).join('')):''};
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:680px;margin:0 auto;padding:36px 20px;font-size:12px;line-height:1.5">'+
-  '<div style="font-size:17px;font-weight:700">Packliste – '+esc(b.title||b.event_type||'Auftrag')+'</div>'+
+  '<div style="font-size:17px;font-weight:700">Packliste – '+esc(b.title||b.event_type||'Gig')+'</div>'+
   '<div style="color:#555;margin-bottom:6px">'+dt(b.event_date)+(b.start_time?' · Beginn '+b.start_time.slice(0,5)+' Uhr':'')+
   (r.setup_from?' · Aufbau ab '+r.setup_from.slice(0,5)+' Uhr':'')+
   ((b.venue_name||b.venue_address)?' · '+esc([b.venue_name,b.venue_address].filter(Boolean).join(', ')):'')+'</div>'+
-  sec('Technik für diesen Auftrag',eq)+
+  sec('Technik für diesen Gig',eq)+
   sec('Immer dabei',always)+
   sec('DJ-Standard',dj)+
   '<div style="margin-top:20px;color:#777;border-top:1px solid #ddd;padding-top:8px;font-size:10.5px">Vor Abfahrt abhaken – nach der Veranstaltung dieselbe Liste für den Rückweg nutzen. '+esc(comp.name||'')+'</div></div>';
@@ -6792,7 +6792,7 @@ function dateConflicts(datum,eigenerKunde){
     if(eigenerKunde&&b.customer_id===eigenerKunde&&b.event_date===datum)return;
     var bis=b.end_date||b.event_date;
     if(datum>=b.event_date&&datum<=bis)
-      out.push((b.title||b.event_type||'Auftrag')+(b.customers?' · '+custName(b.customers):''));
+      out.push((b.title||b.event_type||'Gig')+(b.customers?' · '+custName(b.customers):''));
   });
   (CACHE.blocks||[]).forEach(function(c){
     var bis=c.end_date||c.start_date;
