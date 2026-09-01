@@ -325,6 +325,8 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <div class="grid2" style="gap:16px">
       <div class="card"><h3>Nächste Termine</h3><div id="dashNext" class="sml mut">–</div></div>
       <div class="card"><h3>Wiedervorlagen / Nachfassen</h3><div id="dashFollow" class="sml mut">–</div></div>
+      <div class="card"><h3>Angebote ohne Reaktion <span class="mut sml" style="font-weight:400">(versendet, Kunde schweigt)</span></h3><div id="dashNoReply" class="sml mut">–</div></div>
+      <div class="card"><h3>Anfragen ohne Antwort <span class="mut sml" style="font-weight:400">(älter als 3 Tage, noch kein Kontakt)</span></h3><div id="dashSilentInq" class="sml mut">–</div></div>
       <div class="card"><h3>Neue Anfragen</h3><div id="dashInq" class="sml mut">–</div></div>
       <div class="card"><h3>Offene Rechnungen</h3><div id="dashOpenInv" class="sml mut">–</div></div>
       <div class="card"><h3>Portal-Aktivität <span class="mut sml" style="font-weight:400">(Kundenreaktionen auf Angebote)</span></h3><div id="dashPortal" class="sml mut">–</div></div>
@@ -354,6 +356,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <a onclick="showPage('cust')">← Kunden</a>
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="cdName"></div><div class="ps" id="cdSub"></div></div>
       <div><button class="btn g sm" onclick="openCustModal(curCust)">Bearbeiten</button>
+      <button class="btn g sm" onclick="custComposeMail()">E-Mail schreiben</button>
       <button class="btn sm" onclick="newDocFor('angebot')">Angebot erstellen</button></div></div>
     <div class="grid2" style="gap:16px;align-items:start">
       <div>
@@ -920,7 +923,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           </div>
           <div class="grid2">
             <div><label>Veranstaltungsplaner: Sperrfrist vor Termin (Tage)</label><input type="number" id="sPlanLock"></div>
-            <div></div>
+            <div><label>Nachfassen nach (Tage ohne Reaktion auf ein Angebot)</label><input type="number" id="sFollowDays" min="1"></div>
           </div>
           <div class="grid2">
             <div><label>USt.-Satz Standard (%)</label><input type="number" step="0.1" id="sTaxRate"></div>
@@ -1367,6 +1370,37 @@ function renderDash(){
     var cu=CACHE.customers.find(function(x){return x.id===c.customer_id});
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openCustDetail(\''+c.customer_id+'\')">'+esc(custName(cu))+'</a> <span class="mut">'+esc(c.subject||c.channel)+' · fällig '+dt(c.followup_at)+'</span> <a class="sml" onclick="markFollowDone(\''+c.id+'\')">✓ erledigt</a></div>';
   }).join('')||'Nichts fällig.';
+  /* Angebote/ABs, die raus sind und auf die nichts zurueckkam - nach Wartezeit sortiert.
+     Ab der Nachfassen-Frist (Einstellungen) oder nach Ablauf der Gueltigkeit hervorgehoben. */
+  var fuDays=Number((S.defaults||{}).followup_days)||7;
+  var silent=CACHE.documents.filter(function(d){return ['angebot','bestaetigung'].indexOf(d.doc_type)>=0&&d.status==='versendet'})
+    .map(function(d){
+      var sent=(d.sent_at||d.doc_date||d.created_at||today).slice(0,10);
+      var days=Math.max(0,Math.round((new Date(today)-new Date(sent))/86400000));
+      var abgelaufen=!!d.valid_until&&d.valid_until.slice(0,10)<today;
+      return {d:d,days:days,abgelaufen:abgelaufen,hot:abgelaufen||days>=fuDays};
+    }).sort(function(a,b){return b.days-a.days});
+  document.getElementById('dashNoReply').innerHTML=silent.slice(0,8).map(function(x){
+    var d=x.d;
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)'+(x.hot?';color:'+(x.abgelaufen?'var(--redl)':'var(--yel)'):'')+'">'+
+      '<a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> <span class="'+(x.hot?'':'mut')+'">· '+esc(custName(d.customers))+
+      ' · versendet vor '+x.days+' Tag'+(x.days===1?'':'en')+(d.valid_until?' · gültig bis '+dt(d.valid_until)+(x.abgelaufen?' (abgelaufen!)':''):'')+'</span> '+
+      '<span style="white-space:nowrap;float:right"><button class="btn g sm" onclick="docFollowupMail(\''+d.id+'\')">Nachfassen per E-Mail</button> '+
+      '<button class="btn g sm" onclick="openDocEditor(\''+d.id+'\')">Öffnen</button></span><div style="clear:both"></div></div>';
+  }).join('')||'Alle versendeten Angebote haben eine Rückmeldung.';
+  /* Anfragen, die seit mehr als 3 Tagen offen sind und bei denen seit Eingang nichts
+     rausging (Notizen zaehlen nicht als Kontakt). */
+  var vor3=new Date(Date.now()-3*86400000).toISOString();
+  var silentInq=CACHE.inquiries.filter(function(i){
+    if(['neu','in_bearbeitung'].indexOf(i.status)<0||!i.created_at||i.created_at>vor3)return false;
+    return !CACHE.comms.some(function(c){return i.customer_id&&c.customer_id===i.customer_id&&c.channel!=='note'&&c.occurred_at>=i.created_at});
+  }).sort(function(a,b){return a.created_at<b.created_at?-1:1});
+  document.getElementById('dashSilentInq').innerHTML=silentInq.slice(0,8).map(function(i){
+    var tage=Math.round((Date.now()-new Date(i.created_at))/86400000);
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="viewInq(\''+i.id+'\')">'+esc(i.name)+'</a> <span class="mut">'+
+      esc(i.event_type||'')+(i.event_date?' · '+dt(i.event_date):'')+' · seit '+tage+' Tagen ohne Antwort</span> '+
+      '<button class="btn g sm" style="float:right" onclick="viewInq(\''+i.id+'\')">Antworten</button><div style="clear:both"></div></div>';
+  }).join('')||'Alle Anfragen sind beantwortet.';
   document.getElementById('dashInq').innerHTML=newInq.slice(0,6).map(function(i){
     var onclick=i.kind==='booking'?'openBookDetail(\''+i.id+'\')':'viewInq(\''+i.id+'\')';
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+(i.urgent?'<span class="b red" style="margin-right:6px">bald</span>':'')+'<a onclick="'+onclick+'">'+esc(i.label||'?')+'</a> <span class="mut">'+esc(i.sub||'')+'</span></div>';
@@ -1431,7 +1465,7 @@ function tile(v,l){return '<div class="tile"><div class="tv">'+v+'</div><div cla
 function markFollowDone(id){api('communications?id=eq.'+id,{method:'PATCH',body:{followup_done:true}}).then(function(){loadAll();toast('Erledigt ✓')})}
 
 /* ===== Anfragen ===== */
-var INQ_BADGE={neu:'gold',in_bearbeitung:'blue',erledigt:'green',archiviert:'grey'};
+var INQ_BADGE={neu:'gold',in_bearbeitung:'blue',erledigt:'green',abgesagt:'red',archiviert:'grey'};
 function renderInq(){
   /* Die Zahl im Menü zählt nur die neuen Anfragen, die Liste zeigt alle - ohne diese
      Zeile wirkt das wie ein Zählfehler. */
@@ -1474,9 +1508,37 @@ function viewInq(id){
     '<div style="margin-top:14px">'+
     (i.customer_id?'':'<button class="btn g" onclick="inqToCust(\''+i.id+'\')">→ In CRM übernehmen</button>')+
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'erledigt\')">Erledigt</button> '+
+    (i.status==='abgesagt'?'':'<button class="btn g" onclick="inqAbsagen(\''+i.id+'\')">Absagen</button> ')+
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'archiviert\')">Archivieren</button></div>');
 }
 function setInqStatus(id,st){api('inquiries?id=eq.'+id,{method:'PATCH',body:{status:st}}).then(function(){closeModal();loadAll()})}
+/* Die Veranstaltung, die automatisch zu dieser Anfrage angelegt wurde (gleicher Kunde,
+   gleiches Datum, noch nicht fest). */
+function inqBooking(i){
+  if(!i||!i.customer_id||!i.event_date)return null;
+  return (CACHE.bookings||[]).find(function(b){return b.customer_id===i.customer_id&&b.event_date===i.event_date&&['anfrage','angebot'].indexOf(b.status)>=0})||null;
+}
+/* Markus sagt ab (keine Zeit, passt nicht): Anfrage auf "abgesagt" und - auf Nachfrage -
+   den zugehoerigen Gig stornieren, damit der Termin aus Kalender und iCal-Anfragen
+   verschwindet. Bisher blieb da eine Geister-Anfrage stehen. nachMail=true: kommt aus
+   dem Absage-Mailversand, dann erst fragen, ob ueberhaupt abgesagt werden soll. */
+function inqAbsagen(id,nachMail){
+  var i=CACHE.inquiries.find(function(x){return x.id===id});if(!i)return;
+  var bk=inqBooking(i),frei=false;
+  if(nachMail){
+    if(!confirm('Anfrage von '+i.name+' jetzt als abgesagt markieren'+(bk?' und den Gig am '+dt(bk.event_date)+' im Kalender freigeben':'')+'?'))return;
+    frei=!!bk;
+  }else if(bk){
+    frei=confirm('Auch den Gig am '+dt(bk.event_date)+' im Kalender freigeben? Er verschwindet dann aus Kalender und iCal-Anfragen.');
+  }
+  var jobs=[api('inquiries?id=eq.'+id,{method:'PATCH',body:{status:'abgesagt'}})];
+  if(frei)jobs.push(api('bookings?id=eq.'+bk.id,{method:'PATCH',body:{status:'storniert'}}));
+  if(i.customer_id)jobs.push(api('communications',{method:'POST',body:{customer_id:i.customer_id,booking_id:frei?bk.id:null,channel:'note',direction:'out',
+    subject:'Anfrage abgesagt',content:'Anfrage'+(i.event_type?' ('+i.event_type+')':'')+(i.event_date?' für den '+dt(i.event_date):'')+' von meiner Seite abgesagt'+(frei?', Termin im Kalender freigegeben.':'.'),
+    occurred_at:new Date().toISOString()}}));
+  Promise.all(jobs).then(function(){closeModal();toast('Anfrage abgesagt'+(frei?', Termin freigegeben':'')+' ✓');loadAll()})
+    .catch(function(e){toast(e.message,1)});
+}
 var INQ_UEBERNAHME={};   /* laufende Übernahmen - schützt vor Doppelklick */
 function inqToCust(id){
   var i=CACHE.inquiries.find(function(x){return x.id===id});if(!i)return;
@@ -2731,7 +2793,20 @@ function renderDocSub(){
       (d.accept_signature?' <a onclick="showAcceptSig()">Unterschrift ansehen</a>':''):'')+
     (offen?'<div id="docExpiredHint" style="margin-top:6px;color:var(--yel)">Angenommen nach Ablauf – Gig noch nicht bestätigt '+
       '<button class="btn g sm" onclick="confirmGigFromDoc()">Gig bestätigen</button> '+
-      '<button class="btn g sm" onclick="setDocStatus(\'abgelehnt\')">Absagen</button></div>':'');
+      '<button class="btn g sm" onclick="setDocStatus(\'abgelehnt\')">Absagen</button></div>':'')+
+    renderDocEvents(d);
+}
+/* Kundenreaktionen aus dem Portal direkt am Beleg - bleiben sichtbar, auch wenn sie im
+   Dashboard laengst als gesehen gelten (dort war der Absage-Grund vorher verschwunden). */
+function renderDocEvents(d){
+  var LBL={accept:'angenommen',decline:'abgelehnt',comment:'Frage gestellt',callback:'Rückruf gewünscht',bande:'DJ-Vermittlung gewünscht',konflikt:'wollte annehmen, Termin war belegt'};
+  var evs=(CACHE.docEvents||[]).filter(function(e){return e.document_id===d.id})
+    .sort(function(a,b){return a.created_at<b.created_at?1:-1}).slice(0,5);
+  if(!evs.length)return '';
+  return '<div class="mut sml" style="margin-top:6px">'+evs.map(function(e){
+    return '<div>Kunde: '+(LBL[e.kind]||esc(e.kind))+' am '+dt((e.created_at||'').slice(0,10))+
+      (e.message?' – „'+esc(e.message.slice(0,200))+(e.message.length>200?'…':'')+'“':'')+(e.phone?' · '+esc(e.phone):'')+'</div>';
+  }).join('')+'</div>';
 }
 function confirmGigFromDoc(){
   syncVeranstaltungStatus('angenommen').then(renderDocSub).catch(function(e){toast(e.message,1)});
@@ -2916,7 +2991,7 @@ function setDocStatus(st){
   api('documents?id=eq.'+curDoc.id,{method:'PATCH',body:patch}).then(function(){
     curDoc.status=st;toast('Status: '+st+' ✓');
     renderDocSub();
-    renderStatusBtns();renderItems();applyDocLock();refreshDocs();
+    renderStatusBtns();renderItems();applyDocLock();refreshDocs();refreshComms();
     return syncVeranstaltungStatus(st).then(renderDocSub);
   }).catch(function(e){toast(e.message,1)});
 }
@@ -6116,6 +6191,7 @@ function renderSet(){
   document.getElementById('sPayDays').value=d.payment_days!=null?d.payment_days:14;
   document.getElementById('sValidDays').value=d.quote_valid_days!=null?d.quote_valid_days:30;
   document.getElementById('sPlanLock').value=d.plan_lock_days!=null?d.plan_lock_days:3;
+  document.getElementById('sFollowDays').value=d.followup_days!=null?d.followup_days:7;
   document.getElementById('sRental').value=(S.rental_contract&&S.rental_contract.text)||'';
 }
 function saveRental(){
@@ -6155,7 +6231,7 @@ function saveNumbering(){
   n.gutschrift={prefix:v('sGPre')||'GS-',next:Number(v('sGNext'))||1};
   n.year_in_number=true;
   var d=S.defaults||{};d.payment_days=Number(v('sPayDays'))||14;d.quote_valid_days=Number(v('sValidDays'))||30;
-  d.plan_lock_days=Number(v('sPlanLock'))||0;
+  d.plan_lock_days=Number(v('sPlanLock'))||0;d.followup_days=Number(v('sFollowDays'))||7;
   d.tax_rate=Number(v('sTaxRate'))||19;d.partner_discount_pct=Number(v('sPartnerPct'))||20;
   d.tier_week_pct=Number(v('sTierWeek'))||0;d.tier_2week_pct=Number(v('sTier2Week'))||0;d.tier_month_pct=Number(v('sTierMonth'))||0;
   d.travel_rate_km=Number(v('sKmRate'))||0;d.travel_free_km=Number(v('sKmFree'))||0;
@@ -6200,13 +6276,16 @@ function shareDoc(){
    passende Vorlage vorbelegen und den vorhandenen Direktversand (openCompose ->
    api.php/sendmail) nutzen. Erst wenn die Mail wirklich raus ist, wird ein Entwurf
    auf "versendet" gesetzt - nichts geht ohne Klick auf "Direkt senden" los. */
-function docSendMail(){
+function docSendMail(mode){
   ensureDocShare().then(function(r){
     var d=curDoc,cust=r.cust;
     if(!cust.email){toast('Der Kunde hat keine E-Mail-Adresse – bitte erst am Kunden eintragen.',1);return}
     var b=(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id})||{};
     var tpl;
-    if(d.doc_type==='angebot'){
+    if(mode==='nachfassen'){
+      tpl=(CACHE.tpls||[]).find(function(t){return /nachfassen zum angebot/i.test(t.name)})
+        ||{subject:'Kurze Frage zu eurem Angebot {nummer}',body:'Hallo {vorname},\n\nich wollte einmal kurz nachhören: Ist mein Angebot {nummer} bei euch angekommen und passt es soweit? Falls etwas unklar ist, sagt einfach Bescheid.\n\nDas Angebot findet ihr weiterhin hier (Login ist eure Postleitzahl):\n{link}\n\nGültig ist es bis {gueltig}, bis dahin halte ich euch den Termin frei.\n\nViele Grüße\nMarkus'};
+    }else if(d.doc_type==='angebot'){
       tpl=(CACHE.tpls||[]).find(function(t){return /angebots-begleitmail/i.test(t.name)})
         ||{subject:'Euer Angebot {nummer} ist fertig',body:'Hallo {vorname},\n\neuer Angebot {nummer} ist fertig und wartet hier auf euch:\n{link}\n\nLogin ist eure Postleitzahl. Wenn euch etwas nicht passt: sagt es mir einfach.\n\nViele Grüße\nMarkus'};
     }else if(d.doc_type==='bestaetigung'){
@@ -6216,13 +6295,28 @@ function docSendMail(){
     }
     var i={name:custName(cust),email:cust.email,customer_id:cust.id,booking_id:d.booking_id||null,event_date:b.event_date||null,
       location:b.venue_name||'',event_type:b.event_type||b.title||'',
-      _nummer:d.number,_link:r.url,_betrag:euro(d.total_gross),_faellig:dt(d.due_date),
-      _title:docTypeName(d.doc_type)+' '+esc(d.number)+' per E-Mail',_doc:true};
+      _nummer:d.number,_link:r.url,_betrag:euro(d.total_gross),_faellig:dt(d.due_date),_gueltig:d.valid_until?dt(d.valid_until):'–',
+      _title:(mode==='nachfassen'?'Nachfassen zu ':'')+docTypeName(d.doc_type)+' '+esc(d.number)+' per E-Mail',_doc:true};
     openCompose(i,tpl,null,function(){
+      if(mode==='nachfassen'){
+        /* Nachgefasst = Wiedervorlage erledigt; das Angebot bleibt trotzdem unter
+           "Angebote ohne Reaktion", bis der Kunde sich rührt. */
+        var offen=(CACHE.comms||[]).filter(function(c){return c.customer_id===d.customer_id&&c.followup_at&&!c.followup_done&&/^Nachfassen: /.test(c.subject||'')&&(c.subject||'').indexOf(d.number)>=0});
+        Promise.all(offen.map(function(c){return api('communications?id=eq.'+c.id,{method:'PATCH',body:{followup_done:true}})})).then(refreshComms);
+        return;
+      }
       if(curDoc&&curDoc.id===d.id&&curDoc.status==='entwurf')setDocStatus('versendet');
     });
   }).catch(function(e){toast(e.message,1)});
 }
+/* Vom Dashboard aus: Nachfass-Mail zu einem versendeten Angebot, ohne erst den Editor
+   zu oeffnen. curDoc wird nur fuer ensureDocShare gebraucht. */
+function docFollowupMail(id){
+  var d=CACHE.documents.find(function(x){return x.id===id});if(!d)return;
+  curDoc=d;
+  docSendMail('nachfassen');
+}
+function refreshComms(){return api('communications?select=*&order=occurred_at.desc').then(function(r){CACHE.comms=r||[];renderDash();if(curCust&&document.getElementById('pg-custd').classList.contains('a'))renderComms()})}
 
 function renderForms(){
   var STB={offen:'gold',beantwortet:'green'};
@@ -6938,9 +7032,10 @@ function fillTpl(text,i){
     '{bewertungen}':links||'(Bewertungslinks unter Inhalte → Bewertungen eintragen)',
     /* Dokument-Mails (docSendMail): Portal-Link, Belegnummer, Betrag, Faelligkeit */
     '{link}':i._link||'','{nummer}':i._nummer||'','{nr}':i._nummer||'',
-    '{betrag}':i._betrag||'','{faellig}':i._faellig||''
+    '{betrag}':i._betrag||'','{faellig}':i._faellig||'','{gueltig}':i._gueltig||'',
+    '{telefon}':(S.company&&S.company.phone)||''
   };
-  return (text||'').replace(/\{vorname\}|\{name\}|\{datum\}|\{anlass\}|\{ort\}|\{bewertungen\}|\{link\}|\{nummer\}|\{nr\}|\{betrag\}|\{faellig\}/g,function(m){return map[m]});
+  return (text||'').replace(/\{vorname\}|\{name\}|\{datum\}|\{anlass\}|\{ort\}|\{bewertungen\}|\{link\}|\{nummer\}|\{nr\}|\{betrag\}|\{faellig\}|\{gueltig\}|\{telefon\}/g,function(m){return map[m]});
 }
 function composeReply(inqId){
   var i=CACHE.inquiries.find(function(x){return x.id===inqId});if(!i)return;
@@ -6955,7 +7050,10 @@ function composeReply(inqId){
     });
     return;
   }
-  openCompose(i,t,null);
+  /* Absage-/Termin-belegt-Vorlagen: Nach dem Versand direkt anbieten, die Anfrage
+     abzusagen und den Termin freizugeben - sonst bleibt sie als offen stehen. */
+  var absage=/^(Absage:|Termin belegt|Termin nicht mehr verfügbar)/i.test(t.name||'');
+  openCompose(i,t,null,absage?function(){inqAbsagen(i.id,true)}:null);
 }
 /* Termin-Konflikte zum Anfragedatum: eigene Aufträge (außer Storno) und Kalender-Blocker.
    Mehrtägige Einträge zählen mit, solange das Datum im Zeitraum liegt. */
@@ -6981,6 +7079,7 @@ function dateConflicts(datum,eigenerKunde){
    per Direktversand oder ueber das Mail-Programm - nicht schon beim Oeffnen. */
 function openCompose(i,t,formLink,onSent){
   window._composeSent=onSent||null;
+  window._composeCtx={i:i,formLink:formLink||null};
   var body=fillTpl(t.body,i);
   if(formLink)body=body.replace(/\{fragebogen\}/g,formLink);
   /* Die Erstantwort-Vorlagen sagen "der Termin ist noch frei". Steht an dem Tag schon
@@ -6992,8 +7091,13 @@ function openCompose(i,t,formLink,onSent){
       '<div class="sml" style="margin-top:4px">'+konflikt.map(esc).join('<br>')+'</div>'+
       '<div class="sml" style="margin-top:6px">Die Vorlage behauptet unten, der Termin sei frei. Text anpassen oder die Vorlage „Termin belegt“ nehmen.</div></div>'
     : '';
+  /* Vorlage wechseln geht direkt im Dialog - so sind z.B. die Absage-Bausteine auch aus dem
+     Dokument-Editor und von der Kundenseite aus erreichbar, nicht nur aus der Anfrage. */
+  var picker='<label>Vorlage</label><select id="rTpl" onchange="composeSwitchTpl()"><option value="">'+(t.id?'– eingebaute Vorlage –':'– eingebauter Text –')+'</option>'+
+    (CACHE.tpls||[]).map(function(x){return '<option value="'+x.id+'"'+(x.id===t.id?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select>';
+  window._composeBuiltin=t.id?null:t;
   openModal((i._title||'Antwort an '+esc(i.name))+(i.email?' <span class="mut sml">('+esc(i.email)+')</span>':''),
-    hinweis+
+    hinweis+picker+
     '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
     '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+edBtn('rBody')+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
@@ -7001,6 +7105,26 @@ function openCompose(i,t,formLink,onSent){
     '<button class="btn g" onclick="copyReply()">Text kopieren</button>'+
     (i.email?'<button class="btn g" onclick="mailReply(\''+jsq(i.email)+'\')">Im Mail-Programm öffnen</button>':'')+
     '</div>'+(konflikt.length||i._doc?'':'<div class="sml mut" style="margin-top:8px">Am '+(i.event_date?dt(i.event_date):'angefragten Termin')+' ist bei dir nichts eingetragen – die Vorlage passt.</div>'));
+}
+/* Andere Vorlage im offenen Compose-Dialog: Betreff und Text neu fuellen, Rest bleibt. */
+function composeSwitchTpl(){
+  var ctx=window._composeCtx;if(!ctx)return;
+  var id=v('rTpl'),t=id?(CACHE.tpls||[]).find(function(x){return x.id===id}):window._composeBuiltin;
+  if(!t){t={subject:'',body:'Hallo {vorname},\n\n\n\nViele Grüße\nMarkus'}}
+  var body=fillTpl(t.body,ctx.i);
+  if(ctx.formLink)body=body.replace(/\{fragebogen\}/g,ctx.formLink);
+  document.getElementById('rSubject').value=fillTpl(t.subject,ctx.i);
+  document.getElementById('rBody').value=body;
+}
+/* Freie E-Mail an den Kunden von der Kundenseite aus - Vorlage im Dialog waehlbar. */
+function custComposeMail(){
+  var c=curCust;if(!c)return;
+  if(!c.email){toast('Der Kunde hat keine E-Mail-Adresse – bitte erst eintragen.',1);return}
+  var b=(CACHE.bookings||[]).filter(function(x){return x.customer_id===c.id&&x.status!=='storniert'})
+    .sort(function(x,y){return x.event_date<y.event_date?1:-1})[0]||{};
+  openCompose({name:custName(c),email:c.email,customer_id:c.id,booking_id:b.id||null,event_date:b.event_date||null,
+    location:b.venue_name||'',event_type:b.event_type||b.title||'',_title:'E-Mail an '+esc(custName(c)),_doc:true},
+    {subject:'',body:'Hallo {vorname},\n\n\n\nViele Grüße\nMarkus'},null,null);
 }
 function adminSendMail(to,subject,body,custId,cb,bookingId){
   fetch('api.php/sendmail',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},

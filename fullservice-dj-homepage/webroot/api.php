@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 82;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 83;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -242,8 +242,9 @@ function upgrade(PDO $p): void {
   if ($v >= SCHEMA_VERSION) return;
   /* Neue Vorlagen fuer bestehende Datenbanken nachziehen (seedExtraTemplates legt nur
      an, was namentlich noch fehlt): v81 "Angebot angenommen – Bestaetigung", v82 die
-     beiden Sonderfaelle bei der Annahme (Termin inzwischen belegt / Angebot abgelaufen). */
-  if ($v < 82) seedExtraTemplates($p);
+     beiden Sonderfaelle bei der Annahme (Termin inzwischen belegt / Angebot abgelaufen),
+     v83 "Nachfassen zum Angebot" fuer Kunden, die sich nach dem Angebot nicht melden. */
+  if ($v < 83) seedExtraTemplates($p);
   if ($v < 80) {
     /* Technik-Check war bisher ein einzelnes JSON-Feld direkt am Kunden - ein Kunde
        konnte also nie mehr als einen Check je gehabt haben. Jetzt eine eigene Tabelle,
@@ -1030,6 +1031,10 @@ function seedExtraTemplates(PDO $p): void {
        der Termin ist noch nicht fest - Markus prueft erst Verfuegbarkeit und Preis. */
     [98, 'Angebot angenommen – abgelaufen, wird geprüft', 'Angebot {nummer} angenommen – ich prüfe das kurz',
       "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen. Eine Kleinigkeit muss ich dazu sagen: Das Angebot war schon abgelaufen (gültig bis {gueltig}). Ich schaue mir deshalb kurz an, ob {termin} bei mir noch frei ist und ob die Preise noch so passen, und melde mich dann ganz schnell bei euch.\n\nBis dahin gilt: Der Termin ist noch nicht fest zugesagt – ich will euch nichts versprechen, was ich dann nicht halten kann.\n\nEuer Angebot findet ihr weiterhin hier – Login ist eure Postleitzahl:\n{link}\n\nFragen? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
+    /* Nachfassen bei Funkstille: Das Angebot ist raus, der Kunde meldet sich nicht. Kein
+       Druck, nur ein freundliches "Ich bin noch da" - mit Link, damit er direkt reagieren kann. */
+    [99, 'Nachfassen zum Angebot', 'Kurze Frage zu eurem Angebot {nummer}',
+      "Hallo {vorname},\n\nich wollte einmal kurz nachhören: Ist mein Angebot {nummer} bei euch angekommen und passt es soweit? Falls etwas unklar ist oder ihr euch etwas anders vorstellt, sagt einfach Bescheid – das lässt sich meistens mit einem kurzen Telefonat klären.\n\nDas Angebot findet ihr weiterhin hier (Login ist eure Postleitzahl):\n{link}\n\nGültig ist es bis {gueltig}, ich halte euch den Termin bis dahin frei. Und falls ihr euch anders entschieden habt: auch kein Problem, dann freue ich mich über eine kurze Nachricht.\n\nViele Grüße\nMarkus"],
     [92, 'Workshop-Bestätigung (Zahlung eingegangen)', 'Dein Platz ist fix!',
       "Hallo {vorname},\n\ndeine Zahlung ist da – damit ist dein Workshop-Platz verbindlich reserviert!\n\nWann: {datum}\nWo: Lager Hemer, Büttmecker Weg 35c\n\nBring gern dein eigenes Equipment-Problem mit – wir schauen uns echte Fälle an. Getränke gehen auf mich.\n\nBis bald!\nMarkus"],
     /* Absage-Bausteine: Jede Absage soll persönlich klingen und möglichst in eine
@@ -1365,6 +1370,51 @@ function syncBookingFromDoc(PDO $p, array $doc, string $newStatus): void {
   if ($type === 'bestaetigung' && $newStatus === 'versendet') $neu = 'gebucht';
   if (!$neu || $neu === $cur) return;
   $p->prepare('update bookings set status=?, updated_at=? where id=?')->execute([$neu, now(), $doc['booking_id']]);
+}
+
+/* Nachfassen-Frist in Tagen (Einstellungen -> Nachfassen nach), Standard 7. */
+function followupDays(PDO $p): int {
+  $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
+  $n = (int)($defs['followup_days'] ?? 7);
+  return $n > 0 ? $n : 7;
+}
+function docFollowupSubject(array $doc): string {
+  return 'Nachfassen: ' . (($doc['doc_type'] ?? '') === 'bestaetigung' ? 'Auftragsbestätigung' : 'Angebot') . ' ' . ($doc['number'] ?? '');
+}
+/* Automatische Wiedervorlage, sobald ein Angebot/eine AB versendet ist: Ohne sie ging
+   ein Angebot, auf das der Kunde nicht reagiert, schlicht unter. Termin = das Fruehere
+   aus "sent_at + Nachfassen-Frist" und "gueltig bis minus 3 Tage", nie in der
+   Vergangenheit. Je Dokument nur eine offene Wiedervorlage (erneuter Versand legt
+   keine zweite an). */
+function scheduleDocFollowup(PDO $p, array $doc): void {
+  if (!in_array($doc['doc_type'] ?? '', ['angebot', 'bestaetigung'], true)) return;
+  if (empty($doc['customer_id']) || empty($doc['number'])) return;
+  $subject = docFollowupSubject($doc);
+  $today = date('Y-m-d');
+  $st = $p->prepare('select 1 from communications where customer_id = ? and subject = ?
+    and followup_at is not null and followup_at >= ? and coalesce(followup_done,0) = 0 limit 1');
+  $st->execute([$doc['customer_id'], $subject, $today]);
+  if ($st->fetchColumn()) return;
+  $sent = strtotime(substr((string)($doc['sent_at'] ?? ''), 0, 10)) ?: time();
+  $fu = $sent + followupDays($p) * 86400;
+  if (!empty($doc['valid_until'])) {
+    $vu = strtotime(substr((string)$doc['valid_until'], 0, 10));
+    if ($vu) $fu = min($fu, $vu - 3 * 86400);
+  }
+  if (date('Y-m-d', $fu) <= $today) $fu = strtotime('tomorrow');
+  $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
+      values (?,?,?,?,?,?,?,?,?,?)')
+    ->execute([uuid(), $doc['customer_id'], $doc['booking_id'] ?: null, 'note', 'out', $subject,
+      (($doc['doc_type'] ?? '') === 'bestaetigung' ? 'Auftragsbestätigung' : 'Angebot') . ' versendet am ' . date('d.m.', $sent) . ' – noch keine Reaktion? Kurz nachhaken.',
+      now(), date('Y-m-d', $fu), now()]);
+}
+/* Sobald der Kunde reagiert (Portal) oder das Dokument entschieden ist, braucht es die
+   Wiedervorlage nicht mehr - die Notiz bleibt als Historie stehen, nur der Termin faellt weg. */
+function resolveDocFollowup(PDO $p, array $doc): void {
+  if (empty($doc['customer_id']) || empty($doc['number'])) return;
+  $p->prepare('update communications set followup_at = null, followup_done = 1
+    where customer_id = ? and subject = ? and followup_at is not null')
+    ->execute([$doc['customer_id'], docFollowupSubject($doc)]);
 }
 
 /* Ist Markus an dem Termin schon anderweitig unterwegs? Serverseitiges Gegenstueck zu
@@ -2797,6 +2847,12 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         /* ... und zieht den Termin genauso nach wie eine Rueckmeldung ueber das Portal. */
         if (isset($row['status']))
           foreach ($before as $b) { try { syncBookingFromDoc($p, $b, (string)$row['status']); } catch (Throwable $e) {} }
+        /* Wiedervorlage zum Nachfassen: beim Versand anlegen (gilt fuer alle Wege, die hier
+           durchkommen - Status-Button wie Mailversand), bei einer Entscheidung wieder aufloesen. */
+        if (($row['status'] ?? null) === 'versendet')
+          foreach ($before as $b) { try { scheduleDocFollowup($p, array_merge($b, $row)); } catch (Throwable $e) {} }
+        if (in_array($row['status'] ?? '', ['angenommen', 'abgelehnt', 'storniert'], true))
+          foreach ($before as $b) { try { resolveDocFollowup($p, $b); } catch (Throwable $e) {} }
       }
       if ($t === 'document_items' && !empty($itemsBefore)) {
         $itemFields = ['description', 'qty', 'unit', 'unit_price', 'discount_value', 'discount_type'];
@@ -3413,8 +3469,47 @@ function dailyDigest(): array {
     group by d.customer_id having max(d.paid_at) < '" . gmdate('Y-m-d', time() - 330 * 86400) . "'")->fetchAll();
   foreach ($wt as $w)
     $parts[] = 'Wartung fällig: ' . trim(($w['company'] ?: trim($w['first_name'] . ' ' . $w['last_name']))) . ' (letzte bezahlte Wartung: ' . substr((string)$w['lastpaid'], 0, 10) .')';
+  /* Funkstille nach dem Angebot: versendet, aelter als die Nachfassen-Frist (oder schon
+     abgelaufen), keine Reaktion - kurz auflisten, Details stehen im Dashboard unter Nachfassen. */
+  $fuDays = followupDays($p);
+  $grenze = gmdate('Y-m-d', time() - $fuDays * 86400);
+  $sd = $p->query("select d.number, d.sent_at, d.valid_until, c.first_name, c.last_name, c.company from documents d
+    left join customers c on c.id = d.customer_id
+    where d.doc_type in ('angebot','bestaetigung') and d.status = 'versendet'
+      and (substr(coalesce(d.sent_at, d.doc_date, d.created_at, ''), 1, 10) <= '$grenze'
+        or (d.valid_until is not null and d.valid_until != '' and substr(d.valid_until, 1, 10) < '$today'))
+    order by d.sent_at")->fetchAll();
+  if ($sd) {
+    $parts[] = '';
+    $parts[] = 'Angebote ohne Reaktion (älter als ' . $fuDays . ' Tage):';
+    foreach (array_slice($sd, 0, 8) as $x) {
+      $tage = max(0, (int)floor((time() - (strtotime(substr((string)$x['sent_at'], 0, 10)) ?: time())) / 86400));
+      $abgel = !empty($x['valid_until']) && substr((string)$x['valid_until'], 0, 10) < $today;
+      $parts[] = '– ' . $x['number'] . ' · ' . trim(($x['company'] ?: trim($x['first_name'] . ' ' . $x['last_name']))) .
+        ' · versendet vor ' . $tage . ' Tag(en)' . ($abgel ? ' · abgelaufen!' : '');
+    }
+    if (count($sd) > 8) $parts[] = '… und ' . (count($sd) - 8) . ' weitere';
+  }
+  /* Anfragen, die "in Bearbeitung" haengen: seit einer Woche kein Kontakt zum Kunden
+     (interne Notizen zaehlen nicht). */
+  $vor7 = gmdate('Y-m-d\TH:i:s\Z', time() - 7 * 86400);
+  $si = $p->query("select i.name, i.event_type, i.created_at from inquiries i
+    where i.status = 'in_bearbeitung' and i.created_at < '$vor7'
+      and (i.customer_id is null or i.customer_id = '' or not exists (
+        select 1 from communications k where k.customer_id = i.customer_id and k.channel != 'note' and k.occurred_at >= '$vor7'))
+    order by i.created_at")->fetchAll();
+  if ($si) {
+    $parts[] = '';
+    $parts[] = 'Anfragen in Bearbeitung seit über 7 Tagen ohne Kontakt:';
+    foreach (array_slice($si, 0, 8) as $i)
+      $parts[] = '– ' . $i['name'] . ($i['event_type'] ? ' (' . $i['event_type'] . ')' : '') .
+        ' · seit ' . max(1, (int)floor((time() - strtotime((string)$i['created_at'])) / 86400)) . ' Tagen';
+    if (count($si) > 8) $parts[] = '… und ' . (count($si) - 8) . ' weitere';
+  }
+  if ($parts && $parts[0] === '') array_shift($parts);
   if (!$parts) return ['sent' => false, 'reason' => 'nichts zu melden'];
-  $ok = notifyOwner('Dein Tages-Update: ' . count($parts) . ' Punkt(e)', implode("\n", $parts));
+  $punkte = count(array_filter($parts, fn($x) => $x !== '' && !preg_match('/:$/', $x) && !str_starts_with($x, '…')));
+  $ok = notifyOwner('Dein Tages-Update: ' . $punkte . ' Punkt(e)', implode("\n", $parts));
   return ['sent' => $ok, 'items' => count($parts)];
 }
 
@@ -3907,6 +4002,28 @@ function handlePortal(string $path, string $method, $body): never {
     }
     $p->prepare('insert into doc_events (id,document_id,kind,message,phone,created_at) values (?,?,?,?,?,?)')
       ->execute([uuid(), $d['id'], $evKind, $evMsg, $phone, now()]);
+    /* Die Reaktion dauerhaft in die Kunden-Timeline: doc_events verschwinden vom Dashboard,
+       sobald sie "gesehen" sind - der Absage-Grund war danach nirgends mehr zu finden.
+       Bei der Annahme schreibt acceptConfirmationMail schon die Bestaetigungsmail in die
+       Timeline, deshalb dort nur eine kurze Notiz und die auch nur einmal. */
+    try {
+      $tlSubject = ['accept' => 'Angebot angenommen (Portal): ' . $d['number'], 'decline' => 'Angebot abgelehnt: ' . $d['number'],
+        'comment' => 'Frage zum Angebot ' . $d['number'], 'callback' => 'Rückruf gewünscht: ' . $d['number'],
+        'bande' => 'DJ-Vermittlung gewünscht: ' . $d['number'], 'konflikt' => 'Annahme bei belegtem Termin: ' . $d['number']][$evKind] ?? null;
+      $tlContent = $evMsg !== '' ? $evMsg : ($evKind === 'decline' ? 'kein Grund angegeben' : '');
+      if ($phone !== '') $tlContent = trim($tlContent . "\nTelefon: " . $phone);
+      $dupe = false;
+      if ($evKind === 'accept') {
+        $chk = $p->prepare('select 1 from communications where customer_id = ? and subject = ? limit 1');
+        $chk->execute([$d['customer_id'], $tlSubject]);
+        $dupe = (bool)$chk->fetchColumn();
+      }
+      if ($tlSubject && !$dupe)
+        $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
+            values (?,?,?,?,?,?,?,?,?,?)')
+          ->execute([uuid(), $d['customer_id'], $d['booking_id'] ?: null, 'note', 'in', $tlSubject, $tlContent, now(), null, now()]);
+      resolveDocFollowup($p, $d);
+    } catch (Throwable $e) {}
     $labels = ['accept' => 'Angebot ANGENOMMEN', 'decline' => 'Angebot abgelehnt', 'comment' => 'Frage zum Angebot',
       'callback' => 'Rückruf gewünscht', 'bande' => 'DJ-Vermittlung gewünscht'];
     notifyOwner($ownerSubject ?: ($labels[$kind] . ': ' . $d['number']),
