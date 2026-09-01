@@ -484,8 +484,9 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <div><label>ab Uhrzeit</label><input type="time" id="evTime"></div>
         </div>
         <div class="grid3">
-          <div><label>Location</label><input id="evVenue" placeholder="Name der Location"></div>
-          <div><label>Ort / Adresse</label><input id="evAddr"></div>
+          <div><label>Location</label><input id="evVenue" list="ortVorschlaege2" placeholder="Name der Location"></div>
+          <div><label>Ort / Adresse</label><input id="evAddr" list="ortVorschlaege2"></div>
+          <datalist id="ortVorschlaege2"></datalist>
           <div><label>Gäste (ca.)</label><input type="number" id="evGuests"></div>
         </div>
         <div class="mut sml" id="evHint" style="margin-top:6px"></div>
@@ -1114,7 +1115,8 @@ function loadAll(){
     api('rental_contracts?select=*'),
     api('campaign_pages?select=*&order=sort'),
     api('blocks?select=*&order=anchor,sort'),
-    api('event_reports?select=*&order=sort')
+    api('event_reports?select=*&order=sort'),
+    api('locations?select=*&order=sort')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -1126,9 +1128,10 @@ function loadAll(){
     CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
     CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];CACHE.blocks=r[23]||[];
     CACHE.quoteTpls=r[24]||[];CACHE.planChanges=r[25]||[];CACHE.rentalContracts=r[26]||[];
-    CACHE.campaigns=r[27]||[];CACHE.module=r[28]||[];CACHE.reports=r[29]||[];
+    CACHE.campaigns=r[27]||[];CACHE.module=r[28]||[];CACHE.reports=r[29]||[];CACHE.locations=r[30]||[];
     applyBrand();
     renderAll();
+    renderOrtDatalist2();
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
 }
 /* Markenname aus den Einstellungen (Website-Domain, sonst Firmenname) im Kopf & Titel */
@@ -2317,14 +2320,60 @@ function planInvoiceDefaults(b,inv){
     zip_city:inv.zip_city||[cust.zip,cust.city].filter(Boolean).join(' ')
   };
 }
+/* Datalist-Optionen aus den Standort-Stammdaten (locations) - unabhaengig vom public-Flag,
+   das steuert nur die Sichtbarkeit auf der Webseite, nicht die interne Wiederverwendung. */
+function ortDatalistHtml(){
+  return (CACHE.locations||[]).map(function(l){return '<option value="'+esc(l.name)+'">'}).join('');
+}
+function renderOrtDatalist2(){
+  var el=document.getElementById('ortVorschlaege2');if(el)el.innerHTML=ortDatalistHtml();
+}
+function planLocByName(name){
+  return (CACHE.locations||[]).find(function(l){return l.name===name});
+}
+/* Bekannten Ort ausgewaehlt: Adresse nur uebernehmen, wenn dort noch nichts steht (kein
+   stilles Ueberschreiben einer bewusst abweichenden Adresse), Technik-Hinweise anzeigen. */
+function planLocPick(name){
+  var loc=planLocByName(name);
+  document.getElementById('pLocationId').value=loc?loc.id:'';
+  if(loc&&!v('pAddr'))document.getElementById('pAddr').value=loc.address||'';
+  renderPlanLocInfo();
+}
+function renderPlanLocInfo(){
+  var id=v('pLocationId'),el=document.getElementById('pLocInfo');if(!el)return;
+  var loc=id?(CACHE.locations||[]).find(function(l){return l.id===id}):null;
+  if(loc&&(loc.contact_name||loc.contact_phone||loc.technik_notes)){
+    el.innerHTML='<div class="mut sml" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:4px 0 10px">'+
+      '<b style="color:var(--wh)">Bekannter Ort – nur intern sichtbar:</b>'+
+      (loc.contact_name||loc.contact_phone?'<br>Ansprechpartner: '+esc([loc.contact_name,loc.contact_phone].filter(Boolean).join(' · ')):'')+
+      (loc.technik_notes?'<br>'+esc(loc.technik_notes).replace(/\n/g,'<br>'):'')+'</div>';
+  }else if(!loc&&v('pVenue')){
+    el.innerHTML='<div style="margin:4px 0 10px"><a onclick="planSaveLocation()">Diesen Ort für später merken</a></div>';
+  }else el.innerHTML='';
+}
+function planSaveLocation(){
+  var name=v('pVenue');if(!name){toast('Erst einen Namen für die Location eintragen.',1);return}
+  api('locations',{method:'POST',prefer:'return=representation',body:{
+    name:name,address:v('pAddr')||null,public:false,sort:(CACHE.locations||[]).length
+  }}).then(function(rows){
+    (CACHE.locations=CACHE.locations||[]).push(rows[0]);
+    document.getElementById('pLocationId').value=rows[0].id;
+    var dl=document.getElementById('ortVorschlaege');if(dl)dl.innerHTML=ortDatalistHtml();
+    renderOrtDatalist2();
+    renderPlanLocInfo();toast('Ort gemerkt ✓ – Details unter Inhalte → Locations ergänzbar.');
+  }).catch(function(e){toast(e.message,1)});
+}
 function openPlanModal(){
   var b=curBook,pl=planOf(b),ip=planInternalOf(b),bas=pl.basics||{},inv=planInvoiceDefaults(b,pl.invoice||{}),mus=pl.music||{};
   openModal('Veranstaltungsplaner – '+dt(b.event_date),
     '<h4 style="margin:0 0 6px">Grunddaten</h4>'+
     '<div class="grid2"><div><label>Partner/in (Name)</label><input id="pPartner" value="'+esc(bas.partner_name||'')+'"></div>'+
     '<div><label>Anlass</label><input id="pOccasion" value="'+esc(bas.occasion||'')+'"></div></div>'+
-    '<div class="grid2"><div><label>Location</label><input id="pVenue" value="'+esc(bas.venue_name||'')+'"></div>'+
+    '<datalist id="ortVorschlaege">'+ortDatalistHtml()+'</datalist>'+
+    '<input type="hidden" id="pLocationId" value="'+esc(bas.location_id||'')+'">'+
+    '<div class="grid2"><div><label>Location</label><input id="pVenue" list="ortVorschlaege" value="'+esc(bas.venue_name||'')+'" onchange="planLocPick(this.value)"></div>'+
     '<div><label>Adresse</label><input id="pAddr" value="'+esc(bas.venue_address||'')+'"></div></div>'+
+    '<div id="pLocInfo"></div>'+
     '<div class="grid3"><div><label>Gästezahl</label><input type="number" id="pGuests" value="'+(bas.guest_count!=null?bas.guest_count:'')+'"></div>'+
     '<div><label>Ankunft Gäste</label><input type="time" id="pArrival" value="'+(bas.arrival_time||'')+'"></div>'+
     '<div><label>Aufbau ab</label><input type="time" id="pSetup" value="'+(bas.setup_from||'')+'"></div></div>'+
@@ -2349,10 +2398,12 @@ function openPlanModal(){
     '<label>Technik-Zuordnung</label><input id="pTechAssign" value="'+esc(ip.technik_assignment||'')+'">'+
     '<label>Handover-Notizen für Vertretung</label><textarea id="pHandover">'+esc(ip.handover_notes||'')+'</textarea>'+edBtn('pHandover')+
     '<div style="margin-top:14px"><button class="btn" onclick="savePlan()">Speichern</button></div>');
+  renderPlanLocInfo();
 }
 function savePlan(){
   var pl={
     basics:{partner_name:v('pPartner')||null,occasion:v('pOccasion')||null,venue_name:v('pVenue')||null,
+      location_id:v('pLocationId')||null,
       venue_address:v('pAddr')||null,guest_count:v('pGuests')?Number(v('pGuests')):null,arrival_time:v('pArrival')||null,
       venue_contact_name:v('pVenueContact')||null,venue_contact_phone:v('pVenuePhone')||null,
       setup_from:v('pSetup')||null,teardown_until:v('pTeardown')||null},
@@ -4921,6 +4972,11 @@ function openLocModal(id){
     '<div class="grid2"><div><label>Adresse</label><input id="lAddr" value="'+esc(l.address||'')+'" placeholder="Straße, Hausnummer"></div>'+
     '<div><label>Telefon</label><input id="lPhone" value="'+esc(l.phone||'')+'" placeholder="z. B. 02371 123456"></div></div>'+
     '<label>Warum empfehle ich sie? (kurz)</label><textarea id="lDesc">'+esc(l.description||'')+'</textarea>'+edBtn('lDesc')+
+    '<h4 style="margin:14px 0 6px;color:var(--mut)">Intern (nie auf der Webseite oder beim Kunden)</h4>'+
+    '<div class="grid2"><div><label>Ansprechpartner vor Ort</label><input id="lContactName" value="'+esc(l.contact_name||'')+'"></div>'+
+    '<div><label>Telefon Ansprechpartner</label><input id="lContactPhone" value="'+esc(l.contact_phone||'')+'"></div></div>'+
+    '<label>Technik-Hinweise (Stromanschluss, Auflagen, Parkmöglichkeiten, übliche Ausstattung …)</label>'+
+    '<textarea id="lTechNotes">'+esc(l.technik_notes||'')+'</textarea>'+edBtn('lTechNotes')+
     '<label>Website der Location</label><input id="lWeb" value="'+esc(l.website||'')+'" placeholder="https://…">'+
     (webPending?
       '<div style="margin:6px 0 14px;padding:12px 14px;border:1px solid #c98a3c;border-radius:9px;background:rgba(201,138,60,.08)">'+
@@ -4951,6 +5007,7 @@ function saveLoc(id){
   var body={name:v('lName'),city:v('lCity'),region:v('lRegion'),address:v('lAddr'),phone:v('lPhone'),
     description:v('lDesc'),website:v('lWeb'),image_url:imgVal,image_focal:v('lFocal'),
     image_source:imageSource,image_approved:imageApproved,
+    contact_name:v('lContactName'),contact_phone:v('lContactPhone'),technik_notes:v('lTechNotes'),
     highlight:document.getElementById('lHl').checked,
     public:document.getElementById('lPub').checked};
   if(!id)body.sort=(CACHE.locations||[]).length;

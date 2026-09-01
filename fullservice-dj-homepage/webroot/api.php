@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 78;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 79;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -235,6 +235,14 @@ function db(): PDO {
 function upgrade(PDO $p): void {
   $v = (int)$p->query('PRAGMA user_version')->fetchColumn();
   if ($v >= SCHEMA_VERSION) return;
+  if ($v < 79) foreach ([
+    /* Standort-Stammdaten: bestehende "Lieblingslocations"-Tabelle um interne, nie an den
+       Kunden ausgelieferte Felder erweitern, statt eine eigene Tabelle einzufuehren -
+       public=0 blendet einen Eintrag schon jetzt von der Webseite aus. */
+    "alter table locations add column contact_name text",
+    "alter table locations add column contact_phone text",
+    "alter table locations add column technik_notes text",
+  ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   if ($v < 2) foreach ([
     "alter table documents add column share_token text",
     "alter table document_items add column note text",
@@ -1999,7 +2007,8 @@ create table locations (id text primary key, sort integer default 0, name text n
   city text, region text, address text, phone text, description text, image_url text,
   image_focal text default '50% 50%', website text,
   image_source text default 'eigen', image_approved integer default 0,
-  highlight integer default 0, public integer default 1, created_at text);
+  highlight integer default 0, public integer default 1, created_at text,
+  contact_name text, contact_phone text, technik_notes text);
 create table content_versions (id text primary key, key text not null,
   label text, value text not null default '{}', created_at text);
 create table inquiries (id text primary key, name text not null, email text, phone text,
