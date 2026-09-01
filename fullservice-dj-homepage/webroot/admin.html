@@ -2300,8 +2300,21 @@ function rejectPlanChange(id){
   api('event_plan_changes?id=eq.'+id,{method:'PATCH',body:{status:'abgelehnt',reviewed_at:new Date().toISOString()}})
     .then(function(){toast('Verworfen');loadAll()}).catch(function(e){toast(e.message,1)});
 }
+/* Rechnungsadresse im Planer und die Kundendaten sind die gleiche Angabe an zwei Stellen.
+   Ist ein Planer-Feld noch leer, hier mit dem Kundendatensatz vorbefuellen - beim Speichern
+   greift dann ganz normal die "leer -> direkt uebernehmen"-Regel des Planers. Ein bereits
+   gesetztes Planer-Feld wird dabei NIE ueberschrieben. */
+function planInvoiceDefaults(b,inv){
+  var cust=b.customers||CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
+  return{
+    company:inv.company||cust.company||'',
+    name:inv.name||((cust.first_name||'')+' '+(cust.last_name||'')).trim(),
+    street:inv.street||cust.street||'',
+    zip_city:inv.zip_city||[cust.zip,cust.city].filter(Boolean).join(' ')
+  };
+}
 function openPlanModal(){
-  var b=curBook,pl=planOf(b),ip=planInternalOf(b),bas=pl.basics||{},inv=pl.invoice||{},mus=pl.music||{};
+  var b=curBook,pl=planOf(b),ip=planInternalOf(b),bas=pl.basics||{},inv=planInvoiceDefaults(b,pl.invoice||{}),mus=pl.music||{};
   openModal('Veranstaltungsplaner – '+dt(b.event_date),
     '<h4 style="margin:0 0 6px">Grunddaten</h4>'+
     '<div class="grid2"><div><label>Partner/in (Name)</label><input id="pPartner" value="'+esc(bas.partner_name||'')+'"></div>'+
@@ -2315,6 +2328,7 @@ function openPlanModal(){
     '<div><label>Telefon Location</label><input id="pVenuePhone" value="'+esc(bas.venue_contact_phone||'')+'"></div></div>'+
     '<div><label>Abbau bis</label><input type="time" id="pTeardown" value="'+(bas.teardown_until||'')+'" style="max-width:160px"></div>'+
     '<h4 style="margin:14px 0 6px">Rechnungsadresse</h4>'+
+    '<div class="mut sml" style="margin-bottom:6px">Leere Felder sind mit den Kundendaten vorbefüllt – beim Speichern wird das direkt übernommen.</div>'+
     '<div class="grid2"><div><label>Firma</label><input id="pInvCompany" value="'+esc(inv.company||'')+'"></div>'+
     '<div><label>Name</label><input id="pInvName" value="'+esc(inv.name||'')+'"></div></div>'+
     '<div class="grid2"><div><label>Straße</label><input id="pInvStreet" value="'+esc(inv.street||'')+'"></div>'+
@@ -2345,7 +2359,28 @@ function savePlan(){
   };
   var ip={technik_assignment:v('pTechAssign')||null,handover_notes:v('pHandover')||null};
   api('bookings?id=eq.'+curBook.id,{method:'PATCH',body:{event_plan:pl,event_plan_internal:ip}}).then(function(){
-    Object.assign(curBook,{event_plan:pl,event_plan_internal:ip});closeModal();toast('Planer gespeichert ✓');openBookDetail(curBook.id);
+    Object.assign(curBook,{event_plan:pl,event_plan_internal:ip});
+    offerPlanToCustomerSync(curBook,pl.invoice);
+    closeModal();toast('Planer gespeichert ✓');openBookDetail(curBook.id);
+  }).catch(function(e){toast(e.message,1)});
+}
+/* Weicht die im Planer gespeicherte Rechnungsadresse vom Kundendatensatz ab (oder ist dort
+   noch leer), einmal kurz nachfragen statt die Kunden-Stammdaten still zu ueberschreiben. */
+function offerPlanToCustomerSync(b,inv){
+  var cust=b.customers||CACHE.customers.find(function(c){return c.id===b.customer_id});
+  if(!cust||!inv)return;
+  var zipParts=(inv.zip_city||'').trim().split(/\s+/);
+  var zip=/^\d+$/.test(zipParts[0]||'')?zipParts.shift():null;
+  var city=zipParts.join(' ')||null;
+  var diffs={};
+  if(inv.company&&inv.company!==cust.company)diffs.company=inv.company;
+  if(inv.street&&inv.street!==cust.street)diffs.street=inv.street;
+  if(zip&&zip!==cust.zip)diffs.zip=zip;
+  if(city&&city!==cust.city)diffs.city=city;
+  if(!Object.keys(diffs).length)return;
+  if(!confirm('Die Rechnungsadresse im Planer weicht vom Kundenprofil ab. Auch im Kundenprofil übernehmen?'))return;
+  api('customers?id=eq.'+cust.id,{method:'PATCH',body:diffs}).then(function(){
+    Object.assign(cust,diffs);toast('Kundenprofil aktualisiert ✓');
   }).catch(function(e){toast(e.message,1)});
 }
 function printEventPlan(){

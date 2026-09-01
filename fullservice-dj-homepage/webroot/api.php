@@ -3256,7 +3256,11 @@ function handlePortal(string $path, string $method, $body): never {
       $ff->execute([$me['id']]);
       $fm = $p->prepare("select token, title, status, created_at, submitted_at from forms where customer_id = ? order by created_at desc");
       $fm->execute([$me['id']]);
-      out(['customer' => ['name' => trim(($me['company'] ?: trim($me['first_name'] . ' ' . $me['last_name']))), 'email' => $me['email']],
+      out(['customer' => ['name' => trim(($me['company'] ?: trim($me['first_name'] . ' ' . $me['last_name']))), 'email' => $me['email'],
+        /* Fuer die Vorbefuellung der Rechnungsadresse im Veranstaltungsplaner - Kundendaten
+           und Planer-Rechnungsadresse sind sonst zwei getrennte, sich nie sehende Datentoepfe. */
+        'company' => $me['company'], 'first_name' => $me['first_name'], 'last_name' => $me['last_name'],
+        'street' => $me['street'], 'zip' => $me['zip'], 'city' => $me['city']],
         'bookings' => $bookings, 'documents' => $docs, 'rentals' => $rc->fetchAll(), 'files' => $ff->fetchAll(), 'forms' => $fm->fetchAll()]);
     }
     if (preg_match('#^portal/account/booking/([a-f0-9-]{30,40})/notes$#', $path, $m) && $method === 'POST') {

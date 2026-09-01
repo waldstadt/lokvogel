@@ -834,8 +834,20 @@ function planSubmit(key){
       setTimeout(function(){loadAccount()},res.j.hinweis?4000:1200);
     }).catch(function(){alert('Verbindungsfehler – bitte später erneut versuchen.')});
 }
+/* Leere Rechnungsadress-Felder im Planer mit den Kundendaten vorbefuellen - die gleiche
+   Angabe soll nicht doppelt eingetippt werden muessen. Ein bereits gesetztes Planer-Feld
+   bleibt unangetastet. */
+function planInvoiceDefaults(inv,cust){
+  cust=cust||{};
+  return{
+    company:inv.company||cust.company||'',
+    name:inv.name||((cust.first_name||'')+' '+(cust.last_name||'')).trim(),
+    street:inv.street||cust.street||'',
+    zip_city:inv.zip_city||[cust.zip,cust.city].filter(Boolean).join(' ')
+  };
+}
 function planCard(b,i){
-  var pl=b.event_plan||{},bas=pl.basics||{},inv=pl.invoice||{},mus=pl.music||{},locked=!!b.plan_locked;
+  var pl=b.event_plan||{},bas=pl.basics||{},invRaw=pl.invoice||{},inv=planInvoiceDefaults(invRaw,ME.customer),mus=pl.music||{},locked=!!b.plan_locked;
   var k=function(s){return 'p'+i+'_'+s};
   var rows=
     planRow(b.id,k('partner'),'basics.partner_name','Partner/in',{val:bas.partner_name,empty:!bas.partner_name,locked:locked})+
@@ -848,10 +860,10 @@ function planCard(b,i){
     planRow(b.id,k('vphone'),'basics.venue_contact_phone','Telefon Location',{val:bas.venue_contact_phone,empty:!bas.venue_contact_phone,locked:locked})+
     planRow(b.id,k('setup'),'basics.setup_from','Aufbau ab',{val:bas.setup_from,empty:!bas.setup_from,locked:locked})+
     planRow(b.id,k('teardown'),'basics.teardown_until','Abbau bis',{val:bas.teardown_until,empty:!bas.teardown_until,locked:locked})+
-    planRow(b.id,k('invcompany'),'invoice.company','Firma (Rechnung)',{val:inv.company,empty:!inv.company,locked:locked})+
-    planRow(b.id,k('invname'),'invoice.name','Name (Rechnung)',{val:inv.name,empty:!inv.name,locked:locked})+
-    planRow(b.id,k('invstreet'),'invoice.street','Straße',{val:inv.street,empty:!inv.street,locked:locked})+
-    planRow(b.id,k('invzip'),'invoice.zip_city','PLZ Ort',{val:inv.zip_city,empty:!inv.zip_city,locked:locked})+
+    planRow(b.id,k('invcompany'),'invoice.company','Firma (Rechnung)',{val:inv.company,empty:!invRaw.company,locked:locked})+
+    planRow(b.id,k('invname'),'invoice.name','Name (Rechnung)',{val:inv.name,empty:!invRaw.name,locked:locked})+
+    planRow(b.id,k('invstreet'),'invoice.street','Straße',{val:inv.street,empty:!invRaw.street,locked:locked})+
+    planRow(b.id,k('invzip'),'invoice.zip_city','PLZ Ort',{val:inv.zip_city,empty:!invRaw.zip_city,locked:locked})+
     planRow(b.id,k('musts'),'music.musts','Musik-Musts',{val:mus.musts,empty:!mus.musts,locked:locked})+
     planRow(b.id,k('nogos'),'music.nogos','No-Gos',{val:mus.nogos,empty:!mus.nogos,locked:locked})+
     planRow(b.id,k('playlists'),'music.playlists','Spotify-Playlists',{
