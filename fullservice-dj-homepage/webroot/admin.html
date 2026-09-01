@@ -6002,12 +6002,17 @@ function renderForms(){
     '<td><span class="b '+(STB[f.status]||'grey')+'">'+f.status+'</span></td>'+
     '<td style="white-space:nowrap">'+
     (f.status==='beantwortet'?'<button class="btn sm" onclick="viewFormAnswers(\''+f.id+'\')">Antworten</button> ':
-      '<button class="btn g sm" onclick="copyFormLink(\''+f.token+'\')">Link</button>')+
+      '<button class="btn g sm" onclick="copyFormLink(\''+f.token+'\')">Link</button> ')+
+    '<button class="btn g sm" onclick="previewForm(\''+f.id+'\')">Vorschau</button> '+
     '<a onclick="delRow(\'forms\',\''+f.id+'\',reloadForms)" style="color:var(--redl)">✕</a></td></tr>';
   }).join('')||'<tr><td colspan="5" class="mut">Noch keine Fragebögen verschickt.</td></tr>';
   document.getElementById('ftList').innerHTML=(CACHE.formTpls||[]).map(function(t){
     return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openFtModal(\''+t.id+'\')">'+esc(t.name)+'</a> <span class="mut">'+(t.fields||[]).length+' Fragen</span></div>';
   }).join('')||'<span class="mut">Keine Vorlagen.</span>';
+}
+function previewForm(id){
+  var f=(CACHE.forms||[]).find(function(x){return x.id===id});if(!f)return;
+  openFormKundenansicht(f.title,f.intro,f.fields);
 }
 function copyFormLink(token){
   var url=portalUrl('f',token);
@@ -6051,21 +6056,59 @@ function openFtModal(id){
     '<label>Einleitung</label><textarea id="ftIntro" style="min-height:56px">'+esc(t.intro||'')+'</textarea>'+edBtn('ftIntro')+
     '<label>Fragen – eine pro Zeile: Frage | Typ | Optionen (Typ: text, textarea, select, checkbox)</label>'+
     '<textarea id="ftFields" style="min-height:180px;font-size:11px">'+esc(lines)+'</textarea>'+
-    '<div style="margin-top:14px"><button class="btn" onclick="saveFt(\''+(id||'')+'\')">Speichern</button>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveFt(\''+(id||'')+'\')">Speichern</button> '+
+    '<button class="btn g" onclick="previewFt()">Vorschau</button>'+
     (id?' <button class="btn r" onclick="delRow(\'form_templates\',\''+id+'\',reloadForms)">Löschen</button>':'')+'</div>');
 }
-function saveFt(id){
-  if(!v('ftName')){toast('Name fehlt.',1);return}
-  var fields=document.getElementById('ftFields').value.split('\n').map(function(l){
+/* Aus den Zeilen "Frage | Typ | Optionen" im Editor die Feld-Objekte bauen -
+   von saveFt() UND der Vorschau genutzt, damit beide exakt dasselbe parsen. */
+function parseFtFields(){
+  return document.getElementById('ftFields').value.split('\n').map(function(l){
     var p=l.split('|').map(function(s){return s.trim()});
     if(!p[0])return null;
     var f={label:p[0],type:p[1]||'text'};
     if(p[2])f.options=p[2].split(',').map(function(s){return s.trim()}).filter(Boolean);
     return f;
   }).filter(Boolean);
-  var body={name:v('ftName'),intro:document.getElementById('ftIntro').value,fields:fields};
+}
+function saveFt(id){
+  if(!v('ftName')){toast('Name fehlt.',1);return}
+  var body={name:v('ftName'),intro:document.getElementById('ftIntro').value,fields:parseFtFields()};
   (id?api('form_templates?id=eq.'+id,{method:'PATCH',body:body}):api('form_templates',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');reloadForms()}).catch(function(e){toast(e.message,1)});
+}
+/* Vorschau der gerade im Editor stehenden (auch noch ungespeicherten) Werte -
+   liest direkt aus den Feldern statt aus t.fields, damit man vor dem
+   Speichern schon sieht, wie der Bogen beim Kunden aussieht. */
+function previewFt(){
+  openFormKundenansicht(v('ftName')||'Fragebogen',document.getElementById('ftIntro').value,parseFtFields());
+}
+/* Baut exakt das HTML, das der Kunde im Portal sieht (renderForm() in
+   portal.html), aber mit leeren Eingaben und ohne Absenden-Logik - fuer die
+   Vorschau ohne dass irgendetwas verschickt wird. */
+function buildFormHtml(title,intro,fields){
+  var fieldStyle='display:block;width:100%;box-sizing:border-box;padding:9px 10px;margin:4px 0 14px;border:1px solid #ccc;border-radius:6px;font-size:14px;font-family:inherit';
+  var body=(fields||[]).map(function(f,i){
+    var t=f.type||'text';
+    if(t==='textarea')return '<label style="display:block;font-weight:600;font-size:13px">'+esc(f.label)+'</label><textarea disabled style="'+fieldStyle+';min-height:70px"></textarea>';
+    if(t==='select')return '<label style="display:block;font-weight:600;font-size:13px">'+esc(f.label)+'</label><select disabled style="'+fieldStyle+'"><option value="">– bitte wählen –</option>'+
+      (f.options||[]).map(function(o){return '<option>'+esc(o)+'</option>'}).join('')+'</select>';
+    if(t==='checkbox')return '<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0 14px"><input type="checkbox" disabled style="width:auto"><span>'+esc(f.label)+'</span></label>';
+    return '<label style="display:block;font-weight:600;font-size:13px">'+esc(f.label)+'</label><input type="text" disabled style="'+fieldStyle+'">';
+  }).join('');
+  return '<div style="max-width:560px;margin:0 auto;padding:30px 20px;font-family:sans-serif;color:#111">'+
+    '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px">Ein paar Fragen</div>'+
+    '<h1 style="font-size:22px;margin:0 0 8px">'+esc(title||'')+'</h1>'+
+    (intro?'<p style="color:#555;margin-bottom:16px">'+esc(intro)+'</p>':'')+
+    '<div style="margin-top:6px">'+body+'</div>'+
+    '<div style="margin-top:10px"><button disabled style="padding:10px 18px;border:none;border-radius:6px;background:#ccc;color:#666">Antworten absenden</button></div>'+
+    '<div style="margin-top:10px;font-size:11px;color:#999">Vorschau – hier wird nichts gespeichert oder versendet.</div></div>';
+}
+function openFormKundenansicht(title,intro,fields){
+  var html=buildFormHtml(title,intro,fields);
+  openModal('Kundenansicht – '+esc(title||'Fragebogen'),
+    '<iframe id="ftKaFrame" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:8px;background:#fff" sandbox=""></iframe>');
+  document.getElementById('ftKaFrame').srcdoc='<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0">'+html+'</body></html>';
 }
 function reloadForms(){
   Promise.all([api('forms?select=*&order=created_at.desc'),api('form_templates?select=*&order=sort')])
