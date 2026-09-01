@@ -134,6 +134,18 @@ table.batch tr.dirty td{background:rgba(255,111,91,.14)}
 table.batch tr.dirty td:first-child{box-shadow:inset 3px 0 0 var(--acc)}
 table.batch td.chk,table.batch th.chk{text-align:center}
 
+/* Breadcrumb (Kunden-/Buchungsdetail) */
+.crumb{font-size:11px;color:var(--gl);margin-bottom:6px}
+.crumb a{color:var(--gll)}
+.crumb a:hover{color:var(--acc)}
+
+/* Kleines Aktionsmenü (z. B. "Weitere Aktionen" in der Buchung) */
+.dd-wrap{position:relative;display:inline-block}
+.dd-menu{position:absolute;right:0;top:calc(100% + 6px);background:var(--cd2);border:1px solid var(--bdr);min-width:220px;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.dd-menu a{display:block;padding:10px 14px;font-size:12px;color:var(--gll);cursor:pointer}
+.dd-menu a:hover{background:var(--bg);color:var(--wh)}
+.dd-menu a.r{color:var(--redl)}
+
 /* Badges */
 .b{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:9px;border:1px solid}
 .b.grey{color:var(--gl);border-color:var(--bdr)}
@@ -286,8 +298,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <a data-pg="forms"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>Fragebögen</a>
       <div class="grp">Finanzen</div>
       <a data-pg="prod"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>Produkte</a>
-      <a data-pg="quotes"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Angebote</a>
-      <a data-pg="inv"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Rechnungen</a>
+      <a data-pg="docs"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Dokumente</a>
       <a data-pg="stats"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>Statistik</a>
       <div class="grp">Betrieb</div>
       <a data-pg="tech"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>Technik</a>
@@ -377,29 +388,30 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 
   <!-- BUCHUNG-DETAIL -->
   <div class="pg" id="pg-bookd">
-    <a onclick="showPage('book')">← Buchungen</a>
-    <div class="phead" style="margin-top:8px"><div><div class="pt" id="bdTitle"></div><div class="ps" id="bdSub"></div></div>
-      <div><button class="btn g sm" onclick="openBookModal(curBook)">Bearbeiten</button>
-      <button class="btn g sm" onclick="createDocFromBooking('angebot')">→ Angebot</button>
-      <button class="btn g sm" onclick="createDocFromBooking('bestaetigung')">→ Auftragsbestätigung</button>
-      <button class="btn g sm" onclick="createDocFromBooking('abschlag')">→ Abschlagsrechnung</button>
-      <button class="btn sm" onclick="createDocFromBooking('rechnung')">→ Rechnung</button>
-      <button class="btn g sm" onclick="printPackliste()">Packliste</button>
-      <button class="btn g sm" onclick="createLieferschein()">Lieferschein</button>
-      <button class="btn g sm" onclick="printMietvertrag()">Mietvertrag</button>
-      <button class="btn g sm" onclick="openDigitalRental()">Mietvertrag digital</button>
-      <button class="btn r sm" onclick="openStornoModal()">Storno</button></div></div>
+    <div class="crumb" id="bdCrumb"></div>
+    <div class="phead"><div><div class="pt" id="bdTitle"></div><div class="ps" id="bdSub"></div></div>
+      <div class="dd-wrap">
+        <button class="btn g sm" onclick="toggleBookMenu(event)" aria-haspopup="true" aria-expanded="false" id="bdMoreBtn">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>Weitere Aktionen
+        </button>
+        <div class="dd-menu" id="bdMoreMenu" hidden>
+          <a onclick="closeBookMenu();openDigitalRental()">Mietvertrag digital</a>
+          <a onclick="closeBookMenu();printMietvertrag()">Mietvertrag (Papier) drucken</a>
+          <a onclick="closeBookMenu();printPackliste()">Packliste drucken</a>
+          <a class="r" onclick="closeBookMenu();openStornoModal()">Buchung stornieren</a>
+        </div>
+      </div></div>
     <div class="grid2" style="gap:16px;align-items:start">
-      <div class="card"><h3>Details</h3><div id="bdData" class="sml"></div></div>
-      <div class="card"><h3>Technik für diesen Auftrag <button class="btn sm" style="float:right" onclick="openBeModal()">+ Technik</button></h3>
+      <div class="card"><h3>Stammdaten <a class="sml" style="float:right" onclick="openBookModal(curBook)">Bearbeiten</a></h3><div id="bdData" class="sml"></div></div>
+      <div class="card"><h3>Technik <a class="sml" style="float:right" onclick="openBeModal()">Bearbeiten</a></h3>
         <div id="bdEquip" class="sml mut">Keine Technik zugeordnet.</div></div>
     </div>
-    <div class="card"><h3>Veranstaltungsplaner <span style="float:right"><button class="btn g sm" onclick="printEventPlan()">Handout drucken</button> <button class="btn sm" onclick="openPlanModal()">Bearbeiten</button></span></h3>
+    <div class="card"><h3>Planer <span style="float:right"><a class="sml" onclick="printEventPlan()">Handout drucken</a> <a class="sml" onclick="openPlanModal()">Öffnen</a></span></h3>
       <div id="bdPlan" class="sml mut">–</div>
       <div id="bdPlanChanges" class="sml" style="margin-top:10px"></div></div>
-    <div class="card"><h3>Rider / Einsatzblatt <span style="float:right"><button class="btn g sm" onclick="printRider()">Drucken</button> <button class="btn sm" onclick="openRiderModal()">Bearbeiten</button></span></h3>
+    <div class="card"><h3>Rider <span style="float:right"><a class="sml" onclick="printRider()">Drucken</a> <a class="sml" onclick="openRiderModal()">Öffnen</a></span></h3>
       <div id="bdRider" class="sml mut">–</div></div>
-    <div class="card"><h3>Dokumente zu diesem Auftrag</h3><div id="bdDocs" class="sml mut">–</div></div>
+    <div class="card"><h3>Dokumente dieser Buchung <button class="btn sm" style="float:right" onclick="newDocForBooking()">+ Neues Dokument</button></h3><div id="bdDocs" class="sml mut">–</div></div>
   </div>
 
   <!-- E-MAIL-VORLAGEN -->
@@ -426,26 +438,34 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Name</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis brutto</th><th>Typ</th><th>Status</th></tr></thead><tbody id="prodRows"></tbody></table></div>
   </div>
 
-  <!-- ANGEBOTE -->
-  <div class="pg" id="pg-quotes">
-    <div class="phead"><div><div class="pt">Angebote</div><div class="ps" id="qStats"></div></div>
-      <button class="btn" onclick="newQuote(null)">+ Neues Angebot</button></div>
-    <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Datum</th><th>Kunde</th><th class="num">Brutto</th><th>Gültig bis</th><th>Status</th></tr></thead><tbody id="quoteRows"></tbody></table></div>
-  </div>
-
-  <!-- RECHNUNGEN -->
-  <div class="pg" id="pg-inv">
-    <div class="phead"><div><div class="pt">Rechnungen</div><div class="ps">inkl. Abschlags- und Schlussrechnungen</div></div>
+  <!-- DOKUMENTE -->
+  <div class="pg" id="pg-docs">
+    <div class="phead"><div><div class="pt">Dokumente</div><div class="ps">Angebote, Auftragsbestätigungen, Rechnungen, Lieferscheine und Gutschriften – alles an einem Ort</div></div>
       <div><button class="btn g sm" onclick="exportInvoicesCsv()">CSV-Export</button>
-      <button class="btn g" onclick="openDocEditor(null,'abschlag')">+ Abschlag</button>
-      <button class="btn" onclick="openDocEditor(null,'rechnung')">+ Neue Rechnung</button></div></div>
-    <div id="invOverdue" class="sml" style="color:var(--redl);margin-bottom:10px"></div>
-    <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Typ</th><th>Datum</th><th>Kunde</th><th class="num">Brutto</th><th>Fällig</th><th>Status</th></tr></thead><tbody id="invRows"></tbody></table></div>
+      <button class="btn" onclick="openDocEditor(null)">+ Neues Dokument</button></div></div>
+    <div class="card" style="padding:14px 18px">
+      <div class="grid3">
+        <div><label>Typ</label><select id="docsFType" onchange="renderDocsPage()">
+          <option value="">Alle Typen</option>
+          <option value="angebot">Angebot</option><option value="bestaetigung">Auftragsbestätigung</option>
+          <option value="rechnung">Rechnung</option><option value="abschlag">Abschlagsrechnung</option>
+          <option value="schluss">Schlussrechnung</option><option value="lieferschein">Lieferschein</option>
+          <option value="gutschrift">Gutschrift</option></select></div>
+        <div><label>Status</label><select id="docsFStatus" onchange="renderDocsPage()">
+          <option value="">Alle</option><option value="entwurf">Entwurf</option><option value="versendet">Versendet</option>
+          <option value="angenommen">Angenommen</option><option value="abgelehnt">Abgelehnt</option>
+          <option value="bezahlt">Bezahlt</option><option value="ueberfaellig">Überfällig</option>
+          <option value="storniert">Storniert</option></select></div>
+        <div><label>Kunde</label><input type="text" id="docsFCust" placeholder="Name suchen …" oninput="renderDocsPage()"></div>
+      </div>
+    </div>
+    <div id="docsOverdue" class="sml" style="color:var(--redl);margin-bottom:10px"></div>
+    <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Typ</th><th>Datum</th><th>Kunde</th><th class="num">Brutto</th><th>Fällig / gültig</th><th>Status</th></tr></thead><tbody id="docsRows"></tbody></table></div>
   </div>
 
   <!-- DOKUMENT-EDITOR -->
   <div class="pg" id="pg-doc">
-    <a id="docBack" onclick="showPage('inv')">← Zurück</a>
+    <a id="docBack" onclick="showPage('docs')">← Zurück</a>
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="docTitle">Dokument</div><div class="ps" id="docSub"></div></div>
       <div>
         <span id="docDocBtns"><button class="btn g sm" onclick="printDoc()">Drucken / PDF</button>
@@ -1074,10 +1094,14 @@ if(saved){TOKEN=saved;enter()}
 document.querySelectorAll('#nav a').forEach(function(a){a.addEventListener('click',function(){showPage(a.dataset.pg);closeMobileNav()})});
 function toggleMobileNav(){document.getElementById('side').classList.toggle('open');document.getElementById('mnavBg').classList.toggle('v')}
 function closeMobileNav(){document.getElementById('side').classList.remove('open');document.getElementById('mnavBg').classList.remove('v')}
+/* Detailseiten haben keinen eigenen Nav-Eintrag - der Elternpunkt bleibt aktiv,
+   damit man sieht, in welchem Bereich man gerade steckt. */
+var SUBPAGE_PARENT={custd:'cust',bookd:'book',doc:'docs'};
 function showPage(id){
   document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('a')});
   document.getElementById('pg-'+id).classList.add('a');
-  document.querySelectorAll('#nav a').forEach(function(a){a.classList.toggle('a',a.dataset.pg===id)});
+  var navId=SUBPAGE_PARENT[id]||id;
+  document.querySelectorAll('#nav a').forEach(function(a){a.classList.toggle('a',a.dataset.pg===navId)});
   if(id==='stats')loadWebStats();
   if(id==='workshops')loadNewsletter();
   if(id==='media')loadMediaPage();
@@ -1144,7 +1168,7 @@ function applyBrand(){
   document.title=b+' \u00b7 Backoffice';
 }
 function renderAll(){
-  renderDash();renderInq();renderCustList();renderBook();renderQuotes();renderInv();
+  renderDash();renderInq();renderCustList();renderBook();renderDocsPage();
   renderEq();renderSetsAdmin();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
   renderProducts();renderPartners();renderWsAdmin();renderCampaigns();renderModulAdmin();renderReportAdmin();
   renderTplSettings();
@@ -1503,12 +1527,7 @@ function openCustDetail(id){
       (gefuellt?'<button class="btn g sm" onclick="printEventPlanFor(\''+b.id+'\')">Handout drucken</button>':'')+
       '</div>';
   }).join(''):'Sobald es eine Veranstaltung gibt, kannst du hier Location, Ablaufplan und Musikwünsche pflegen.';
-  var docs=CACHE.documents.filter(function(d){return d.customer_id===id});
-  document.getElementById('cdDocs').innerHTML=docs.map(function(d){
-    /* Bei Zahlbelegen zaehlt der offene Betrag: die Schlussrechnung stand hier mit der
-       vollen Auftragssumme, obwohl der Abschlag laengst bezahlt war. */
-    return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+docOffenText(d)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
-  }).join('')||'Keine Dokumente.';
+  document.getElementById('cdDocs').innerHTML=renderDocList(function(d){return d.customer_id===id})||'Keine Dokumente.';
   renderComms();
   showPage('custd');
 }
@@ -1720,8 +1739,10 @@ function reloadBlocks(){
 function openBookDetail(id){
   curBook=CACHE.bookings.find(function(b){return b.id===id});if(!curBook)return;
   var b=curBook;
+  document.getElementById('bdCrumb').innerHTML='<a onclick="showPage(\'book\')">Buchungen</a> · '+
+    '<a onclick="openCustDetail(\''+b.customer_id+'\')">'+esc(custName(b.customers))+'</a> › Buchung vom '+dt(b.event_date);
   document.getElementById('bdTitle').textContent=b.title||b.event_type||'Auftrag';
-  document.getElementById('bdSub').innerHTML=dt(b.event_date)+(b.end_date?' – '+dt(b.end_date):'')+' · <a onclick="openCustDetail(\''+b.customer_id+'\')">'+esc(custName(b.customers))+'</a> · <span class="b '+bookBadge(b.status)+'">'+b.status+'</span>';
+  document.getElementById('bdSub').innerHTML=dt(b.event_date)+(b.end_date?' – '+dt(b.end_date):'')+' · <span class="b '+bookBadge(b.status)+'">'+b.status+'</span>';
   document.getElementById('bdData').innerHTML=
     row('Anlass',b.event_type)+row('Zeit',[b.start_time,b.end_time].filter(Boolean).join(' – '))+
     row('Location',b.venue_name)+row('Adresse',b.venue_address)+row('Gäste',b.guests)+
@@ -1730,13 +1751,35 @@ function openBookDetail(id){
       ?'<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b style="color:var(--acc)">Vom Kunden gepflegt'+(b.customer_notes.updated_at?' ('+dt(b.customer_notes.updated_at)+')':'')+':</b>'+
        row('Programmablauf',b.customer_notes.schedule)+row('Musikwünsche',b.customer_notes.music)+row('Vereinbarungen',b.customer_notes.agreements)+'</div>':'');
   renderBe();renderRider();renderPlan();
-  var docs=CACHE.documents.filter(function(d){return d.booking_id===id});
-  document.getElementById('bdDocs').innerHTML=docs.map(function(d){
-    /* Bei Zahlbelegen zaehlt der offene Betrag: die Schlussrechnung stand hier mit der
-       vollen Auftragssumme, obwohl der Abschlag laengst bezahlt war. */
-    return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+docOffenText(d)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
-  }).join('')||'Noch keine Dokumente – erzeuge oben ein Angebot oder eine Rechnung.';
+  document.getElementById('bdDocs').innerHTML=renderDocList(function(d){return d.booking_id===id})||
+    'Noch keine Dokumente – leg über „+ Neues Dokument" eins an.';
+  closeBookMenu();
   showPage('bookd');
+}
+/* ===== "Weitere Aktionen"-Menü in der Buchung (Storno, Mietvertrag, Packliste) ===== */
+function toggleBookMenu(ev){
+  if(ev)ev.stopPropagation();
+  var m=document.getElementById('bdMoreMenu');
+  var open=m.hidden;
+  m.hidden=!open;
+  document.getElementById('bdMoreBtn').setAttribute('aria-expanded',open?'true':'false');
+}
+function closeBookMenu(){
+  var m=document.getElementById('bdMoreMenu');if(m)m.hidden=true;
+  var btn=document.getElementById('bdMoreBtn');if(btn)btn.setAttribute('aria-expanded','false');
+}
+document.addEventListener('click',function(e){
+  var m=document.getElementById('bdMoreMenu');
+  if(!m||m.hidden)return;
+  if(m.contains(e.target)||(e.target.closest&&e.target.closest('#bdMoreBtn')))return;
+  closeBookMenu();
+});
+/* Neues Dokument direkt aus der Buchung heraus - Kunde und Buchung sind schon gesetzt,
+   den Dokumenttyp kann man im Editor selbst noch umstellen. */
+function newDocForBooking(){
+  var b=curBook;if(!b)return;
+  openDocEditor(null,'angebot');
+  setTimeout(function(){presetDocFromBooking(b);renderTotals()},30);
 }
 function renderBe(){
   var list=CACHE.be.filter(function(x){return x.booking_id===curBook.id});
@@ -2505,31 +2548,35 @@ function docTypeName(t){return {angebot:'Angebot',bestaetigung:'Auftragsbestäti
    Fälligkeitsdatum, keine Mahnung und keinen Bezahlt-Status. */
 function istZahlbeleg(t){return t!=='angebot'&&t!=='bestaetigung'&&t!=='lieferschein'}
 function docBadge(st){return {entwurf:'grey',versendet:'blue',angenommen:'green',abgelehnt:'red',bezahlt:'green',ueberfaellig:'red',storniert:'red'}[st]||'grey'}
-function renderQuotes(){
-  /* Auftragsbestätigungen stehen mit in der Angebotsliste - sie gehören zur selben
-     Phase und sollen nicht zwischen den Rechnungen untergehen. */
-  var list=CACHE.documents.filter(function(d){return d.doc_type==='angebot'||d.doc_type==='bestaetigung'});
-  var sent=list.filter(function(d){return ['versendet','angenommen','abgelehnt'].indexOf(d.status)>=0});
-  var acc=list.filter(function(d){return d.status==='angenommen'});
-  document.getElementById('qStats').textContent=sent.length?('Annahmequote: '+Math.round(acc.length/sent.length*100)+' % ('+acc.length+'/'+sent.length+')'):'Noch keine versendeten Angebote';
-  document.getElementById('quoteRows').innerHTML=applySort(list,'quotes').map(function(d){
-    return '<tr class="click" onclick="openDocEditor(\''+d.id+'\')"><td><b>'+esc(d.number)+'</b></td><td>'+dt(d.doc_date)+'</td>'+
-    '<td>'+esc(custName(d.customers))+'</td><td class="num">'+euro(d.total_gross)+'</td><td>'+dt(d.valid_until)+'</td>'+
-    '<td><span class="b '+docBadge(d.status)+'">'+d.status+'</span></td></tr>';
-  }).join('')||'<tr><td colspan="6" class="mut">Noch keine Angebote.</td></tr>';
+/* Kompakte Dokumentenliste - von Kunden-, Buchungs- und der Dokumente-Übersichtsseite
+   genutzt, damit es nicht wieder zwei leicht unterschiedliche Varianten gibt. */
+function renderDocList(filterFn){
+  var docs=CACHE.documents.filter(filterFn).sort(function(a,b){return (b.doc_date||'').localeCompare(a.doc_date||'')});
+  return docs.map(function(d){
+    /* Bei Zahlbelegen zaehlt der offene Betrag: die Schlussrechnung stand hier mit der
+       vollen Auftragssumme, obwohl der Abschlag laengst bezahlt war. */
+    return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+docOffenText(d)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
+  }).join('');
 }
-function renderInv(){
-  var list=CACHE.documents.filter(function(d){return istZahlbeleg(d.doc_type)});
-  document.getElementById('invRows').innerHTML=applySort(list,'invoices').map(function(d){
+function renderDocsPage(){
+  var t=v('docsFType'),st=v('docsFStatus'),q=(v('docsFCust')||'').toLowerCase();
+  var list=CACHE.documents.filter(function(d){
+    if(t&&d.doc_type!==t)return false;
+    if(st&&d.status!==st)return false;
+    if(q&&(custName(d.customers)||'').toLowerCase().indexOf(q)<0)return false;
+    return true;
+  });
+  document.getElementById('docsRows').innerHTML=applySort(list,'docs').map(function(d){
     return '<tr class="click" onclick="openDocEditor(\''+d.id+'\')"><td><b>'+esc(d.number)+'</b></td><td>'+docTypeName(d.doc_type)+'</td><td>'+dt(d.doc_date)+'</td>'+
-    '<td>'+esc(custName(d.customers))+'</td><td class="num">'+euro(Number(d.total_gross)-Number(d.deposit_deducted||0))+'</td><td>'+dt(d.due_date)+'</td>'+
+    '<td>'+esc(custName(d.customers))+'</td><td class="num">'+euro(Number(d.total_gross)-Number(d.deposit_deducted||0))+'</td>'+
+    '<td>'+dt(istZahlbeleg(d.doc_type)?d.due_date:d.valid_until)+'</td>'+
     '<td>'+(isOverdue(d)?'<span class="b red">überfällig</span>':'<span class="b '+docBadge(d.status)+'">'+d.status+'</span>')+'</td></tr>';
-  }).join('')||'<tr><td colspan="7" class="mut">Noch keine Rechnungen.</td></tr>';
-  var od=list.filter(isOverdue);
-  var el=document.getElementById('invOverdue');
-  if(el)el.innerHTML=od.length?(' <b>'+od.length+'</b>überfällige Rechnung'+(od.length>1?'en':'')+' – insgesamt '+
+  }).join('')||'<tr><td colspan="7" class="mut">Keine Dokumente gefunden.</td></tr>';
+  var od=CACHE.documents.filter(isOverdue);
+  var el=document.getElementById('docsOverdue');
+  if(el)el.innerHTML=od.length?(' <b>'+od.length+'</b> überfällige Rechnung'+(od.length>1?'en':'')+' – insgesamt '+
     euro(od.reduce(function(s,d){return s+Number(d.total_gross)-Number(d.deposit_deducted||0)},0))+
-    '. Öffne die Rechnung und nutze „ Zahlungserinnerung".'):'';
+    '. Öffne die Rechnung und nutze „Zahlungserinnerung".'):'';
 }
 
 var curDoc=null,curItems=[];
@@ -2613,7 +2660,7 @@ function updateDocTypeUI(t){
   document.getElementById('docDepWrap').style.display=t==='schluss'?'':'none';
   document.getElementById('docDateLbl2').textContent=istZahlbeleg(t)?'Fällig am':'Gültig bis';
   if(curTpl)return; /* im Vorlagen-Editor gelten Zurueck-Link und Vorlagen-Buttons von setTplMode */
-  document.getElementById('docBack').setAttribute('onclick',"showPage('"+((t==='angebot'||t==='bestaetigung')?'quotes':'inv')+"')");
+  document.getElementById('docBack').setAttribute('onclick',"showPage('docs')");
   document.getElementById('docTplBtns').innerHTML=t==='angebot'?
     '<button class="btn sm" onclick="openTplPicker()">Vorlage laden</button> <button class="btn sm" onclick="saveAsTpl()">Als Vorlage speichern</button>':'';
 }
@@ -2801,7 +2848,7 @@ function setDocStatus(st){
     return syncVeranstaltungStatus(st);
   }).catch(function(e){toast(e.message,1)});
 }
-function refreshDocs(){api('documents?select=*,customers(*)&order=created_at.desc').then(function(r){CACHE.documents=r||[];renderQuotes();renderInv();renderDash()})}
+function refreshDocs(){api('documents?select=*,customers(*)&order=created_at.desc').then(function(r){CACHE.documents=r||[];renderDocsPage();renderDash()})}
 
 var UNIT_OPTIONS=['Stk.','Set','Tag','Tage','Std.','Kilometer','Liter','pausch.'];
 function unitOptionsHtml(cur){
@@ -3933,20 +3980,13 @@ var SORTDEFS={
     {get:function(b){return b.venue_name},type:'text'},
     {get:function(b){return bookingValue(b)},type:'num'},
     {get:function(b){return b.status},type:'text'}]},
-  quotes:{rowsId:'quoteRows',render:function(){renderQuotes()},cols:[
-    {get:function(d){return d.number},type:'text'},
-    {get:function(d){return d.doc_date},type:'date'},
-    {get:function(d){return custName(d.customers)},type:'text'},
-    {get:function(d){return d.total_gross},type:'num'},
-    {get:function(d){return d.valid_until},type:'date'},
-    {get:function(d){return d.status},type:'text'}]},
-  invoices:{rowsId:'invRows',render:function(){renderInv()},cols:[
+  docs:{rowsId:'docsRows',render:function(){renderDocsPage()},cols:[
     {get:function(d){return d.number},type:'text'},
     {get:function(d){return d.doc_type},type:'text'},
     {get:function(d){return d.doc_date},type:'date'},
     {get:function(d){return custName(d.customers)},type:'text'},
     {get:function(d){return Number(d.total_gross)-Number(d.deposit_deducted||0)},type:'num'},
-    {get:function(d){return d.due_date},type:'date'},
+    {get:function(d){return istZahlbeleg(d.doc_type)?d.due_date:d.valid_until},type:'date'},
     {get:function(d){return d.status},type:'text'}]},
   products:{rowsId:'prodRows',render:function(){renderProducts()},cols:[
     {get:function(p){return p.sku},type:'text'},
@@ -6382,7 +6422,7 @@ function setTplMode(on){
   ['docTplNote','docTplNameWrap'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.style.display=on?'':'none';});
   document.getElementById('docSaveBtn').setAttribute('onclick',on?'saveQuoteTpl()':'saveDoc()');
-  document.getElementById('docBack').setAttribute('onclick',"showPage('"+(on?'set':'inv')+"')");
+  document.getElementById('docBack').setAttribute('onclick',"showPage('"+(on?'set':'docs')+"')");
   var tb=document.getElementById('docTplBtns');if(on&&tb)tb.innerHTML='';
 }
 function openTplEditor(id){
