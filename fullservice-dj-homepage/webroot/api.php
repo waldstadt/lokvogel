@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 85;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 86;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -74,7 +74,7 @@ function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $mo
       'model' => $model, 'max_tokens' => $maxTokens, 'system' => $system,
       'messages' => [['role' => 'user', 'content' => $userText]],
     ], JSON_UNESCAPED_UNICODE);
-    $header = "x-api-key: $apiKey\r\nanthropic-version: 2023-06-01\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\nAccept: application/json\r\n";
+    $header = "x-api-key: $apiKey\r\nanthropic-version: 2023-06-01\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; " . uaName() . "/1.0)\r\nAccept: application/json\r\n";
     if ($workspaceId !== '') $header .= "anthropic-workspace-id: $workspaceId\r\n";
     $ctx = stream_context_create(['http' => ['method' => 'POST', 'header' => $header, 'content' => $reqBody, 'timeout' => 40, 'ignore_errors' => true]]);
     $resp = @file_get_contents($baseUrl . '/messages', false, $ctx);
@@ -101,7 +101,7 @@ function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $mo
   ], JSON_UNESCAPED_UNICODE);
   $ctx = stream_context_create(['http' => [
     'method' => 'POST',
-    'header' => "Authorization: Bearer $apiKey\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\nAccept: application/json\r\n",
+    'header' => "Authorization: Bearer $apiKey\r\nContent-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; " . uaName() . "/1.0)\r\nAccept: application/json\r\n",
     'content' => $reqBody, 'timeout' => 40, 'ignore_errors' => true,
   ]]);
   $resp = @file_get_contents($baseUrl . '/chat/completions', false, $ctx);
@@ -142,7 +142,7 @@ function aiConfigOrFail(): array {
 function orsGet(string $url, string $apiKey): array {
   $ctx = stream_context_create(['http' => [
     'method' => 'GET',
-    'header' => "Authorization: $apiKey\r\nAccept: application/json, application/geo+json\r\nUser-Agent: Mozilla/5.0 (compatible; LauschgiftBackoffice/1.0)\r\n",
+    'header' => "Authorization: $apiKey\r\nAccept: application/json, application/geo+json\r\nUser-Agent: Mozilla/5.0 (compatible; " . uaName() . "/1.0)\r\n",
     'timeout' => 20, 'ignore_errors' => true,
   ]]);
   $resp = @file_get_contents($url, false, $ctx);
@@ -248,7 +248,38 @@ function upgrade(PDO $p): void {
      beiden Sonderfaelle bei der Annahme (Termin inzwischen belegt / Angebot abgelaufen),
      v83 "Nachfassen zum Angebot" fuer Kunden, die sich nach dem Angebot nicht melden,
      v85 die Eingangsbestaetigungen fuer Absage, Frage und Rueckrufwunsch im Portal. */
-  if ($v < 85) seedExtraTemplates($p);
+  if ($v < 86) seedExtraTemplates($p);
+  if ($v < 86) {
+    /* v86: Wiedervorlagen zu fehlgeschlagenen Mails wissen, zu welchem Beleg sie gehoeren
+       (ref_doc_id) und welche Mail nicht rauskam (ref_kind) - so kann das Dashboard
+       "Erneut senden" anbieten, statt nur einen Text zum Abtippen zu zeigen. */
+    foreach (["alter table communications add column ref_doc_id text",
+              "alter table communications add column ref_kind text"] as $sql)
+      { try { $p->exec($sql); } catch (PDOException $e) {} }
+    /* Betreiber-Details, die bisher fest im Code standen (Partner-Agentur, WhatsApp,
+       Hoster): fuer eine bestehende Installation die bisherigen Werte uebernehmen, damit
+       sich fuer den Betreiber nichts aendert. Frische Installationen bekommen in seed()
+       neutrale Vorgaben (Vermittlung aus). */
+    try {
+      $comp = json_decode((string)$p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true) ?: [];
+      $changed = false;
+      foreach (['agency_name' => 'DJ Bande', 'agency_city' => 'Münster', 'agency_enabled' => true,
+                'whatsapp' => (string)($comp['phone'] ?? ''), 'hoster_name' => 'All-Inkl'] as $k => $vDef)
+        if (!array_key_exists($k, $comp)) { $comp[$k] = $vDef; $changed = true; }
+      if ($changed)
+        $p->prepare("update settings set value=?, updated_at=? where key='company'")
+          ->execute([json_encode($comp, JSON_UNESCAPED_UNICODE), now()]);
+      /* Aktionsseiten: "Hallo Markus, …" in der WhatsApp-Vorbelegung wird zum Platzhalter
+         {inhaber}, den kampagne.js aus den Firmendaten fuellt. Nur der unveraenderte
+         Seed-Anfang wird ersetzt - selbst geschriebene Texte bleiben stehen. */
+      foreach ($p->query("select id, form_cfg from campaign_pages")->fetchAll() as $row) {
+        $cfg = json_decode((string)$row['form_cfg'], true);
+        if (!is_array($cfg) || !str_starts_with((string)($cfg['wa_text'] ?? ''), 'Hallo Markus, ')) continue;
+        $cfg['wa_text'] = 'Hallo {inhaber}, ' . substr((string)$cfg['wa_text'], strlen('Hallo Markus, '));
+        $p->prepare('update campaign_pages set form_cfg = ? where id = ?')->execute([json_encode($cfg, JSON_UNESCAPED_UNICODE), $row['id']]);
+      }
+    } catch (Throwable $e) {}
+  }
   if ($v < 84) {
     /* v84: Angebots-Versionen (der Kunde sah bisher stillschweigend den geaenderten
        Stand unter demselben Link), Kennzeichen fuer die DJ-Vermittlung am Kunden. */
@@ -807,7 +838,7 @@ function bandeMailBody(): string {
 
 danke für eure Anfrage! Die weniger gute Nachricht zuerst: An eurem Termin am {datum} bin ich leider schon fest gebucht.
 
-Aber ich lasse euch nicht allein suchen. Wenn ihr mögt, empfehle ich euch drei bis fünf Kollegen, die an eurem Termin noch frei sind und richtig gute Arbeit machen – handverlesen, passend zu eurer Feier und komplett kostenlos. Die Vermittlung läuft über meine Partner-Agentur DJ Bande (Münster), bei der ich selbst als DJ im Einsatz bin – ich kenne die Kollegen von echten Veranstaltungen, nicht vom Papier.
+Aber ich lasse euch nicht allein suchen. Wenn ihr mögt, empfehle ich euch drei bis fünf Kollegen, die an eurem Termin noch frei sind und richtig gute Arbeit machen – handverlesen, passend zu eurer Feier und komplett kostenlos. Die Vermittlung läuft über meine Partner-Agentur {agentur}, bei der ich selbst als DJ im Einsatz bin – ich kenne die Kollegen von echten Veranstaltungen, nicht vom Papier.
 
 Damit meine Vorauswahl passt, füllt kurz diesen Bogen aus (keine 5 Minuten – er fragt auch eure Anschrift und euer Einverständnis zur Weitergabe ab):
 {fragebogen}
@@ -815,7 +846,7 @@ Damit meine Vorauswahl passt, füllt kurz diesen Bogen aus (keine 5 Minuten – 
 Zur Transparenz: Für eine Vermittlung erhalte ich eine Aufwandsentschädigung von der Agentur. Für euch kostet das nichts – eure Preise vereinbart ihr direkt mit dem DJ.
 
 Viele Grüße
-Markus";
+{inhaber}";
 }
 
 /* v20/v21: konsolidierte Vermittlungs-Mail + Anschrift-Feld im Vorauswahl-Bogen */
@@ -1136,34 +1167,34 @@ function bandeFormFor(PDO $p, string $custId): ?array {
 /* Opt-in verarbeiten: Kennzeichen am Kunden, Bogen anlegen, Mail mit Link (Vorlage
    "DJ-Vermittlung – Vorauswahl-Bogen", eingebauter Text als Rueckfall), bei Mailfehler
    Wiedervorlage. Liefert den Bogen-Link (fuer die Dankesseite im Portal) oder null. */
-function bandeOptIn(PDO $p, string $custId, ?string $bookingId = null): ?string {
+function bandeOptIn(PDO $p, string $custId, ?string $bookingId = null, bool $resend = false, ?string $docId = null): ?string {
   try {
     $p->prepare("update customers set referral_status = 'angefragt', referral_at = coalesce(referral_at, ?) where id = ? and coalesce(referral_status,'') != 'vermittelt'")
       ->execute([now(), $custId]);
     $f = bandeFormFor($p, $custId);
     if (!$f) return null;
-    if (!$f['created']) return $f['link'];
+    if (!$f['created'] && !$resend) return $f['link'];
     $cst = $p->prepare('select email, first_name, company, kind from customers where id = ?');
     $cst->execute([$custId]);
     $c = $cst->fetch() ?: [];
     $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
     $vorname = anredeVorname($c);
-    $map = ['{vorname}' => $vorname, '{fragebogen}' => $f['link'], '{link}' => $f['link'], '{telefon}' => (string)($comp['phone'] ?? '')];
+    $map = ['{vorname}' => $vorname, '{fragebogen}' => $f['link'], '{link}' => $f['link']] + tplMap();
     $subject = 'Damit ich euch die passenden DJs raussuchen kann';
-    $body = "Hallo {vorname},\n\ndanke für euer Vertrauen – ich suche euch gern ein paar richtig gute Kollegen aus meinem Partner-Netzwerk raus. Eure Einwilligung zur Weitergabe der Eckdaten habe ich schon notiert.\n\nDamit die Vorschläge wirklich zu euch passen, füllt bitte kurz diesen Bogen aus (keine 5 Minuten):\n{fragebogen}\n\nSobald ich die Antworten habe, melde ich mich mit konkreten Vorschlägen. Fragen vorab? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus";
+    $body = "Hallo {vorname},\n\ndanke für euer Vertrauen – ich suche euch gern ein paar richtig gute Kollegen aus meinem Partner-Netzwerk raus. Eure Einwilligung zur Weitergabe der Eckdaten habe ich schon notiert.\n\nDamit die Vorschläge wirklich zu euch passen, füllt bitte kurz diesen Bogen aus (keine 5 Minuten):\n{fragebogen}\n\nSobald ich die Antworten habe, melde ich mich mit konkreten Vorschlägen. Fragen vorab? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\n{inhaber}";
     $tst = $p->prepare('select subject, body from email_templates where name = ? limit 1');
     $tst->execute(['DJ-Vermittlung – Vorauswahl-Bogen']);
     if ($tpl = $tst->fetch()) { $subject = (string)$tpl['subject']; $body = (string)$tpl['body']; }
     $subject = strtr($subject, $map); $body = strtr($body, $map);
     $to = trim((string)($c['email'] ?? ''));
     $mailed = $to !== '' && sendMailSafe($to, $subject, $body);
-    $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
-        values (?,?,?,?,?,?,?,?,?,?)')
+    $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, ref_doc_id, ref_kind, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?)')
       ->execute([uuid(), $custId, $bookingId ?: null, $mailed ? 'email' : 'note', 'out',
         $mailed ? $subject : 'Vorauswahl-Bogen konnte NICHT gemailt werden – bitte Link selbst schicken',
         $mailed ? $body : "Der Kunde hat der DJ-Vermittlung zugestimmt, die Mail mit dem Vorauswahl-Bogen an " .
           ($to !== '' ? $to : '(keine E-Mail-Adresse hinterlegt)') . " ist aber nicht rausgegangen.\n\nLink zum Bogen:\n" . $f['link'],
-        now(), $mailed ? null : gmdate('Y-m-d'), now()]);
+        now(), $mailed ? null : gmdate('Y-m-d'), $docId, 'bande', now()]);
     return $f['link'];
   } catch (Throwable $e) { return null; }
 }
@@ -1171,35 +1202,39 @@ function bandeOptIn(PDO $p, string $custId, ?string $bookingId = null): ?string 
 /* Nachträgliche E-Mail-Vorlagen, nur wenn noch nicht vorhanden */
 function seedExtraTemplates(PDO $p): void {
   $extra = [
+    /* Termin belegt OHNE Vermittlung: fuer Betreiber ohne Partner-Agentur (Vorlage 5 verspricht
+       DJ-Vorschlaege und wird bei ausgeschalteter Vermittlung ausgeblendet). */
+    [7, 'Termin belegt – Absage', 'Euer Termin am {datum} – leider schon vergeben',
+      "Hallo {vorname},\n\ndanke für eure Anfrage! Die weniger gute Nachricht zuerst: An eurem Termin am {datum} bin ich leider schon fest gebucht.\n\nFalls euer Termin noch nicht in Stein gemeißelt ist: Sagt mir gern Bescheid, für welche Alternativen ihr offen wärt – dann schaue ich sofort nach.\n\nAnsonsten wünsche ich euch eine richtig gute Feier und drücke die Daumen bei der Suche.\n\nViele Grüße\n{inhaber}"],
     [90, 'Zahlungserinnerung (freundlich)', 'Kleine Erinnerung: Rechnung {nr}',
-      "Hallo {vorname},\n\nich hoffe, es ist alles gut angekommen! Mir ist aufgefallen, dass die Rechnung {nr} über {betrag} (fällig am {faellig}) noch offen ist.\n\nBestimmt ist sie nur untergegangen – hier ist der Link zum Ansehen und als PDF:\n{link}\n\nFalls die Zahlung schon unterwegs ist: einfach ignorieren, dann hat sich das überschnitten.\n\nViele Grüße\nMarkus"],
+      "Hallo {vorname},\n\nich hoffe, es ist alles gut angekommen! Mir ist aufgefallen, dass die Rechnung {nr} über {betrag} (fällig am {faellig}) noch offen ist.\n\nBestimmt ist sie nur untergegangen – hier ist der Link zum Ansehen und als PDF:\n{link}\n\nFalls die Zahlung schon unterwegs ist: einfach ignorieren, dann hat sich das überschnitten.\n\nViele Grüße\n{inhaber}"],
     [91, 'Angebots-Begleitmail', 'Euer Angebot ist fertig',
-      "Hallo {vorname},\n\ndanke für das gute Gespräch! Euer Angebot ist fertig und wartet hier auf euch:\n{link}\n\nIhr könnt es direkt online ansehen, Fragen zu einzelnen Positionen stellen oder mit einem Klick annehmen. Login ist eure Postleitzahl.\n\nWenn euch etwas nicht passt: sagt es mir einfach – wir biegen das hin.\n\nViele Grüße\nMarkus"],
+      "Hallo {vorname},\n\ndanke für das gute Gespräch! Euer Angebot ist fertig und wartet hier auf euch:\n{link}\n\nIhr könnt es direkt online ansehen, Fragen zu einzelnen Positionen stellen oder mit einem Klick annehmen. Login ist eure Postleitzahl.\n\nWenn euch etwas nicht passt: sagt es mir einfach – wir biegen das hin.\n\nViele Grüße\n{inhaber}"],
     /* Geht automatisch an den Kunden, sobald er ein Angebot im Portal annimmt - das Portal
        verspricht ihm an der Stelle ausdruecklich eine Bestaetigung. */
     [96, 'Angebot angenommen – Bestätigung', 'Angebot {nummer} angenommen – danke!',
-      "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen, damit ist {termin} fest bei mir reserviert.\n\nWie es weitergeht: Ihr bekommt von mir noch die Auftragsbestätigung und ggf. eine Abschlagsrechnung. Alles Weitere (Musikwünsche, Ablauf, Fragen) klären wir dann ganz entspannt bis zum Termin.\n\nEuer Angebot findet ihr jederzeit hier – Login ist eure Postleitzahl:\n{link}\n\nWenn euch vorher etwas einfällt: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
+      "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen, damit ist {termin} fest bei mir reserviert.\n\nWie es weitergeht: Ihr bekommt von mir noch die Auftragsbestätigung und ggf. eine Abschlagsrechnung. Alles Weitere (Musikwünsche, Ablauf, Fragen) klären wir dann ganz entspannt bis zum Termin.\n\nEuer Angebot findet ihr jederzeit hier – Login ist eure Postleitzahl:\n{link}\n\nWenn euch vorher etwas einfällt: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\n{inhaber}"],
     /* Sonderfaelle bei der Annahme im Portal: Der Termin ist seit dem Angebot anderweitig
        fest gebucht worden - dann kann Markus nicht liefern, will den Kunden aber nicht
        ohne Alternative stehen lassen. */
     [97, 'Termin nicht mehr verfügbar – DJ-Vermittlung', 'Euer Termin am {datum} – leider inzwischen vergeben',
-      "Hallo {vorname},\n\nihr wolltet gerade das Angebot {nummer} annehmen – und genau das tut mir jetzt richtig leid: euer Termin am {datum} ist bei mir in der Zwischenzeit fest gebucht worden. Das Angebot kann ich deshalb nicht mehr erfüllen, so ehrlich muss ich sein.\n\nWas ich euch aber anbieten kann: Ich kenne über meine Partner-Agentur DJ Bande (Münster) richtig gute Kollegen und suche euch gern persönlich einen passenden DJ raus – kostenlos, ihr müsst nur kurz zustimmen. Das geht direkt hier:\n{link}\n\nWenn ihr lieber erst sprechen wollt: ruft mich einfach an ({telefon}) oder antwortet auf diese Mail.\n\nViele Grüße\nMarkus"],
+      "Hallo {vorname},\n\nihr wolltet gerade das Angebot {nummer} annehmen – und genau das tut mir jetzt richtig leid: euer Termin am {datum} ist bei mir in der Zwischenzeit fest gebucht worden. Das Angebot kann ich deshalb nicht mehr erfüllen, so ehrlich muss ich sein.\n\nWas ich euch aber anbieten kann: Ich kenne über meine Partner-Agentur {agentur} richtig gute Kollegen und suche euch gern persönlich einen passenden DJ raus – kostenlos, ihr müsst nur kurz zustimmen. Das geht direkt hier:\n{link}\n\nWenn ihr lieber erst sprechen wollt: ruft mich einfach an ({telefon}) oder antwortet auf diese Mail.\n\nViele Grüße\n{inhaber}"],
     /* Der Kunde nimmt nach Ablauf der Gueltigkeit an: Annahme wird festgehalten, aber
        der Termin ist noch nicht fest - Markus prueft erst Verfuegbarkeit und Preis. */
     [98, 'Angebot angenommen – abgelaufen, wird geprüft', 'Angebot {nummer} angenommen – ich prüfe das kurz',
-      "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen. Eine Kleinigkeit muss ich dazu sagen: Das Angebot war schon abgelaufen (gültig bis {gueltig}). Ich schaue mir deshalb kurz an, ob {termin} bei mir noch frei ist und ob die Preise noch so passen, und melde mich dann ganz schnell bei euch.\n\nBis dahin gilt: Der Termin ist noch nicht fest zugesagt – ich will euch nichts versprechen, was ich dann nicht halten kann.\n\nEuer Angebot findet ihr weiterhin hier – Login ist eure Postleitzahl:\n{link}\n\nFragen? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
+      "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen. Eine Kleinigkeit muss ich dazu sagen: Das Angebot war schon abgelaufen (gültig bis {gueltig}). Ich schaue mir deshalb kurz an, ob {termin} bei mir noch frei ist und ob die Preise noch so passen, und melde mich dann ganz schnell bei euch.\n\nBis dahin gilt: Der Termin ist noch nicht fest zugesagt – ich will euch nichts versprechen, was ich dann nicht halten kann.\n\nEuer Angebot findet ihr weiterhin hier – Login ist eure Postleitzahl:\n{link}\n\nFragen? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\n{inhaber}"],
     /* Nachfassen bei Funkstille: Das Angebot ist raus, der Kunde meldet sich nicht. Kein
        Druck, nur ein freundliches "Ich bin noch da" - mit Link, damit er direkt reagieren kann. */
     [99, 'Nachfassen zum Angebot', 'Kurze Frage zu eurem Angebot {nummer}',
-      "Hallo {vorname},\n\nich wollte einmal kurz nachhören: Ist mein Angebot {nummer} bei euch angekommen und passt es soweit? Falls etwas unklar ist oder ihr euch etwas anders vorstellt, sagt einfach Bescheid – das lässt sich meistens mit einem kurzen Telefonat klären.\n\nDas Angebot findet ihr weiterhin hier (Login ist eure Postleitzahl):\n{link}\n\nGültig ist es bis {gueltig}, ich halte euch den Termin bis dahin frei. Und falls ihr euch anders entschieden habt: auch kein Problem, dann freue ich mich über eine kurze Nachricht.\n\nViele Grüße\nMarkus"],
+      "Hallo {vorname},\n\nich wollte einmal kurz nachhören: Ist mein Angebot {nummer} bei euch angekommen und passt es soweit? Falls etwas unklar ist oder ihr euch etwas anders vorstellt, sagt einfach Bescheid – das lässt sich meistens mit einem kurzen Telefonat klären.\n\nDas Angebot findet ihr weiterhin hier (Login ist eure Postleitzahl):\n{link}\n\nGültig ist es bis {gueltig}, ich halte euch den Termin bis dahin frei. Und falls ihr euch anders entschieden habt: auch kein Problem, dann freue ich mich über eine kurze Nachricht.\n\nViele Grüße\n{inhaber}"],
     /* Eingangsbestaetigung zur Miet-Anfrage aus dem Tourcase: Bisher ging nur eine Mail an
        Markus - der Kunde sah nach dem Absenden nichts mehr von seiner Anfrage. */
     [100, 'Miet-Anfrage eingegangen', 'Deine Miet-Anfrage ist da – {zeitraum}',
-      "Hallo {vorname},\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet. Das hast du angefragt:\n\nZeitraum: {zeitraum}\n{positionen}\n\nIch schaue mir das an und melde mich innerhalb von 24 Stunden mit Verfügbarkeit und Preis. Die Anfrage findest du jederzeit in deinem Kundenkonto:\n{link}\n\nWenn es eilig ist: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nBis gleich!\nMarkus"],
+      "Hallo {vorname},\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet. Das hast du angefragt:\n\nZeitraum: {zeitraum}\n{positionen}\n\nIch schaue mir das an und melde mich innerhalb von 24 Stunden mit Verfügbarkeit und Preis. Die Anfrage findest du jederzeit in deinem Kundenkonto:\n{link}\n\nWenn es eilig ist: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nBis gleich!\n{inhaber}"],
     /* Der Kunde hat im Portal der DJ-Vermittlung zugestimmt - jetzt braucht Markus die
        Eckdaten, um passende Kollegen auszusuchen. Der Bogen wird automatisch angelegt. */
     [101, 'DJ-Vermittlung – Vorauswahl-Bogen', 'Damit ich euch die passenden DJs raussuchen kann',
-      "Hallo {vorname},\n\ndanke für euer Vertrauen – ich suche euch gern ein paar richtig gute Kollegen aus meinem Partner-Netzwerk raus. Eure Einwilligung zur Weitergabe der Eckdaten habe ich schon notiert.\n\nDamit die Vorschläge wirklich zu euch passen, füllt bitte kurz diesen Bogen aus (keine 5 Minuten):\n{fragebogen}\n\nSobald ich die Antworten habe, melde ich mich mit konkreten Vorschlägen. Fragen vorab? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
+      "Hallo {vorname},\n\ndanke für euer Vertrauen – ich suche euch gern ein paar richtig gute Kollegen aus meinem Partner-Netzwerk raus. Eure Einwilligung zur Weitergabe der Eckdaten habe ich schon notiert.\n\nDamit die Vorschläge wirklich zu euch passen, füllt bitte kurz diesen Bogen aus (keine 5 Minuten):\n{fragebogen}\n\nSobald ich die Antworten habe, melde ich mich mit konkreten Vorschlägen. Fragen vorab? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\n{inhaber}"],
     /* Rueckmeldungen aus dem Portal: Wer absagt, fragt oder um Rueckruf bittet, sah bisher
        nur eine Zeile auf der Seite - kein Beleg im Postfach, dass etwas angekommen ist. */
     [102, 'Absage erhalten', 'Danke für eure Rückmeldung zu Angebot {nummer}',
@@ -1209,16 +1244,16 @@ function seedExtraTemplates(PDO $p): void {
     [104, 'Rückruf notiert', 'Rückruf notiert – ich melde mich',
       "Hallo {vorname},\n\nalles klar, ich rufe euch an: {rueckruf}\n\nFällt euch vorher noch etwas ein, antwortet einfach auf diese Mail. Das Angebot {nummer} findet ihr weiterhin hier:\n{link}\n\nBis gleich am Telefon!\n{inhaber}"],
     [92, 'Workshop-Bestätigung (Zahlung eingegangen)', 'Dein Platz ist fix!',
-      "Hallo {vorname},\n\ndeine Zahlung ist da – damit ist dein Workshop-Platz verbindlich reserviert!\n\nWann: {datum}\nWo: Lager Hemer, Büttmecker Weg 35c\n\nBring gern dein eigenes Equipment-Problem mit – wir schauen uns echte Fälle an. Getränke gehen auf mich.\n\nBis bald!\nMarkus"],
+      "Hallo {vorname},\n\ndeine Zahlung ist da – damit ist dein Workshop-Platz verbindlich reserviert!\n\nWann: {datum}\nWo: {adresse}\n\nBring gern dein eigenes Equipment-Problem mit – wir schauen uns echte Fälle an. Getränke gehen auf mich.\n\nBis bald!\n{inhaber}"],
     /* Absage-Bausteine: Jede Absage soll persönlich klingen und möglichst in eine
        Vermittlung münden - eine unpassende Anfrage ist trotzdem ein Mensch, der
        gerade Musik für seine Feier sucht. */
     [93, 'Absage: Budget passt nicht', 'Zu eurer Anfrage für den {datum}',
-      "Hallo {vorname},\n\ndanke, dass ihr an mich gedacht habt – und danke, dass ihr euer Budget offen dazugeschrieben habt. Das macht es für uns beide einfacher.\n\nEhrlich gesagt komme ich in dem Rahmen nicht raus: Bei mir hängen an einem Abend Anfahrt, Auf- und Abbau, die Technik und der Abend selbst dran, deshalb liege ich deutlich darüber. Ich will euch nichts verkaufen, das sich für euch nicht richtig anfühlt.\n\nWas ich euch aber anbieten kann:\n– Feiert ihr unter der Woche oder tagsüber, sieht die Rechnung ganz anders aus. Sagt mir einfach Bescheid, dann rechne ich das durch.\n– Wenn der Termin feststeht: Ich kenne Kollegen, die günstiger einsteigen und trotzdem gut sind. Sagt kurz Bescheid, dann frage ich für euch herum.\n\nSo oder so: Ich drücke euch die Daumen, dass es ein schöner Abend wird.\n\nViele Grüße\nMarkus"],
+      "Hallo {vorname},\n\ndanke, dass ihr an mich gedacht habt – und danke, dass ihr euer Budget offen dazugeschrieben habt. Das macht es für uns beide einfacher.\n\nEhrlich gesagt komme ich in dem Rahmen nicht raus: Bei mir hängen an einem Abend Anfahrt, Auf- und Abbau, die Technik und der Abend selbst dran, deshalb liege ich deutlich darüber. Ich will euch nichts verkaufen, das sich für euch nicht richtig anfühlt.\n\nWas ich euch aber anbieten kann:\n– Feiert ihr unter der Woche oder tagsüber, sieht die Rechnung ganz anders aus. Sagt mir einfach Bescheid, dann rechne ich das durch.\n– Wenn der Termin feststeht: Ich kenne Kollegen, die günstiger einsteigen und trotzdem gut sind. Sagt kurz Bescheid, dann frage ich für euch herum.\n\nSo oder so: Ich drücke euch die Daumen, dass es ein schöner Abend wird.\n\nViele Grüße\n{inhaber}"],
     [94, 'Absage: Anfahrt zu weit', 'Eure Feier am {datum} in {ort}',
-      "Hallo {vorname},\n\nschön, dass ihr euch gemeldet habt! Leider muss ich ehrlich sein: {ort} ist von Hemer aus so weit weg, dass Anfahrt und Übernachtung euren Preis deutlich nach oben treiben würden – und dafür bekommt ihr vor Ort jemanden, der genauso gut ist, ohne dass ihr meine Fahrerei mitbezahlt.\n\nWenn ihr mögt, frage ich in meinem Kollegen-Netzwerk nach jemandem in eurer Ecke. Schreibt mir dafür kurz, was für eine Feier es wird und was euch musikalisch wichtig ist – dann melde ich mich mit Vorschlägen.\n\nUnd falls ihr doch unbedingt mich wollt: Sagt es, dann rechne ich es euch einmal ehrlich durch, damit ihr die Zahl kennt.\n\nViele Grüße\nMarkus"],
+      "Hallo {vorname},\n\nschön, dass ihr euch gemeldet habt! Leider muss ich ehrlich sein: {ort} ist von {firmenort} aus so weit weg, dass Anfahrt und Übernachtung euren Preis deutlich nach oben treiben würden – und dafür bekommt ihr vor Ort jemanden, der genauso gut ist, ohne dass ihr meine Fahrerei mitbezahlt.\n\nWenn ihr mögt, frage ich in meinem Kollegen-Netzwerk nach jemandem in eurer Ecke. Schreibt mir dafür kurz, was für eine Feier es wird und was euch musikalisch wichtig ist – dann melde ich mich mit Vorschlägen.\n\nUnd falls ihr doch unbedingt mich wollt: Sagt es, dann rechne ich es euch einmal ehrlich durch, damit ihr die Zahl kennt.\n\nViele Grüße\n{inhaber}"],
     [95, 'Absage: musikalisch nicht mein Ding', 'Zu eurer Anfrage für den {datum}',
-      "Hallo {vorname},\n\ndanke für eure Anfrage und dafür, dass ihr so klar geschrieben habt, was ihr musikalisch wollt. Genau deshalb sage ich euch offen: Das ist nicht mein Zuhause. Ich könnte den Abend irgendwie über die Bühne bringen, aber ihr hättet nicht den DJ, den diese Feier verdient – und ich wäre nicht der, der ich sonst bin.\n\nIhr habt euch etwas Bestimmtes vorgestellt, und dafür gibt es Leute, die genau dafür brennen. Wenn ihr wollt, frage ich in meinem Netzwerk nach jemandem, der das wirklich draufhat.\n\nSchreibt mir einfach kurz, ob ich das machen soll.\n\nViele Grüße\nMarkus"],
+      "Hallo {vorname},\n\ndanke für eure Anfrage und dafür, dass ihr so klar geschrieben habt, was ihr musikalisch wollt. Genau deshalb sage ich euch offen: Das ist nicht mein Zuhause. Ich könnte den Abend irgendwie über die Bühne bringen, aber ihr hättet nicht den DJ, den diese Feier verdient – und ich wäre nicht der, der ich sonst bin.\n\nIhr habt euch etwas Bestimmtes vorgestellt, und dafür gibt es Leute, die genau dafür brennen. Wenn ihr wollt, frage ich in meinem Netzwerk nach jemandem, der das wirklich draufhat.\n\nSchreibt mir einfach kurz, ob ich das machen soll.\n\nViele Grüße\n{inhaber}"],
   ];
   foreach ($extra as [$s, $n, $sub, $b]) {
     $c = $p->prepare('select count(*) from email_templates where name = ?');
@@ -1378,14 +1413,29 @@ function renameEquipmentCategories(PDO $p): void {
    der AGB-Volltext bekommt eine kurze, warme Zusammenfassung vorangestellt statt direkt mit
    Paragraphen zu starten. Idempotent: ändert nur Texte, die noch dem alten Seed-Stand
    entsprechen - eigene Anpassungen von Markus im Backoffice bleiben unangetastet. */
+/* Impressum-Grundtext aus den Firmendaten - fuer den Seed und um beim Update zu erkennen,
+   ob der Betreiber den Text noch nie angefasst hat (nur dann wird er ergaenzt). Leere
+   Angaben erscheinen als Luecke zum Ausfuellen statt als fremder Name. */
+function impressumText(array $comp): string {
+  $v = fn(string $k, string $leer) => trim((string)($comp[$k] ?? '')) ?: $leer;
+  return "Angaben gemäß § 5 DDG\n\n" . $v('owner', '[Inhaber]') . "\n" . $v('name', '[Firma]') . "\n" . $v('street', '[Straße]') . "\n" . $v('zip_city', '[PLZ Ort]') .
+    "\n\nTelefon: " . $v('phone', '[Telefon]') . "\nE-Mail: " . $v('email', '[E-Mail]') .
+    "\n\nVerantwortlich für den Inhalt: " . $v('owner', '[Inhaber]') . " (Anschrift wie oben)";
+}
 function legalComplianceUpdate(PDO $p): void {
   $row = $p->query("select value from site_content where key='legal'")->fetchColumn();
   $legal = $row ? json_decode($row, true) : null;
   if (!is_array($legal)) return;
   $changed = false;
-  $oldImpressum = "Angaben gemäß § 5 DDG\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\n\nTelefon: 01523 6439373\nE-Mail: lauschgiftmarkus@gmail.com\n\nVerantwortlich für den Inhalt: Markus Jankowski (Anschrift wie oben)";
-  if (($legal['impressum'] ?? '') === $oldImpressum) {
-    $legal['impressum'] = $oldImpressum . "\n\nVerbraucherstreitbeilegung: Ich bin nicht verpflichtet und nicht bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen (§ 36 VSBG).";
+  /* Nur ein unveraenderter Seed-Text wird ergaenzt: entweder der aus den aktuellen
+     Firmendaten gebaute oder der historische Seed der Erstinstallation. Alles, was der
+     Betreiber selbst geschrieben hat, bleibt unangetastet. */
+  $comp = json_decode((string)$p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true) ?: [];
+  $seeds = [impressumText($comp),
+    "Angaben gemäß § 5 DDG\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\n\nTelefon: 01523 6439373\nE-Mail: lauschgiftmarkus@gmail.com\n\nVerantwortlich für den Inhalt: Markus Jankowski (Anschrift wie oben)"];
+  $cur = (string)($legal['impressum'] ?? '');
+  if (in_array($cur, $seeds, true)) {
+    $legal['impressum'] = $cur . "\n\nVerbraucherstreitbeilegung: Ich bin nicht verpflichtet und nicht bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen (§ 36 VSBG).";
     $changed = true;
   }
   $oldAgbStart = "Allgemeine Geschäftsbedingungen (AGB)\n\n1. Geltungsbereich";
@@ -1394,7 +1444,7 @@ function legalComplianceUpdate(PDO $p): void {
     $changed = true;
   }
   if (empty($legal['widerrufsformular'])) {
-    $legal['widerrufsformular'] = widerrufsformularText();
+    $legal['widerrufsformular'] = widerrufsformularText($comp);
     $changed = true;
   }
   if ($changed) {
@@ -1405,8 +1455,9 @@ function legalComplianceUpdate(PDO $p): void {
 function agbIntro(): string {
   return "Kurz und ehrlich, bevor es juristisch wird: Ich will, dass ihr genau wisst, woran ihr seid – ohne Kleingedrucktes-Schreck erst am Ende. Falls ich mal ausfalle, bekommt ihr einen passenden Ersatz-DJ vorgeschlagen oder euer Geld zurück. Sagt ihr die Veranstaltung ab, gilt eine faire, gestaffelte Regelung je nachdem wie kurzfristig das passiert (steht weiter unten genau drin) – so kann ich meine Zeit auch für andere Paare freihalten. Bei Fragen zu irgendeinem Punkt: einfach anrufen oder schreiben, das klären wir persönlich statt über Anwälte.\n\nUnd jetzt der vollständige, rechtlich verbindliche Text:\n\n";
 }
-function widerrufsformularText(): string {
-  return "Muster-Widerrufsformular\n\nDieses Formular ist nur relevant, falls im Einzelfall ausnahmsweise ein Widerrufsrecht besteht (siehe Ziffer 7 der AGB) – für die allermeisten Buchungen mit festem Termin gilt: kein Widerrufsrecht.\n\nWenn ihr den Vertrag trotzdem widerrufen wollt, füllt dieses Formular aus und schickt es an:\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\nE-Mail: lauschgiftmarkus@gmail.com\n\n– Hiermit widerrufe(n) ich/wir den von mir/uns abgeschlossenen Vertrag über die Erbringung folgender Dienstleistung:\n– Bestellt am:\n– Name des/der Verbraucher(s):\n– Anschrift des/der Verbraucher(s):\n– Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier):\n– Datum:";
+function widerrufsformularText(array $comp = []): string {
+  $v = fn(string $k, string $leer) => trim((string)($comp[$k] ?? '')) ?: $leer;
+  return "Muster-Widerrufsformular\n\nDieses Formular ist nur relevant, falls im Einzelfall ausnahmsweise ein Widerrufsrecht besteht (siehe Ziffer 7 der AGB) – für die allermeisten Buchungen mit festem Termin gilt: kein Widerrufsrecht.\n\nWenn ihr den Vertrag trotzdem widerrufen wollt, füllt dieses Formular aus und schickt es an:\n\n" . $v('owner', '[Inhaber]') . "\n" . $v('name', '[Firma]') . "\n" . $v('street', '[Straße]') . "\n" . $v('zip_city', '[PLZ Ort]') . "\nE-Mail: " . $v('email', '[E-Mail]') . "\n\n– Hiermit widerrufe(n) ich/wir den von mir/uns abgeschlossenen Vertrag über die Erbringung folgender Dienstleistung:\n– Bestellt am:\n– Name des/der Verbraucher(s):\n– Anschrift des/der Verbraucher(s):\n– Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier):\n– Datum:";
 }
 
 /* Bei jeder eingehenden Anfrage direkt Kunde + Buchung + Veranstaltungsplaner anlegen, damit
@@ -1694,7 +1745,7 @@ function autoTechCheckInvite(PDO $p, string $custId, array $row): ?string {
     "$anrede,\n\n" .
     "schön, dass ihr euren Technik-Check angefragt habt! Damit ich beim Termin direkt gezielt loslegen kann, " .
     "beantwortet mir vorab kurz ein paar Fragen zu eurer Anlage - dauert keine 5 Minuten:\n\n$link\n\n" .
-    "Ich melde mich in Kürze bei euch, um einen Termin abzustimmen.\n\nBis bald!\nMarkus");
+    "Ich melde mich in Kürze bei euch, um einen Termin abzustimmen.\n\nBis bald!\n" . ownerFirst());
   /* Scheitert der Versand (Spamfilter, Tippfehler, Serverproblem), erfuhr das bisher
      niemand - der Bogen stand für immer auf "offen". Jetzt steht es in der Timeline,
      und der Link wird dem Kunden zusätzlich direkt auf der Bestätigungsseite gezeigt. */
@@ -1729,8 +1780,8 @@ function fixSieToDuTexts(PDO $p): void {
   $st->execute([$old['subject'], $old['body']]);
   $id = $st->fetchColumn();
   if ($id) {
-    $new = ['subject' => 'Deine Veranstaltung am {datum} – Rückmeldung von DJ Lauschgift',
-      'body' => "Hallo {name},\n\nvielen Dank für deine Anfrage zu eurer Firmenveranstaltung am {datum}.\n\nDer Termin ist bei mir aktuell noch verfügbar. Gerne stimme ich mich kurz mit dir (oder eurer Eventplanung) zum Ablauf ab – vom dezenten Empfang über Ton für Redebeiträge bis zum Partyprogramm. Auf dieser Basis bekommst du ein transparentes Angebot mit klar ausgewiesenen Posten für Dauer und Technik.\n\nFür Veranstaltungen unter der Woche oder tagsüber kalkuliere ich übrigens spürbar günstiger.\n\nWann darf ich dich am besten anrufen?\n\nViele Grüße\nMarkus Jankowski – DJ Lauschgift\n\nPS: Stimmen bisheriger Kunden findest du hier: {bewertungen}"];
+    $new = ['subject' => 'Deine Veranstaltung am {datum} – Rückmeldung von {firma}',   /* Betreiber-Platzhalter, kein fester Name */
+      'body' => "Hallo {name},\n\nvielen Dank für deine Anfrage zu eurer Firmenveranstaltung am {datum}.\n\nDer Termin ist bei mir aktuell noch verfügbar. Gerne stimme ich mich kurz mit dir (oder eurer Eventplanung) zum Ablauf ab – vom dezenten Empfang über Ton für Redebeiträge bis zum Partyprogramm. Auf dieser Basis bekommst du ein transparentes Angebot mit klar ausgewiesenen Posten für Dauer und Technik.\n\nFür Veranstaltungen unter der Woche oder tagsüber kalkuliere ich übrigens spürbar günstiger.\n\nWann darf ich dich am besten anrufen?\n\nViele Grüße\n{inhaber} – {firma}\n\nPS: Stimmen bisheriger Kunden findest du hier: {bewertungen}"];
     $p->prepare("update email_templates set subject=?, body=? where id=?")->execute([$new['subject'], $new['body'], $id]);
   }
 }
@@ -1858,7 +1909,7 @@ function campaignPageRows(): array {
    'form_cfg' => ['event_types' => ['Hochzeit'], 'name_label' => 'Namen (Brautpaar) *', 'show_guests' => true,
      'location_label' => 'Location / Ort', 'location_ph' => 'z. B. Schloss, Scheune, Hemer …',
      'msg_label' => 'Erzählt kurz von eurer Feier', 'msg_ph' => 'z. B. freie Trauung vor Ort, Dinner, danach Party bis 2 Uhr, Musikrichtung …',
-     'wa_text' => 'Hallo Markus, es geht um unsere Hochzeit: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um unsere Hochzeit: '],
    'footer_target' => 'index'],
 
   ['slug' => 'vereinsfest-technik', 'sort' => 20, 'accent' => '#3cc8b4', 'accent2' => '#5fdcc9', 'btn_txt' => '#0a2420',
@@ -1892,7 +1943,7 @@ function campaignPageRows(): array {
      'type_label' => 'Was braucht ihr?', 'company_label' => 'Verein / Organisation',
      'location_label' => 'Ort / Vereinsheim', 'location_ph' => 'z. B. Vereinsheim in Hemer, Turnhalle …',
      'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. Jubiläumsfeier, ca. 80 Gäste, Reden und danach Musik …',
-     'wa_text' => 'Hallo Markus, es geht um unser Vereinsfest: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um unser Vereinsfest: '],
    'footer_target' => 'technik'],
 
   ['slug' => 'abiball', 'sort' => 30, 'accent' => '#8b93ff', 'accent2' => '#a8afff', 'btn_txt' => '#1a1730',
@@ -1926,7 +1977,7 @@ function campaignPageRows(): array {
      'company_label' => 'Schule / Jahrgangsstufe', 'show_guests' => true, 'guests_ph' => 'z. B. 150',
      'location_label' => 'Location', 'location_ph' => 'z. B. Aula, Stadthalle, Festsaal …',
      'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. Einlass, Programm mit Reden, danach Party bis 1 Uhr, Musikrichtung …',
-     'wa_text' => 'Hallo Markus, es geht um unseren Abiball: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um unseren Abiball: '],
    'footer_target' => 'index'],
 
   ['slug' => 'firmensommerfest', 'sort' => 40, 'accent' => '#e0c93a', 'accent2' => '#ecdb6c', 'btn_txt' => '#2b2506',
@@ -1959,7 +2010,7 @@ function campaignPageRows(): array {
    'form_cfg' => ['event_types' => ['Firmenfeier'], 'company_label' => 'Firma', 'show_guests' => true, 'guests_ph' => 'z. B. 100',
      'location_label' => 'Ort / Location', 'location_ph' => 'z. B. Betriebsgelände, Garten, Vereinsplatz …',
      'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. Grillen ab 15 Uhr, Ansprache der Geschäftsführung, danach Party im Freien …',
-     'wa_text' => 'Hallo Markus, es geht um unser Firmen-Sommerfest: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um unser Firmen-Sommerfest: '],
    'footer_target' => 'index'],
 
   ['slug' => 'betriebsversammlung', 'sort' => 50, 'accent' => '#7fb4e6', 'accent2' => '#a3cbf0', 'btn_txt' => '#0d1a26',
@@ -1993,7 +2044,7 @@ function campaignPageRows(): array {
      'show_guests' => true, 'guests_label' => 'Teilnehmer (ca.)', 'guests_ph' => 'z. B. 120',
      'location_label' => 'Ort / Halle', 'location_ph' => 'z. B. Werkhalle in Hemer, Kantine …',
      'msg_label' => 'Worum geht es?', 'msg_ph' => 'z. B. Versammlung 90 Minuten, zwei Redner, Fragen aus der Belegschaft, Beamerton …',
-     'wa_text' => 'Hallo Markus, es geht um unsere Betriebsversammlung: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um unsere Betriebsversammlung: '],
    'footer_target' => 'technik'],
 
   ['slug' => 'seminartechnik', 'sort' => 60, 'accent' => '#7ecb8f', 'accent2' => '#a1dbae', 'btn_txt' => '#0c2012',
@@ -2027,7 +2078,7 @@ function campaignPageRows(): array {
      'show_guests' => true, 'guests_label' => 'Teilnehmer (ca.)', 'guests_ph' => 'z. B. 40',
      'location_label' => 'Ort / Raum', 'location_ph' => 'z. B. Tagungsraum im Hotel, Schulungsraum …',
      'msg_label' => 'Worum geht es?', 'msg_ph' => 'z. B. Ganztages-Fortbildung, eine Trainerin, Videoeinspieler, Fragen aus dem Raum …',
-     'wa_text' => 'Hallo Markus, es geht um Tontechnik für unser Seminar: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um Tontechnik für unser Seminar: '],
    'footer_target' => 'technik'],
 
   ['slug' => 'messe', 'sort' => 70, 'accent' => '#f0955b', 'accent2' => '#f5b183', 'btn_txt' => '#241105',
@@ -2060,7 +2111,7 @@ function campaignPageRows(): array {
    'form_cfg' => ['event_types' => ['Messe / Ausstellung'], 'company_label' => 'Firma',
      'location_label' => 'Messe / Halle', 'location_ph' => 'z. B. Messe Dortmund, Halle 4, Stand 12 m² …',
      'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. drei Messetage, Produktvideo mit Ton, zwei Kurzpräsentationen täglich …',
-     'wa_text' => 'Hallo Markus, es geht um Technik für unseren Messestand: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um Technik für unseren Messestand: '],
    'footer_target' => 'technik'],
 
   ['slug' => 'objektbeleuchtung', 'sort' => 80, 'accent' => '#ffc247', 'accent2' => '#ffd47e', 'btn_txt' => '#241a05',
@@ -2093,7 +2144,7 @@ function campaignPageRows(): array {
    'form_cfg' => ['event_types' => ['Objektbeleuchtung'], 'company_label' => 'Firma / Verein',
      'location_label' => 'Objekt / Adresse', 'location_ph' => 'z. B. Firmengebäude in Hemer, Vereinsheim mit Garten …',
      'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. Firmenjubiläum im Oktober, Fassade und Einfahrt beleuchten, Firmenfarbe Blau …',
-     'wa_text' => 'Hallo Markus, es geht um Objektbeleuchtung: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um Objektbeleuchtung: '],
    'footer_target' => 'technik'],
 
   ['slug' => 'instore-dj', 'sort' => 90, 'accent' => '#ff8bc2', 'accent2' => '#ffaed4', 'btn_txt' => '#260d1b',
@@ -2126,7 +2177,7 @@ function campaignPageRows(): array {
    'form_cfg' => ['event_types' => ['Instore-DJ / Store-Event'], 'company_label' => 'Geschäft / Marke',
      'location_label' => 'Store / Adresse', 'location_ph' => 'z. B. Modegeschäft in der Innenstadt von Iserlohn …',
      'msg_label' => 'Was ihr plant', 'msg_ph' => 'z. B. Sale-Samstag von 11 bis 18 Uhr, junge Zielgruppe, Ecke im Eingangsbereich frei …',
-     'wa_text' => 'Hallo Markus, es geht um einen DJ für unser Geschäft: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um einen DJ für unser Geschäft: '],
    'footer_target' => 'index'],
 
   ['slug' => 'produktpraesentation', 'sort' => 100, 'accent' => '#59c3e8', 'accent2' => '#84d3ef', 'btn_txt' => '#07202b',
@@ -2160,7 +2211,7 @@ function campaignPageRows(): array {
      'show_guests' => true, 'guests_ph' => 'z. B. 60',
      'location_label' => 'Ort / Location', 'location_ph' => 'z. B. Autohaus, Showroom, Firmengebäude …',
      'msg_label' => 'Was ihr plant', 'msg_ph' => 'z. B. Kundenabend mit Enthüllung um 19 Uhr, danach Get-together mit Musik …',
-     'wa_text' => 'Hallo Markus, es geht um unsere Produktpräsentation: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um unsere Produktpräsentation: '],
    'footer_target' => 'index'],
 
   ['slug' => 'tagesparty', 'sort' => 110, 'accent' => '#ff9e7a', 'accent2' => '#ffbca0', 'btn_txt' => '#26120a',
@@ -2193,7 +2244,7 @@ function campaignPageRows(): array {
    'form_cfg' => ['event_types' => ['Tagesparty'], 'show_guests' => true, 'guests_ph' => 'z. B. 40',
      'location_label' => 'Ort / Location', 'location_ph' => 'z. B. Garten in Hemer, Terrasse, gemietete Scheune …',
      'msg_label' => 'Was ihr euch vorstellt', 'msg_ph' => 'z. B. 40. Geburtstag, ab 14 Uhr im Garten, entspannt mit Tanzen zum Abend …',
-     'wa_text' => 'Hallo Markus, es geht um eine Tagesparty: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um eine Tagesparty: '],
    'footer_target' => 'index'],
 
   ['slug' => 'technik-check', 'sort' => 120, 'accent' => '#3cc8b4', 'accent2' => '#5fdcc9', 'btn_txt' => '#0a2420',
@@ -2227,7 +2278,7 @@ function campaignPageRows(): array {
      'show_date' => false,
      'location_label' => 'Ort / Gebäude', 'location_ph' => 'z. B. Vereinsheim in Hemer, Gemeindehaus …',
      'msg_label' => 'Was stört euch?', 'msg_ph' => 'z. B. Brummen sobald das Mischpult an ist, Reden versteht man hinten nicht …',
-     'wa_text' => 'Hallo Markus, es geht um einen Technik-Check unserer Anlage: ',
+     'wa_text' => 'Hallo {inhaber}, es geht um einen Technik-Check unserer Anlage: ',
      'success_text' => 'Danke! Eure Anfrage ist angekommen – schaut gleich in euer Postfach, dort wartet schon der kurze Vorab-Fragebogen. Ich melde mich innerhalb von 24 Stunden für die Terminabstimmung.'],
    'footer_target' => 'technik'],
 
@@ -2262,7 +2313,7 @@ function campaignPageRows(): array {
      'show_date' => false,
      'location_label' => 'Ort', 'location_ph' => 'z. B. bei euch im Vereinsheim oder bei mir …',
      'msg_label' => 'Was wollt ihr lernen?', 'msg_ph' => 'z. B. 5 Leute aus dem Verein, Grundlagen Mischpult und Funkmikros, gern an unserer Anlage …',
-     'wa_text' => 'Hallo Markus, es geht um einen Tontechnik-Workshop: '],
+     'wa_text' => 'Hallo {inhaber}, es geht um einen Tontechnik-Workshop: '],
    'footer_target' => 'technik'],
 
   ];
@@ -2404,7 +2455,7 @@ create table customers (id text primary key, kind text default 'privat', status 
 create table communications (id text primary key,
   customer_id text not null references customers(id) on delete cascade,
   booking_id text, channel text not null, direction text default 'out', subject text, content text,
-  occurred_at text, followup_at text, followup_done integer default 0, created_at text);
+  occurred_at text, followup_at text, followup_done integer default 0, ref_doc_id text, ref_kind text, created_at text);
 create table bookings (id text primary key,
   customer_id text not null references customers(id) on delete cascade,
   status text default 'anfrage', kind text default 'dj', event_type text, title text,
@@ -2507,7 +2558,9 @@ function seed(PDO $p): void {
       implode(',', array_fill(0, count($cols), '?')) . ")")->execute(array_values($row));
   };
   foreach ([
-    ['company', '{"name":"DJ Lauschgift","owner":"Markus Jankowski","street":"Büttmecker Weg 35c","zip_city":"58675 Hemer","phone":"01523 6439373","email":"lauschgiftmarkus@gmail.com","website":"https://lauschgift.net","tax_id":"","vat_id":"","iban":"","bic":"","bank":"","small_business":false}'],
+    /* Frische Installation: keine Betreiber-Details im Code - die traegt der Betreiber
+       unter Einstellungen ein (Einrichtungs-Checkliste im Dashboard). Vermittlung aus. */
+    ['company', '{"name":"","owner":"","street":"","zip_city":"","phone":"","email":"","website":"","tax_id":"","vat_id":"","iban":"","bic":"","bank":"","small_business":false,"whatsapp":"","agency_name":"","agency_city":"","agency_enabled":false,"hoster_name":""}'],
     ['numbering', '{"angebot":{"prefix":"AN-","next":1},"rechnung":{"prefix":"RE-","next":1},"lieferschein":{"prefix":"LS-","next":1},"year_in_number":true}'],
     ['rental_contract', json_encode(['text' => rentalContractDefault()], JSON_UNESCAPED_UNICODE)],
     ['defaults', '{"tax_rate":19,"payment_days":14,"quote_valid_days":30,"quote_intro":"vielen Dank für eure Anfrage. Gerne biete ich euch an:","confirm_intro":"schön, dass ihr euch entschieden habt. Hiermit bestätige ich euch den Auftrag verbindlich – der Termin ist ab jetzt für euch reserviert.","invoice_outro":"Bitte überweist den Betrag unter Angabe der Rechnungsnummer auf das unten genannte Konto."}'],
@@ -2530,10 +2583,10 @@ function seed(PDO $p): void {
     ['badges_sec', '{"mitglied": {"enabled": true, "show_tech": true, "title": "Wo ich mitmache", "text": "Netzwerke und Portale, in denen ich gelistet bin – wer mag, schaut dort nach, was andere über meine Arbeit schreiben."}, "technik": {"enabled": true, "show_tech": true, "title": "Womit ich arbeite", "text": "Die Technik, die bei mir im Wagen liegt. Keine Werbung, sondern eine ehrliche Auskunft darüber, was ich mitbringe."}}'],
     ['seo', '{"title":"DJ Lauschgift – Hochzeits-DJ & Event-DJ | Deutschlandweit","description":"DJ Lauschgift – Markus Jankowski. 23 Jahre Erfahrung für Hochzeiten, Geburtstage & Firmenfeiern. Deutschlandweit buchbar. Technikverleih in Hemer."}'],
     ['legal', json_encode([
-      'impressum' => "Angaben gemäß § 5 DDG\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\n\nTelefon: 01523 6439373\nE-Mail: lauschgiftmarkus@gmail.com\n\nVerantwortlich für den Inhalt: Markus Jankowski (Anschrift wie oben)\n\nVerbraucherstreitbeilegung: Ich bin nicht verpflichtet und nicht bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen (§ 36 VSBG).",
+      'impressum' => impressumText([]) . "\n\nVerbraucherstreitbeilegung: Ich bin nicht verpflichtet und nicht bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen (§ 36 VSBG).",
       'datenschutz' => datenschutzText(),
       'reviewed' => false,
-      'widerrufsformular' => widerrufsformularText(),
+      'widerrufsformular' => widerrufsformularText([]),
       'agb' => agbIntro() . "Allgemeine Geschäftsbedingungen (AGB)\n\n1. Geltungsbereich\nDiese AGB gelten ausschließlich für Verträge über DJ-Leistungen und Technikvermietung, die unmittelbar mit Markus Jankowski (DJ Lauschgift), Büttmecker Weg 35c, 58675 Hemer, geschlossen werden.\n\nSie gelten nicht für Verträge, die der Auftraggeber mit anderen DJs schließt – etwa nach einer Empfehlung bzw. Vermittlung über die Partner-Agentur (vgl. Ziffer 6) oder direkt mit dem jeweiligen DJ. Für solche Verträge gelten allein die Bedingungen des jeweiligen DJs bzw. der Agentur; der Auftragnehmer ist an diesen Verträgen nicht beteiligt und übernimmt für deren Inhalt und Erfüllung keine Haftung.\n\n2. Angebot und Vertragsschluss\nAngebote sind freibleibend. Der Vertrag kommt mit schriftlicher Bestätigung (auch per E-Mail) zustande. Erst mit der Bestätigung ist der Termin verbindlich reserviert.\n\n3. Preise\nDie Vergütung richtet sich nach Auslastung, Arbeitsstunden und technischem Aufwand der jeweiligen Veranstaltung; eine Unterscheidung nach Anlass (z. B. Hochzeit, Geburtstag, Firmenfeier) findet nicht statt. Alle Posten werden im Angebot ausgewiesen.\n\n4. Ausfall des Auftragnehmers und Ersatz (Plan B)\nFällt der Auftragnehmer aus (z. B. durch Krankheit), verpflichtet er sich, sich im Rahmen seiner Möglichkeiten um einen geeigneten Ersatz-DJ aus seinem Kollegen-Netzwerk zu bemühen und diesen dem Auftraggeber unverzüglich vorzuschlagen.\n\nDer Vorschlag ist für den Auftraggeber unverbindlich: Er kann frei entscheiden, ob er den vorgeschlagenen Ersatz-DJ beauftragt oder vom Vertrag zurücktritt. Bei Rücktritt werden bereits geleistete Zahlungen vollständig erstattet; weitergehende Ansprüche bestehen nur bei Vorsatz oder grober Fahrlässigkeit.\n\nEntscheidet sich der Auftraggeber für den Ersatz-DJ, kommt der Vertrag über dessen Leistung direkt mit dem Ersatz-DJ zustande. Wichtig: Der Ersatz-DJ rechnet zu seinen eigenen Preisen ab – der Endpreis kann daher vom ursprünglich vereinbarten Preis abweichen. Auch der Leistungsumfang, insbesondere die mitgeführte Ton- und Lichttechnik, kann vom Angebot des Auftragnehmers abweichen. Bereits an den Auftragnehmer geleistete Zahlungen werden in diesem Fall erstattet bzw. verrechnet.\n\n5. Stornierung durch den Auftraggeber\nSagt der Auftraggeber die Veranstaltung ab, kann kurzfristig in der Regel kein Ersatzauftrag mehr angenommen werden – insbesondere innerhalb von sechs Wochen vor dem Termin ist eine Neubelegung praktisch ausgeschlossen. Daher gilt folgende pauschale Ausfallvergütung (jeweils bezogen auf die vereinbarte Nettovergütung):\n– Absage bis 6 Monate vor dem Termin: 20 %\n– Absage bis 3 Monate vor dem Termin: 40 %\n– Absage bis 6 Wochen vor dem Termin: 60 %\n– Absage weniger als 6 Wochen vor dem Termin: 80 %\n– Absage weniger als 7 Tage vor dem Termin oder Nichtabnahme: 90 %\nErsparte Aufwendungen (z. B. nicht anfallende Fahrtkosten sowie stornierbare Übernachtungskosten) werden angerechnet und von der Ausfallvergütung abgezogen. Dem Auftraggeber bleibt der Nachweis unbenommen, dass kein oder ein wesentlich geringerer Schaden entstanden ist. Gelingt es dem Auftragnehmer, für den Termin einen gleichwertigen Ersatzauftrag anzunehmen, entfällt die Ausfallvergütung bis auf bereits entstandene Kosten. Maßgeblich für die Staffel ist der Zugang der Absage in Textform.\n\nUmbuchung auf einen Ersatztermin: Einigen sich beide Seiten auf einen Ersatztermin, kann der Auftragnehmer anstelle der Ausfallvergütung eine reduzierte Umbuchungspauschale ansetzen; bereits entstandene Kosten (z. B. nicht stornierbare Auslagen) werden zusätzlich berechnet. Die Umbuchung ist eine reine Kulanzregelung des Auftragnehmers: Ein Anspruch auf einen Ersatztermin oder auf eine reduzierte Pauschale besteht nicht. Ob und zu welchen Konditionen umgebucht wird, entscheidet der Auftragnehmer frei im Einzelfall – insbesondere abhängig von seiner Verfügbarkeit am Wunschtermin, davon, ob der ursprüngliche Termin anderweitig belegt werden kann, und vom Buchungswert des Ersatztermins.\n\n6. DJ-Vermittlung über Partner-Agentur\nIst der Auftragnehmer am gewünschten Termin verhindert oder kommt eine Zusammenarbeit aus anderen Gründen nicht zustande, kann er dem Interessenten auf Wunsch bis zu fünf passende DJs vorschlagen. Diese Empfehlung ist eine reine Vermittlungsleistung des Auftragnehmers und für den Interessenten kostenlos – sie wird ihm nicht in Rechnung gestellt.\n\nDie Vermittlung erfolgt über die Partner-Agentur DJ Bande (Münster). Der Vertrag über die DJ-Leistung kommt ausschließlich zwischen dem Interessenten und dem vermittelten DJ bzw. der Agentur zustande; die Abrechnung der DJ-Leistung erfolgt nicht über den Auftragnehmer. Die Vermittlungsleistung finanziert sich dadurch, dass der Auftragnehmer für eine erfolgreich zustande gekommene Vermittlung eine Aufwandsentschädigung (Provision) von der Agentur bzw. dem vermittelten DJ erhält. Für den Interessenten entstehen dadurch keine zusätzlichen Kosten. Die auf dieser Website genannten Preise und Preisbeispiele gelten ausschließlich für Leistungen des Auftragnehmers selbst; vermittelte DJs kalkulieren ihre Vergütung eigenständig, deren Konditionen können abweichen.\n\n7. Widerrufsrecht\nBei der Buchung von DJ- und Veranstaltungstechnik-Leistungen für einen bestimmten Termin besteht kein Widerrufsrecht. Gemäß § 312g Abs. 2 Nr. 9 BGB ist das Widerrufsrecht ausgeschlossen bei Verträgen zur Erbringung von Dienstleistungen im Zusammenhang mit Freizeitbetätigungen, wenn der Vertrag für die Erbringung einen spezifischen Termin oder Zeitraum vorsieht. Jede Buchung ist daher rechtsverbindlich und verpflichtet zur Abnahme und Bezahlung der Leistung.\n\nSofern eine Buchung im Einzelfall nicht unter § 312g Abs. 2 Nr. 9 BGB fallen sollte, gilt für Verbraucher: Sie haben das Recht, binnen vierzehn Tagen ab Vertragsschluss diesen Vertrag ohne Angabe von Gründen zu widerrufen. Der Widerruf ist zu richten an: Markus Jankowski, Büttmecker Weg 35c, 58675 Hemer (oder per E-Mail an die im Impressum genannte Adresse).\n\n8. Technikvermietung\nMietpreise gelten pro Miettag (24 Stunden); jeder Folgetag wird mit 50 % des Grundpreises berechnet. Der Mieter haftet für Verlust und Beschädigung der Mietsachen ab Übergabe bis zur Rückgabe.\n\n9. Zahlungsbedingungen\nRechnungen sind, sofern nicht anders vereinbart, innerhalb von 14 Tagen ohne Abzug zahlbar. Bei Buchungen kann eine Abschlagszahlung vereinbart werden.\n\n10. Schlussbestimmungen\nEs gilt deutsches Recht. Sollten einzelne Bestimmungen unwirksam sein, bleibt der Vertrag im Übrigen wirksam.\n\nStand: August 2026.",
     ], JSON_UNESCAPED_UNICODE)],
   ] as [$k, $v]) $p->prepare('insert into site_content (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
@@ -2598,7 +2651,7 @@ function seed(PDO $p): void {
 
   /* E-Mail-Antwortvorlagen – Platzhalter: {vorname} {name} {datum} {anlass} {ort} */
   $tpls = [
-    [1, 'Hochzeit – Erstantwort', 'Eure Hochzeit am {datum} – Rückmeldung von DJ Lauschgift',
+    [1, 'Hochzeit – Erstantwort', 'Eure Hochzeit am {datum} – Rückmeldung von {firma}',
 "Hallo {vorname},
 
 vielen Dank für eure Anfrage – wie schön, dass ihr heiratet!
@@ -2615,10 +2668,10 @@ Danach bekommt ihr von mir ein Angebot mit klaren Posten für Dauer und Technik.
 Wann erreiche ich euch am besten? Oder ruft mich einfach direkt an.
 
 Viele Grüße
-Markus Jankowski – DJ Lauschgift
+{inhaber} – {firma}
 
 PS: Was andere Paare über ihre Feier mit mir sagen, lest ihr hier: {bewertungen}"],
-    [2, 'Geburtstag / private Feier – Erstantwort', 'Eure Feier am {datum} – Rückmeldung von DJ Lauschgift',
+    [2, 'Geburtstag / private Feier – Erstantwort', 'Eure Feier am {datum} – Rückmeldung von {firma}',
 "Hallo {vorname},
 
 danke für eure Anfrage – klingt nach einer richtig guten Party!
@@ -2630,10 +2683,10 @@ Am einfachsten telefonieren wir einmal kurz (15 Minuten reichen), dann klären w
 Wann passt es euch am besten?
 
 Viele Grüße
-Markus Jankowski – DJ Lauschgift
+{inhaber} – {firma}
 
 PS: Was andere über ihre Feier mit mir sagen, lest ihr hier: {bewertungen}"],
-    [3, 'Firmenfeier – Erstantwort', 'Deine Veranstaltung am {datum} – Rückmeldung von DJ Lauschgift',
+    [3, 'Firmenfeier – Erstantwort', 'Deine Veranstaltung am {datum} – Rückmeldung von {firma}',
 "Hallo {name},
 
 vielen Dank für deine Anfrage zu eurer Firmenveranstaltung am {datum}.
@@ -2645,15 +2698,15 @@ Für Veranstaltungen unter der Woche oder tagsüber kalkuliere ich übrigens sp�
 Wann darf ich dich am besten anrufen?
 
 Viele Grüße
-Markus Jankowski – DJ Lauschgift
+{inhaber} – {firma}
 
 PS: Stimmen bisheriger Kunden findest du hier: {bewertungen}"],
-    [4, 'Technik-Anfrage – Erstantwort', 'Eure Technik-Anfrage – Lauschgift Veranstaltungstechnik',
+    [4, 'Technik-Anfrage – Erstantwort', 'Eure Technik-Anfrage – {firma}',
 "Hallo {vorname},
 
 danke für eure Anfrage!
 
-Kurz zu den Konditionen: Ein Miettag entspricht 24 Stunden ab Übergabe, jeder weitere Tag kostet 50 % des Grundpreises. Abholung nach Terminabsprache an meinem Lager in Hemer (mit kurzer Einweisung) – auf Wunsch liefere ich auch, baue auf und wieder ab.
+Kurz zu den Konditionen: Ein Miettag entspricht 24 Stunden ab Übergabe, jeder weitere Tag kostet 50 % des Grundpreises. Abholung nach Terminabsprache an meinem Lager ({adresse}, mit kurzer Einweisung) – auf Wunsch liefere ich auch, baue auf und wieder ab.
 
 Damit ich euch Verfügbarkeit und Preis nennen kann, brauche ich nur noch:
 – den genauen Zeitraum (Abholung/Rückgabe bzw. Veranstaltungsdatum)
@@ -2661,7 +2714,7 @@ Damit ich euch Verfügbarkeit und Preis nennen kann, brauche ich nur noch:
 – ob ihr Lieferung/Aufbau wünscht (dann bitte Ort angeben)
 
 Viele Grüße
-Markus Jankowski – Lauschgift Veranstaltungstechnik"],
+{inhaber} – {firma}"],
     [6, 'Nach der Feier – Danke & Bewertung',
      'Danke für eure Feier am {datum}!',
 "Hallo {vorname},
@@ -2675,7 +2728,7 @@ Eine kleine Bitte zum Schluss: Bewertungen sind für mich als selbstständigen D
 Und falls euch später noch etwas einfällt (Fotos, Fragen oder die nächste Feier): Meldet euch jederzeit.
 
 Viele Grüße und alles Gute
-Markus Jankowski – DJ Lauschgift"],
+{inhaber} – {firma}"],
     [5, 'Termin belegt – DJ-Vermittlung', bandeMailSubject(), bandeMailBody()],
   ];
   foreach ($tpls as [$s,$n,$sub,$b])
@@ -2929,7 +2982,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
           (($comp['phone'] ?? '') !== '' ?
             "Wenn es eilig ist, erreichst du mich unter " . $comp['phone'] . " – am schnellsten per WhatsApp:\n" .
             "https://wa.me/" . $waDigits . "\n\n" : '') .
-          "Bis gleich!\n" . ($comp['owner'] ?? 'Markus'));
+          "Bis gleich!\n" . ownerFirst());
       }
       /* Bei einer Technik-Check-Anfrage den Fragebogen-Link mitgeben: Die Seite verspricht
          ihn "sofort im Postfach" - falls die Mail hängt, sieht der Kunde ihn wenigstens hier. */
@@ -3143,7 +3196,7 @@ function portalDoc(string $token, string $plz): array {
   $me = custAuth();
   if ($me && $me['id'] === $d['customer_id']) return $d;
   if (trim((string)$d['zip']) === '')
-    fail('Zu diesem Vorgang ist bei mir noch keine Postleitzahl hinterlegt – deshalb kann ich den Zugang nicht prüfen. Melde dich kurz bei mir (01523 6439373), dann schalte ich dich frei.', 409);
+    fail('Zu diesem Vorgang ist bei mir noch keine Postleitzahl hinterlegt – deshalb kann ich den Zugang nicht prüfen. Melde dich kurz bei mir' . phoneHint() . ', dann schalte ich dich frei.', 409);
   if (trim($plz) === '' || trim($plz) !== trim((string)$d['zip'])) {
     plzBremse($token, true);
     usleep(500000);
@@ -3177,7 +3230,7 @@ function plzBremse(string $token, bool $fehler): void {
   $n = (int)($st['n'] ?? 0); $bis = (int)($st['bis'] ?? 0);
   if ($bis > time()) {
     usleep(500000);
-    fail('Zu viele Fehlversuche. Bitte in etwa 15 Minuten erneut versuchen – oder ruf mich einfach an: 01523 6439373.', 429);
+    fail('Zu viele Fehlversuche. Bitte in etwa 15 Minuten erneut versuchen' . phoneHint(' – oder ruf mich einfach an: %s') . '.', 429);
   }
   /* Ist die Sperre abgelaufen, wieder bei null anfangen - sonst löst schon der nächste
      Fehlversuch sofort die nächsten 15 Minuten aus. */
@@ -3200,7 +3253,7 @@ function portalRental(string $token, string $plz): array {
   /* Ohne hinterlegte PLZ könnte der Kunde sich nie einloggen - dann lieber sagen,
      woran es liegt, statt ihn endlos "falsche PLZ" probieren zu lassen. */
   if (trim((string)$r['zip']) === '')
-    fail('Zu diesem Vorgang ist bei mir noch keine Postleitzahl hinterlegt – deshalb kann ich den Zugang nicht prüfen. Melde dich kurz bei mir (01523 6439373), dann schalte ich dich frei.', 409);
+    fail('Zu diesem Vorgang ist bei mir noch keine Postleitzahl hinterlegt – deshalb kann ich den Zugang nicht prüfen. Melde dich kurz bei mir' . phoneHint() . ', dann schalte ich dich frei.', 409);
   if (trim($plz) === '' || trim($plz) !== trim((string)$r['zip'])) {
     plzBremse($token, true);
     usleep(500000);
@@ -3311,11 +3364,85 @@ function decodeDataUrl(string $s, array $allowed, int $max): ?array {
 
 /* Mail über den eigenen Server (All-Inkl: PHP mail() nutzt den Domain-Mailserver).
    Absender = Firmen-E-Mail aus den Einstellungen; ohne die wird nicht versendet. */
+/* ---------- Betreiber-Stammdaten an einer Stelle ----------
+   Name, Inhaber, Telefon, Anschrift und Partner-Agentur kommen aus settings.company -
+   nirgends im Code darf mehr ein fester Name oder eine feste Nummer stehen, sonst laesst
+   sich das Backoffice nicht fuer einen zweiten Betreiber einsetzen. */
+function uaName(): string { return preg_replace('/[^A-Za-z0-9]/', '', companyName() ?: 'Backoffice') . 'Backoffice'; }
+function companySettings(?PDO $p = null): array {
+  static $cache = null;
+  if ($cache !== null) return $cache;
+  try {
+    $row = ($p ?? db())->query("select value from settings where key='company'")->fetchColumn();
+    $cache = $row ? (json_decode((string)$row, true) ?: []) : [];
+  } catch (Throwable $e) { $cache = []; }
+  return $cache;
+}
+function companyName(): string { return trim((string)(companySettings()['name'] ?? '')); }
+function ownerName(): string { return trim((string)(companySettings()['owner'] ?? '')); }
+/* Vorname des Inhabers fuer die Unterschrift unter persoenlichen Mails ("Bis gleich! Alex") -
+   ohne Inhaber bleibt der Firmenname, ohne beides "dein Team". */
+function ownerFirst(): string {
+  $o = ownerName();
+  if ($o === '') return companyName() ?: 'dein Team';
+  return preg_split('/\s+/', $o, 2)[0] ?? $o;
+}
+function companyPhone(): string { return trim((string)(companySettings()['phone'] ?? '')); }
+function companyWhatsapp(): string { return trim((string)(companySettings()['whatsapp'] ?? '')) ?: companyPhone(); }
+function companyAddress(): string {
+  $c = companySettings();
+  return trim(implode(', ', array_filter([trim((string)($c['street'] ?? '')), trim((string)($c['zip_city'] ?? ''))])));
+}
+/* Ort ohne PLZ ("58675 Hemer" -> "Hemer") fuer Formulierungen wie "von Hemer aus". */
+function companyCity(): string {
+  $z = trim((string)(companySettings()['zip_city'] ?? ''));
+  return trim(preg_replace('/^\d{4,5}\s*/', '', $z));
+}
+/* Domain aus der Website-Angabe - Kennung fuer iCal-UIDs, User-Agent und Kalendernamen. */
+function companyDomain(): string {
+  $w = trim((string)(companySettings()['website'] ?? ''));
+  $w = preg_replace('#^https?://#', '', $w); $w = preg_replace('#/.*$#', '', $w);
+  if ($w !== '') return $w;
+  return $_SERVER['HTTP_HOST'] ?? 'backoffice';
+}
+/* Oeffentlich zeigbare Betreiber-Daten (Website-Fuss, Portal, Aktionsseiten) - keine
+   Bankdaten, keine Steuernummer. owner_first fuer "Alex prüft das". */
+function publicCompany(?array $comp = null): array {
+  $c = $comp ?? companySettings();
+  $owner = trim((string)($c['owner'] ?? ''));
+  $wa = trim((string)($c['whatsapp'] ?? '')) ?: trim((string)($c['phone'] ?? ''));
+  $waDigits = preg_replace('/\D/', '', $wa);
+  if ($waDigits !== '' && $waDigits[0] === '0') $waDigits = '49' . substr($waDigits, 1);
+  return ['name' => trim((string)($c['name'] ?? '')), 'owner' => $owner,
+    'owner_first' => $owner !== '' ? (preg_split('/\s+/', $owner, 2)[0] ?? $owner) : '',
+    'phone' => trim((string)($c['phone'] ?? '')), 'whatsapp' => $wa, 'whatsapp_digits' => $waDigits,
+    'email' => trim((string)($c['email'] ?? '')), 'street' => trim((string)($c['street'] ?? '')),
+    'zip_city' => trim((string)($c['zip_city'] ?? '')), 'website' => trim((string)($c['website'] ?? '')),
+    'agency_name' => trim((string)($c['agency_name'] ?? '')), 'agency_city' => trim((string)($c['agency_city'] ?? '')),
+    'agency_enabled' => !empty($c['agency_enabled'])];
+}
+function productName(): string { return (companyName() ?: 'Backoffice') . ' Backoffice'; }
+function agencyEnabled(): bool { return !empty(companySettings()['agency_enabled']); }
+function agencyName(): string {
+  $c = companySettings();
+  $n = trim((string)($c['agency_name'] ?? '')); $city = trim((string)($c['agency_city'] ?? ''));
+  if ($n === '') return '';
+  return $city !== '' ? "$n ($city)" : $n;
+}
+/* "einfach anrufen (0170 …)" - ohne hinterlegte Nummer bleibt nur "melde dich kurz". */
+function phoneHint(string $mit = ' (%s)'): string { return companyPhone() !== '' ? sprintf($mit, companyPhone()) : ''; }
+/* Platzhalter, die in JEDER Kundenmail gelten - dieselbe Liste wie fillTpl() im Backoffice. */
+function tplMap(): array {
+  return ['{inhaber}' => ownerName() ?: companyName(), '{firma}' => companyName(), '{telefon}' => companyPhone(),
+    '{adresse}' => companyAddress(), '{firmenort}' => companyCity(), '{agentur}' => agencyName()];
+}
+function fillTplPhp(string $text, array $map = []): string { return strtr($text, $map + tplMap()); }
+
 function sendMailSafe(string $to, string $subject, string $bodyText): bool {
   $comp = json_decode(db()->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
   $from = trim((string)($comp['email'] ?? ''));
   if ($from === '' || !filter_var($from, FILTER_VALIDATE_EMAIL) || !filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
-  $fromName = preg_replace('/[\r\n"]+/', '', (string)($comp['name'] ?? 'Lauschgift'));
+  $fromName = preg_replace('/[\r\n"]+/', '', (string)($comp['name'] ?? '')) ?: $from;
   $headers = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$from>\r\n" .
              "Reply-To: $from\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit";
   return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $bodyText, $headers);
@@ -3445,13 +3572,13 @@ function workshopInvoice(PDO $p, string $signupId): array {
      eine Wiedervorlage auf heute, damit sie im Dashboard unter "Wiedervorlagen" auftaucht -
      nachsenden geht im Dokument ueber "Per E-Mail senden". */
   $p->prepare('update documents set status = ?, sent_at = ? where id = ?')->execute(['versendet', now(), $docId]);
-  $p->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
-      values (?,?,?,?,?,?,?,?,?)')
+  $p->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, followup_at, ref_doc_id, ref_kind, created_at)
+      values (?,?,?,?,?,?,?,?,?,?,?)')
     ->execute([uuid(), $cid, $mailed ? 'email' : 'note', 'out',
       'Workshop-Rechnung ' . $number . ($mailed ? ' automatisch versendet' : ' nicht zugestellt – bitte per E-Mail nachsenden'),
       'Workshop: ' . $dTitle . ' · ' . $seats . ' Platz/Plätze · ' . number_format($gross, 2, ',', '.') . " €\nPortal-Link: $portal" .
       ($mailed ? '' : "\n\nDer automatische Mailversand an " . $s['email'] . " ist fehlgeschlagen. Die Rechnung steht als 'versendet' im System (Nummer vergeben, Kunde informiert) – bitte im Dokument über „Per E-Mail senden“ nachschicken."),
-      now(), $mailed ? null : gmdate('Y-m-d'), now()]);
+      now(), $mailed ? null : gmdate('Y-m-d'), $docId, 'doc', now()]);
   return ['ok' => true, 'number' => $number, 'mailed' => $mailed, 'portal' => $portal];
 }
 
@@ -3462,9 +3589,9 @@ function rentalRequestMail(PDO $p, array $me, string $bookingId, string $from, s
   $zeitraum = date('d.m.Y', strtotime($from)) . ($to !== $from ? ' bis ' . date('d.m.Y', strtotime($to)) : '');
   $pos = implode("\n", array_map(fn($l) => '– ' . $l['name'] . ' × ' . $l['qty'], $lines));
   $map = ['{vorname}' => anredeVorname($me), '{name}' => trim((string)($me['company'] ?? '')) ?: trim(($me['first_name'] ?? '') . ' ' . ($me['last_name'] ?? '')),
-    '{zeitraum}' => $zeitraum, '{positionen}' => $pos, '{link}' => baseUrl() . '/portal.html', '{telefon}' => (string)($comp['phone'] ?? '')];
+    '{zeitraum}' => $zeitraum, '{positionen}' => $pos, '{link}' => baseUrl() . '/portal.html'] + tplMap();
   $subject = 'Deine Miet-Anfrage ist da – {zeitraum}';
-  $body = "Hallo {vorname},\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet. Das hast du angefragt:\n\nZeitraum: {zeitraum}\n{positionen}\n\nIch schaue mir das an und melde mich innerhalb von 24 Stunden mit Verfügbarkeit und Preis. Die Anfrage findest du jederzeit in deinem Kundenkonto:\n{link}\n\nWenn es eilig ist: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nBis gleich!\nMarkus";
+  $body = "Hallo {vorname},\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet. Das hast du angefragt:\n\nZeitraum: {zeitraum}\n{positionen}\n\nIch schaue mir das an und melde mich innerhalb von 24 Stunden mit Verfügbarkeit und Preis. Die Anfrage findest du jederzeit in deinem Kundenkonto:\n{link}\n\nWenn es eilig ist: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nBis gleich!\n{inhaber}";
   $tst = $p->prepare('select subject, body from email_templates where name = ? limit 1');
   $tst->execute(['Miet-Anfrage eingegangen']);
   if ($tpl = $tst->fetch()) { $subject = (string)$tpl['subject']; $body = (string)$tpl['body']; }
@@ -3607,29 +3734,36 @@ function acceptConfirmationMail(PDO $p, array $d, string $fall = 'ok'): bool {
     $map = ['{vorname}' => anredeVorname($c), '{name}' => $name, '{nummer}' => (string)$d['number'], '{nr}' => (string)$d['number'],
       '{termin}' => $termin, '{datum}' => $datum, '{link}' => $link, '{telefon}' => (string)($comp['phone'] ?? ''),
       '{gueltig}' => !empty($d['valid_until']) ? date('d.m.Y', strtotime((string)$d['valid_until'])) : '–',
-      '{betrag}' => number_format((float)$d['total_gross'], 2, ',', '.') . ' €'];
+      '{betrag}' => number_format((float)$d['total_gross'], 2, ',', '.') . ' €'] + tplMap();
     $texte = [
       'ok' => ['Angebot angenommen – Bestätigung', 'Angebot {nummer} angenommen – danke!',
-        "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen, damit ist {termin} fest bei mir reserviert.\n\nWie es weitergeht: Ihr bekommt von mir noch die Auftragsbestätigung und ggf. eine Abschlagsrechnung.\n\nEuer Angebot findet ihr jederzeit hier – Login ist eure Postleitzahl:\n{link}\n\nBei Fragen: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
+        "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen, damit ist {termin} fest bei mir reserviert.\n\nWie es weitergeht: Ihr bekommt von mir noch die Auftragsbestätigung und ggf. eine Abschlagsrechnung.\n\nEuer Angebot findet ihr jederzeit hier – Login ist eure Postleitzahl:\n{link}\n\nBei Fragen: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\n{inhaber}"],
       'konflikt' => ['Termin nicht mehr verfügbar – DJ-Vermittlung', 'Euer Termin am {datum} – leider inzwischen vergeben',
-        "Hallo {vorname},\n\nihr wolltet gerade das Angebot {nummer} annehmen – und genau das tut mir jetzt richtig leid: euer Termin am {datum} ist bei mir in der Zwischenzeit fest gebucht worden. Das Angebot kann ich deshalb nicht mehr erfüllen.\n\nWas ich euch anbieten kann: Über meine Partner-Agentur DJ Bande (Münster) suche ich euch gern persönlich einen passenden DJ raus – kostenlos, ihr müsst nur kurz zustimmen. Das geht direkt hier:\n{link}\n\nOder ruft mich einfach an ({telefon}).\n\nViele Grüße\nMarkus"],
+        "Hallo {vorname},\n\nihr wolltet gerade das Angebot {nummer} annehmen – und genau das tut mir jetzt richtig leid: euer Termin am {datum} ist bei mir in der Zwischenzeit fest gebucht worden. Das Angebot kann ich deshalb nicht mehr erfüllen.\n\nWas ich euch anbieten kann: Über meine Partner-Agentur {agentur} suche ich euch gern persönlich einen passenden DJ raus – kostenlos, ihr müsst nur kurz zustimmen. Das geht direkt hier:\n{link}\n\nOder ruft mich einfach an ({telefon}).\n\nViele Grüße\n{inhaber}"],
       'abgelaufen' => ['Angebot angenommen – abgelaufen, wird geprüft', 'Angebot {nummer} angenommen – ich prüfe das kurz',
-        "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen. Das Angebot war allerdings schon abgelaufen (gültig bis {gueltig}). Ich prüfe deshalb kurz, ob {termin} noch frei ist und die Preise noch passen, und melde mich schnell bei euch. Bis dahin ist der Termin noch nicht fest zugesagt.\n\nEuer Angebot: {link}\n\nFragen? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
+        "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen. Das Angebot war allerdings schon abgelaufen (gültig bis {gueltig}). Ich prüfe deshalb kurz, ob {termin} noch frei ist und die Preise noch passen, und melde mich schnell bei euch. Bis dahin ist der Termin noch nicht fest zugesagt.\n\nEuer Angebot: {link}\n\nFragen? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\n{inhaber}"],
     ];
+    /* Ohne Partner-Agentur (Einstellungen -> Betreiber) darf die Konflikt-Mail keine
+       Vermittlung versprechen - dann ehrlich absagen und aufs Telefon verweisen. */
+    if ($fall === 'konflikt' && !agencyEnabled())
+      $texte['konflikt'] = [null, 'Euer Termin am {datum} – leider inzwischen vergeben',
+        "Hallo {vorname},\n\nihr wolltet gerade das Angebot {nummer} annehmen – und genau das tut mir jetzt richtig leid: euer Termin am {datum} ist bei mir in der Zwischenzeit fest gebucht worden. Das Angebot kann ich deshalb nicht mehr erfüllen.\n\nWenn ihr mögt, telefonieren wir kurz – vielleicht finden wir gemeinsam eine Lösung. Ruft mich einfach an ({telefon}) oder antwortet auf diese Mail.\n\nViele Grüße\n{inhaber}"];
     [$tplName, $subject, $body] = $texte[$fall] ?? $texte['ok'];
-    $tst = $p->prepare('select subject, body from email_templates where name = ? limit 1');
-    $tst->execute([$tplName]);
-    if ($tpl = $tst->fetch()) { $subject = (string)$tpl['subject']; $body = (string)$tpl['body']; }
+    if ($tplName !== null) {
+      $tst = $p->prepare('select subject, body from email_templates where name = ? limit 1');
+      $tst->execute([$tplName]);
+      if ($tpl = $tst->fetch()) { $subject = (string)$tpl['subject']; $body = (string)$tpl['body']; }
+    }
     $subject = strtr($subject, $map);
     $body = strtr($body, $map);
     $mailed = $to !== '' && sendMailSafe($to, $subject, $body);
-    $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
-        values (?,?,?,?,?,?,?,?,?,?)')
+    $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, ref_doc_id, ref_kind, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?)')
       ->execute([uuid(), $d['customer_id'], $d['booking_id'] ?: null, $mailed ? 'email' : 'note', 'out',
         $mailed ? $subject : 'Bestätigungsmail konnte nicht versendet werden – ' . $d['number'],
         $mailed ? $body : "Der Kunde hat das Angebot " . $d['number'] . " im Portal angenommen, die automatische Bestätigung an " .
           ($to !== '' ? $to : '(keine E-Mail-Adresse hinterlegt)') . " ist aber nicht rausgegangen. Bitte selbst bestätigen.\n\nVorgesehener Text:\n" . $body,
-        now(), $mailed ? null : gmdate('Y-m-d'), now()]);
+        now(), $mailed ? null : gmdate('Y-m-d'), $d['id'], 'accept_' . $fall, now()]);
     return $mailed;
   } catch (Throwable $e) { return false; }
 }
@@ -3656,7 +3790,7 @@ function portalReactionMail(PDO $p, array $d, string $kind, string $msg, string 
       '{termin}' => $termin, '{nachricht}' => $msg !== '' ? $msg : '(keine Nachricht)',
       '{rueckruf}' => trim($phone . ($msg !== '' ? ' – ' . $msg : '')),
       '{link}' => baseUrl() . '/portal.html?a=' . $d['share_token'],
-      '{telefon}' => (string)($comp['phone'] ?? ''), '{inhaber}' => (string)($comp['owner'] ?: 'Markus')];
+    ] + tplMap();
     $texte = [
       'decline' => ['Absage erhalten', 'Danke für eure Rückmeldung zu Angebot {nummer}',
         "Hallo {vorname},\n\ndanke, dass ihr mir ehrlich Bescheid gegeben habt. Ich habe das Angebot {nummer} als abgesagt vermerkt, {termin} ist bei mir damit wieder frei.\n\nFalls sich doch noch etwas ändert: Die Tür bleibt offen – ruft einfach an ({telefon}) oder antwortet auf diese Mail.\n\nAlles Gute für eure Feier!\n{inhaber}"],
@@ -3672,15 +3806,82 @@ function portalReactionMail(PDO $p, array $d, string $kind, string $msg, string 
     $subject = strtr($subject, $map);
     $body = strtr($body, $map);
     $mailed = $to !== '' && sendMailSafe($to, $subject, $body);
-    $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
-        values (?,?,?,?,?,?,?,?,?,?)')
+    $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, ref_doc_id, ref_kind, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?)')
       ->execute([uuid(), $d['customer_id'], $d['booking_id'] ?: null, $mailed ? 'email' : 'note', 'out',
         $mailed ? $subject : 'Eingangsbestätigung konnte nicht versendet werden – ' . $d['number'],
         $mailed ? $body : "Der Kunde hat sich im Portal zum Angebot " . $d['number'] . " gemeldet, die automatische Bestätigung an " .
           ($to !== '' ? $to : '(keine E-Mail-Adresse hinterlegt)') . " ist aber nicht rausgegangen. Bitte selbst kurz antworten.\n\nVorgesehener Text:\n" . $body,
-        now(), $mailed ? null : gmdate('Y-m-d'), now()]);
+        now(), $mailed ? null : gmdate('Y-m-d'), $d['id'], 'reaction_' . $kind, now()]);
     return $mailed;
   } catch (Throwable $e) { return false; }
+}
+
+/* ---------- Beleg-Aktionen (Backoffice) ----------
+   Storno und "Bezahlt" liefen bisher als nackter Status-PATCH ohne Rueckfrage - ein
+   Fehlklick war nicht rueckholbar. Jetzt: Storno nur mit Grund und nie auf einer
+   bezahlten Rechnung (dafuer gibt es die Gutschrift), Zahlung mit Zahldatum, und die
+   automatischen Kundenmails lassen sich nach einem Mailfehler erneut anstossen. */
+function handleDocAction(string $id, string $action, array $body): never {
+  $p = db();
+  $st = $p->prepare('select d.*, c.email as c_email, c.first_name as c_first_name, c.last_name as c_last_name,
+      c.company as c_company, c.kind as c_kind from documents d left join customers c on c.id = d.customer_id where d.id = ?');
+  $st->execute([$id]);
+  $d = $st->fetch();
+  if (!$d) fail('Beleg nicht gefunden.', 404);
+  if ($action === 'storno') {
+    $reason = trim((string)($body['reason'] ?? ''));
+    if ($d['status'] === 'storniert') fail('Der Beleg ist schon storniert.', 409);
+    if ($d['status'] === 'bezahlt')
+      fail('Eine bezahlte Rechnung wird nicht storniert – dafür gibt es die Gutschrift (Rechnung → Gutschrift). So bleibt nachvollziehbar, dass Geld geflossen ist.', 409);
+    if (mb_strlen($reason) < 3) fail('Bitte einen kurzen Grund für den Storno angeben.');
+    $p->prepare("update documents set status='storniert', updated_at=? where id=?")->execute([now(), $id]);
+    docAudit($p, $id, 'storniert', $d['number'] . ' – Grund: ' . $reason);
+    if (!empty($d['customer_id']))
+      $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, created_at) values (?,?,?,?,?,?,?,?,?)')
+        ->execute([uuid(), $d['customer_id'], $d['booking_id'] ?: null, 'note', 'out', 'Storno ' . $d['number'], 'Beleg storniert. Grund: ' . $reason, now(), now()]);
+    out(['ok' => true, 'status' => 'storniert']);
+  }
+  if ($action === 'paid') {
+    if (!in_array($d['status'], ['versendet', 'ueberfaellig', 'entwurf'], true) || !in_array($d['doc_type'], ['rechnung','abschlag','schluss','gutschrift'], true))
+      fail('Dieser Beleg lässt sich in seinem Status nicht als bezahlt markieren.', 409);
+    $date = (string)($body['paid_at'] ?? '');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) fail('Bitte ein Zahldatum angeben (YYYY-MM-DD).');
+    $amount = isset($body['amount']) && $body['amount'] !== '' ? (float)$body['amount'] : null;
+    $note = trim((string)($body['note'] ?? ''));
+    $p->prepare("update documents set status='bezahlt', paid_at=?, updated_at=? where id=?")->execute([$date . 'T12:00:00Z', now(), $id]);
+    docAudit($p, $id, 'bezahlt', $d['number'] . ' – Zahlung am ' . date('d.m.Y', strtotime($date)) .
+      ($amount !== null ? ' über ' . number_format($amount, 2, ',', '.') . ' €' : '') . ($note !== '' ? ' – ' . $note : ''));
+    if (!empty($d['customer_id']) && ($note !== '' || ($amount !== null && abs($amount - (float)$d['total_gross']) > 0.005)))
+      $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, created_at) values (?,?,?,?,?,?,?,?,?)')
+        ->execute([uuid(), $d['customer_id'], $d['booking_id'] ?: null, 'note', 'in', 'Zahlung zu ' . $d['number'],
+          'Zahlung am ' . date('d.m.Y', strtotime($date)) . ($amount !== null ? ' über ' . number_format($amount, 2, ',', '.') . ' €' : '') . ($note !== '' ? "\n" . $note : ''), now(), now()]);
+    out(['ok' => true, 'status' => 'bezahlt', 'paid_at' => $date . 'T12:00:00Z']);
+  }
+  /* resend: automatische Kundenmail noch einmal anstossen. kind = ref_kind der Notiz. */
+  $kind = (string)($body['kind'] ?? ($_GET['kind'] ?? ''));
+  if (empty($d['share_token'])) {
+    $tok = bin2hex(random_bytes(24));
+    $p->prepare('update documents set share_token = ? where id = ?')->execute([$tok, $id]);
+    $d['share_token'] = $tok;
+  }
+  $cust = ['email' => $d['c_email'], 'first_name' => $d['c_first_name'], 'last_name' => $d['c_last_name'], 'company' => $d['c_company'], 'kind' => $d['c_kind']];
+  $ok = false;
+  if (preg_match('/^accept_(ok|konflikt|abgelaufen)$/', $kind, $mm)) $ok = acceptConfirmationMail($p, $d, $mm[1]);
+  elseif (preg_match('/^reaction_(decline|comment|callback)$/', $kind, $mm)) {
+    /* Nachricht/Telefon aus der letzten passenden Portal-Reaktion uebernehmen */
+    $ev = $p->prepare('select message, phone from doc_events where document_id = ? and kind = ? order by created_at desc limit 1');
+    $ev->execute([$id, $mm[1]]);
+    $e = $ev->fetch() ?: ['message' => '', 'phone' => ''];
+    $ok = portalReactionMail($p, $d + $cust, $mm[1], (string)($e['message'] ?? ''), (string)($e['phone'] ?? ''));
+  } elseif ($kind === 'bande') {
+    if (!agencyEnabled()) fail('Die DJ-Vermittlung ist in den Einstellungen ausgeschaltet.', 400);
+    $ok = bandeOptIn($p, (string)$d['customer_id'], $d['booking_id'] ?: null, true, $id) !== null;
+  } else fail('Diese Mail kann nur aus dem Beleg heraus erneut gesendet werden.', 400);
+  if ($ok && !empty($body['note_id'])) {
+    try { $p->prepare('update communications set followup_done = 1 where id = ? and ref_doc_id = ?')->execute([(string)$body['note_id'], $id]); } catch (PDOException $e) {}
+  }
+  out(['ok' => (bool)$ok, 'mailed' => (bool)$ok]);
 }
 
 /* ---------- Kalender-Feeds (iCal) ---------- */
@@ -3700,7 +3901,7 @@ function icsEsc(string $s): string {
   return str_replace(["\\", "\n", ",", ";"], ["\\\\", "\\n", "\\,", "\\;"], $s);
 }
 function icsEvent(string $uid, string $summary, string $dateStart, ?string $dateEnd, ?string $t1, ?string $t2, string $desc, string $loc, bool $tentative): string {
-  $out = "BEGIN:VEVENT\r\nUID:$uid@lauschgift\r\nDTSTAMP:" . gmdate('Ymd\THis\Z') . "\r\n";
+  $out = "BEGIN:VEVENT\r\nUID:$uid@" . companyDomain() . "\r\nDTSTAMP:" . gmdate('Ymd\THis\Z') . "\r\n";
   if ($t1) {
     $d1 = str_replace('-', '', $dateStart) . 'T' . str_replace(':', '', substr($t1, 0, 5)) . '00';
     $endDate = $dateStart;
@@ -3776,10 +3977,11 @@ function serveIcal(string $typ): never {
         trim(($b['venue_name'] ?? '') . ' ' . ($b['venue_address'] ?? '')), false);
     }
   }
-  $names = ['anfragen' => 'Lauschgift · Anfragen', 'buchungen' => 'Lauschgift · Buchungen', 'technik' => 'Lauschgift · Vermietung'];
+  $brand = companyName() ?: companyDomain();
+  $names = ['anfragen' => "$brand · Anfragen", 'buchungen' => "$brand · Buchungen", 'technik' => "$brand · Vermietung"];
   header('Content-Type: text/calendar; charset=utf-8');
   header('Content-Disposition: inline; filename="' . $typ . '.ics"');
-  echo "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Lauschgift//Backoffice//DE\r\n" .
+  echo "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//" . icsEsc($brand) . "//Backoffice//DE\r\n" .
     'X-WR-CALNAME:' . icsEsc($names[$typ]) . "\r\nX-PUBLISHED-TTL:PT30M\r\n" . $ev . "END:VCALENDAR\r\n";
   exit;
 }
@@ -3949,10 +4151,10 @@ function handlePortal(string $path, string $method, $body): never {
       $p->prepare('update customers set portal_invite = ?, portal_invite_expires = ?, updated_at = ? where id = ?')
         ->execute([$inv, time() + 2 * 86400, now(), $existing['id']]);
       $mailed = sendMailSafe($email, 'Dein Zugang zum Kundenkonto',
-        "Hallo,\n\ndu möchtest dir ein Kundenkonto bei DJ Lauschgift anlegen – zu deiner E-Mail-Adresse gibt es bei mir schon einen Vorgang.\n\n" .
+        "Hallo,\n\ndu möchtest dir ein Kundenkonto bei " . (companyName() ?: 'mir') . " anlegen – zu deiner E-Mail-Adresse gibt es bei mir schon einen Vorgang.\n\n" .
         "Damit niemand Fremdes an deine Unterlagen kommt, bestätige den Zugang bitte über diesen Link (48 Stunden gültig) und vergib dort dein Passwort:\n" .
         baseUrl() . "/portal.html?einladung=$inv\n\n" .
-        "Warst du das nicht? Dann ignoriere diese Mail einfach – ohne den Link passiert nichts.\n\nViele Grüße\nMarkus");
+        "Warst du das nicht? Dann ignoriere diese Mail einfach – ohne den Link passiert nichts.\n\nViele Grüße\n" . ownerFirst());
       /* Kommt die Mail nicht raus, wartet der Kunde sonst vergeblich - Markus soll das sehen. */
       if (!$mailed)
         notifyOwner('Bestätigungsmail fürs Kundenkonto konnte nicht versendet werden',
@@ -3960,7 +4162,7 @@ function handlePortal(string $path, string $method, $body): never {
       out(['pending' => true,
         'message' => $mailed
           ? 'Fast geschafft: Zu deiner Adresse gibt es schon einen Vorgang bei mir. Ich habe dir gerade einen Bestätigungslink geschickt – damit legst du dein Passwort fest und kommst direkt rein.'
-          : 'Zu deiner Adresse gibt es schon einen Vorgang bei mir. Die Bestätigungsmail konnte ich gerade nicht verschicken – melde dich kurz unter 01523 6439373, dann schalte ich dich frei.'], 202);
+          : 'Zu deiner Adresse gibt es schon einen Vorgang bei mir. Die Bestätigungsmail konnte ich gerade nicht verschicken – melde dich kurz bei mir' . phoneHint(' unter %s') . ', dann schalte ich dich frei.'], 202);
     } else {
       $custId = uuid();
       /* Anschrift gleich mitnehmen: Ohne PLZ lässt sich später kein Mietvertrag erzeugen
@@ -4014,7 +4216,7 @@ function handlePortal(string $path, string $method, $body): never {
       $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
       sendMailSafe((string)$c['email'], 'Neues Passwort für dein Kundenkonto',
         anredeFor($c) . ",\n\nüber diesen Link kannst du ein neues Passwort für dein Kundenkonto setzen (48 Stunden gültig):\n" .
-        baseUrl() . "/portal.html?einladung=$inv\n\nFalls du das nicht warst, kannst du diese Mail einfach ignorieren – ohne den Link ändert sich nichts.\n\nViele Grüße\n" . ($comp['owner'] ?? 'Markus'));
+        baseUrl() . "/portal.html?einladung=$inv\n\nFalls du das nicht warst, kannst du diese Mail einfach ignorieren – ohne den Link ändert sich nichts.\n\nViele Grüße\n" . ownerFirst());
     }
     out(['ok' => true]);   // keine Auskunft, ob die Adresse existiert
   }
@@ -4281,7 +4483,7 @@ function handlePortal(string $path, string $method, $body): never {
       })(),
       'today' => date('Y-m-d'),
       'items' => $it->fetchAll(),
-      'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city','iban','bic','bank','tax_id'])),
+      'company' => publicCompany($comp) + array_intersect_key($comp, array_flip(['iban','bic','bank','tax_id'])),
       'upsells' => $ups,
       'reviews' => json_decode($p->query("select value from site_content where key='reviews'")->fetchColumn() ?: '{}', true),
     ]);
@@ -4384,7 +4586,8 @@ function handlePortal(string $path, string $method, $body): never {
     /* Opt-in zur DJ-Vermittlung: Kunde kennzeichnen, Vorauswahl-Bogen anlegen und mailen,
        Link gleich mit zurueckgeben, damit die Dankesseite ihn sofort zeigt. */
     if ($kind === 'bande') {
-      $formLink = bandeOptIn($p, $d['customer_id'], $d['booking_id'] ?: null);
+      if (!agencyEnabled()) fail('Eine DJ-Vermittlung ist hier nicht eingerichtet – ruft mich einfach an, dann finden wir eine Lösung.', 400);
+      $formLink = bandeOptIn($p, $d['customer_id'], $d['booking_id'] ?: null, false, $d['id']);
       if ($formLink) { $resp['form_link'] = $formLink; $ownerExtra .= "\n\nVorauswahl-Bogen wurde angelegt und dem Kunden gemailt:\n$formLink"; }
     }
     $p->prepare('insert into doc_events (id,document_id,kind,message,phone,created_at) values (?,?,?,?,?,?)')
@@ -4465,7 +4668,7 @@ function handlePortal(string $path, string $method, $body): never {
       'status' => $r['status'], 'signed_at' => $r['signed_at'], 'signed_name' => $r['signed_name'],
       'customer' => ['name' => trim($r['company'] ?: trim($r['first_name'].' '.$r['last_name'])),
         'street' => $r['street'], 'zip_city' => trim($r['zip'].' '.$r['city'])],
-      'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city'])),
+      'company' => publicCompany($comp),
       'booking' => ['title' => $r['title'],
         'event_date' => $snap['event_date'] ?? $r['event_date'], 'end_date' => $snap['end_date'] ?? $r['end_date'],
         'days' => $snap['days'] ?? rentalDays($r)],
@@ -4577,7 +4780,7 @@ function handlePortal(string $path, string $method, $body): never {
       $cst = $p->prepare('select first_name, kind from customers where email = ? order by (portal_hash is not null) desc limit 1');
       $cst->execute([$email]);
       sendMailSafe($email, 'Du stehst auf der Warteliste – ich melde mich!',
-        anredeFor(($cst->fetch() ?: []) + ['name' => $name]) . ",\n\ndanke für dein Interesse am Workshop „" . $w['title'] . "“ am " . deDate($w['event_date']) . "!\n\nDer Termin ist aktuell voll – du stehst jetzt auf der Warteliste. Sobald ein Platz frei wird, melde ich mich sofort persönlich bei dir. Bezahlt wird erst, wenn du wirklich einen Platz hast.\n\nBis hoffentlich bald!\nMarkus");
+        anredeFor(($cst->fetch() ?: []) + ['name' => $name]) . ",\n\ndanke für dein Interesse am Workshop „" . $w['title'] . "“ am " . deDate($w['event_date']) . "!\n\nDer Termin ist aktuell voll – du stehst jetzt auf der Warteliste. Sobald ein Platz frei wird, melde ich mich sofort persönlich bei dir. Bezahlt wird erst, wenn du wirklich einen Platz hast.\n\nBis hoffentlich bald!\n" . ownerFirst());
     }
     notifyOwner(($status === 'warteliste' ? 'Warteliste' : 'Workshop-Buchung') . ': ' . $w['title'],
       "Name: $name ($seats Platz/Plätze)\nE-Mail: $email\nTermin: " . $w['event_date'] .
@@ -4738,7 +4941,7 @@ function handlePortal(string $path, string $method, $body): never {
       "Bestätige kurz deine Anmeldung, damit ich sicher weiß, dass die Adresse dir gehört:\n\n$link\n\n" .
       "Du bekommst danach nur Post, wenn es wirklich etwas gibt: neue Termine, neue Themen, freie Plätze. " .
       "Abmelden geht jederzeit mit einem Klick.\n\n" .
-      "Falls du das nicht warst, ignoriere diese Mail einfach – dann passiert nichts.\n\nBis bald!\nMarkus");
+      "Falls du das nicht warst, ignoriere diese Mail einfach – dann passiert nichts.\n\nBis bald!\n" . ownerFirst());
     out(['ok' => true, 'mailed' => $mailed], 201);
   }
   /* Token bewusst großzügig entgegennehmen: Ein im Mailprogramm abgeschnittener Link
@@ -4778,7 +4981,7 @@ function handlePortal(string $path, string $method, $body): never {
   }
   /* Kaputte/abgeschnittene Links aus Mailprogrammen landen hier - der Besucher darf
      keine Entwickler-Formulierung sehen, sondern braucht einen Ausweg. */
-  fail('Dieser Link stimmt so nicht. Bitte kopiere ihn noch einmal komplett aus meiner E-Mail – oder melde dich kurz bei mir: 01523 6439373.', 404);
+  fail('Dieser Link stimmt so nicht. Bitte kopiere ihn noch einmal komplett aus meiner E-Mail – oder melde dich kurz bei mir' . phoneHint(': %s') . '.', 404);
 }
 
 /* ---------- Upload ---------- */
@@ -5424,7 +5627,7 @@ try {
     $mailed = false;
     if (!empty($body['mail']) && $c['email']) {
       $mailed = sendMailSafe((string)$c['email'], 'Dein Zugang zum Kundenkonto',
-        "Hallo " . trim((string)$c['first_name']) . ",\n\nhier ist dein persönlicher Zugang zu deinem Kundenkonto – dort findest du alle Unterlagen (Angebote, Rechnungen, Verträge) und kannst Programmablauf, Musikwünsche und Fotos eurer Location hinterlegen:\n\n$url\n\nEinfach öffnen und ein Passwort setzen (Link ist 7 Tage gültig).\n\nViele Grüße\nMarkus");
+        "Hallo " . trim((string)$c['first_name']) . ",\n\nhier ist dein persönlicher Zugang zu deinem Kundenkonto – dort findest du alle Unterlagen (Angebote, Rechnungen, Verträge) und kannst Programmablauf, Musikwünsche und Fotos eurer Location hinterlegen:\n\n$url\n\nEinfach öffnen und ein Passwort setzen (Link ist 7 Tage gültig).\n\nViele Grüße\n" . ownerFirst());
     }
     out(['ok' => true, 'url' => $url, 'mailed' => $mailed, 'has_account' => !empty($c['portal_hash'])], 201);
   }
@@ -5464,6 +5667,14 @@ try {
   /* Öffentlich: nur USt.-Satz + Kleinunternehmer-Flag, damit die Technik-Mietseite Preise
      wahlweise brutto (Privatkunde) oder netto (Firmenkunde) anzeigen kann - kein Zugriff
      auf die restlichen (geschützten) Einstellungen. */
+  /* Oeffentliche Betreiber-Basisdaten fuer Website-Fuss, WhatsApp-Link, Aktionsseiten und
+     Portal - was ohnehin im Impressum steht, nichts Vertrauliches. */
+  if ($path === 'public/company' && $method === 'GET') out(publicCompany());
+  /* Beleg-Aktionen mit Rueckfrage (Storno mit Grund, Zahlung mit Datum, Mail erneut senden) */
+  if (preg_match('#^doc/([a-f0-9-]{30,40})/(storno|paid|resend)$#', $path, $m) && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    handleDocAction($m[1], $m[2], $body ?? []);
+  }
   if ($path === 'public/tax-info' && $method === 'GET') {
     $p = db();
     $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
@@ -5584,7 +5795,8 @@ try {
     $p = db();
     $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
     $style = trim((string)($cfg['style'] ?? '')) ?: (
-      'Du schreibst deutsche Texte im Ton von Markus, einem DJ und Verleiher für Veranstaltungstechnik: '
+      'Du schreibst deutsche Texte im Ton von ' . (ownerName() ?: 'dem Inhaber') . (companyName() ? ' (' . companyName() . ')' : '')
+      . ', einem DJ und Verleiher für Veranstaltungstechnik: '
       . 'persönlich, locker, professionell – so, wie er es am Telefon sagen würde. Keine Emojis, keine '
       . 'Worthülsen oder Floskeln, keine Aufzählungen und keine Überschriften – nur zusammenhängender '
       . 'Fließtext. Ein Gedankenstrich wird als Halbgeviertstrich „–" geschrieben, nicht als Bindestrich. '
@@ -5632,7 +5844,7 @@ try {
       . 'Schlage GENAU EINE neue, sinnvolle Frage samt kurzer, passender Antwort vor, die zu den gegebenen '
       . 'Inhalten passt und sich klar von den vorhandenen Fragen unterscheidet. Antworte AUSSCHLIESSLICH als '
       . 'kompaktes JSON-Objekt ohne Markdown-Codeblock, exakt in der Form {"question":"...","answer":"..."}. '
-      . 'Die Antwort im JSON soll im Ton von Markus formuliert sein: persönlich, locker, professionell, '
+      . 'Die Antwort im JSON soll im Ton von ' . (ownerName() ?: 'dem Inhaber') . (companyName() ? ' (' . companyName() . ')' : '') . ' formuliert sein: persönlich, locker, professionell, '
       . 'keine Floskeln, kein Bindestrich statt Halbgeviertstrich, ca. 1–3 Sätze.';
     $userText = "Website-Inhalte:\n" . mb_substr($siteText, 0, 3000)
       . "\n\nBereits vorhandene FAQ-Fragen (nicht wiederholen):\n" . ($existing ? implode("\n", $existing) : '(noch keine)');

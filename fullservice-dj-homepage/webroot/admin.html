@@ -161,6 +161,23 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .tile.click{cursor:pointer}.tile.click:hover{border-color:var(--acc)}
 .tile .tv{font-size:24px;font-weight:700;color:var(--acc)}
 .tile .tl{font-size:10px;color:var(--gl);letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
+/* Hinweiskaesten (Anfrage-Dialog, Storno-Rueckfrage) und GoBD-Kurzhinweise. Farben gegen
+   --cd (#17181c) gerechnet: #8cc98c 9,2:1, --redl 6,5:1, --gll 7,9:1. */
+.msg{border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--gll)}
+.msg.err{border-color:var(--redl);color:var(--redl)}
+.msg.ok{border-color:var(--grn);color:#8cc98c}
+.hint{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid var(--gll);border-radius:50%;font-size:10px;line-height:1;color:var(--gll);cursor:help;margin:0 6px 0 2px;vertical-align:middle}
+.card.hl{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc);transition:box-shadow .3s}
+/* Einklappbare Bloecke im Beleg-Editor (Miettage, Eckdaten, Rabatt) */
+.dblk{border:1px solid var(--line);border-radius:8px;padding:0 14px;margin-bottom:14px}
+.dblk-h{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--gll);padding:9px 0}
+.dblk-h .ic{width:14px;height:14px;transition:transform .15s;flex:none}
+.dblk.open .dblk-h .ic{transform:rotate(90deg)}
+.dblk-h .fill{font-size:10px;color:var(--acc);text-transform:none;letter-spacing:0;margin-left:auto}
+.dblk-b{display:none;padding-bottom:4px}.dblk.open .dblk-b{display:block}
+.setup-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.setup-row .ic{width:15px;height:15px;flex:none}
+.setup-row.ok{color:var(--gl)}.setup-row.ok .ic{color:var(--grn)}
 
 /* Einsatzplan: Artikel x Tage. Frei = dunkle Zelle ohne Wert, teilweise = Gelb,
    voll = helles Rot, ueber Bestand = helles Rot mit heller Kante und fettem Wert.
@@ -356,6 +373,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
   <div class="pg a" id="pg-dash">
     <div class="pt">Dashboard</div><div class="ps" id="dashDate"></div>
     <div class="tiles" id="dashTiles"></div>
+    <div class="card" id="dashSetupCard" style="display:none;border-left:3px solid var(--acc)"><h3>Einrichtung abschließen <span class="mut sml" style="font-weight:400">(einmalig – danach verschwindet die Liste)</span></h3><div id="dashSetup" class="sml"></div></div>
     <div class="grid2" style="gap:16px">
       <div class="card"><h3>Kommende Gigs</h3><div id="dashNext" class="sml mut">–</div></div>
       <div class="card"><h3>Wiedervorlagen / Nachfassen</h3><div id="dashFollow" class="sml mut">–</div></div>
@@ -524,12 +542,14 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
         <div><label>Datum</label><input type="date" id="docDate"></div>
         <div><label id="docDateLbl2">Fällig / gültig bis</label><input type="date" id="docDate2"></div>
       </div>
+      <div class="dblk" id="docRentBlk"><div class="dblk-h" onclick="docBlkToggle('rent')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>Miettage <span class="fill" id="docRentFill"></span></div><div class="dblk-b">
       <div class="grid3" id="docRentGrid">
         <div><label>Miettage von <span class="mut sml" style="text-transform:none;letter-spacing:0">– für Technikartikel mit Menge Stk./Set</span></label><input type="date" id="docRentFrom" onchange="renderRentalHint()"></div>
         <div><label>Miettage bis <span class="mut sml" style="text-transform:none;letter-spacing:0">– leer = 1 Miettag</span></label><input type="date" id="docRentTo" onchange="renderRentalHint()"></div>
         <div style="display:flex;align-items:flex-end;padding-bottom:11px"><span class="mut sml" id="docRentHint"></span></div>
-      </div>
-      <div id="docEventBox" style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+      </div></div></div>
+      <div class="dblk" id="docEventBlk"><div class="dblk-h" onclick="docBlkToggle('event')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>Eckdaten der Veranstaltung <span class="fill" id="docEventFill"></span></div><div class="dblk-b">
+      <div id="docEventBox" style="padding:4px 0 8px">
         <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:normal;cursor:pointer;margin:0">
           <input type="checkbox" id="evShow" style="width:auto" onchange="renderEventHint()">
           <b style="color:var(--wh)">Eckdaten der Veranstaltung auf dem Beleg anzeigen</b></label>
@@ -550,7 +570,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
         </div>
         <div class="mut sml" id="evHint" style="margin-top:6px"></div>
         <div class="sml" id="evDateCheck" style="margin-top:4px"></div>
-      </div>
+      </div></div></div>
       <div class="grid4" id="docTypeGrid">
         <div><label>Typ</label><select id="docType">
           <option value="angebot">Angebot</option><option value="bestaetigung">Auftragsbestätigung</option>
@@ -568,12 +588,13 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
       <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel brutto</div><div>Gesamt</div><div></div></div>
       <div id="docItems"></div>
       <datalist id="artikelVorschlaege"></datalist>
-      <div class="grid4" id="docDiscGrid" style="margin-top:10px">
+      <div class="dblk" id="docDiscBlk" style="margin-top:12px"><div class="dblk-h" onclick="docBlkToggle('disc')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>Rabatt / Pauschalpreis <span class="fill" id="docDiscFill"></span></div><div class="dblk-b">
+      <div class="grid4" id="docDiscGrid">
         <div><label>Rabatt aufs Gesamtdokument</label><input type="number" step="0.01" id="docDiscVal" value="0"></div>
         <div><label>Rabatt-Art</label><select id="docDiscType"><option value="pct">%</option><option value="eur">€ (brutto)</option></select></div>
         <div><label>Pauschal-Gesamtpreis (brutto €) <span class="mut sml" style="text-transform:none;letter-spacing:0">– überschreibt die Positionssumme</span></label><input type="number" step="0.01" id="docTotalOverride" placeholder="leer = aus Positionen berechnet"></div>
         <div></div>
-      </div>
+      </div></div></div>
       <div class="totals" id="docTotals"></div>
     </div>
     <div class="card"><label>Schlusstext</label><textarea id="docOutro" style="min-height:46px"></textarea>
@@ -887,7 +908,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cSeoDesc')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('seo')">Speichern</button></div>
           <div id="vb_seo"></div></div>
-        <div class="card"><h3>Rechtstexte</h3>
+        <div class="card" id="cms-legal"><h3>Rechtstexte</h3>
           <label>Impressum</label><textarea id="cLegImp" style="min-height:90px"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cLegImp')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <label>Datenschutzerklärung</label><textarea id="cLegDs" style="min-height:90px"></textarea>
@@ -903,7 +924,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
   <div class="pg" id="pg-set">
     <div class="pt">Einstellungen</div><div class="ps">Firmendaten, Nummernkreise &amp; Vorgaben für Dokumente</div>
     <div class="sec-label">Rechnungsstellung</div>
-      <div class="card"><h3>Firmendaten (Briefkopf)</h3>
+      <div class="card" id="set-company"><h3>Firmendaten (Briefkopf)</h3>
         <div class="grid2">
           <div><label>Firmierung</label><input id="sName"></div>
           <div><label>Inhaber</label><input id="sOwner"></div>
@@ -933,7 +954,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
         <label style="margin-top:12px"><input type="checkbox" id="sSmall" style="width:auto;margin-right:6px"><b>Umsatzsteuer AUS</b> – Kleinunternehmer nach §19 UStG: Dokumente werden ohne USt. erstellt, inkl. Pflichthinweis</label>
         <div style="margin-top:12px"><button class="btn sm" onclick="saveCompany()">Speichern</button></div>
       </div>
-        <div class="card"><h3>Bankverbindung</h3>
+        <div class="card" id="set-bank"><h3>Bankverbindung</h3>
           <label>Bank</label><input id="sBank">
           <label>IBAN</label><input id="sIban">
           <label>BIC</label><input id="sBic">
@@ -941,7 +962,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <input id="sPaypal" placeholder="paypal.me/deinname oder E-Mail-Adresse">
           <div style="margin-top:12px"><button class="btn sm" onclick="saveCompany()">Speichern</button></div>
         </div>
-        <div class="card"><h3>Benachrichtigungen aufs Handy (Telegram)</h3>
+        <div class="card" id="set-telegram"><h3>Benachrichtigungen aufs Handy (Telegram)</h3>
           <div class="sml mut" style="margin-bottom:8px">Neue Anfragen, Angebots-Reaktionen, Workshop-Anmeldungen und Co. landen zusätzlich als kurze Nachricht in Telegram. E-Mail-Benachrichtigungen bleiben immer an – Telegram kommt zusätzlich.</div>
           <ol class="sml" style="margin:0 0 10px 18px;padding:0;line-height:1.7">
             <li>Telegram auf dem Handy installieren (falls noch nicht drauf).</li>
@@ -962,7 +983,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div id="tgStatus" class="sml" style="margin-top:8px"></div>
           <div class="sml mut" style="margin-top:6px">Datenschutz: Die Nachrichten bleiben kurz (Betreff plus ein paar Zeilen) – die Details stehen weiterhin nur im Backoffice.</div>
         </div>
-        <div class="card"><h3>Nummernkreise &amp; Vorgaben</h3>
+        <div class="card" id="set-numbering"><h3>Nummernkreise &amp; Vorgaben</h3>
           <div class="grid2">
             <div><label>Angebots-Präfix</label><input id="sQPre"></div>
             <div><label>Nächste Angebots-Nr.</label><input type="number" id="sQNext"></div>
@@ -1033,7 +1054,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <button class="btn sm" onclick="saveRoutingConfig()">Speichern</button>
         </div>
     <div class="sec-label">Verträge &amp; Vermietung</div>
-        <div class="card"><h3>Mietvertrag – Vertragsbedingungen</h3>
+        <div class="card" id="set-rental"><h3>Mietvertrag – Vertragsbedingungen</h3>
           <textarea id="sRental" style="min-height:160px;font-size:11px"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('sRental')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <div class="mut sml" style="margin-top:6px">Erscheint auf jedem gedruckten Mietvertrag (Gig-Detail → „ Mietvertrag“). Vor Livegang anwaltlich prüfen lassen.</div>
@@ -1072,10 +1093,12 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <label style="margin-top:10px">Cronjob-URL für automatische Updates (z. B. alle 15 Minuten)</label>
           <input id="dpCron" readonly onclick="this.select()" style="font-size:11px">
         </div>
-        <div class="card"><h3>Datensicherung <button class="btn sm" style="float:right" onclick="runBackupNow()">Backup jetzt</button></h3>
-          <div class="sml mut" style="margin-bottom:8px">Snapshots der Datenbank landen geschützt in <code>data/backups/</code> (die letzten 14 werden behalten). Für automatische tägliche Sicherung: bei All-Inkl (KAS → Tools → Cronjobs) einen täglichen Cronjob auf diese URL anlegen:</div>
+        <div class="card" id="set-backup"><h3>Datensicherung <button class="btn sm" style="float:right" onclick="runBackupNow()">Backup jetzt</button></h3>
+          <div class="sml mut" style="margin-bottom:8px">Snapshots der Datenbank landen geschützt in <code>data/backups/</code> (die letzten 14 werden behalten). Für die automatische tägliche Sicherung beim Hoster einen Cronjob anlegen – im Hosting-Panel meist unter „Cronjobs“ (bei All-Inkl zum Beispiel KAS → Tools → Cronjobs). Beispiel: einmal täglich nachts diese URL aufrufen:</div>
           <input id="bkUrl" readonly onclick="this.select()" style="font-size:11px">
-          <div class="sml mut" style="margin:8px 0 4px">Wichtig: Backups liegen auf demselben Server – lade dir regelmäßig eins per Klick herunter (externe Kopie).</div>
+          <label style="margin-top:8px"><input type="checkbox" id="bkCronOk" style="width:auto;margin-right:6px" onchange="saveBackupFlag(this.checked)">Cronjob ist beim Hoster eingerichtet <span class="mut sml" style="text-transform:none;letter-spacing:0">(Haken für die Einrichtungs-Checkliste im Dashboard)</span></label>
+          <div class="sml mut" style="margin:8px 0 4px">Wichtig: Backups liegen auf demselben Server – lade dir regelmäßig eins herunter (externe Kopie).</div>
+          <div id="bkLatest" style="margin-bottom:6px"></div>
           <div id="bkList" class="sml mut">–</div>
         </div>
         <div class="card"><h3>KI-Textassistent</h3>
@@ -1377,7 +1400,7 @@ function wsAddModal(wid){
   var free=(w.capacity||0)-wsBooked(wid);
   var opts='<option value="">– neuer Teilnehmer (unten eintragen) –</option>'+
     (CACHE.customers||[]).slice().sort(function(a,b){return custName(a).localeCompare(custName(b))}).map(function(c){
-      return '<option value="'+c.id+'" data-s="'+esc((custName(c)+' '+(c.email||'')).toLowerCase())+'">'+esc(custName(c))+(c.email?' · '+esc(c.email):'')+'</option>'}).join('');
+      return '<option value="'+c.id+'" data-s="'+esc((custName(c)+' '+(c.city||'')+' '+(c.email||'')).toLowerCase())+'">'+esc(custOptionLabel(c))+'</option>'}).join('');
   openModal('Teilnehmer erfassen – '+esc(w.title),
     '<div class="sml mut" style="margin-bottom:10px">Frei: <b style="color:var(--wh)">'+Math.max(0,free)+'</b> von '+(w.capacity||0)+' Plätzen'+(free<=0?' – neue Teilnehmer landen auf der Warteliste.':'')+'</div>'+
     '<label>Bestehender Kunde</label><input id="waFilter" placeholder="Zum Filtern tippen (Name oder E-Mail)" oninput="wsAddFilter()" style="margin-bottom:6px">'+
@@ -1481,7 +1504,11 @@ function renderDash(){
     .map(function(b){return {kind:'booking',id:b.id,label:custName(CACHE.customers.find(function(c){return c.id===b.customer_id})),
       sub:(b.event_type||'Technik-Miete')+(b.event_date?(' · '+dt(b.event_date)):''),urgent:isUrgent(b.event_date)};});
   newInq=newInq.concat(cartInq).sort(function(a,b){return (b.urgent?1:0)-(a.urgent?1:0)});
-  var upcoming=CACHE.bookings.filter(function(b){return b.event_date>=today&&b.status!=='storniert'}).sort(function(a,b){return a.event_date<b.event_date?-1:1});
+  /* "Kommende Gigs" zaehlt nur, was wirklich fest ist - Anfragen und offene Angebote
+     stehen getrennt daneben, sonst sah das Dashboard voller aus als der Kalender war. */
+  var upcomingAll=CACHE.bookings.filter(function(b){return b.event_date>=today&&b.status!=='storniert'}).sort(function(a,b){return a.event_date<b.event_date?-1:1});
+  var upcoming=upcomingAll.filter(function(b){return ['gebucht','abgeschlossen'].indexOf(b.status)>=0});
+  var unbestaetigt=upcomingAll.length-upcoming.length;
   var openInv=CACHE.documents.filter(function(d){return istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0});
   var openQ=CACHE.documents.filter(function(d){return d.doc_type==='angebot'&&d.status==='versendet'});
   var year=new Date().getFullYear();
@@ -1489,6 +1516,7 @@ function renderDash(){
     .reduce(function(s,d){return s+Number(d.total_gross)-Number(d.deposit_deducted||0)},0);
   document.getElementById('dashTiles').innerHTML=
     tile(newInq.length,'Neue Anfragen',"showPage('inq')")+tile(upcoming.length,'Kommende Gigs',"showPage('book')")+
+    (unbestaetigt?tile(unbestaetigt,'davon unbestätigte Anfragen',"showPage('book')"):'')+
     tile(openQ.length,'Offene Angebote',"gotoDocs('angebot','versendet')")+tile(openInv.length,'Offene Rechnungen',"gotoDocs('','versendet')")+
     tile(euro(rev),'Umsatz '+year);
   /* Der Zähler muss zur Liste passen: Warenkorb-Mietanfragen sind Buchungen und stehen
@@ -1496,13 +1524,20 @@ function renderDash(){
   var badge=document.getElementById('inqBadge');
   var offeneInq=CACHE.inquiries.filter(function(i){return i.status==='neu'}).length;
   badge.style.display=offeneInq?'':'none';badge.textContent=offeneInq;
-  document.getElementById('dashNext').innerHTML=upcoming.slice(0,6).map(function(b){
+  document.getElementById('dashNext').innerHTML=(upcoming.slice(0,6).map(function(b){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Gig')+'</a> <span class="mut">'+esc(custName(b.customers))+'</span></div>';
-  }).join('')||'Keine anstehenden Gigs.';
+  }).join('')||'Keine festen Gigs in Sicht.')+
+    (unbestaetigt?'<div class="mut sml" style="margin-top:8px">Dazu '+unbestaetigt+' unbestätigte Anfrage'+(unbestaetigt===1?'':'n')+'/Angebote – <a onclick="showPage(\'book\')">im Kalender ansehen</a></div>':'');
   var fups=CACHE.comms.filter(function(c){return c.followup_at&&!c.followup_done&&c.followup_at<=today});
   document.getElementById('dashFollow').innerHTML=fups.slice(0,6).map(function(c){
     var cu=CACHE.customers.find(function(x){return x.id===c.customer_id});
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openCustDetail(\''+c.customer_id+'\')">'+esc(custName(cu))+'</a> <span class="mut">'+esc(c.subject||c.channel)+' · fällig '+dt(c.followup_at)+'</span> <a class="sml" onclick="markFollowDone(\''+c.id+'\')">✓ erledigt</a></div>';
+    /* Mail-Fehler-Wiedervorlagen: die automatische Kundenmail direkt von hier erneut
+       anstossen, statt den Text aus der Notiz abzutippen. */
+    var again='';
+    if(c.ref_doc_id&&/^(accept_|reaction_|bande)/.test(c.ref_kind||''))again=' <button class="btn g sm" onclick="resendNoteMail(\''+c.id+'\')">Erneut senden</button>';
+    else if(c.ref_doc_id&&c.ref_kind==='doc')again=' <button class="btn g sm" onclick="resendDocMail(\''+c.ref_doc_id+'\',\''+c.id+'\')">Erneut senden</button>';
+    else if(/nicht versendet|nicht zugestellt|nicht rausgegangen|NICHT gemailt/i.test(c.subject||''))again=' <button class="btn g sm" onclick="composeFromNote(\''+c.id+'\')">Selbst schreiben</button>';
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openCustDetail(\''+c.customer_id+'\')">'+esc(custName(cu))+'</a> <span class="mut">'+esc(c.subject||c.channel)+' · fällig '+dt(c.followup_at)+'</span>'+again+' <span id="fud-'+c.id+'"><a class="sml" onclick="askFollowDone(\''+c.id+'\')">✓ erledigt</a></span></div>';
   }).join('')||'Nichts fällig.';
   /* Angebote/ABs, die raus sind und auf die nichts zurueckkam - nach Wartezeit sortiert.
      Ab der Nachfassen-Frist (Einstellungen) oder nach Ablauf der Gueltigkeit hervorgehoben. */
@@ -1571,17 +1606,71 @@ function renderDash(){
     '<button class="btn sm" style="float:right" onclick="composeReviewMail(\''+b.id+'\')">Danke &amp; Bewertung</button></div>';
   }).join('')||'Alle vergangenen Feiern sind angeschrieben.';
   document.getElementById('dashMissing').innerHTML=computeMissingInfo().map(function(m){
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="'+(m.onclick||('showPage(\''+m.pg+'\')'))+'">'+esc(m.text)+'</a></div>';
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="'+(m.onclick||(m.go?'gotoSetting(\''+m.go+'\')':'showPage(\''+m.pg+'\')'))+'">'+esc(m.text)+'</a></div>';
   }).join('')||'Alles vollständig – nichts offen.';
+  renderSetupCard();
+}
+/* Einrichtungs-Checkliste: Was ein neuer Betreiber einmal eintragen muss, bevor Belege
+   und Kundenmails vollstaendig sind. Jeder Punkt springt direkt zur passenden Karte in
+   den Einstellungen. Verschwindet, sobald alle Pflichtpunkte erledigt sind. */
+function setupChecklist(){
+  var c=S.company||{},legal=(CACHE.content&&CACHE.content.legal)||{},n=S.numbering||{},st=S.setup||{},tg=S.notify||{};
+  var LBL={name:'Firmierung',owner:'Inhaber',street:'Straße',zip_city:'PLZ/Ort',phone:'Telefon',email:'E-Mail'};
+  var fehlt=Object.keys(LBL).filter(function(k){return !String(c[k]||'').trim()});
+  var items=[
+    {ok:!fehlt.length,text:'Firmendaten'+(fehlt.length?' – fehlt: '+fehlt.map(function(k){return LBL[k]}).join(', '):''),go:'set-company'},
+    {ok:!!(c.tax_id||c.vat_id),text:'Steuernummer oder USt-IdNr.',go:'set-company'},
+    {ok:!!c.iban,text:'IBAN für Rechnungen',go:'set-bank'},
+    {ok:!!(n.angebot&&n.angebot.prefix&&n.rechnung&&n.rechnung.prefix),text:'Nummernkreise (Angebot, Rechnung)',go:'set-numbering'},
+    {ok:!!legal.reviewed,text:'Rechtstexte (Impressum, Datenschutz, AGB) geprüft',go:'cms-legal'},
+    {ok:!!(S.rental_contract&&String(S.rental_contract.text||'').trim()),text:'Mietvertragsbedingungen',go:'set-rental'},
+    {ok:!!st.backup_cron,text:'Backup-Cronjob beim Hoster eingerichtet',go:'set-backup'},
+    {ok:!!String(c.whatsapp||c.phone||'').trim(),text:'WhatsApp-Nummer für die Website (sonst gilt die Telefonnummer)',go:'set-operator',optional:true}
+  ];
+  if(c.agency_enabled)items.splice(7,0,{ok:!!String(c.agency_name||'').trim(),text:'Partner-Agentur für die DJ-Vermittlung benannt',go:'set-operator'});
+  items.push({ok:!!tg.telegram_enabled,text:'Telegram-Benachrichtigungen',go:'set-telegram',optional:true});
+  return items;
+}
+function renderSetupCard(){
+  var card=document.getElementById('dashSetupCard'),box=document.getElementById('dashSetup');if(!card||!box)return;
+  var items=setupChecklist();
+  var offen=items.filter(function(i){return !i.ok&&!i.optional}).length;
+  if(!offen){card.style.display='none';return}
+  card.style.display='';
+  var OK='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+  var TODO='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>';
+  box.innerHTML='<div class="mut" style="margin-bottom:6px">Noch '+offen+' Punkt'+(offen===1?'':'e')+' offen – ohne sie fehlen auf Belegen und in Kundenmails Angaben.</div>'+
+    items.map(function(i){
+      return '<div class="setup-row'+(i.ok?' ok':'')+'">'+(i.ok?OK:TODO)+(i.ok?'<span>'+esc(i.text)+'</span>':'<a onclick="gotoSetting(\''+i.go+'\')">'+esc(i.text)+'</a>')+
+        (i.optional?' <span class="b grey">optional</span>':'')+'</div>';
+    }).join('');
+}
+/* Zur passenden Karte in den Einstellungen springen: Seite wechseln, hinscrollen, kurz
+   hervorheben - "Einstellungen -> Firmendaten" als Text war ein Suchauftrag. */
+function gotoSetting(id){
+  var el=document.getElementById(id);if(!el){showPage('set');return}
+  var pg=el.closest('.pg');if(pg)showPage(pg.id.replace(/^pg-/,''));
+  /* Einstellungs- und Inhalte-Karten sind zugeklappt (.clps) - erst aufklappen, sonst
+     landet man vor einer geschlossenen Überschrift. */
+  if(el.classList.contains('clps'))el.classList.add('open');
+  setTimeout(function(){
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+    el.classList.add('hl');setTimeout(function(){el.classList.remove('hl')},2500);
+  },60);
+}
+function saveBackupFlag(on){
+  var val=Object.assign({},S.setup||{},{backup_cron:!!on});
+  api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'setup',value:val}})
+    .then(function(){S.setup=val;renderSetupCard();toast(on?'Backup-Cronjob als eingerichtet vermerkt ✓':'Vermerk entfernt')}).catch(function(e){toast(e.message,1)});
 }
 /* Prüft Firmendaten & Rechtstexte auf fehlende/unbestätigte Angaben und liefert
    Dashboard-Zeilen (Text + Ziel-Seite zum Draufklicken). Rein informativ, kein Blocker. */
 function computeMissingInfo(){
   var issues=[],comp=S.company||{},legal=(CACHE.content&&CACHE.content.legal)||{};
-  if(!comp.email)issues.push({text:'Firmen-E-Mail fehlt (Einstellungen → Firmendaten)',pg:'set'});
-  if(!comp.tax_id&&!comp.vat_id)issues.push({text:'Steuernummer/USt-IdNr. fehlt (Einstellungen → Firmendaten)',pg:'set'});
-  if(!comp.iban)issues.push({text:'IBAN fehlt (Einstellungen → Bankverbindung)',pg:'set'});
-  if(!legal.reviewed)issues.push({text:'Rechtstexte (Impressum/Datenschutz/AGB) sind noch nicht als geprüft markiert',pg:'cms'});
+  if(!comp.email)issues.push({text:'Firmen-E-Mail fehlt (Einstellungen → Firmendaten)',go:'set-company'});
+  if(!comp.tax_id&&!comp.vat_id)issues.push({text:'Steuernummer/USt-IdNr. fehlt (Einstellungen → Firmendaten)',go:'set-company'});
+  if(!comp.iban)issues.push({text:'IBAN fehlt (Einstellungen → Bankverbindung)',go:'set-bank'});
+  if(!legal.reviewed)issues.push({text:'Rechtstexte (Impressum/Datenschutz/AGB) sind noch nicht als geprüft markiert',go:'cms-legal'});
   (CACHE.rentalContracts||[]).filter(function(rc){return rc.status!=='unterschrieben'&&!rc.deposit_amount}).forEach(function(rc){
     var bk=CACHE.bookings.find(function(b){return b.id===rc.booking_id});
     issues.push({text:'Kaution für Mietvertrag'+(bk?(' · '+esc(custName(bk.customers))+' · '+dt(bk.event_date)):'')+' noch nicht festgelegt',
@@ -1600,6 +1689,35 @@ function openEventDoc(evId,docId){
 function tile(v,l,go){return '<div class="tile'+(go?' click':'')+'"'+(go?' onclick="'+go+'"':'')+'><div class="tv">'+v+'</div><div class="tl">'+l+'</div></div>'}
 function gotoDocs(type,status){showPage('docs');document.getElementById('docsFType').value=type||'';document.getElementById('docsFStatus').value=status||'';document.getElementById('docsFCust').value='';renderDocsPage()}
 function markFollowDone(id){api('communications?id=eq.'+id,{method:'PATCH',body:{followup_done:true}}).then(function(){loadAll();toast('Erledigt ✓')})}
+/* Leichte Rueckfrage direkt in der Zeile - ein Fehlklick auf "erledigt" liess die
+   Wiedervorlage sonst kommentarlos verschwinden. */
+function askFollowDone(id){
+  var el=document.getElementById('fud-'+id);if(!el)return;
+  el.innerHTML='<span class="sml">Wirklich erledigt? <a onclick="markFollowDone(\''+id+'\')">Ja</a> · <a onclick="renderDash()">Nein</a></span>';
+}
+function resendNoteMail(noteId){
+  var c=(CACHE.comms||[]).find(function(x){return x.id===noteId});if(!c)return;
+  docAction(c.ref_doc_id,'resend',{kind:c.ref_kind,note_id:c.id}).then(function(j){
+    if(j.mailed){toast('Mail erneut gesendet ✓');refreshComms()}
+    else toast('Versand erneut fehlgeschlagen – Firmen-E-Mail (Einstellungen) und Kundenadresse prüfen.',1);
+  }).catch(function(e){toast(e.message,1)});
+}
+/* Beleg-Mail (z. B. Workshop-Rechnung) erneut: ueber den normalen Compose-Dialog,
+   die Wiedervorlage gilt nach dem Versand als erledigt. */
+function resendDocMail(docId,noteId){
+  var d=(CACHE.documents||[]).find(function(x){return x.id===docId});if(!d){toast('Beleg nicht gefunden.',1);return}
+  curDoc=d;window._resendNote=noteId;docSendMail();
+}
+/* Mail-Fehler ohne Beleg-Bezug: Compose-Dialog mit dem vorgesehenen Text aus der Notiz. */
+function composeFromNote(noteId){
+  var c=(CACHE.comms||[]).find(function(x){return x.id===noteId});if(!c)return;
+  var cu=(CACHE.customers||[]).find(function(x){return x.id===c.customer_id});
+  if(!cu||!cu.email){toast('Der Kunde hat keine E-Mail-Adresse – bitte erst am Kunden eintragen.',1);return}
+  var m=(c.content||'').match(/Vorgesehener Text:\n([\s\S]+)$/);
+  openCompose({name:custName(cu),email:cu.email,customer_id:cu.id,booking_id:c.booking_id||null,_title:'E-Mail an '+esc(custName(cu)),_doc:true},
+    {subject:(c.subject||'').replace(/ (konnte|wurde) .*$/i,'').replace(/ – bitte.*$/i,''),body:m?m[1]:('Hallo {vorname},\n\n'+(c.content||'')+'\n\nViele Grüße\n{inhaber}')},null,
+    function(){api('communications?id=eq.'+noteId,{method:'PATCH',body:{followup_done:true}}).then(refreshComms)});
+}
 
 /* ===== Anfragen ===== */
 var INQ_BADGE={neu:'gold',in_bearbeitung:'blue',erledigt:'green',abgesagt:'red',archiviert:'grey'};
@@ -1630,8 +1748,12 @@ function viewInq(id){
   var konf=dateConflicts(i.event_date,i.customer_id);
   var tage=i.event_date?Math.round((new Date(i.event_date)-new Date(new Date().toISOString().slice(0,10)))/86400000):null;
   var eilig=tage!=null&&tage>=0&&tage<=10;
+  /* Verfuegbarkeit sofort oben im Dialog: gruen "frei" oder rot "belegt" - vorher stand
+     der Hinweis nur im Konfliktfall, und man musste selbst in den Kalender schauen. */
+  var frei=!!i.event_date&&!konf.length;
   openModal('Anfrage von '+esc(i.name),
-    (konf.length?'<div class="msg err" style="margin-bottom:10px"><b>Am '+dt(i.event_date)+' steht schon etwas im Kalender:</b> '+esc(konf.join(' · '))+'</div>':'')+
+    (konf.length?'<div class="msg err" style="margin-bottom:10px"><b>Achtung: '+dt(i.event_date)+' ist belegt durch</b> '+esc(konf.join(' · '))+'<div class="sml" style="margin-top:4px">Die Vorlage „Termin belegt“ ist unten vorausgewählt.</div></div>':
+      frei?'<div class="msg ok" style="margin-bottom:10px"><b>Termin frei:</b> am '+dt(i.event_date)+' steht nichts im Kalender.</div>':'')+
     (eilig?'<div class="msg" style="margin-bottom:10px;border:1px solid var(--gold,#b8860b)"><b>Kurzfristig:</b> nur noch '+tage+' Tage bis zum Termin.</div>':'')+
     '<div class="sml"><b>Kontakt:</b> '+esc(i.email||'–')+' · '+esc(i.phone||'–')+'<br>'+
     '<b>Anlass:</b> '+esc(i.event_type||'–')+' · <b>Datum:</b> '+dt(i.event_date)+' · <b>Ort:</b> '+esc(i.location||'–')+'<br><br>'+
@@ -1640,7 +1762,7 @@ function viewInq(id){
     '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--bdr)">'+
     '<label>Antworten mit Vorlage</label>'+
     '<div style="display:flex;gap:8px"><select id="replyTpl">'+
-    (CACHE.tpls||[]).map(function(t){return '<option value="'+t.id+'">'+esc(t.name)+'</option>'}).join('')+
+    replyTplOptions(konf.length?/^Termin belegt/i:null)+
     '</select><button class="btn" style="white-space:nowrap" onclick="composeReply(\''+i.id+'\')">Verfassen</button></div></div>'+
     '<div style="margin-top:14px">'+
     (i.customer_id?'':'<button class="btn g" onclick="inqToCust(\''+i.id+'\')">→ Als Kunde anlegen</button>')+
@@ -1648,6 +1770,14 @@ function viewInq(id){
     (i.status==='abgesagt'?'':'<button class="btn g" onclick="inqAbsagen(\''+i.id+'\')">Absagen</button> ')+
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'archiviert\')">Archivieren</button></div>');
 }
+/* Vorlagenliste fuer den Anfrage-Dialog; bei Terminkonflikt die "Termin belegt"-Vorlage
+   vorwaehlen. Vermittlungs-Vorlagen nur, wenn eine Partner-Agentur eingerichtet ist. */
+function replyTplOptions(preselect){
+  var list=(CACHE.tpls||[]).filter(function(t){return agencyEnabled()||!/vermittlung/i.test(t.name||'')});
+  var sel=preselect?list.find(function(t){return preselect.test(t.name||'')}):null;
+  return list.map(function(t){return '<option value="'+t.id+'"'+(sel&&sel.id===t.id?' selected':'')+'>'+esc(t.name)+'</option>'}).join('');
+}
+function agencyEnabled(){return !!(S.company&&S.company.agency_enabled)}
 function setInqStatus(id,st){api('inquiries?id=eq.'+id,{method:'PATCH',body:{status:st}}).then(function(){closeModal();loadAll()})}
 /* Die Veranstaltung, die automatisch zu dieser Anfrage angelegt wurde (gleicher Kunde,
    gleiches Datum, noch nicht fest). */
@@ -1837,10 +1967,19 @@ function saveCust(id){
   if(mail){
     var doppelt=(CACHE.customers||[]).filter(function(c){
       return c.id!==id&&String(c.email||'').trim().toLowerCase()===mail});
-    if(doppelt.length&&!confirm('Zu „'+mail+'\u201c gibt es schon einen Kunden: '+
-        doppelt.map(custName).join(', ')+
-        '.\n\nZwei Datensaetze mit derselben Adresse fuehren dazu, dass das Kundenkonto im '+
-        'Portal spaeter am falschen haengt.\n\nTrotzdem anlegen?'))return;
+    if(doppelt.length&&!confirm('Es gibt schon einen Kunden mit dieser E-Mail („'+mail+'\u201c): '+
+        doppelt.map(custOptionLabel).join(', ')+
+        '.\n\nZwei Datensätze mit derselben Adresse führen dazu, dass das Kundenkonto im '+
+        'Portal später am falschen hängt.\n\nTrotzdem anlegen?'))return;
+  }
+  /* Gleicher Name am gleichen Ort ist meist derselbe Mensch mit neuer Adresse - kurz
+     nachfragen, aber nicht blockieren (Vater und Sohn gibt es auch). */
+  var nm=(v('kFirst')+' '+v('kLast')).trim().toLowerCase(),ort=(v('kCity')||'').trim().toLowerCase();
+  if(nm&&ort){
+    var gleich=(CACHE.customers||[]).filter(function(c){
+      return c.id!==id&&((c.first_name||'')+' '+(c.last_name||'')).trim().toLowerCase()===nm&&String(c.city||'').trim().toLowerCase()===ort});
+    if(gleich.length&&!confirm('Es gibt schon einen Kunden mit diesem Namen in '+v('kCity')+': '+
+        gleich.map(custOptionLabel).join(', ')+'.\n\nTrotzdem anlegen?'))return;
   }
   var body={kind:v('kKind'),status:v('kStatus'),source:v('kSource'),first_name:v('kFirst'),last_name:v('kLast'),
     company:v('kComp'),partner_name:v('kPartner'),email:v('kMail'),phone:v('kPhone'),whatsapp:v('kWa'),street:v('kStreet'),zip:v('kZip'),
@@ -2308,7 +2447,7 @@ function presetDocCust(custId){
 }
 function openBookModal(b,presetCust){
   b=b||{};
-  var custOpts=CACHE.customers.map(function(c){return '<option value="'+c.id+'"'+((b.customer_id||presetCust)===c.id?' selected':'')+'>'+esc(custName(c))+'</option>'}).join('');
+  var custOpts=CACHE.customers.map(function(c){return '<option value="'+c.id+'"'+((b.customer_id||presetCust)===c.id?' selected':'')+'>'+esc(custOptionLabel(c))+'</option>'}).join('');
   openModal(b.id?'Gig bearbeiten':'Neuer Gig',
     '<label>Kunde *</label><select id="bCust">'+custOpts+'</select>'+
     '<div class="grid3"><div><label>Status</label><select id="bStatus"><option>anfrage</option><option>angebot</option><option>gebucht</option><option>abgeschlossen</option><option>storniert</option></select></div>'+
@@ -2876,6 +3015,14 @@ function nextNumber(type){
     return api('settings?key=eq.numbering',{method:'PATCH',body:{value:n}}).then(function(){S.numbering=n});
   }};
 }
+/* Kunden in Auswahllisten eindeutig machen: Zwei "Anna Müller" sind ohne Ort und Adresse
+   nicht zu unterscheiden - ein Beleg am falschen Kunden ist die Folge. */
+function custOptionLabel(c){
+  if(!c)return '';
+  var mail=String(c.email||'');
+  if(mail.length>26){var at=mail.indexOf('@');mail=at>0?mail.slice(0,Math.min(at,9))+'…'+mail.slice(at):mail.slice(0,24)+'…'}
+  return [custName(c),c.city||'',mail].filter(Boolean).join(' · ');
+}
 function openDocEditor(id,newType){
   /* Merkt sich die aktuell sichtbare Seite als Rueckkehrziel - ausser der
      Editor ist schon offen (z.B. korrekturDoc()), dann bleibt das alte Ziel. */
@@ -2884,7 +3031,7 @@ function openDocEditor(id,newType){
   /* Immer als echter Beleg starten - sonst blieben nach dem Vorlagen-Editor die
      Kundenfelder ausgeblendet und "Speichern" haenge noch am Vorlagen-Speichern. */
   setTplMode(false);
-  var custOpts='<option value="">– wählen –</option><option value="__new__">-- NEUER KUNDE --</option>'+CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custName(c))+'</option>'}).join('');
+  var custOpts='<option value="">– wählen –</option><option value="__new__">-- NEUER KUNDE --</option>'+CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custOptionLabel(c))+'</option>'}).join('');
   document.getElementById('docCust').innerHTML=custOpts;
   refreshBookOpts();
   if(id){
@@ -2921,7 +3068,7 @@ function docCustChanged(){
   if(sel.value==='__new__'){
     sel.value='';
     openCustModal(null,function(newId){
-      document.getElementById('docCust').innerHTML+='<option value="'+newId+'">'+esc(custName(CACHE.customers.find(function(c){return c.id===newId})))+'</option>';
+      document.getElementById('docCust').innerHTML+='<option value="'+newId+'">'+esc(custOptionLabel(CACHE.customers.find(function(c){return c.id===newId})))+'</option>';
       document.getElementById('docCust').value=newId;
       refreshBookOpts();
     });
@@ -3018,6 +3165,33 @@ function fillDocForm(){
   evFill(evOf(d));
   updateDocTypeUI(d.doc_type);
   renderItems();renderStatusBtns();applyDocLock();renderRentalHint();renderDocExtraBtns();
+  docBlkDefaults();
+}
+/* Einklappbare Bloecke im Beleg-Editor: Der Editor war eine Feldwand, obwohl die meisten
+   Belege weder Miettage noch Rabatt brauchen. Bloecke mit Inhalt sind immer offen, leere
+   Bloecke so, wie du sie zuletzt gelassen hast (localStorage), sonst zu. */
+var DOC_BLK={rent:'docRentBlk',event:'docEventBlk',disc:'docDiscBlk'};
+function docBlkState(){try{return JSON.parse(localStorage.getItem('docBlocks')||'{}')||{}}catch(e){return {}}}
+function docBlkToggle(k,open,merken){
+  var el=document.getElementById(DOC_BLK[k]);if(!el)return;
+  var jetzt=open!==undefined?open:!el.classList.contains('open');
+  el.classList.toggle('open',jetzt);
+  if(open===undefined||merken){var st=docBlkState();st[k]=jetzt;try{localStorage.setItem('docBlocks',JSON.stringify(st))}catch(e){}}
+}
+function docBlkDefaults(){
+  var d=curDoc||{},st=docBlkState();
+  var b=d.booking_id?(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id}):null;
+  var hat={
+    event:!!(d.event_info||d.booking_id),
+    rent:!!(d.rental_from||(b&&(b.kind==='technik'||b.kind==='dj_technik'))),
+    disc:!!(Number(d.discount_value)||(d.total_override!=null&&d.total_override!==''))
+  };
+  Object.keys(DOC_BLK).forEach(function(k){
+    var open=hat[k]||(st[k]!==undefined?!!st[k]:false);
+    docBlkToggle(k,open);
+    var f=document.getElementById(DOC_BLK[k].replace('Blk','Fill'));
+    if(f)f.textContent=hat[k]&&!open?'ausgefüllt':'';
+  });
 }
 function showAcceptSig(){
   openModal('Unterschrift – '+esc(curDoc.number)+' · '+esc(curDoc.accepted_name||''),
@@ -3031,7 +3205,7 @@ function applyDocLock(){
   var locked=docLockedJs(curDoc);
   document.getElementById('docLockNote').innerHTML=docAcceptedJs(curDoc)
     ?' <b>Angenommenes Angebot:</b> Der Kunde hat genau diesen Stand angenommen – Inhalte lassen sich deshalb nicht mehr ändern. Für Änderungen <a onclick="copyAsNewOffer()">als neues Angebot kopieren</a>. <a onclick="openAuditModal()" style="float:right">Änderungsprotokoll</a>'
-    :' <b>Festgeschrieben (GoBD):</b> Diese Rechnung wurde versendet – Inhalte lassen sich nicht mehr ändern. Für Änderungen eine <a onclick="korrekturDoc()">Korrekturrechnung erstellen</a> oder die Rechnung stornieren. <a onclick="openAuditModal()" style="float:right">Änderungsprotokoll</a>';
+    :' <b>Festgeschrieben (GoBD):</b>'+gobdHint('lock')+'Diese Rechnung wurde versendet – Inhalte lassen sich nicht mehr ändern. Für Änderungen eine <a onclick="korrekturDoc()">Korrekturrechnung erstellen</a>'+gobdHint('korrektur')+'oder die Rechnung <a onclick="askStorno()">stornieren</a>'+gobdHint('storno')+(curDoc.status==='bezahlt'?' – bei einer bezahlten Rechnung per <a onclick="docToInvoice(\'gutschrift\')">Gutschrift</a>'+gobdHint('gutschrift'):'')+'. <a onclick="openAuditModal()" style="float:right">Änderungsprotokoll</a>';
   ['docType','docCust','docBook','docDate','docDate2','docTax','docNetto','docRentFrom','docRentTo','docDiscVal','docDiscType','docDep','docTotalOverride','docIntro','docOutro']
     .forEach(function(i){var el=document.getElementById(i);if(el)el.disabled=locked});
   document.querySelectorAll('#docItems input, #docItems select').forEach(function(el){el.disabled=locked});
@@ -3113,7 +3287,7 @@ function renderStatusBtns(){
   if(d.doc_type==='angebot'&&d.status==='versendet')
     btns+='<button class="btn g sm" onclick="setDocStatus(\'angenommen\')">✓ Angenommen</button> <button class="btn g sm" onclick="setDocStatus(\'abgelehnt\')">✕ Abgelehnt</button>';
   if(istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
-    btns+='<button class="btn g sm" onclick="setDocStatus(\'bezahlt\')">€ Bezahlt</button> ';
+    btns+='<button class="btn g sm" onclick="askPaid()">€ Bezahlt</button> ';
   if(d.doc_type==='angebot'&&d.status==='angenommen')
     btns+='<button class="btn sm" onclick="docToInvoice(\'bestaetigung\')">→ Auftragsbestätigung</button> '+
       '<button class="btn g sm" onclick="docToInvoice(\'abschlag\')">→ Abschlag</button> <button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button>';
@@ -3124,10 +3298,10 @@ function renderStatusBtns(){
   if(d.doc_type==='lieferschein')
     btns+='<button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button>';
   if((d.doc_type==='rechnung'||d.doc_type==='schluss')&&['versendet','ueberfaellig','bezahlt'].indexOf(d.status)>=0)
-    btns+='<button class="btn sm" onclick="docToInvoice(\'gutschrift\')">→ Gutschrift</button>';
+    btns+='<button class="btn sm" onclick="docToInvoice(\'gutschrift\')">→ Gutschrift</button>'+gobdHint('gutschrift');
   if(istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
     btns+='<button class="btn g sm" onclick="composeReminderMail()">Zahlungserinnerung</button>';
-  if(d.status!=='storniert')btns+='<button class="btn g sm" onclick="setDocStatus(\'storniert\')">Storno</button> ';
+  if(d.status!=='storniert')btns+='<button class="btn g sm" onclick="askStorno()">Storno</button>'+gobdHint('storno')+' ';
   if(d.doc_type==='angebot')btns+='<button class="btn g sm" onclick="copyAsNewOffer()">Als neues Angebot kopieren</button> ';
   document.getElementById('docStatusBtns').innerHTML=btns;
 }
@@ -3187,6 +3361,67 @@ function sendReminder(){
     .then(function(){closeModal();
       location.href='mailto:'+to+'?subject='+encodeURIComponent(v('remSubject'))+'&body='+encodeURIComponent(document.getElementById('remBody').value);
     }).catch(function(e){toast(e.message,1)});
+}
+/* GoBD in einem Satz je Weg - als "?"-Hinweis neben den Knoepfen, damit niemand aus
+   Versehen storniert, wo eine Korrekturrechnung oder Gutschrift der richtige Weg ist. */
+var GOBD_HINT={
+  storno:'Storno: Der Beleg bleibt mit seiner Nummer erhalten und wird nur als ungültig gekennzeichnet – für Rechnungen, die nie hätten rausgehen dürfen. Bezahlte Rechnungen werden nicht storniert, sondern per Gutschrift ausgeglichen.',
+  korrektur:'Korrekturrechnung: Neue Rechnung mit neuer Nummer, die die alte ersetzt – für Tippfehler oder falsche Beträge auf einer schon versendeten Rechnung.',
+  gutschrift:'Gutschrift: Gleicht eine bereits bezahlte Rechnung ganz oder teilweise aus – der Betrag geht an den Kunden zurück.',
+  lock:'Versendete Rechnungen sind festgeschrieben (GoBD): Inhalte lassen sich nicht mehr ändern, Änderungen laufen nur über Korrekturrechnung, Storno oder Gutschrift.'
+};
+function gobdHint(k){return '<span class="hint" title="'+esc(GOBD_HINT[k])+'" aria-label="'+esc(GOBD_HINT[k])+'">?</span>'}
+/* Beleg-Aktionen mit Rueckfrage laufen ueber api.php/doc/<id>/<aktion> - der Server
+   prueft dabei auch, dass eine bezahlte Rechnung nicht storniert wird. */
+function docAction(id,action,body){
+  return fetch('api.php/doc/'+id+'/'+action,{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body||{})})
+    .then(function(r){return r.json().catch(function(){return {}}).then(function(j){if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j})});
+}
+function docAfterStatus(st){
+  curDoc.status=st;renderDocSub();renderStatusBtns();renderItems();applyDocLock();refreshDocs();refreshComms();
+  return syncVeranstaltungStatus(st).then(renderDocSub);
+}
+/* Storno: nie ohne Grund, nie auf einer bezahlten Rechnung (dafuer gibt es die Gutschrift). */
+function askStorno(){
+  var d=curDoc;if(!d||!d.id)return;
+  if(d.status==='bezahlt'){
+    openModal('Storno nicht möglich – '+esc(d.number),
+      '<div class="msg err" style="margin-bottom:12px"><b>Diese Rechnung ist schon bezahlt.</b> Eine bezahlte Rechnung wird nicht storniert, sondern per Gutschrift ausgeglichen – so bleibt nachvollziehbar, dass Geld geflossen ist (GoBD).</div>'+
+      '<div class="sml mut" style="margin-bottom:14px">Die Gutschrift übernimmt die Positionen mit umgekehrtem Vorzeichen, du kürzt sie bei Bedarf auf den Teilbetrag. Den Betrag überweist du dem Kunden zurück.</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="closeModal();docToInvoice(\'gutschrift\')">Gutschrift erstellen</button><button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+    return;
+  }
+  openModal('Storno – '+esc(d.number),
+    '<div class="sml mut" style="margin-bottom:10px">'+(d.status==='entwurf'?'Der Entwurf wird als storniert gekennzeichnet.':'Der Beleg bleibt mit seiner Nummer erhalten und wird als storniert gekennzeichnet – gelöscht wird nichts (GoBD).')+
+    (istZahlbeleg(d.doc_type)&&d.status!=='entwurf'?' Ist nur ein Betrag oder ein Tippfehler falsch, ist die Korrekturrechnung der bessere Weg.':'')+'</div>'+
+    '<label>Grund *</label><textarea id="stornoReason" style="min-height:70px" placeholder="z. B. Kunde hat abgesagt, Doppelbeleg, falscher Kunde"></textarea>'+
+    '<div class="sml mut" style="margin-top:4px">Der Grund landet im Änderungsprotokoll und als Notiz in der Kunden-Timeline.</div>'+
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn r" onclick="doStorno()">Jetzt stornieren</button><button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+  setTimeout(function(){var t=document.getElementById('stornoReason');if(t)t.focus()},50);
+}
+function doStorno(){
+  var reason=v('stornoReason');
+  if(reason.length<3){toast('Bitte einen kurzen Grund angeben.',1);return}
+  docAction(curDoc.id,'storno',{reason:reason}).then(function(){closeModal();toast('Storniert ✓');return docAfterStatus('storniert')})
+    .catch(function(e){toast(e.message,1)});
+}
+/* Bezahlt: Zahldatum abfragen statt stillschweigend "heute" - das Datum steuert Umsatz
+   und Steuerberater-Export. Betrag und Notiz sind optional. */
+function askPaid(){
+  var d=curDoc;if(!d||!d.id)return;
+  var today=new Date().toISOString().slice(0,10);
+  openModal('Zahlung eingegangen – '+esc(d.number),
+    '<div class="grid2"><div><label>Zahldatum *</label><input type="date" id="paidDate" value="'+today+'"></div>'+
+    '<div><label>Betrag (€, optional)</label><input type="number" step="0.01" id="paidAmount" placeholder="'+esc(String(d.total_gross!=null?d.total_gross:''))+'"></div></div>'+
+    '<label>Notiz (optional)</label><input id="paidNote" placeholder="z. B. Überweisung, PayPal, bar">'+
+    '<div class="sml mut" style="margin-top:6px">Das Zahldatum zählt für Umsatz und Export – lieber das Datum vom Kontoauszug als „heute“. Weicht der Betrag ab, entsteht eine Notiz in der Timeline.</div>'+
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="doPaid()">Als bezahlt markieren</button><button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+}
+function doPaid(){
+  var date=v('paidDate');if(!date){toast('Bitte ein Zahldatum angeben.',1);return}
+  docAction(curDoc.id,'paid',{paid_at:date,amount:v('paidAmount'),note:v('paidNote')})
+    .then(function(j){closeModal();curDoc.paid_at=j.paid_at;toast('Bezahlt ✓');return docAfterStatus('bezahlt')})
+    .catch(function(e){toast(e.message,1)});
 }
 function setDocStatus(st){
   var wasVersand=st==='versendet';
@@ -6065,7 +6300,7 @@ function renderTechChecks(){
   }).join('')||'<tr><td colspan="4" class="mut">Noch keine Technik-Checks – entstehen automatisch, wenn ein Angebot mit dem Produkt Technik-Check angenommen wird, oder hier manuell über „+ Neuer Technik-Check“.</td></tr>';
 }
 function openNewTechCheckModal(){
-  var custOpts='<option value="">– wählen –</option>'+CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custName(c))+'</option>'}).join('');
+  var custOpts='<option value="">– wählen –</option>'+CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custOptionLabel(c))+'</option>'}).join('');
   openModal('Neuer Technik-Check',
     '<label>Kunde *</label><select id="ntcCust">'+custOpts+'</select>'+
     '<div class="mut sml" style="margin-top:8px">Entsteht sonst automatisch, wenn ein Angebot mit dem Produkt TECH-CHECK / TECH-CHECK-PLUS angenommen wird.</div>'+
@@ -6395,6 +6630,8 @@ function loadBackups(){
   fetch('api.php/backup/list',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(j){
     if(!j||!j.key)return;
     document.getElementById('bkUrl').value=location.origin+location.pathname.replace(/[^\/]*$/,'')+'api.php/cron/backup?key='+j.key;
+    var latest=document.getElementById('bkLatest');
+    if(latest)latest.innerHTML=(j.files&&j.files.length)?'<a class="btn g sm" onclick="dlBackup(\''+j.files[0].name+'\')">Neuestes Backup herunterladen</a> <span class="mut sml">'+esc(j.files[0].name)+'</span>':'';
     document.getElementById('bkList').innerHTML=(j.files&&j.files.length)?j.files.map(function(f){
       return '<div style="padding:4px 0"> <a onclick="dlBackup(\''+f.name+'\')">'+f.name+'</a> <span class="mut">('+fmtBytes(f.size)+')</span></div>';
     }).join(''):'Noch keine Backups – „Backup jetzt" klicken oder Cronjob einrichten.';
@@ -6579,6 +6816,7 @@ function renderSet(){
   djSet.value=d.dj_default_set||'';
   if(djSet.value!==(d.dj_default_set||''))djSet.value='';   /* Set inzwischen geloescht */
   document.getElementById('sRental').value=(S.rental_contract&&S.rental_contract.text)||'';
+  var bk=document.getElementById('bkCronOk');if(bk)bk.checked=!!(S.setup&&S.setup.backup_cron);
 }
 function saveRental(){
   var val={text:document.getElementById('sRental').value};
@@ -6693,6 +6931,7 @@ function docSendMail(mode){
         return;
       }
       if(curDoc&&curDoc.id===d.id&&curDoc.status==='entwurf')setDocStatus('versendet');
+      if(window._resendNote){api('communications?id=eq.'+window._resendNote,{method:'PATCH',body:{followup_done:true}}).then(refreshComms);window._resendNote=null}
     });
   }).catch(function(e){toast(e.message,1)});
 }
@@ -6735,7 +6974,7 @@ function openNewFormModal(){
   openModal('Fragebogen erstellen',
     '<label>Vorlage</label><select id="nfTpl">'+(CACHE.formTpls||[]).map(function(t){return '<option value="'+t.id+'">'+esc(t.name)+'</option>'}).join('')+'</select>'+
     '<label>Kunde (optional – Antworten landen dann in der Timeline)</label><select id="nfCust"><option value="">–</option>'+
-    CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custName(c))+'</option>'}).join('')+'</select>'+
+    CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custOptionLabel(c))+'</option>'}).join('')+'</select>'+
     '<div style="margin-top:14px"><button class="btn" onclick="createForm()">Erstellen &amp; Link kopieren</button></div>');
 }
 function createForm(tplId,inqId,custId,cb){
@@ -7089,7 +7328,7 @@ function startQuote(tplId){
 var curTpl=null;
 function setTplMode(on){
   curTpl=on?curTpl:null;
-  ['docHeadGrid','docRentGrid','docTypeGrid','docDiscGrid','docDocBtns','docEventBox'].forEach(function(id){
+  ['docHeadGrid','docRentBlk','docTypeGrid','docDiscBlk','docDocBtns','docEventBlk'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.style.display=on?'none':'';});
   ['docTplNote','docTplNameWrap'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.style.display=on?'':'none';});
