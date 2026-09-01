@@ -465,7 +465,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 
   <!-- DOKUMENT-EDITOR -->
   <div class="pg" id="pg-doc">
-    <a id="docBack" onclick="showPage('docs')">← Zurück</a>
+    <a id="docBack" onclick="docBack()">← Zurück</a>
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="docTitle">Dokument</div><div class="ps" id="docSub"></div></div>
       <div>
         <span id="docDocBtns"><button class="btn g sm" onclick="printDoc()">Drucken / PDF</button>
@@ -2579,7 +2579,10 @@ function renderDocsPage(){
     '. Öffne die Rechnung und nutze „Zahlungserinnerung".'):'';
 }
 
-var curDoc=null,curItems=[];
+var curDoc=null,curItems=[],DOC_RETURN='docs';
+/* "Zurueck" im Beleg-Editor soll dahin fuehren, von wo aus er geoeffnet wurde
+   (Kunde, Buchung oder Dokumente-Liste) - nicht immer zur Dokumente-Liste. */
+function docBack(){showPage(DOC_RETURN||'docs')}
 function nextNumber(type){
   var n=S.numbering||{angebot:{prefix:'AN-',next:1},rechnung:{prefix:'RE-',next:1},year_in_number:true};
   var kind=type==='angebot'?'angebot'
@@ -2595,6 +2598,10 @@ function nextNumber(type){
   }};
 }
 function openDocEditor(id,newType){
+  /* Merkt sich die aktuell sichtbare Seite als Rueckkehrziel - ausser der
+     Editor ist schon offen (z.B. korrekturDoc()), dann bleibt das alte Ziel. */
+  var curPg=document.querySelector('.pg.a');
+  if(curPg&&curPg.id!=='pg-doc')DOC_RETURN=curPg.id.replace(/^pg-/,'');
   /* Immer als echter Beleg starten - sonst blieben nach dem Vorlagen-Editor die
      Kundenfelder ausgeblendet und "Speichern" haenge noch am Vorlagen-Speichern. */
   setTplMode(false);
@@ -2660,7 +2667,7 @@ function updateDocTypeUI(t){
   document.getElementById('docDepWrap').style.display=t==='schluss'?'':'none';
   document.getElementById('docDateLbl2').textContent=istZahlbeleg(t)?'Fällig am':'Gültig bis';
   if(curTpl)return; /* im Vorlagen-Editor gelten Zurueck-Link und Vorlagen-Buttons von setTplMode */
-  document.getElementById('docBack').setAttribute('onclick',"showPage('docs')");
+  document.getElementById('docBack').setAttribute('onclick','docBack()');
   document.getElementById('docTplBtns').innerHTML=t==='angebot'?
     '<button class="btn sm" onclick="openTplPicker()">Vorlage laden</button> <button class="btn sm" onclick="saveAsTpl()">Als Vorlage speichern</button>':'';
 }
@@ -6422,7 +6429,7 @@ function setTplMode(on){
   ['docTplNote','docTplNameWrap'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.style.display=on?'':'none';});
   document.getElementById('docSaveBtn').setAttribute('onclick',on?'saveQuoteTpl()':'saveDoc()');
-  document.getElementById('docBack').setAttribute('onclick',"showPage('"+(on?'set':'docs')+"')");
+  document.getElementById('docBack').setAttribute('onclick',on?"showPage('set')":'docBack()');
   var tb=document.getElementById('docTplBtns');if(on&&tb)tb.innerHTML='';
 }
 function openTplEditor(id){
