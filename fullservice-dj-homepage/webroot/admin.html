@@ -4183,11 +4183,7 @@ function openEqModal(id){
     '<div><label>Bestand</label><input type="number" id="eQty" value="'+(e.qty_total||1)+'"></div>'+
     '<div><label>Status</label><select id="eStatus"><option>aktiv</option><option>wartung</option><option>inaktiv</option></select></div></div>'+
     '<div class="grid2"><div><label>Mindestabnahme (Stück) <span class="mut sml" style="text-transform:none;letter-spacing:0">– z. B. 6 = nur im 6er-Set, Preis gilt je Stück</span></label><input type="number" min="1" id="eMinQty" value="'+(e.min_qty||1)+'"></div><div></div></div>'+
-    '<div class="grid2"><div><label>Partner-Preis €/Tag (leer = Rabatt % aus Einstellungen)</label><input type="number" step="0.01" id="ePartner" value="'+(e.partner_rate!=null?e.partner_rate:'')+'"></div>'+
-    '<div><label>Zubehör-Empfehlung („passt dazu“ – bis zu 5)</label>'+
-    eqRelSelects('eAddon',(e.addon_ids&&e.addon_ids.length?e.addon_ids:(e.addon_id?[e.addon_id]:[])),e.id)+
-    '<label style="margin-top:10px">Passend für („passend für" – bis zu 5, z. B. Kabel/Stativ zu einem Gerät)</label>'+
-    eqRelSelects('eFits',e.fits_ids||[],e.id)+'</div></div>'+
+    '<div class="grid2"><div><label>Partner-Preis €/Tag (leer = Rabatt % aus Einstellungen)</label><input type="number" step="0.01" id="ePartner" value="'+(e.partner_rate!=null?e.partner_rate:'')+'"></div><div></div></div>'+
     '<div class="grid2"><div><label>Produktlink (Hersteller/Händler – Nachbestellung, techn. Daten)</label><input id="eThomann" value="'+esc(e.thomann_url||'')+'" placeholder="https://…">'+
     (safeUrl(e.thomann_url)?'<a href="'+esc(safeUrl(e.thomann_url))+'" target="_blank" rel="noopener noreferrer" class="mut sml">Produktseite ansehen ↗</a>':'')+'</div>'+
     '<div style="display:flex;align-items:flex-end"><label style="margin:0"><input type="checkbox" id="eOnReq" style="width:auto;margin-right:6px" '+(e.on_request?'checked':'')+'>Nur auf Anfrage verfügbar – Kunde kann in den Tourcase legen, Bestätigung machst du manuell</label></div></div>'+
@@ -4211,6 +4207,11 @@ function openEqModal(id){
     '<div id="eqImgGrid"></div>'+
     '<div id="eqFocalWrap"></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="ePub" style="width:auto;margin-right:6px" '+(e.public!==false?'checked':'')+'>Auf Homepage anzeigen (mietbar)</label>'+
+    '<h4 style="margin:16px 0 6px;color:var(--mut)">Verknüpfungen zu anderen Artikeln</h4>'+
+    '<div class="grid2"><div><label>Zubehör-Empfehlung („passt dazu“ – bis zu 5)</label>'+
+    eqRelSelects('eAddon',(e.addon_ids&&e.addon_ids.length?e.addon_ids:(e.addon_id?[e.addon_id]:[])),e.id)+'</div>'+
+    '<div><label>Passend für („passend für" – bis zu 5, z. B. Kabel/Stativ zu einem Gerät)</label>'+
+    eqRelSelects('eFits',e.fits_ids||[],e.id)+'</div></div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveEq(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delEq(\''+id+'\')">Löschen</button>':'')+'</div>');
   EQ_IMAGES=eqImagesOf(e);EQ_FOCAL=e.image_focal||'50% 50%';renderEqImgGrid();renderEqFocal();
