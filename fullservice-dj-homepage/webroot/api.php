@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 79;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 80;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -191,7 +191,7 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -235,6 +235,25 @@ function db(): PDO {
 function upgrade(PDO $p): void {
   $v = (int)$p->query('PRAGMA user_version')->fetchColumn();
   if ($v >= SCHEMA_VERSION) return;
+  if ($v < 80) {
+    /* Technik-Check war bisher ein einzelnes JSON-Feld direkt am Kunden - ein Kunde
+       konnte also nie mehr als einen Check je gehabt haben. Jetzt eine eigene Tabelle,
+       damit beliebig viele Checks/Wartungen je Kunde moeglich sind, jeweils optional
+       verknuepft mit dem Angebot, das den Check ausgeloest hat. */
+    $p->exec("create table if not exists tech_checks (id text primary key,
+      customer_id text not null references customers(id) on delete cascade,
+      document_id text references documents(id) on delete set null,
+      data text default '{}', created_at text, updated_at text)");
+    /* Bestehende Checks vom Kunden in die neue Tabelle uebernehmen, damit keine
+       bisherige Arbeit verloren geht. */
+    try {
+      $old = $p->query("select id, tech_check from customers where tech_check is not null and tech_check != ''")->fetchAll();
+      foreach ($old as $c) {
+        $p->prepare('insert into tech_checks (id, customer_id, document_id, data, created_at, updated_at) values (?,?,?,?,?,?)')
+          ->execute([uuid(), $c['id'], null, $c['tech_check'], now(), now()]);
+      }
+    } catch (PDOException $e) {}
+  }
   if ($v < 79) foreach ([
     /* Standort-Stammdaten: bestehende "Lieblingslocations"-Tabelle um interne, nie an den
        Kunden ausgelieferte Felder erweitern, statt eine eigene Tabelle einzufuehren -
@@ -1307,6 +1326,37 @@ function autoInquiryPlanner(PDO $p, array $row): void {
       json_encode(['basics' => $basics], JSON_UNESCAPED_UNICODE), now(), now()]);
 }
 
+/* Legt automatisch einen Technik-Check an, sobald ein Angebot mit dem Produkt
+   TECH-CHECK oder TECH-CHECK-PLUS angenommen wird - Technik-Check ist ein seltenes
+   Zusatzprodukt und soll deshalb nicht bei jedem Kunden als Option auftauchen,
+   sondern erst entstehen, wenn er tatsaechlich beauftragt ist. Erkennung ueber den
+   Positionstext (document_items speichert keine Produkt-Referenz, nur den zum
+   Erstellungszeitpunkt kopierten Namen) - trifft die Automatik daneben, laesst sich
+   ein Check unter "Technik-Checks" jederzeit auch von Hand anlegen. */
+function maybeAutoTechCheck(PDO $p, string $documentId): void {
+  $st = $p->prepare('select * from documents where id = ?');
+  $st->execute([$documentId]);
+  $d = $st->fetch();
+  if (!$d || $d['doc_type'] !== 'angebot') return;
+  $already = $p->prepare('select 1 from tech_checks where document_id = ?');
+  $already->execute([$documentId]);
+  if ($already->fetchColumn()) return;
+  $names = $p->query("select name from products where sku in ('TECH-CHECK','TECH-CHECK-PLUS')")->fetchAll(PDO::FETCH_COLUMN);
+  if (!$names) return;
+  $items = $p->prepare('select description from document_items where document_id = ?');
+  $items->execute([$documentId]);
+  $match = false;
+  foreach ($items->fetchAll(PDO::FETCH_COLUMN) as $desc) {
+    foreach ($names as $n) {
+      if ($n !== '' && stripos((string)$desc, (string)$n) !== false) { $match = true; break 2; }
+    }
+  }
+  if (!$match) return;
+  $p->prepare('insert into tech_checks (id, customer_id, document_id, data, created_at, updated_at) values (?,?,?,?,?,?)')
+    ->execute([uuid(), $d['customer_id'], $documentId, '{}', now(), now()]);
+  notifyOwner('Neuer Technik-Check angelegt', 'Ausgelöst durch Angebot ' . $d['number'] . ' – Protokoll jetzt unter „Technik-Checks" ausfüllen.');
+}
+
 /* Verschickt bei einer Technik-Check-Anfrage automatisch den Vorab-Fragebogen als
    ausgefüllten Formular-Link per Mail - kein manueller Admin-Klick nötig. Schlägt eine
    Teil-Aktion fehl (z. B. keine Firmen-Mail hinterlegt), bleibt der Kunde/die Anfrage
@@ -2064,6 +2114,10 @@ create table documents (id text primary key, share_token text, doc_type text not
   total_net real default 0, total_tax real default 0, total_gross real default 0,
   deposit_deducted real default 0, total_override real, sent_at text, paid_at text,
   accepted_name text, accept_signature text, event_info text, created_at text, updated_at text);
+create table tech_checks (id text primary key,
+  customer_id text not null references customers(id) on delete cascade,
+  document_id text references documents(id) on delete set null,
+  data text default '{}', created_at text, updated_at text);
 create table email_templates (id text primary key, sort integer default 0, name text not null,
   subject text, body text, created_at text);
 create table products (id text primary key, sku text unique, sort integer default 0,
@@ -2666,6 +2720,10 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
           }
           if ($changes) docAudit($p, $b['id'], 'geändert', $b['number'] . ' · ' . implode(', ', $changes));
         }
+        /* Angebots-Annahme direkt im Backoffice (Status-Buttons) loest denselben
+           Technik-Check-Automatismus aus wie die Annahme im Kundenportal. */
+        if (($row['status'] ?? null) === 'angenommen')
+          foreach ($before as $b) { try { maybeAutoTechCheck($p, $b['id']); } catch (Throwable $e) {} }
       }
       if ($t === 'document_items' && !empty($itemsBefore)) {
         $itemFields = ['description', 'qty', 'unit', 'unit_price', 'discount_value', 'discount_type'];
@@ -3546,6 +3604,7 @@ function handlePortal(string $path, string $method, $body): never {
       $p->prepare("update documents set status='angenommen', accepted_name=?, accept_signature=?, updated_at=? where id=?")
         ->execute([$accName ?: null, $sig, now(), $d['id']]);
       docAudit($p, $d['id'], 'angenommen', $d['number'] . ' – vom Kunden angenommen' . ($accName ? ' und unterschrieben: ' . $accName : '') . ' (Portal)');
+      try { maybeAutoTechCheck($p, $d['id']); } catch (Throwable $e) {}
     }
     if ($kind === 'decline' && $d['status'] !== 'storniert')
       $p->prepare("update documents set status='abgelehnt', updated_at=? where id=?")->execute([now(), $d['id']]);

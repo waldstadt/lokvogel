@@ -302,6 +302,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <a data-pg="stats"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>Statistik</a>
       <div class="grp">Betrieb</div>
       <a data-pg="tech"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>Technik</a>
+      <a data-pg="techchecks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Technik-Checks</a>
       <a data-pg="workshops"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Workshops</a>
       <a data-pg="partners"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Miet-Partner</a>
       <div class="grp">Website</div>
@@ -599,6 +600,13 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <button class="btn sm" id="nlSendBtn" onclick="nlAdminSend(false)">An alle Abonnenten senden</button>
         </div>
       </div></div>
+  </div>
+
+  <!-- TECHNIK-CHECKS -->
+  <div class="pg" id="pg-techchecks">
+    <div class="phead"><div><div class="pt">Technik-Checks</div><div class="ps">Protokoll &amp; Bericht je Check – entsteht meist automatisch bei angenommenem Angebot</div></div>
+      <div><button class="btn" onclick="openNewTechCheckModal()">+ Neuer Technik-Check</button></div></div>
+    <div class="tbl-wrap card"><table><thead><tr><th>Kunde</th><th>Datum</th><th>Empfehlung</th><th>Angebot</th></tr></thead><tbody id="tcRows"></tbody></table></div>
   </div>
 
   <!-- MIET-PARTNER -->
@@ -1141,7 +1149,8 @@ function loadAll(){
     api('campaign_pages?select=*&order=sort'),
     api('blocks?select=*&order=anchor,sort'),
     api('event_reports?select=*&order=sort'),
-    api('locations?select=*&order=sort')
+    api('locations?select=*&order=sort'),
+    api('tech_checks?select=*&order=created_at.desc')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -1154,6 +1163,7 @@ function loadAll(){
     CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];CACHE.blocks=r[23]||[];
     CACHE.quoteTpls=r[24]||[];CACHE.planChanges=r[25]||[];CACHE.rentalContracts=r[26]||[];
     CACHE.campaigns=r[27]||[];CACHE.module=r[28]||[];CACHE.reports=r[29]||[];CACHE.locations=r[30]||[];
+    CACHE.techChecks=r[31]||[];
     applyBrand();
     renderAll();
     renderOrtDatalist2();
@@ -1171,7 +1181,7 @@ function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderDocsPage();
   renderEq();renderSetsAdmin();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
   renderProducts();renderPartners();renderWsAdmin();renderCampaigns();renderModulAdmin();renderReportAdmin();
-  renderTplSettings();
+  renderTplSettings();renderTechChecks();
   initSort();
 }
 /* ===== Workshop-Termine & Anmeldungen ===== */
@@ -1501,15 +1511,18 @@ function openCustDetail(id){
   var c=curCust;
   document.getElementById('cdName').textContent=custName(c);
   document.getElementById('cdSub').textContent=(c.kind==='firma'?'Firma':'Privat')+' · '+c.status+(c.source?' · Quelle: '+c.source:'');
+  /* Technik-Check ist ein seltenes Zusatzprodukt - deshalb kein "erfassen"-Link mehr
+     bei jedem Kunden. Nur wenn schon welche existieren (angelegt über Technik-Checks
+     bei Angebots-Annahme), stehen sie hier zur Info und zum Weiterspringen. */
+  var custChecks=(CACHE.techChecks||[]).filter(function(x){return x.customer_id===id});
   document.getElementById('cdData').innerHTML=
     row('E-Mail',c.email)+row('Telefon',c.phone)+row('WhatsApp',c.whatsapp)+
     row('Adresse',[c.street,[c.zip,c.city].filter(Boolean).join(' ')].filter(Boolean).join(', '))+
     row('Tags',(c.tags||[]).join(', '))+row('Notizen',c.notes)+
-    (c.tech_check&&c.tech_check.date?row('Technik-Check',dt(c.tech_check.date)+' – '+(c.tech_check.recommendation||'')):'')+
-    /* Der Technik-Check betrifft nur wenige Kunden - deshalb hier als kleiner Link
-       statt als Knopf neben "Bearbeiten". */
-    '<div style="margin-top:10px"><a class="sml" onclick="openTechCheck()">'+
-    (c.tech_check&&c.tech_check.date?'Technik-Check ansehen oder ergänzen':'Technik-Check erfassen')+'</a></div>';
+    (custChecks.length?('<div style="padding:3px 0"><span class="mut" style="display:inline-block;width:90px;vertical-align:top">Technik-Checks</span><span>'+
+      custChecks.map(function(t){var d=t.data||{};
+        return '<a onclick="openTechCheckModal(\''+t.id+'\')">'+(d.date?dt(d.date):'Entwurf')+(d.recommendation?' – '+esc(d.recommendation):'')+'</a>';
+      }).join('<br>')+'</span></div>'):'');
   renderCdPortal();
   var books=CACHE.bookings.filter(function(b){return b.customer_id===id})
     .sort(function(a,b){return a.event_date<b.event_date?1:-1});
@@ -5543,9 +5556,41 @@ var TC_EMPF=['Neu einstellen genügt','Gezielt ergänzen','Neu einstellen + erg�
    ein nie ausgefülltes Protokoll ergäbe einen Bericht mit Befunden, die es nie gab. */
 function tcSel(id,opts,val){return '<select id="'+id+'"><option value=""'+(val?'':' selected')+'>– bitte wählen –</option>'+
   opts.map(function(o){return '<option'+(o===val?' selected':'')+'>'+o+'</option>'}).join('')+'</select>'}
-function openTechCheck(){
-  var t=(curCust&&curCust.tech_check)||{};
-  openModal('Technik-Check – '+esc(custName(curCust)),
+/* Eigener Bereich statt Feld am Kunden: ein Technik-Check betrifft nur wenige Kunden
+   und entsteht in aller Regel automatisch, wenn ein Angebot mit dem Produkt
+   TECH-CHECK/TECH-CHECK-PLUS angenommen wird (siehe maybeAutoTechCheck in api.php).
+   Manuelles Anlegen bleibt moeglich (z.B. Wartungs-Folgetermin ohne eigenes Angebot). */
+function renderTechChecks(){
+  var el=document.getElementById('tcRows');if(!el)return;
+  var list=(CACHE.techChecks||[]).slice().sort(function(a,b){return (b.created_at||'').localeCompare(a.created_at||'')});
+  el.innerHTML=list.map(function(t){
+    var d=t.data||{},cust=(CACHE.customers||[]).find(function(c){return c.id===t.customer_id});
+    var doc=t.document_id?(CACHE.documents||[]).find(function(x){return x.id===t.document_id}):null;
+    return '<tr class="click" onclick="openTechCheckModal(\''+t.id+'\')"><td>'+esc(cust?custName(cust):'–')+'</td>'+
+      '<td>'+(d.date?dt(d.date):'<span class="mut">Entwurf</span>')+'</td>'+
+      '<td>'+esc(d.recommendation||'–')+'</td>'+
+      '<td>'+(doc?esc(doc.number):'–')+'</td></tr>';
+  }).join('')||'<tr><td colspan="4" class="mut">Noch keine Technik-Checks.</td></tr>';
+}
+function openNewTechCheckModal(){
+  var custOpts='<option value="">– wählen –</option>'+CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custName(c))+'</option>'}).join('');
+  openModal('Neuer Technik-Check',
+    '<label>Kunde *</label><select id="ntcCust">'+custOpts+'</select>'+
+    '<div class="mut sml" style="margin-top:8px">Entsteht sonst automatisch, wenn ein Angebot mit dem Produkt TECH-CHECK / TECH-CHECK-PLUS angenommen wird.</div>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="createTechCheck()">Anlegen</button></div>');
+}
+function createTechCheck(){
+  var custId=v('ntcCust');if(!custId){toast('Bitte einen Kunden wählen.',1);return}
+  api('tech_checks',{method:'POST',prefer:'return=representation',body:{customer_id:custId,data:{}}}).then(function(r){
+    var row=(r||[])[0];if(!row)return;
+    CACHE.techChecks.push(row);closeModal();renderTechChecks();openTechCheckModal(row.id);
+  }).catch(function(e){toast(e.message,1)});
+}
+var curCheck=null;
+function openTechCheckModal(id){
+  curCheck=(CACHE.techChecks||[]).find(function(x){return x.id===id});if(!curCheck)return;
+  var t=curCheck.data||{},cust=(CACHE.customers||[]).find(function(c){return c.id===curCheck.customer_id});
+  openModal('Technik-Check – '+esc(cust?custName(cust):'?'),
     '<div class="grid2"><div><label>Datum des Checks</label><input type="date" id="tcDate" value="'+(t.date||new Date().toISOString().slice(0,10))+'"></div>'+
     '<div><label>Anlage / Ort</label><input id="tcWhere" value="'+esc(t.where||'')+'" placeholder="z. B. Saalanlage Vereinsheim Musterstraße"></div></div>'+
     '<div class="sml mut" style="margin:10px 0 2px">– Vom Kunden (aus dem Vorab-Fragebogen übernehmen oder vor Ort erfragen) –</div>'+
@@ -5598,7 +5643,7 @@ function tcAddPhotos(inp){
       c.getContext('2d').drawImage(img,0,0,c.width,c.height);
       URL.revokeObjectURL(url);
       c.toBlob(function(bl){
-        fetch('api.php/checkpic/'+curCust.id,{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:bl})
+        fetch('api.php/checkpic/'+curCheck.id,{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:bl})
           .then(function(r){return r.json()})
           .then(function(j){if(j.name){TC_PHOTOS.push(j.name);tcRenderPhotos()}else toast(j.error||'Upload fehlgeschlagen',1)})
           .catch(function(e){toast(e.message,1)});
@@ -5617,10 +5662,10 @@ function tcDelPhoto(i){
   fetch('api.php/checkpic/get/'+n,{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}})
     .catch(function(){})
     .then(function(){
-      if(!curCust)return;
-      var t=Object.assign({},curCust.tech_check||{},{photos:TC_PHOTOS.slice()});
-      return api('customers?id=eq.'+curCust.id,{method:'PATCH',body:{tech_check:t}})
-        .then(function(){curCust.tech_check=t});
+      if(!curCheck)return;
+      var t=Object.assign({},curCheck.data||{},{photos:TC_PHOTOS.slice()});
+      return api('tech_checks?id=eq.'+curCheck.id,{method:'PATCH',body:{data:t}})
+        .then(function(){curCheck.data=t});
     }).catch(function(e){toast(e.message,1)});
 }
 function saveTechCheck(){
@@ -5630,12 +5675,12 @@ function saveTechCheck(){
     sound:v('tcSound')?Math.max(1,Math.min(10,Math.round(Number(v('tcSound'))||0))):null,
     tune:v('tcTune'),add:v('tcAdd'),findings:v('tcFind'),photos:TC_PHOTOS.slice(),
     recommendation:v('tcEmpf'),reasoning:v('tcWhy'),personal:v('tcPersonal'),steps:v('tcSteps')};
-  api('customers?id=eq.'+curCust.id,{method:'PATCH',body:{tech_check:t}}).then(function(){
-    curCust.tech_check=t;toast('Technik-Check gespeichert ✓');openTechCheck();
+  api('tech_checks?id=eq.'+curCheck.id,{method:'PATCH',body:{data:t}}).then(function(){
+    curCheck.data=t;toast('Technik-Check gespeichert ✓');renderTechChecks();openTechCheckModal(curCheck.id);
   }).catch(function(e){toast(e.message,1)});
 }
 function printTechCheck(){
-  var t=(curCust&&curCust.tech_check)||{},comp=S.company||{},c=curCust;
+  var t=(curCheck&&curCheck.data)||{},comp=S.company||{},c=(CACHE.customers||[]).find(function(x){return x.id===(curCheck&&curCheck.customer_id)});
   /* Ohne Bewertung kein Kundenbericht: Sonst geht ein bezahltes Dokument raus, in dem
      Befunde stehen, die nie erhoben wurden. */
   if(!t.func&&!t.recommendation&&!t.findings){
