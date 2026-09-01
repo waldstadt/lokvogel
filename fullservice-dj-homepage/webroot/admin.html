@@ -496,7 +496,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <option value="angebot">Angebot</option><option value="bestaetigung">Auftragsbestätigung</option>
           <option value="rechnung">Rechnung</option>
           <option value="abschlag">Abschlagsrechnung</option><option value="schluss">Schlussrechnung</option>
-          <option value="lieferschein">Lieferschein</option></select></div>
+          <option value="lieferschein">Lieferschein</option><option value="gutschrift">Gutschrift</option></select></div>
         <div><label>USt. %</label><input type="number" id="docTax" step="0.1" value="19"></div>
         <div><label>Preisanzeige</label><label style="display:flex;align-items:center;gap:8px;margin-top:9px;font-weight:400;text-transform:none;letter-spacing:normal;cursor:pointer"><input type="checkbox" id="docNetto" style="width:auto" onchange="renderTotals()">Netto anzeigen (für Geschäftskunden)</label></div>
         <div id="docDepWrap" style="display:none"><label>Verrechnete Abschläge (brutto €)</label><input type="number" id="docDep" step="0.01" value="0"></div>
@@ -858,6 +858,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
           <div class="grid2">
             <div><label>Rechnungs-Präfix</label><input id="sIPre"></div>
             <div><label>Nächste Rechnungs-Nr.</label><input type="number" id="sINext"></div>
+          </div>
+          <div class="grid2">
+            <div><label>Gutschrift-Präfix</label><input id="sGPre"></div>
+            <div><label>Nächste Gutschrift-Nr.</label><input type="number" id="sGNext"></div>
           </div>
           <div class="grid2">
             <div><label>Zahlungsziel (Tage)</label><input type="number" id="sPayDays"></div>
@@ -2418,10 +2422,18 @@ function printEventPlan(){
 /* ===== Dokumente (Angebote & Rechnungen) ===== */
 /* Was von einem Beleg noch offen ist. Ohne den Abzug stand die Schlussrechnung beim
    Kunden mit der vollen Auftragssumme da. */
+/* Summe aller Gutschriften, die sich auf dieses Dokument beziehen (parent_id) - unit_price
+   steht dort bereits mit umgekehrtem Vorzeichen, total_gross ist also negativ. */
+function gutschriftSum(d){
+  return (CACHE.documents||[]).filter(function(g){return g.doc_type==='gutschrift'&&g.status!=='storniert'&&g.parent_id===d.id})
+    .reduce(function(s,g){return s+Number(g.total_gross);},0);
+}
 function docOffenText(d){
-  var offen=Number(d.total_gross)-Number(d.deposit_deducted||0);
+  var gs=gutschriftSum(d);
+  var offen=Number(d.total_gross)-Number(d.deposit_deducted||0)+gs;
   return euro(offen)+(istZahlbeleg(d.doc_type)&&Number(d.deposit_deducted)
-    ? ' <span class="mut">(von '+euro(d.total_gross)+', Abschlag abgezogen)</span>':'');
+    ? ' <span class="mut">(von '+euro(d.total_gross)+', Abschlag abgezogen)</span>':'')+
+    (gs?' <span class="mut">(Gutschrift '+euro(gs)+' abgezogen)</span>':'');
 }
 /* Namen zerlegen wie der Server (splitPersonName in api.php): "Familie Kettner" bleibt
    ganz, sonst wuerde die Anrede "Hallo Familie," lauten. Dasselbe gilt fuer "Herr" und
@@ -2436,7 +2448,7 @@ function namensTeile(name){
   if(w.length===1)return [name,''];
   return [w[0],w.slice(1).join(' ')];
 }
-function docTypeName(t){return {angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'}[t]||t}
+function docTypeName(t){return {angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein',gutschrift:'Gutschrift'}[t]||t}
 /* Angebot und Auftragsbestätigung sind keine Zahlungsaufforderungen - sie haben kein
    Fälligkeitsdatum, keine Mahnung und keinen Bezahlt-Status. */
 function istZahlbeleg(t){return t!=='angebot'&&t!=='bestaetigung'&&t!=='lieferschein'}
@@ -2473,8 +2485,9 @@ function nextNumber(type){
   var n=S.numbering||{angebot:{prefix:'AN-',next:1},rechnung:{prefix:'RE-',next:1},year_in_number:true};
   var kind=type==='angebot'?'angebot'
     :(type==='bestaetigung'?'bestaetigung'
-    :(type==='lieferschein'?'lieferschein':'rechnung'));
-  if(!n[kind])n[kind]={prefix:type==='bestaetigung'?'AB-':(type==='lieferschein'?'LS-':'RE-'),next:1};
+    :(type==='lieferschein'?'lieferschein'
+    :(type==='gutschrift'?'gutschrift':'rechnung')));
+  if(!n[kind])n[kind]={prefix:type==='bestaetigung'?'AB-':(type==='lieferschein'?'LS-':(type==='gutschrift'?'GS-':'RE-')),next:1};
   var cfg=n[kind];
   var num=cfg.prefix+(n.year_in_number?new Date().getFullYear()+'-':'')+String(cfg.next).padStart(4,'0');
   return {number:num,commit:function(){
@@ -2639,6 +2652,8 @@ function renderStatusBtns(){
     btns+='<button class="btn g sm" onclick="docToInvoice(\'abschlag\')">→ Abschlag</button> <button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button>';
   if(d.doc_type==='abschlag'&&d.status==='bezahlt')
     btns+='<button class="btn g sm" onclick="docToInvoice(\'schluss\')">→ Schlussrechnung</button>';
+  if((d.doc_type==='rechnung'||d.doc_type==='schluss')&&['versendet','ueberfaellig','bezahlt'].indexOf(d.status)>=0)
+    btns+='<button class="btn sm" onclick="docToInvoice(\'gutschrift\')">→ Gutschrift</button>';
   if(istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
     btns+='<button class="btn g sm" onclick="composeReminderMail()">Zahlungserinnerung</button>';
   if(d.status!=='storniert')btns+='<button class="btn g sm" onclick="setDocStatus(\'storniert\')">Storno</button> ';
@@ -2702,8 +2717,12 @@ function sendReminder(){
     }).catch(function(e){toast(e.message,1)});
 }
 function setDocStatus(st){
+  var wasVersand=st==='versendet';
+  /* Eine Gutschrift wird nicht bezahlt - sie mindert beim Versand sofort den offenen
+     Betrag der Rechnung, ohne eigenen Zahlungsvorgang. */
+  if(curDoc.doc_type==='gutschrift'&&st==='versendet')st='bezahlt';
   var patch={status:st};
-  if(st==='versendet')patch.sent_at=new Date().toISOString();
+  if(wasVersand)patch.sent_at=new Date().toISOString();
   if(st==='bezahlt')patch.paid_at=new Date().toISOString();
   api('documents?id=eq.'+curDoc.id,{method:'PATCH',body:patch}).then(function(){
     curDoc.status=st;toast('Status: '+st+' ✓');
@@ -3450,6 +3469,13 @@ function docToInvoice(type){
       else api('document_items?document_id=eq.'+basisDoc.id+'&order=pos')
         .then(function(r){fertig(r||[],basisDoc)})
         .catch(function(){fertig(items,src)});
+    }else if(type==='gutschrift'){
+      /* Positionen mit umgekehrtem Vorzeichen uebernehmen - Markus kuerzt sie danach auf
+         das, was tatsaechlich gutgeschrieben wird. Rabatt/Pauschalpreis bewusst NICHT
+         uebernehmen, die passen als relative Groessen nicht automatisch zur Korrektur. */
+      curItems=copyItems(items.map(function(it){return Object.assign({},it,{unit_price:-Number(it.unit_price)||0,discount_value:0})}));
+      document.getElementById('docDiscVal').value=0;
+      document.getElementById('docTotalOverride').value='';
     }else{
       curItems=copyItems(items);
       /* Gesamtrabatt und Pauschalpreis mit übernehmen */
@@ -5796,6 +5822,8 @@ function renderSet(){
   document.getElementById('sBNext').value=(n.bestaetigung&&n.bestaetigung.next)||1;
   document.getElementById('sIPre').value=(n.rechnung&&n.rechnung.prefix)||'RE-';
   document.getElementById('sINext').value=(n.rechnung&&n.rechnung.next)||1;
+  document.getElementById('sGPre').value=(n.gutschrift&&n.gutschrift.prefix)||'GS-';
+  document.getElementById('sGNext').value=(n.gutschrift&&n.gutschrift.next)||1;
   document.getElementById('sPayDays').value=d.payment_days!=null?d.payment_days:14;
   document.getElementById('sValidDays').value=d.quote_valid_days!=null?d.quote_valid_days:30;
   document.getElementById('sPlanLock').value=d.plan_lock_days!=null?d.plan_lock_days:3;
@@ -5835,6 +5863,7 @@ function saveNumbering(){
   n.angebot={prefix:v('sQPre'),next:Number(v('sQNext'))||1};
   n.bestaetigung={prefix:v('sBPre')||'AB-',next:Number(v('sBNext'))||1};
   n.rechnung={prefix:v('sIPre'),next:Number(v('sINext'))||1};
+  n.gutschrift={prefix:v('sGPre')||'GS-',next:Number(v('sGNext'))||1};
   n.year_in_number=true;
   var d=S.defaults||{};d.payment_days=Number(v('sPayDays'))||14;d.quote_valid_days=Number(v('sValidDays'))||30;
   d.plan_lock_days=Number(v('sPlanLock'))||0;
