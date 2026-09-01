@@ -438,28 +438,30 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
       <div id="wsForm" style="display:none;max-width:560px;margin-top:26px;background:var(--card);border:1px solid var(--acc);border-radius:5px;padding:26px 24px">
         <h3 style="font-size:17px;margin-bottom:4px" id="wsFormTitle"></h3>
         <div class="msg" id="wsMsg" style="display:none"></div>
+        <div id="wsFields">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
           <div><label for="wsName">Name *</label><input id="wsName"></div>
           <div><label for="wsMail">E-Mail *</label><input id="wsMail" type="email"></div>
           <div><label for="wsPhone">Telefon</label><input id="wsPhone"></div>
           <div><label for="wsSeats">Plätze</label><select id="wsSeats"><option>1</option><option>2</option><option>3</option></select></div>
-          <div><label for="wsStreet">Straße &amp; Hausnummer *</label><input id="wsStreet" autocomplete="street-address"></div>
+          <div><label for="wsStreet">Straße &amp; Hausnummer<span class="ws-req"> *</span></label><input id="wsStreet" autocomplete="street-address"></div>
           <div class="ws-plzort">
-            <div><label for="wsZip">PLZ *</label><input id="wsZip" inputmode="numeric" autocomplete="postal-code"></div>
-            <div><label for="wsCity">Ort *</label><input id="wsCity" autocomplete="address-level2"></div>
+            <div><label for="wsZip">PLZ<span class="ws-req"> *</span></label><input id="wsZip" inputmode="numeric" autocomplete="postal-code"></div>
+            <div><label for="wsCity">Ort<span class="ws-req"> *</span></label><input id="wsCity" autocomplete="address-level2"></div>
           </div>
         </div>
-        <div class="sml" style="color:var(--mut2);margin-top:6px">Die Anschrift brauche ich für deine Rechnung – sie kommt direkt nach der Buchung per E-Mail, zahlbar per Überweisung. Mit Zahlungseingang ist dein Platz fix.</div>
+        <div class="sml" style="color:var(--mut2);margin-top:6px" id="wsAddrHint">Die Anschrift brauche ich für deine Rechnung – sie kommt direkt nach der Buchung per E-Mail, zahlbar per Überweisung. Mit Zahlungseingang ist dein Platz fix.</div>
         <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
-          <div class="sml" style="color:var(--mut);margin-bottom:4px">Drei kurze Fragen, damit ich den Workshop auf euch zuschneiden kann:</div>
-          <label for="wsQ1">Was machst du musikalisch? *</label><input id="wsQ1" placeholder="z. B. Ich lege Techno mit XDJ auf / spiele Gitarre in einer Coverband …">
-          <label for="wsQ2">Wo liegt deine größte Herausforderung? *</label><input id="wsQ2" placeholder="z. B. Es pfeift, sobald ich das Mikro aufdrehe / mein Bass matscht …">
-          <label for="wsQ3">Was willst du aus dem Workshop mitnehmen? *</label><input id="wsQ3" placeholder="z. B. Meine Anlage endlich selbst sauber einstellen können …">
+          <div class="sml" style="color:var(--mut);margin-bottom:4px">Drei kurze Fragen (freiwillig), damit ich den Workshop auf euch zuschneiden kann:</div>
+          <label for="wsQ1">Was machst du musikalisch?</label><input id="wsQ1" placeholder="z. B. Ich lege Techno mit XDJ auf / spiele Gitarre in einer Coverband …">
+          <label for="wsQ2">Wo liegt deine größte Herausforderung?</label><input id="wsQ2" placeholder="z. B. Es pfeift, sobald ich das Mikro aufdrehe / mein Bass matscht …">
+          <label for="wsQ3">Was willst du aus dem Workshop mitnehmen?</label><input id="wsQ3" placeholder="z. B. Meine Anlage endlich selbst sauber einstellen können …">
         </div>
         <label for="wsNote">Nachricht (optional)</label><input id="wsNote" placeholder="Sonst noch etwas?">
         <div style="margin-top:16px;display:flex;gap:10px">
           <button class="btn" id="wsSend" onclick="sendWs()">Platz verbindlich reservieren</button>
           <button class="btn ghost" onclick="document.getElementById('wsForm').style.display='none'">Abbrechen</button>
+        </div>
         </div>
       </div>
     </div>
@@ -798,8 +800,21 @@ function openWsForm(i,wl){
   document.getElementById('wsFormTitle').textContent=wsSel.title+' – '+wsDate(wsSel)+(wsWl?' · Warteliste':'');
   document.getElementById('wsSend').textContent=wsWl?'Auf die Warteliste setzen':'Platz verbindlich reservieren';
   var m=document.getElementById('wsMsg');m.style.display='none';
+  document.getElementById('wsFields').style.display='';
+  wsApplyMode();
   var f=document.getElementById('wsForm');f.style.display='';
   f.scrollIntoView({behavior:'smooth',block:'center'});
+}
+/* Anschrift ist nur bei einer echten Buchung Pflicht (fuer die Rechnung) - auf der
+   Warteliste wird noch nichts berechnet, da reichen Name und E-Mail. Die Sternchen und
+   der Hinweis folgen dem, was der Server tatsaechlich verlangt. */
+function wsNeedsAddr(){return !wsWl&&!!(wsSel&&wsSel.price_net>0)}
+function wsApplyMode(){
+  var need=wsNeedsAddr();
+  [].forEach.call(document.querySelectorAll('#wsForm .ws-req'),function(el){el.style.display=need?'':'none'});
+  document.getElementById('wsAddrHint').textContent=need
+    ?'Die Anschrift brauche ich für deine Rechnung – sie kommt direkt nach der Buchung per E-Mail, zahlbar per Überweisung. Mit Zahlungseingang ist dein Platz fix.'
+    :'Für die Warteliste reichen Name und E-Mail. Die Anschrift kannst du jetzt schon eintragen oder später, wenn ein Platz frei wird.';
 }
 function pickSondertermin(){
   var f=document.getElementById('inqForm');
@@ -813,10 +828,10 @@ function sendWs(){
   var name=document.getElementById('wsName').value.trim(),mail=document.getElementById('wsMail').value.trim();
   if(!name||!mail){err('Bitte Name und E-Mail angeben.');return}
   var street=document.getElementById('wsStreet').value.trim(),zip=document.getElementById('wsZip').value.trim(),city=document.getElementById('wsCity').value.trim();
-  if(wsSel.price_net>0&&(!street||!zip||!city)){err('Bitte Anschrift angeben (Straße, PLZ, Ort) – sie wird für die Rechnung benötigt.');return}
+  if(wsNeedsAddr()&&(!street||!zip||!city)){err('Bitte Anschrift angeben (Straße, PLZ, Ort) – sie wird für die Rechnung benötigt.');return}
   var q1=document.getElementById('wsQ1').value.trim(),q2=document.getElementById('wsQ2').value.trim(),q3=document.getElementById('wsQ3').value.trim();
-  if(!q1||!q2||!q3){err('Bitte beantworte kurz die drei Fragen – so kann ich den Workshop auf euch zuschneiden.');return}
-  btn.disabled=true;
+  if(btn.disabled)return;   /* Doppelklick: die erste Anmeldung ist noch unterwegs */
+  btn.disabled=true;var btnText=btn.textContent;btn.textContent='Wird gesendet …';
   fetch(API+'/portal/workshops/'+wsSel.id+'/signup',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({name:name,email:mail,phone:document.getElementById('wsPhone').value.trim(),
       seats:Number(document.getElementById('wsSeats').value)||1,message:document.getElementById('wsNote').value.trim(),
@@ -825,10 +840,13 @@ function sendWs(){
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
       if(res.s===409&&/Plätze|Platz frei|ausgebucht/.test(res.j.error||'')){
-        err(esc(res.j.error)+'<br><a onclick="wsWl=true;sendWs()" style="cursor:pointer;font-weight:600">→ Stattdessen auf die Warteliste setzen</a>');
+        err(esc(res.j.error)+'<br><a onclick="wsWl=true;wsApplyMode();sendWs()" style="cursor:pointer;font-weight:600">→ Stattdessen auf die Warteliste setzen</a>');
         return;
       }
       if(res.s>=400)throw new Error(res.j.error||'Anmeldung fehlgeschlagen.');
+      /* Nach dem Erfolg nur noch die Bestaetigung zeigen - ein weiter ausgefuelltes Formular
+         darunter laedt zum zweiten Absenden ein. */
+      document.getElementById('wsFields').style.display='none';
       m.style.display='block';m.className='msg ok';
       var inv=res.j.invoice;
       m.textContent=res.j.status==='warteliste'
@@ -840,7 +858,7 @@ function sendWs(){
             :'Platz reserviert ✓ Du bekommst eine Bestätigung per E-Mail.'));
       loadWorkshops();
     }).catch(function(e){err(esc(e.message))})
-    .finally(function(){btn.disabled=false});
+    .finally(function(){btn.disabled=false;btn.textContent=btnText});
 }
 loadWorkshops();
 function nlSignup(){

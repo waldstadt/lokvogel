@@ -162,10 +162,17 @@ function render(pg){
       /* Kurzfristige Termine bekommen dieselbe ehrliche Ansage wie auf der Startseite */
       var tage=data.event_date?Math.round((new Date(data.event_date)-new Date())/86400000):null;
       msg.className='form-msg ok';
-      msg.textContent=(tage!=null&&tage>=0&&tage<=10)
+      var text=(tage!=null&&tage>=0&&tage<=10)
         ?'Danke! Euer Termin ist ja bald – ich melde mich so schnell wie möglich, meist noch am selben Tag. Wenn es eilig ist, schreibt mir gern zusätzlich per WhatsApp.'
         :(cfg.success_text||'Danke! Eure Anfrage ist angekommen – ich melde mich innerhalb von 24 Stunden mit einer ehrlichen Antwort.');
+      /* Der Technik-Check-Text verspricht den Fragebogen "gleich im Postfach". Kommt vom
+         Server kein Link (Bogen-Vorlage fehlt, Kunde ohne Mail), darf die Seite das nicht
+         versprechen - dann schickt Markus ihn von Hand. */
+      if(!(antwort&&antwort.form_link)&&/Fragebogen|Postfach/.test(text))
+        text='Danke! Eure Anfrage ist angekommen. Den kurzen Vorab-Fragebogen bekommt ihr von mir per Mail, sobald ich die Anfrage gesehen habe – ich melde mich innerhalb von 24 Stunden.';
+      msg.textContent=text;
       document.getElementById('inqForm').reset();
+      msg.scrollIntoView({block:'center'});
       /* Beim Technik-Check kommt der Fragebogen-Link mit: direkt anzeigen, damit das
          Versprechen auch hält, wenn die Mail im Spamfilter hängt. */
       if(antwort&&antwort.form_link){
@@ -184,19 +191,20 @@ function render(pg){
   });
 }
 
-/* Hinweis aufs Kundenkonto nach dem Absenden. Bewusst als ruhiger Kasten unter dem
-   Formular statt als Overlay: kein Zwang, keine Tastaturfalle, nichts zum Wegklicken. */
+/* Hinweis aufs Kundenkonto nach dem Absenden. Bewusst als ruhiger Kasten direkt unter
+   der Bestaetigung statt als Overlay: kein Zwang, keine Tastaturfalle, nichts zum Wegklicken. */
 function showRegHint(data){
   if(document.getElementById('regHint'))return;
-  var form=document.getElementById('inqForm');
-  if(!form)return;
+  var msg=document.getElementById('formMsg');
+  if(!msg)return;
   var box=document.createElement('div');
   box.id='regHint';
-  box.style.cssText='margin-top:22px;padding:20px 22px;border:1px solid var(--line);border-radius:14px;background:var(--card)';
-  box.innerHTML='<div style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;margin-bottom:8px">Wenn ihr mögt: Kundenkonto anlegen</div>'+
+  box.style.cssText='margin:0 0 18px;padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:var(--card)';
+  box.innerHTML='<div style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;margin-bottom:6px">Wenn ihr mögt: Kundenkonto anlegen</div>'+
     '<div style="color:var(--mut);font-size:14px;line-height:1.7">Ihr müsst nicht – ich melde mich so oder so. Mit Konto seht ihr aber jederzeit, was schon geplant ist, habt alle Unterlagen an einem Ort und tragt Adresse und Eckdaten selbst ein, statt sie am Telefon zu diktieren. Kostenlos, kein Abo.</div>'+
-    '<a class="btn" style="margin-top:14px" href="portal.html?register=1&email='+encodeURIComponent(data.email)+'&name='+encodeURIComponent(data.name)+'">Kostenlos registrieren</a>';
-  form.parentNode.insertBefore(box, form.nextSibling);
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:14px"><a class="btn" href="portal.html?register=1&email='+encodeURIComponent(data.email)+'&name='+encodeURIComponent(data.name)+'">Kostenlos registrieren</a>'+
+    '<button type="button" class="btn ghost" onclick="document.getElementById(\'regHint\').remove()">Vielleicht später</button></div>';
+  msg.parentNode.insertBefore(box,msg.nextSibling);
 }
 
 /* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */

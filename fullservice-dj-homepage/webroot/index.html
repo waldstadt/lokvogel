@@ -185,12 +185,10 @@ textarea{min-height:130px;resize:vertical}
 .form-msg{padding:14px 16px;font-size:14px;margin-bottom:18px;display:none;border:1px solid;border-radius:4px}
 .form-msg.ok{display:block;border-color:#3d6b3d;background:rgba(60,120,60,.12);color:#9fd49f}
 .form-msg.err{display:block;border-color:#7a3535;background:rgba(150,60,60,.12);color:#e0a0a0}
-.reg-overlay{position:fixed;inset:0;background:rgba(10,10,12,.72);display:none;align-items:center;justify-content:center;z-index:500;padding:24px}
-.reg-overlay.open{display:flex}
-.reg-card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:32px;max-width:440px;width:100%}
-.reg-card h3{margin:0 0 10px;font-size:20px}
-.reg-card ul{margin:14px 0;padding-left:20px;color:var(--mut);font-size:14px;line-height:1.6}
-.reg-card .row{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
+.reg-hint{margin:0 0 18px;padding:18px 20px;border:1px solid var(--line);border-radius:6px;background:var(--card)}
+.reg-hint h3{margin:0 0 6px;font-size:16px}
+.reg-hint p{color:var(--mut);font-size:14px;line-height:1.65;margin:0}
+.reg-hint .row{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;align-items:center}
 
 /* FOOTER */
 footer{border-top:1px solid var(--line);padding:40px 0;font-size:13px;color:var(--mut2)}
@@ -1297,58 +1295,28 @@ document.getElementById('inqForm').addEventListener('submit',function(ev){
       ?'Danke! Euer Termin ist ja bald – ich melde mich so schnell wie möglich, meist noch am selben Tag. Wenn es eilig ist, schreibt mir gern zusätzlich per WhatsApp (Kontakt oben).'
       :'Danke! Eure Anfrage ist angekommen – ich melde mich in der Regel innerhalb von 24 Stunden.';
     f.reset();
-    document.getElementById('regOverlayLink').href='portal.html?register=1&email='+encodeURIComponent(data.email)+'&name='+encodeURIComponent(data.name);
-    openRegOverlay();
+    /* Die Bestaetigung steht oben im Formular, der Absende-Knopf unten - auf dem Handy
+       waere sie sonst ausserhalb des Bildschirms. */
+    msg.scrollIntoView({block:'center'});
+    showRegHint(data);
   }).catch(function(){
     msg.className='form-msg err';msg.textContent='Senden fehlgeschlagen – bitte versucht es später erneut oder ruft direkt an.';
   }).finally(function(){btn.disabled=false;btn.textContent='Anfrage senden'});
 });
-/* Registrierungs-Hinweis als echter Dialog: Fokus hinein, Escape schließt, Tab bleibt
-   im Fenster und der Hintergrund scrollt nicht mit - sonst kommt man per Tastatur
-   nicht mehr heraus. */
-var regLastFocus=null;
-function openRegOverlay(){
-  var ov=document.getElementById('regOverlay');
-  regLastFocus=document.activeElement;
-  ov.classList.add('open');
-  document.body.style.overflow='hidden';
-  var link=document.getElementById('regOverlayLink');
-  if(link)link.focus();
+/* Hinweis aufs Kundenkonto direkt unter der Bestaetigung - frueher ein Overlay, das die
+   Erfolgsmeldung verdeckte und erst weggeklickt werden musste. */
+function showRegHint(data){
+  if(document.getElementById('regHint'))return;
+  var msg=document.getElementById('formMsg');
+  var box=document.createElement('div');
+  box.id='regHint';box.className='reg-hint';
+  box.innerHTML='<h3>Kundenkonto anlegen?</h3>'+
+    '<p>Kein Muss – ich melde mich sowieso. Mit Konto seht ihr aber jederzeit, was zu eurer Feier schon geplant ist, habt Angebot, Rechnung und Verträge an einem Ort und tragt Rechnungsadresse, Location und Gästezahl selbst ein. Kostenlos, kein Abo.</p>'+
+    '<div class="row"><a class="btn" href="portal.html?register=1&email='+encodeURIComponent(data.email)+'&name='+encodeURIComponent(data.name)+'">Konto anlegen</a>'+
+    '<button type="button" class="btn ghost" onclick="document.getElementById(\'regHint\').remove()">Vielleicht später</button></div>';
+  msg.parentNode.insertBefore(box,msg.nextSibling);
 }
-function closeRegOverlay(){
-  var ov=document.getElementById('regOverlay');
-  ov.classList.remove('open');
-  document.body.style.overflow='';
-  if(regLastFocus&&regLastFocus.focus)regLastFocus.focus();
-}
-document.addEventListener('keydown',function(e){
-  var ov=document.getElementById('regOverlay');
-  if(!ov||!ov.classList.contains('open'))return;
-  if(e.key==='Escape'){closeRegOverlay();return}
-  if(e.key!=='Tab')return;
-  var f=ov.querySelectorAll('a[href],button');
-  if(!f.length)return;
-  var first=f[0],last=f[f.length-1];
-  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
-  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
-});
 </script>
-<div class="reg-overlay" id="regOverlay" role="dialog" aria-modal="true" aria-labelledby="regOverlayTitle">
-  <div class="reg-card">
-    <h3 id="regOverlayTitle">Anfrage ist da – und jetzt?</h3>
-    <p class="lead" style="margin:0">Wenn ihr mögt, legt euch direkt ein kostenloses Kundenkonto an:</p>
-    <ul>
-      <li>Ihr seht jederzeit, was zu eurer Feier schon geplant ist, und könnt Dinge direkt korrigieren.</li>
-      <li>Alle Unterlagen – Angebot, Rechnung, Verträge – an einem Ort statt verstreut in E-Mails.</li>
-      <li>Rechnungsadresse, Location und Gästezahl tragt ihr selbst ein, statt sie am Telefon zu diktieren.</li>
-      <li>Kostenlos, jederzeit kündbar, kein Abo.</li>
-    </ul>
-    <div class="row">
-      <a class="btn" id="regOverlayLink" href="portal.html">Jetzt kostenlos registrieren</a>
-      <button type="button" class="btn ghost" onclick="closeRegOverlay()">Vielleicht später</button>
-    </div>
-  </div>
-</div>
 <div class="rep-ovl" id="repOvl" onclick="if(event.target===this)closeReport()">
   <div class="rep-box">
     <button class="btn ghost" style="float:right;padding:6px 14px;font-size:13px" onclick="closeReport()">Schließen</button>

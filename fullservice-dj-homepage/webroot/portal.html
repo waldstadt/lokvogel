@@ -453,11 +453,13 @@ function decline(){
   var opt=document.getElementById('bandeOpt').checked;
   /* Erst das Opt-in melden, dann neu laden: Sonst kommt die Seite ohne den frisch
      angelegten Vorauswahl-Bogen zurueck. */
+  /* bande:true sagt dem Server, dass gleich die Vermittlungs-Mail folgt - dann verschickt
+     er zur Absage keine eigene Bestaetigung, sonst kaemen zwei Mails in derselben Minute. */
   sendAction('decline',document.getElementById('declMsg').value,null,function(){
     if(opt)sendAction('bande','Kunde wünscht DJ-Bande-Vorschläge (Einwilligung zur Datenweitergabe erteilt).',null,function(j){
       if(j&&j.form_link)DOC.bande_link=j.form_link;loadOffer()});
     else loadOffer();
-  });
+  },{bande:opt});
 }
 function act(kind,msg,phone,after){
   msg=msg!==undefined&&msg!==null?msg:(document.getElementById('cmt')?document.getElementById('cmt').value:'');
@@ -470,10 +472,10 @@ function act(kind,msg,phone,after){
     if(after)after();
   });
 }
-function sendAction(kind,msg,phone,cb){
+function sendAction(kind,msg,phone,cb,extra){
   fetch(API+'/portal/offer/'+OFFER+'/action',{
     method:'POST',headers:offerHeaders(),
-    body:JSON.stringify({plz:PLZ,action:kind,message:msg||'',phone:phone||''})
+    body:JSON.stringify(Object.assign({plz:PLZ,action:kind,message:msg||'',phone:phone||''},extra||{}))
   }).then(function(r){
     if(r.ok)return r.json().catch(function(){return null}).then(function(j){if(cb)cb(j)});
     return r.json().catch(function(){return null}).then(function(j){
@@ -751,11 +753,26 @@ function doSetPw(){
     body:JSON.stringify({invite:INVITE,password:p1})})
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
+      /* Verbrauchter oder abgelaufener Link: Meist hat der Kunde sein Passwort laengst
+         gesetzt und klickt die alte Mail nochmal an - dann soll er direkt zur Anmeldung. */
+      if(res.s===404||res.s===410){renderInviteGone();return}
       if(res.s>=400)throw new Error(res.j.error||'Fehlgeschlagen.');
       CTOK=res.j.token;localStorage.setItem('cust_tok',CTOK);
       history.replaceState(null,'',location.pathname);
       loadAccount();
     }).catch(function(e){err(e.message)});
+}
+function renderInviteGone(){
+  app('<div class="card"><div class="kicker">Dein Kundenkonto</div><h1>Der Link geht nicht mehr</h1>'+
+    '<p class="sub">Der Link wurde schon benutzt oder ist abgelaufen. Wenn du dein Passwort schon gesetzt hast, melde dich hier an:</p>'+
+    '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="inviteToLogin()">Zur Anmeldung</button>'+
+    '<a href="#" onclick="inviteToLogin(true);return false" style="font-size:13px">Passwort vergessen? Neuen Link anfordern</a></div></div>');
+}
+function inviteToLogin(forgot){
+  INVITE=null;history.replaceState(null,'',location.pathname);
+  renderLogin(forgot?'Trag deine E-Mail-Adresse ein und klick auf „Passwort vergessen?" – dann schicke ich dir einen frischen Link.':'');
+  if(forgot){var m=document.getElementById('liMsg');if(m)m.className='msg warn'}
+  var em=document.getElementById('liMail');if(em)em.focus();
 }
 function renderLogin(msg){
   if(REGISTER){renderRegister(msg);return}
@@ -868,17 +885,20 @@ function parseTimetable(text){
 function timetableToText(list){return (Array.isArray(list)?list:[]).map(function(t){return (t.time?t.time+' ':'')+t.label}).join('\n')}
 function planRow(bookingId,key,path,label,cfg){
   cfg=cfg||{};
-  PLAN_STATE[key]={bookingId:bookingId,path:path,label:label,kind:cfg.kind||'text'};
+  PLAN_STATE[key]={bookingId:bookingId,path:path,label:label,kind:cfg.kind||'text',empty:!!cfg.empty};
   var display=cfg.displayHtml!=null?cfg.displayHtml:esc(String(cfg.val!=null?cfg.val:''));
   var editVal=cfg.editVal!=null?cfg.editVal:(cfg.val!=null?cfg.val:'');
-  var box=cfg.multiline?('<textarea id="in_'+key+'" style="min-height:'+(cfg.rows||70)+'px">'+esc(editVal)+'</textarea>')
-    :('<input id="in_'+key+'" value="'+esc(editVal)+'">');
+  /* Leere Felder speichern sich selbst, sobald der Kunde sie verlaesst (change feuert
+     beim Verlassen) - 19 einzelne Speichern-Knoepfe waren zu viel des Guten. */
+  var auto=cfg.empty?' onchange="planSubmit(\''+key+'\',true)"':'';
+  var box=cfg.multiline?('<textarea id="in_'+key+'" style="min-height:'+(cfg.rows||70)+'px"'+auto+'>'+esc(editVal)+'</textarea>')
+    :('<input id="in_'+key+'" value="'+esc(editVal)+'"'+auto+'>');
   if(cfg.locked){
     return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>'+esc(label)+':</b> '+(cfg.empty?'<span class="sub">–</span>':display)+'</div>';
   }
   if(cfg.empty){
-    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><label style="margin:4px 0 2px">'+esc(label)+'</label>'+box+
-      '<div style="margin-top:4px"><button class="btn" style="padding:6px 12px" onclick="planSubmit(\''+key+'\')">Speichern</button> <span id="ok_'+key+'" style="color:#9fd49f;font-size:13px;display:none">Gespeichert ✓</span></div></div>';
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><label style="margin:4px 0 2px" for="in_'+key+'">'+esc(label)+
+      ' <span id="ok_'+key+'" style="color:#9fd49f;text-transform:none;letter-spacing:0" hidden>· gespeichert ✓</span></label>'+box+'</div>';
   }
   return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>'+esc(label)+':</b> '+display+
     ' <a onclick="planToggle(\''+key+'\')" style="cursor:pointer;font-size:13px">Änderung vorschlagen</a>'+
@@ -888,24 +908,33 @@ function planRow(bookingId,key,path,label,cfg){
 /* Merkt sich, welche Felder in dieser Sitzung schon abgeschickt wurden - ihr Inhalt
    darf ein spaeteres Neuladen nicht mehr blockieren. */
 var PLAN_GESENDET={};
+/* Felder, deren Anfrage gerade unterwegs ist: Verlaesst der Kunde ein Feld direkt per
+   Klick auf "Alles speichern", feuert erst change (Auto-Speichern) und dann der Klick -
+   ohne diese Sperre ginge dasselbe Feld zweimal raus, das zweite Mal als Aenderungsvorschlag. */
+var PLAN_LAEUFT={};
 function planToggle(key){var el=document.getElementById('ed_'+key);el.hidden=!el.hidden}
-function planSubmit(key){
-  var st=PLAN_STATE[key];if(!st)return;
+function planSubmit(key,auto){
+  var st=PLAN_STATE[key];if(!st||PLAN_LAEUFT[key])return;
   var raw=document.getElementById('in_'+key).value;
+  if(auto&&String(raw||'').trim()==='')return;   /* leeres Feld verlassen: nichts zu speichern */
   var val=raw;
   if(st.kind==='playlists')val=parsePlaylists(raw);
   else if(st.kind==='timetable')val=parseTimetable(raw);
+  PLAN_LAEUFT[key]=true;
   cfetch('portal/account/booking/'+st.bookingId+'/plan-suggest',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({field_path:st.path,field_label:st.label,value:val})})
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
+      PLAN_LAEUFT[key]=false;
       if(res.s>=400){alert(res.j.error||'Das hat nicht geklappt – bitte später erneut versuchen.');return}
       var ok=document.getElementById('ok_'+key);
       if(ok){
         /* Hat der Server Zeilen verworfen (z.B. Links ohne https), gehört das dem Kunden
-           gesagt - sonst denkt er, alles sei angekommen. */
+           gesagt - sonst denkt er, alles sei angekommen. Und wurde ein inzwischen gefuelltes
+           Feld erneut geaendert, ist es kein Speichern mehr, sondern ein Vorschlag. */
         if(res.j.hinweis){ok.textContent=res.j.hinweis;ok.style.color='var(--acc)'}
-        ok.style.display='';
+        else if(st.empty&&res.j.applied===false)ok.textContent='· als Änderungsvorschlag gesendet ✓';
+        ok.hidden=false;ok.style.display='';
       }
       /* Nach dem Speichern wurde bisher immer die ganze Seite neu geladen - hatte der
          Kunde parallel ein weiteres Feld getippt und noch nicht abgeschickt, war die
@@ -920,12 +949,29 @@ function planSubmit(key){
         var ed=document.getElementById('ed_'+k);
         return ed?!ed.hidden:true;   /* Vorschlagsfeld nur, wenn es aufgeklappt ist */
       });
-      if(offen){
+      /* Beim Auto-Speichern tippt der Kunde meist schon im naechsten Feld - dann darf die
+         Seite nicht unter ihm neu laden. Neu geladen wird erst, wenn er den Planer verlaesst. */
+      var tippt=!!(document.activeElement&&/^in_/.test(document.activeElement.id||''));
+      if(offen||tippt){
         var el=document.getElementById('ed_'+key);if(el)el.hidden=true;
         return;
       }
       setTimeout(function(){loadAccount()},res.j.hinweis?4000:1200);
-    }).catch(function(){alert('Verbindungsfehler – bitte später erneut versuchen.')});
+    }).catch(function(){PLAN_LAEUFT[key]=false;alert('Verbindungsfehler – bitte später erneut versuchen.')});
+}
+/* Rueckfall-Knopf am Ende des Planers: schickt alles ab, was eingetragen, aber noch
+   nicht gespeichert ist (z.B. wenn ein Feld nie verlassen wurde). */
+function planSaveAll(i){
+  var n=0;
+  Object.keys(PLAN_STATE).forEach(function(key){
+    if(key.indexOf('p'+i+'_')!==0)return;
+    var st=PLAN_STATE[key];if(!st.empty||PLAN_GESENDET[key]||PLAN_LAEUFT[key])return;
+    var inp=document.getElementById('in_'+key);
+    if(!inp||String(inp.value||'').trim()==='')return;
+    planSubmit(key,true);n++;
+  });
+  var ok=document.getElementById('allok_'+i);
+  if(ok){ok.textContent=n?'Wird gespeichert …':'Alles gespeichert ✓';ok.hidden=false}
 }
 /* Leere Rechnungsadress-Felder im Planer mit den Kundendaten vorbefuellen - die gleiche
    Angabe soll nicht doppelt eingetippt werden muessen. Ein bereits gesetztes Planer-Feld
@@ -969,7 +1015,11 @@ function planCard(b,i){
   return '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">Veranstaltungsplaner <span style="color:var(--mut);font-size:13px;font-weight:400">· '+esc(b.title||'Termin')+'</span></h2>'+
     '<p class="sub" style="font-size:13px;margin:6px 0 10px">Du musst hier nichts ausfüllen – ich kümmere mich sonst darum und melde mich, wenn ich Fragen habe. Es hilft aber, Missverständnisse zu vermeiden, wenn du schon einträgst, was du weißt.</p>'+
     (locked?'<p class="msg err" style="display:block;font-size:13px">Der Ablaufplan ist jetzt final – Änderungswünsche bitte direkt mit mir klären.</p>':'')+
-    rows+'</div>';
+    rows+
+    (locked?'':'<div style="margin-top:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" style="padding:8px 14px" onclick="planSaveAll('+i+')">Alles speichern</button>'+
+      '<span id="allok_'+i+'" style="color:#9fd49f;font-size:13px" hidden></span>'+
+      '<span class="sub" style="font-size:12.5px">Neue Angaben speichere ich automatisch, sobald du ein Feld verlässt.</span></div>')+
+    '</div>';
 }
 function renderAccount(){
   var me=ME;
@@ -980,7 +1030,9 @@ function renderAccount(){
     return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap">'+
     '<div><b>'+(TYPE_LABEL[d.doc_type]||d.doc_type)+' '+esc(d.number)+'</b> <span style="color:var(--mut);font-size:13px">· '+dt(d.doc_date)+termin+' · '+d.status+'</span></div>'+
     '<a href="?a='+d.token+'">Ansehen / PDF →</a></div>';
-  }).join('')||'<p class="sub">Noch keine Unterlagen.</p>';
+  }).join('')||(me.bookings.length||(me.rentals||[]).length
+    ?'<p class="sub">Noch keine Unterlagen.</p>'
+    :'<p class="sub">Hier ist noch nichts – das ist ganz normal. Sobald ich dir ein Angebot schicke, erscheint es hier, und du kannst es direkt online ansehen, Fragen dazu stellen und annehmen. Rechnungen und Verträge landen später am selben Ort.</p>');
   var rentals=(me.rentals||[]).map(function(r){
     return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>Mietvertrag</b> <span style="color:var(--mut);font-size:13px">· Termin '+dt(r.event_date)+' · '+(r.status==='unterschrieben'?'unterschrieben ✓':'offen')+'</span> &nbsp;<a href="?mv='+r.token+'">Öffnen →</a></div>';
   }).join('');
@@ -1010,6 +1062,7 @@ function renderAccount(){
   app('<div class="card"><div class="kicker">Dein Kundenkonto</div><h1>Hallo, '+esc(me.customer.name)+'!</h1>'+
     '<p class="sub">Hier findet ihr alle Unterlagen und könnt alles für eure Termine pflegen. <a onclick="logout()" style="cursor:pointer">Abmelden</a></p></div>'+
     '<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Meine Unterlagen</h2>'+docs+rentals+'</div>'+
+    profileCard()+
     (forms?'<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Fragebögen</h2>'+forms+'</div>':'')+
     books+
     '<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Fotos &amp; Dokumente</h2>'+
@@ -1017,6 +1070,38 @@ function renderAccount(){
     '<div id="fileList">'+files+'</div>'+
     '<div style="margin-top:12px"><input type="file" id="fUp" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" onchange="uploadFiles(this)">'+
     '<div class="msg" id="fUpMsg" style="display:none;margin-top:8px"></div></div></div>');
+}
+/* Telefon und Anschrift sind das Einzige, was der Kunde an seinen Stammdaten selbst
+   pflegt (Name und E-Mail bleiben bei Markus). Ist die Anschrift komplett, bleibt die
+   Karte zugeklappt - sonst steht sie offen, weil sie fuer Rechnung und PLZ-Login fehlt. */
+function profileCard(){
+  var c=ME.customer||{};
+  var filled=!!(c.street&&c.zip&&c.city);
+  var summary=[c.phone,c.street,[c.zip,c.city].filter(Boolean).join(' ')].filter(Boolean).map(esc).join(' · ');
+  return '<div class="card" id="profCard"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Mein Profil</h2>'+
+    '<p class="sub" style="font-size:13px">Telefon und Anschrift brauche ich für Rechnungen und Mietverträge – und mit deiner Postleitzahl öffnest du meine Angebots-Links.</p>'+
+    (filled?'<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0"><span>'+summary+'</span><a onclick="profToggle()" style="cursor:pointer;font-size:13px">bearbeiten</a></div>':'')+
+    '<div id="profEdit"'+(filled?' hidden':'')+' style="margin-top:8px">'+
+    '<label for="pfPhone">Telefon</label><input id="pfPhone" value="'+esc(c.phone||'')+'" autocomplete="tel">'+
+    '<label for="pfStreet">Straße und Hausnummer</label><input id="pfStreet" value="'+esc(c.street||'')+'" autocomplete="street-address">'+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1 1 110px"><label for="pfZip">PLZ</label><input id="pfZip" value="'+esc(c.zip||'')+'" inputmode="numeric" autocomplete="postal-code"></div>'+
+    '<div style="flex:2 1 180px"><label for="pfCity">Ort</label><input id="pfCity" value="'+esc(c.city||'')+'" autocomplete="address-level2"></div></div>'+
+    '<div class="msg err" id="pfMsg" style="display:none"></div>'+
+    '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="saveProfile()">Profil speichern</button><span id="pfOk" style="color:#9fd49f;font-size:13px" hidden>Gespeichert ✓</span></div></div></div>';
+}
+function profToggle(){var e=document.getElementById('profEdit');e.hidden=!e.hidden;if(!e.hidden)document.getElementById('pfPhone').focus()}
+function saveProfile(){
+  var body={phone:val('pfPhone'),street:val('pfStreet'),zip:val('pfZip'),city:val('pfCity')},m=document.getElementById('pfMsg');
+  cfetch('portal/account/profile',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s>=400)throw new Error(res.j.error||'Speichern fehlgeschlagen.');
+      Object.assign(ME.customer,res.j.customer||body);
+      var ok=document.getElementById('pfOk');ok.hidden=false;
+      /* Nur die Profilkarte neu zeichnen - ein Neuaufbau der ganzen Seite wuerde
+         angefangene Eingaben im Planer darunter wegwerfen. */
+      setTimeout(function(){var card=document.getElementById('profCard');if(card)card.outerHTML=profileCard()},1200);
+    }).catch(function(e){m.style.display='block';m.textContent=e.message});
 }
 function saveNotes(i){
   var b=ME.bookings[i];

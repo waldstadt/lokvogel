@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 84;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 85;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -176,6 +176,9 @@ const JSON_COLS = [
   'form_templates' => ['fields'], 'forms' => ['fields','answers'],
   'products' => ['bundle'], 'quote_templates' => ['items'], 'documents' => ['event_info'], 'bookings' => ['rider', 'customer_notes', 'event_plan', 'event_plan_internal'], 'rental_contracts' => ['snapshot'],
   'customers' => ['tags', 'tech_check'],
+  /* Ohne diesen Eintrag landete ein PATCH mit data:{...} als String "Array" in der
+     Datenbank - das komplette Technik-Check-Protokoll war nach dem Neuladen weg. */
+  'tech_checks' => ['data'],
   'equipment' => ['addon_ids', 'images', 'fits_ids'],
   'campaign_pages' => ['cards', 'features', 'form_cfg'],
   'blocks' => ['media'],
@@ -243,8 +246,9 @@ function upgrade(PDO $p): void {
   /* Neue Vorlagen fuer bestehende Datenbanken nachziehen (seedExtraTemplates legt nur
      an, was namentlich noch fehlt): v81 "Angebot angenommen – Bestaetigung", v82 die
      beiden Sonderfaelle bei der Annahme (Termin inzwischen belegt / Angebot abgelaufen),
-     v83 "Nachfassen zum Angebot" fuer Kunden, die sich nach dem Angebot nicht melden. */
-  if ($v < 84) seedExtraTemplates($p);
+     v83 "Nachfassen zum Angebot" fuer Kunden, die sich nach dem Angebot nicht melden,
+     v85 die Eingangsbestaetigungen fuer Absage, Frage und Rueckrufwunsch im Portal. */
+  if ($v < 85) seedExtraTemplates($p);
   if ($v < 84) {
     /* v84: Angebots-Versionen (der Kunde sah bisher stillschweigend den geaenderten
        Stand unter demselben Link), Kennzeichen fuer die DJ-Vermittlung am Kunden. */
@@ -1139,11 +1143,11 @@ function bandeOptIn(PDO $p, string $custId, ?string $bookingId = null): ?string 
     $f = bandeFormFor($p, $custId);
     if (!$f) return null;
     if (!$f['created']) return $f['link'];
-    $cst = $p->prepare('select email, first_name, company from customers where id = ?');
+    $cst = $p->prepare('select email, first_name, company, kind from customers where id = ?');
     $cst->execute([$custId]);
     $c = $cst->fetch() ?: [];
     $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
-    $vorname = trim((string)($c['first_name'] ?? '')) ?: (trim((string)($c['company'] ?? '')) ?: 'zusammen');
+    $vorname = anredeVorname($c);
     $map = ['{vorname}' => $vorname, '{fragebogen}' => $f['link'], '{link}' => $f['link'], '{telefon}' => (string)($comp['phone'] ?? '')];
     $subject = 'Damit ich euch die passenden DJs raussuchen kann';
     $body = "Hallo {vorname},\n\ndanke für euer Vertrauen – ich suche euch gern ein paar richtig gute Kollegen aus meinem Partner-Netzwerk raus. Eure Einwilligung zur Weitergabe der Eckdaten habe ich schon notiert.\n\nDamit die Vorschläge wirklich zu euch passen, füllt bitte kurz diesen Bogen aus (keine 5 Minuten):\n{fragebogen}\n\nSobald ich die Antworten habe, melde ich mich mit konkreten Vorschlägen. Fragen vorab? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus";
@@ -1196,6 +1200,14 @@ function seedExtraTemplates(PDO $p): void {
        Eckdaten, um passende Kollegen auszusuchen. Der Bogen wird automatisch angelegt. */
     [101, 'DJ-Vermittlung – Vorauswahl-Bogen', 'Damit ich euch die passenden DJs raussuchen kann',
       "Hallo {vorname},\n\ndanke für euer Vertrauen – ich suche euch gern ein paar richtig gute Kollegen aus meinem Partner-Netzwerk raus. Eure Einwilligung zur Weitergabe der Eckdaten habe ich schon notiert.\n\nDamit die Vorschläge wirklich zu euch passen, füllt bitte kurz diesen Bogen aus (keine 5 Minuten):\n{fragebogen}\n\nSobald ich die Antworten habe, melde ich mich mit konkreten Vorschlägen. Fragen vorab? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
+    /* Rueckmeldungen aus dem Portal: Wer absagt, fragt oder um Rueckruf bittet, sah bisher
+       nur eine Zeile auf der Seite - kein Beleg im Postfach, dass etwas angekommen ist. */
+    [102, 'Absage erhalten', 'Danke für eure Rückmeldung zu Angebot {nummer}',
+      "Hallo {vorname},\n\ndanke, dass ihr mir ehrlich Bescheid gegeben habt – das ist mir lieber als Funkstille. Ich habe das Angebot {nummer} als abgesagt vermerkt, {termin} ist bei mir damit wieder frei.\n\nFalls sich bei euch doch noch etwas ändert oder ihr eine andere Idee habt: Die Tür bleibt offen. Ruft einfach an ({telefon}) oder antwortet auf diese Mail.\n\nAlles Gute für eure Feier!\n{inhaber}"],
+    [103, 'Frage erhalten', 'Eure Frage zu Angebot {nummer} ist angekommen',
+      "Hallo {vorname},\n\neure Nachricht zum Angebot {nummer} ist bei mir gelandet – ich antworte meist innerhalb von 24 Stunden.\n\nDas habt ihr geschrieben:\n{nachricht}\n\nWenn es eilig ist: einfach anrufen ({telefon}).\n\nViele Grüße\n{inhaber}"],
+    [104, 'Rückruf notiert', 'Rückruf notiert – ich melde mich',
+      "Hallo {vorname},\n\nalles klar, ich rufe euch an: {rueckruf}\n\nFällt euch vorher noch etwas ein, antwortet einfach auf diese Mail. Das Angebot {nummer} findet ihr weiterhin hier:\n{link}\n\nBis gleich am Telefon!\n{inhaber}"],
     [92, 'Workshop-Bestätigung (Zahlung eingegangen)', 'Dein Platz ist fix!',
       "Hallo {vorname},\n\ndeine Zahlung ist da – damit ist dein Workshop-Platz verbindlich reserviert!\n\nWann: {datum}\nWo: Lager Hemer, Büttmecker Weg 35c\n\nBring gern dein eigenes Equipment-Problem mit – wir schauen uns echte Fälle an. Getränke gehen auf mich.\n\nBis bald!\nMarkus"],
     /* Absage-Bausteine: Jede Absage soll persönlich klingen und möglichst in eine
@@ -1441,6 +1453,27 @@ function splitPersonName(string $name): array {
   return [$words[0], implode(' ', array_slice($words, 1))];
 }
 
+/* Anrede fuer Kundenmails an einer Stelle: Firmen, Vereine und Kunden ohne Vornamen
+   bekommen "Hallo zusammen" - "Hallo Schützenverein," las sich wie ein Serienbrief.
+   anredeVorname() liefert nur das Wort nach "Hallo" (fuer den Platzhalter {vorname}
+   in den Vorlagen), anredeFor() die ganze Anredezeile. Faellt ein Datensatz ohne
+   first_name an (Anfrage, Workshop-Anmeldung), zaehlt das erste Wort aus 'name'. */
+function anredeVorname(array $c): string {
+  if (($c['kind'] ?? '') === 'firma') return 'zusammen';
+  $vn = trim((string)($c['first_name'] ?? ''));
+  if ($vn === '' && trim((string)($c['name'] ?? '')) !== '')
+    $vn = preg_split('/\s+/', trim((string)$c['name']), 2)[0] ?? '';
+  return $vn !== '' ? $vn : 'zusammen';
+}
+function anredeFor(array $c): string { return 'Hallo ' . anredeVorname($c); }
+/* Datum als TT.MM.JJJJ fuer Kundenmails - ein rohes 2026-10-15 wirkt wie ein Datenbankauszug. */
+function deDate(?string $d): string {
+  $d = trim((string)$d);
+  if ($d === '') return '';
+  $t = strtotime(substr($d, 0, 10));
+  return $t ? date('d.m.Y', $t) : $d;
+}
+
 function autoInquiryPlanner(PDO $p, array $row): void {
   if (empty($row['email'])) return;
   $email = mb_substr(strtolower(trim((string)$row['email'])), 0, 160);
@@ -1654,9 +1687,11 @@ function autoTechCheckInvite(PDO $p, string $custId, array $row): ?string {
       values (?,?,?,?,?,?,?,?,?)')
     ->execute([uuid(), $token, $t['name'], $t['intro'], $t['fields'], 'offen', $row['id'], $custId, now()]);
   $link = baseUrl() . '/portal.html?f=' . $token;
-  $vn = trim((string)$row['name']) !== '' ? (preg_split('/\s+/', trim((string)$row['name']), 2)[0] ?? $row['name']) : 'zusammen';
+  $cst = $p->prepare('select first_name, kind from customers where id = ?');
+  $cst->execute([$custId]);
+  $anrede = anredeFor(($cst->fetch() ?: []) + ['name' => (string)$row['name']]);
   $mailed = sendMailSafe($row['email'], 'Kurzer Vorab-Fragebogen zu eurem Technik-Check',
-    "Hallo $vn,\n\n" .
+    "$anrede,\n\n" .
     "schön, dass ihr euren Technik-Check angefragt habt! Damit ich beim Termin direkt gezielt loslegen kann, " .
     "beantwortet mir vorab kurz ein paar Fragen zu eurer Anlage - dauert keine 5 Minuten:\n\n$link\n\n" .
     "Ich melde mich in Kürze bei euch, um einen Termin abzustimmen.\n\nBis bald!\nMarkus");
@@ -2880,11 +2915,15 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       /* Warme Eingangsbestätigung an den Interessenten – jeder soll sich sofort gut aufgehoben fühlen */
       if (!empty($row['email'])) {
         $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
-        $vn = preg_split('/\s+/', trim($row['name']), 2)[0] ?? $row['name'];
+        /* Anrede ueber den (eben angelegten oder gefundenen) Kunden - Vereine und
+           Firmen bekommen so "Hallo zusammen" statt "Hallo Schützenverein". */
+        $cst = $p->prepare('select c.first_name, c.kind from customers c join inquiries i on i.customer_id = c.id where i.id = ?');
+        $cst->execute([$row['id']]);
+        $anrede = anredeFor(($cst->fetch() ?: []) + ['name' => (string)$row['name']]);
         $waDigits = preg_replace('/\D/', '', (string)($comp['phone'] ?? ''));
         if ($waDigits !== '' && $waDigits[0] === '0') $waDigits = '49' . substr($waDigits, 1);
         sendMailSafe((string)$row['email'], 'Deine Anfrage ist angekommen',
-          "Hallo $vn,\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet!\n\n" .
+          "$anrede,\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet!\n\n" .
           "Ich melde mich persönlich bei dir, in der Regel innerhalb von 24 Stunden. " .
           "Das hier ist die einzige automatische Mail, die du von mir bekommst – ab jetzt schreibst du direkt mit mir.\n\n" .
           (($comp['phone'] ?? '') !== '' ?
@@ -3094,7 +3133,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
 function portalDoc(string $token, string $plz): array {
   $p = db();
   if (!preg_match('/^[a-f0-9]{24,64}$/', $token)) fail('Ungültiger Link.', 404);
-  $st = $p->prepare('select d.*, c.first_name, c.last_name, c.company, c.street, c.zip, c.city, c.portal_hash
+  $st = $p->prepare('select d.*, c.first_name, c.last_name, c.company, c.kind, c.email, c.street, c.zip, c.city, c.portal_hash
     from documents d join customers c on c.id = d.customer_id where d.share_token = ?');
   $st->execute([$token]);
   $d = $st->fetch();
@@ -3339,7 +3378,9 @@ function workshopInvoice(PDO $p, string $signupId): array {
 
   /* Kunde finden oder anlegen */
   [$cid, $custZip] = workshopCustomer($p, $s);
-  $parts = preg_split('/\s+/', trim($s['name']), 2);
+  $cst = $p->prepare('select first_name, kind from customers where id = ?');
+  $cst->execute([$cid]);
+  $anrede = anredeFor(($cst->fetch() ?: []) + ['name' => (string)$s['name']]);
 
   /* Nummernkreis fortschreiben + Rechnung anlegen (atomar) */
   $p->beginTransaction();
@@ -3389,7 +3430,7 @@ function workshopInvoice(PDO $p, string $signupId): array {
 
   /* Mail mit Portal-Link */
   $portal = baseUrl() . '/portal.html?a=' . $token;
-  $bodyTxt = "Hallo " . ($parts[0] ?? $s['name']) . ",\n\n" .
+  $bodyTxt = "$anrede,\n\n" .
     "danke für deine Anmeldung zum Workshop „" . $s['w_title'] . "“ am " . $wDateDe . "!\n\n" .
     "Hier ist deine Rechnung $number (" . number_format($gross, 2, ',', '.') . " €):\n$portal\n" .
     "Login: deine Postleitzahl ($custZip). Dort kannst du die Rechnung ansehen und als PDF speichern.\n\n" .
@@ -3420,8 +3461,7 @@ function rentalRequestMail(PDO $p, array $me, string $bookingId, string $from, s
   $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
   $zeitraum = date('d.m.Y', strtotime($from)) . ($to !== $from ? ' bis ' . date('d.m.Y', strtotime($to)) : '');
   $pos = implode("\n", array_map(fn($l) => '– ' . $l['name'] . ' × ' . $l['qty'], $lines));
-  $vorname = trim((string)($me['first_name'] ?? '')) ?: (trim((string)($me['company'] ?? '')) ?: 'zusammen');
-  $map = ['{vorname}' => $vorname, '{name}' => trim((string)($me['company'] ?? '')) ?: trim(($me['first_name'] ?? '') . ' ' . ($me['last_name'] ?? '')),
+  $map = ['{vorname}' => anredeVorname($me), '{name}' => trim((string)($me['company'] ?? '')) ?: trim(($me['first_name'] ?? '') . ' ' . ($me['last_name'] ?? '')),
     '{zeitraum}' => $zeitraum, '{positionen}' => $pos, '{link}' => baseUrl() . '/portal.html', '{telefon}' => (string)($comp['phone'] ?? '')];
   $subject = 'Deine Miet-Anfrage ist da – {zeitraum}';
   $body = "Hallo {vorname},\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet. Das hast du angefragt:\n\nZeitraum: {zeitraum}\n{positionen}\n\nIch schaue mir das an und melde mich innerhalb von 24 Stunden mit Verfügbarkeit und Preis. Die Anfrage findest du jederzeit in deinem Kundenkonto:\n{link}\n\nWenn es eilig ist: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nBis gleich!\nMarkus";
@@ -3548,7 +3588,7 @@ function notifyOwner(string $subject, string $body): bool {
    DJ-Vermittlung anbieten) oder 'abgelaufen' (Annahme nach Ablauf, wird geprueft). */
 function acceptConfirmationMail(PDO $p, array $d, string $fall = 'ok'): bool {
   try {
-    $cst = $p->prepare('select email, first_name, last_name, company from customers where id = ?');
+    $cst = $p->prepare('select email, first_name, last_name, company, kind from customers where id = ?');
     $cst->execute([$d['customer_id']]);
     $c = $cst->fetch() ?: [];
     $to = trim((string)($c['email'] ?? ''));
@@ -3563,9 +3603,8 @@ function acceptConfirmationMail(PDO $p, array $d, string $fall = 'ok'): bool {
         if (!empty($b['venue_name'])) $termin .= ($termin === 'euer Termin' ? ' in ' : ' – ') . $b['venue_name'];
       }
     }
-    $vorname = trim((string)($c['first_name'] ?? '')) ?: (trim((string)($c['company'] ?? '')) ?: 'zusammen');
     $name = trim((string)($c['company'] ?? '')) ?: trim(($c['first_name'] ?? '') . ' ' . ($c['last_name'] ?? ''));
-    $map = ['{vorname}' => $vorname, '{name}' => $name, '{nummer}' => (string)$d['number'], '{nr}' => (string)$d['number'],
+    $map = ['{vorname}' => anredeVorname($c), '{name}' => $name, '{nummer}' => (string)$d['number'], '{nr}' => (string)$d['number'],
       '{termin}' => $termin, '{datum}' => $datum, '{link}' => $link, '{telefon}' => (string)($comp['phone'] ?? ''),
       '{gueltig}' => !empty($d['valid_until']) ? date('d.m.Y', strtotime((string)$d['valid_until'])) : '–',
       '{betrag}' => number_format((float)$d['total_gross'], 2, ',', '.') . ' €'];
@@ -3590,6 +3629,55 @@ function acceptConfirmationMail(PDO $p, array $d, string $fall = 'ok'): bool {
         $mailed ? $subject : 'Bestätigungsmail konnte nicht versendet werden – ' . $d['number'],
         $mailed ? $body : "Der Kunde hat das Angebot " . $d['number'] . " im Portal angenommen, die automatische Bestätigung an " .
           ($to !== '' ? $to : '(keine E-Mail-Adresse hinterlegt)') . " ist aber nicht rausgegangen. Bitte selbst bestätigen.\n\nVorgesehener Text:\n" . $body,
+        now(), $mailed ? null : gmdate('Y-m-d'), now()]);
+    return $mailed;
+  } catch (Throwable $e) { return false; }
+}
+
+/* Eingangsbestaetigung fuer Absage, Frage und Rueckrufwunsch aus dem Portal (Vorlagen
+   "Absage erhalten", "Frage erhalten", "Rückruf notiert"; eingebauter Text als Rueckfall).
+   Scheitert der Versand, Wiedervorlage auf heute - dann meldet sich Markus selbst. */
+function portalReactionMail(PDO $p, array $d, string $kind, string $msg, string $phone): bool {
+  try {
+    $to = trim((string)($d['email'] ?? ''));
+    if ($to === '') {
+      $cst = $p->prepare('select email from customers where id = ?');
+      $cst->execute([$d['customer_id']]);
+      $to = trim((string)$cst->fetchColumn());
+    }
+    $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+    $termin = 'euer Wunschtermin';
+    if (!empty($d['booking_id'])) {
+      $bst = $p->prepare('select event_date from bookings where id = ?');
+      $bst->execute([$d['booking_id']]);
+      if (($b = $bst->fetch()) && !empty($b['event_date'])) $termin = 'der ' . deDate($b['event_date']);
+    }
+    $map = ['{vorname}' => anredeVorname($d), '{nummer}' => (string)$d['number'], '{nr}' => (string)$d['number'],
+      '{termin}' => $termin, '{nachricht}' => $msg !== '' ? $msg : '(keine Nachricht)',
+      '{rueckruf}' => trim($phone . ($msg !== '' ? ' – ' . $msg : '')),
+      '{link}' => baseUrl() . '/portal.html?a=' . $d['share_token'],
+      '{telefon}' => (string)($comp['phone'] ?? ''), '{inhaber}' => (string)($comp['owner'] ?: 'Markus')];
+    $texte = [
+      'decline' => ['Absage erhalten', 'Danke für eure Rückmeldung zu Angebot {nummer}',
+        "Hallo {vorname},\n\ndanke, dass ihr mir ehrlich Bescheid gegeben habt. Ich habe das Angebot {nummer} als abgesagt vermerkt, {termin} ist bei mir damit wieder frei.\n\nFalls sich doch noch etwas ändert: Die Tür bleibt offen – ruft einfach an ({telefon}) oder antwortet auf diese Mail.\n\nAlles Gute für eure Feier!\n{inhaber}"],
+      'comment' => ['Frage erhalten', 'Eure Frage zu Angebot {nummer} ist angekommen',
+        "Hallo {vorname},\n\neure Nachricht zum Angebot {nummer} ist bei mir gelandet – ich antworte meist innerhalb von 24 Stunden.\n\nDas habt ihr geschrieben:\n{nachricht}\n\nWenn es eilig ist: einfach anrufen ({telefon}).\n\nViele Grüße\n{inhaber}"],
+      'callback' => ['Rückruf notiert', 'Rückruf notiert – ich melde mich',
+        "Hallo {vorname},\n\nalles klar, ich rufe euch an: {rueckruf}\n\nDas Angebot {nummer} findet ihr weiterhin hier:\n{link}\n\nBis gleich am Telefon!\n{inhaber}"],
+    ];
+    [$tplName, $subject, $body] = $texte[$kind];
+    $tst = $p->prepare('select subject, body from email_templates where name = ? limit 1');
+    $tst->execute([$tplName]);
+    if ($tpl = $tst->fetch()) { $subject = (string)$tpl['subject']; $body = (string)$tpl['body']; }
+    $subject = strtr($subject, $map);
+    $body = strtr($body, $map);
+    $mailed = $to !== '' && sendMailSafe($to, $subject, $body);
+    $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
+        values (?,?,?,?,?,?,?,?,?,?)')
+      ->execute([uuid(), $d['customer_id'], $d['booking_id'] ?: null, $mailed ? 'email' : 'note', 'out',
+        $mailed ? $subject : 'Eingangsbestätigung konnte nicht versendet werden – ' . $d['number'],
+        $mailed ? $body : "Der Kunde hat sich im Portal zum Angebot " . $d['number'] . " gemeldet, die automatische Bestätigung an " .
+          ($to !== '' ? $to : '(keine E-Mail-Adresse hinterlegt)') . " ist aber nicht rausgegangen. Bitte selbst kurz antworten.\n\nVorgesehener Text:\n" . $body,
         now(), $mailed ? null : gmdate('Y-m-d'), now()]);
     return $mailed;
   } catch (Throwable $e) { return false; }
@@ -3905,7 +3993,7 @@ function handlePortal(string $path, string $method, $body): never {
     $st = $p->prepare('select * from customers where portal_invite = ? and portal_invite_expires > ?');
     $st->execute([$inv, time()]);
     $c = $st->fetch();
-    if (!$c) fail('Dieser Einladungslink ist abgelaufen – bitte einen neuen anfordern.', 404);
+    if (!$c) fail('Der Link wurde schon benutzt oder ist abgelaufen. Wenn du dein Passwort schon gesetzt hast, melde dich einfach an – sonst fordere über „Passwort vergessen" einen neuen Link an.', 410);
     $p->prepare('update customers set portal_hash = ?, portal_invite = null, portal_invite_expires = null where id = ?')
       ->execute([password_hash($pass, PASSWORD_DEFAULT), $c['id']]);
     out(['token' => custToken($p, $c['id']), 'email' => $c['email'],
@@ -3923,9 +4011,10 @@ function handlePortal(string $path, string $method, $body): never {
       $inv = bin2hex(random_bytes(24));
       $p->prepare('update customers set portal_invite = ?, portal_invite_expires = ? where id = ?')
         ->execute([$inv, time() + 2 * 86400, $c['id']]);
+      $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
       sendMailSafe((string)$c['email'], 'Neues Passwort für dein Kundenkonto',
-        "Hallo,\n\nüber diesen Link kannst du ein neues Passwort für dein Kundenkonto setzen (48 Stunden gültig):\n" .
-        baseUrl() . "/portal.html?einladung=$inv\n\nFalls du das nicht warst, kannst du diese Mail ignorieren.\n");
+        anredeFor($c) . ",\n\nüber diesen Link kannst du ein neues Passwort für dein Kundenkonto setzen (48 Stunden gültig):\n" .
+        baseUrl() . "/portal.html?einladung=$inv\n\nFalls du das nicht warst, kannst du diese Mail einfach ignorieren – ohne den Link ändert sich nichts.\n\nViele Grüße\n" . ($comp['owner'] ?? 'Markus'));
     }
     out(['ok' => true]);   // keine Auskunft, ob die Adresse existiert
   }
@@ -3976,8 +4065,26 @@ function handlePortal(string $path, string $method, $body): never {
         /* Fuer die Vorbefuellung der Rechnungsadresse im Veranstaltungsplaner - Kundendaten
            und Planer-Rechnungsadresse sind sonst zwei getrennte, sich nie sehende Datentoepfe. */
         'company' => $me['company'], 'first_name' => $me['first_name'], 'last_name' => $me['last_name'],
-        'street' => $me['street'], 'zip' => $me['zip'], 'city' => $me['city']],
+        'phone' => $me['phone'], 'street' => $me['street'], 'zip' => $me['zip'], 'city' => $me['city']],
         'bookings' => $bookings, 'documents' => $docs, 'rentals' => $rc->fetchAll(), 'files' => $ff->fetchAll(), 'forms' => $fm->fetchAll()]);
+    }
+    /* Eigene Stammdaten pflegen: Telefon und Anschrift braucht Markus fuer Rechnung und
+       Mietvertrag, und die PLZ ist zugleich der Login fuer Angebotslinks. Bisher konnte
+       der Kunde die Angaben nur bei der Registrierung machen - oder gar nicht mehr. Es
+       sind bewusst genau diese vier Felder, Name und E-Mail bleiben Sache von Markus. */
+    if ($path === 'portal/account/profile' && $method === 'PATCH') {
+      $felder = ['phone' => 60, 'street' => 120, 'zip' => 10, 'city' => 80];
+      $set = []; $args = [];
+      foreach ($felder as $k => $max) {
+        if (!array_key_exists($k, $body)) continue;
+        $set[] = "$k = ?"; $args[] = mb_substr(trim((string)$body[$k]), 0, $max);
+      }
+      if (!$set) fail('Nichts zu ändern.');
+      $args[] = now(); $args[] = $me['id'];
+      $p->prepare('update customers set ' . implode(', ', $set) . ', updated_at = ? where id = ?')->execute($args);
+      $st = $p->prepare('select phone, street, zip, city from customers where id = ?');
+      $st->execute([$me['id']]);
+      out(['ok' => true, 'customer' => $st->fetch()]);
     }
     if (preg_match('#^portal/account/booking/([a-f0-9-]{30,40})/notes$#', $path, $m) && $method === 'POST') {
       $chk = $p->prepare('select id, title, event_type, event_date from bookings where id = ? and customer_id = ?');
@@ -4265,6 +4372,15 @@ function handlePortal(string $path, string $method, $body): never {
       $p->prepare("update documents set status='abgelehnt', updated_at=? where id=?")->execute([now(), $d['id']]);
       syncBookingFromDoc($p, $d, 'abgelehnt');
     }
+    /* Absage, Frage und Rueckrufwunsch bekommen eine kurze Eingangsbestaetigung. Ausnahme:
+       Haengt an der Absage das Opt-in zur DJ-Vermittlung (Haken im Absage-Formular, kommt
+       als eigene Aktion gleich hinterher, oder ist schon da), reicht die Bogen-Mail -
+       zwei Mails in derselben Minute wirken wie ein Automat. */
+    if (in_array($kind, ['decline','comment','callback'], true)) {
+      $bandeDabei = $kind === 'decline' && (!empty($body['bande'])
+        || (bool)$p->query("select 1 from doc_events where document_id = " . $p->quote($d['id']) . " and kind = 'bande' limit 1")->fetchColumn());
+      if (!$bandeDabei) $bestMail = portalReactionMail($p, $d, $kind, $msg, $phone);
+    }
     /* Opt-in zur DJ-Vermittlung: Kunde kennzeichnen, Vorauswahl-Bogen anlegen und mailen,
        Link gleich mit zurueckgeben, damit die Dankesseite ihn sofort zeigt. */
     if ($kind === 'bande') {
@@ -4456,9 +4572,13 @@ function handlePortal(string $path, string $method, $body): never {
       $r = workshopInvoice($p, $sid);
       if (!empty($r['ok'])) $inv = ['number' => $r['number'], 'mailed' => !empty($r['mailed'])];
     }
-    if ($status === 'warteliste')
+    if ($status === 'warteliste') {
+      /* Anrede ueber den Kundendatensatz, falls es ihn schon gibt (Firma -> "zusammen") */
+      $cst = $p->prepare('select first_name, kind from customers where email = ? order by (portal_hash is not null) desc limit 1');
+      $cst->execute([$email]);
       sendMailSafe($email, 'Du stehst auf der Warteliste – ich melde mich!',
-        "Hallo " . (preg_split('/\s+/', $name, 2)[0] ?? $name) . ",\n\ndanke für dein Interesse am Workshop „" . $w['title'] . "“ am " . $w['event_date'] . "!\n\nDer Termin ist aktuell voll – du stehst jetzt auf der Warteliste. Sobald ein Platz frei wird, melde ich mich sofort persönlich bei dir. Bezahlt wird erst, wenn du wirklich einen Platz hast.\n\nBis hoffentlich bald!\nMarkus");
+        anredeFor(($cst->fetch() ?: []) + ['name' => $name]) . ",\n\ndanke für dein Interesse am Workshop „" . $w['title'] . "“ am " . deDate($w['event_date']) . "!\n\nDer Termin ist aktuell voll – du stehst jetzt auf der Warteliste. Sobald ein Platz frei wird, melde ich mich sofort persönlich bei dir. Bezahlt wird erst, wenn du wirklich einen Platz hast.\n\nBis hoffentlich bald!\nMarkus");
+    }
     notifyOwner(($status === 'warteliste' ? 'Warteliste' : 'Workshop-Buchung') . ': ' . $w['title'],
       "Name: $name ($seats Platz/Plätze)\nE-Mail: $email\nTermin: " . $w['event_date'] .
       ($inv ? "\nRechnung: " . $inv['number'] . ($inv['mailed'] ? ' (automatisch gemailt)' : ' (Mail NICHT zugestellt – im Dokument per E-Mail nachsenden)') : ''));
