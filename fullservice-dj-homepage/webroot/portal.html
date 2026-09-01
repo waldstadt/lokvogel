@@ -375,12 +375,16 @@ function accClear(){
   var c=document.getElementById('accSig'),ctx=c.getContext('2d');
   ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);accDirty=false;
 }
+/* Jede Aktion schickt dieselben Kopfzeilen wie loadOffer(): Wer per Kundenkonto
+   eingeloggt ist, weist sich über den Token aus – sonst verlangt der Server die PLZ,
+   die der eingeloggte Kunde aber nie eingegeben hat. */
+function offerHeaders(){var h={'Content-Type':'application/json'};if(CTOK)h.Authorization='Bearer '+CTOK;return h}
 function doAccept(){
   var name=document.getElementById('accName').value.trim();
   if(!name){showMsg('aMsg','err','Bitte Vor- und Nachnamen eintragen.');return}
   if(!accDirty){showMsg('aMsg','err','Bitte im Unterschriftsfeld unterschreiben.');return}
   fetch(API+'/portal/offer/'+OFFER+'/action',{
-    method:'POST',headers:{'Content-Type':'application/json'},
+    method:'POST',headers:offerHeaders(),
     body:JSON.stringify({plz:PLZ,action:'accept',message:'',phone:'',name:name,
       signature:document.getElementById('accSig').toDataURL('image/png')})
   /* Die Erklärung des Servers durchreichen: Sonst sieht der Kunde bei jeder Absage nur
@@ -411,7 +415,7 @@ function act(kind,msg,phone,after){
 }
 function sendAction(kind,msg,phone,cb){
   fetch(API+'/portal/offer/'+OFFER+'/action',{
-    method:'POST',headers:{'Content-Type':'application/json'},
+    method:'POST',headers:offerHeaders(),
     body:JSON.stringify({plz:PLZ,action:kind,message:msg||'',phone:phone||''})
   }).then(function(r){
     if(r.ok){if(cb)cb();return}

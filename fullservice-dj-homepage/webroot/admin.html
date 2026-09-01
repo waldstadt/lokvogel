@@ -6744,13 +6744,17 @@ function composeReviewMail(bookingId){
   var c=CACHE.customers.find(function(x){return x.id===b.customer_id})||{};
   var t=(CACHE.tpls||[]).find(function(x){return x.name.indexOf('Bewertung')>=0});
   if(!t){toast('Vorlage „Nach der Feier“ nicht gefunden.',1);return}
-  api('bookings?id=eq.'+bookingId,{method:'PATCH',body:{review_requested:true,status:'abgeschlossen'}}).then(function(){
-    b.review_requested=true;b.status='abgeschlossen';renderDash();renderBook();
-  });
+  /* Erst wenn die Mail wirklich raus ist, gilt der Gig als abgeschlossen und die
+     Bewertung als angefragt - wer das Fenster nur zumacht, hat noch nichts verschickt. */
+  var markDone=function(){
+    api('bookings?id=eq.'+bookingId,{method:'PATCH',body:{review_requested:true,status:'abgeschlossen'}}).then(function(){
+      b.review_requested=true;b.status='abgeschlossen';renderDash();renderBook();
+    });
+  };
   /* event_date bewusst nicht mitgeben: Die Feier ist vorbei, ein Terminkonflikt-Hinweis
      wäre hier sinnlos. Das Datum steckt über {datum} bereits im Vorlagentext. */
   openCompose({name:custName(c),email:c.email,event_type:b.event_type,location:b.venue_name,
-    _datum:b.event_date},t,null);
+    _datum:b.event_date},t,null,markDone);
 }
 
 /* ===== Upsell-Extras ===== */
@@ -6845,7 +6849,10 @@ function dateConflicts(datum,eigenerKunde){
   });
   return out;
 }
-function openCompose(i,t,formLink){
+/* onSent (optional) laeuft nur, wenn die Mail auch tatsaechlich losgeschickt wurde -
+   per Direktversand oder ueber das Mail-Programm - nicht schon beim Oeffnen. */
+function openCompose(i,t,formLink,onSent){
+  window._composeSent=onSent||null;
   var body=fillTpl(t.body,i);
   if(formLink)body=body.replace(/\{fragebogen\}/g,formLink);
   /* Die Erstantwort-Vorlagen sagen "der Termin ist noch frei". Steht an dem Tag schon
@@ -6862,7 +6869,7 @@ function openCompose(i,t,formLink){
     '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
     '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+edBtn('rBody')+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
-    (i.email?'<button class="btn" onclick="adminSendMail(\''+jsq(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+jsq(i.customer_id||i.id||'')+'\',closeModal)">Direkt senden</button>':'')+
+    (i.email?'<button class="btn" onclick="adminSendMail(\''+jsq(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+jsq(i.customer_id||i.id||'')+'\',function(){composeSent();closeModal()})">Direkt senden</button>':'')+
     '<button class="btn g" onclick="copyReply()">Text kopieren</button>'+
     (i.email?'<button class="btn g" onclick="mailReply(\''+jsq(i.email)+'\')">Im Mail-Programm öffnen</button>':'')+
     '</div>'+(konflikt.length?'':'<div class="sml mut" style="margin-top:8px">Am '+(i.event_date?dt(i.event_date):'angefragten Termin')+' ist bei dir nichts eingetragen – die Vorlage passt.</div>'));
@@ -6882,14 +6889,16 @@ function copyReply(){
 }
 function mailReply(email){
   location.href='mailto:'+email+'?subject='+encodeURIComponent(v('rSubject'))+'&body='+encodeURIComponent(document.getElementById('rBody').value);
+  composeSent();
 }
+function composeSent(){var f=window._composeSent;window._composeSent=null;if(f)f()}
 
 /* ===== Modal-Helfer ===== */
 function openModal(title,html){
   document.getElementById('modalBox').innerHTML='<h3>'+title+'<span class="x" onclick="closeModal()">✕</span></h3>'+html;
   document.getElementById('modalBg').classList.add('v');
 }
-function closeModal(){document.getElementById('modalBg').classList.remove('v')}
+function closeModal(){document.getElementById('modalBg').classList.remove('v');window._composeSent=null}
 document.getElementById('modalBg').addEventListener('click',function(e){if(e.target===this)closeModal()});
 document.addEventListener('keydown',function(e){
   if(e.key!=='Escape')return;

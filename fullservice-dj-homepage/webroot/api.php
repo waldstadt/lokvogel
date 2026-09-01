@@ -1326,6 +1326,25 @@ function autoInquiryPlanner(PDO $p, array $row): void {
       json_encode(['basics' => $basics], JSON_UNESCAPED_UNICODE), now(), now()]);
 }
 
+/* Spiegelt die Entscheidung zum Angebot auf den Termin - dieselben Regeln wie
+   syncVeranstaltungStatus() im Backoffice, nur serverseitig, damit Portal und
+   Status-Buttons das Gleiche tun. Nur Termine in "anfrage"/"angebot" wandern weiter;
+   was schon fest, abgeschlossen oder von Hand storniert ist, bleibt unangetastet. */
+function syncBookingFromDoc(PDO $p, array $doc, string $newStatus): void {
+  if (empty($doc['booking_id'])) return;
+  $st = $p->prepare('select status from bookings where id = ?');
+  $st->execute([$doc['booking_id']]);
+  $cur = $st->fetchColumn();
+  if ($cur === false || !in_array($cur, ['anfrage', 'angebot'], true)) return;
+  $type = $doc['doc_type'] ?? '';
+  $neu = null;
+  if ($type === 'angebot' && $newStatus === 'angenommen') $neu = 'gebucht';
+  if ($type === 'angebot' && $newStatus === 'abgelehnt' && $cur === 'angebot') $neu = 'storniert';
+  if ($type === 'bestaetigung' && $newStatus === 'versendet') $neu = 'gebucht';
+  if (!$neu || $neu === $cur) return;
+  $p->prepare('update bookings set status=?, updated_at=? where id=?')->execute([$neu, now(), $doc['booking_id']]);
+}
+
 /* Legt automatisch einen Technik-Check an, sobald ein Angebot mit dem Produkt
    TECH-CHECK oder TECH-CHECK-PLUS angenommen wird - Technik-Check ist ein seltenes
    Zusatzprodukt und soll deshalb nicht bei jedem Kunden als Option auftauchen,
@@ -2724,6 +2743,9 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
            Technik-Check-Automatismus aus wie die Annahme im Kundenportal. */
         if (($row['status'] ?? null) === 'angenommen')
           foreach ($before as $b) { try { maybeAutoTechCheck($p, $b['id']); } catch (Throwable $e) {} }
+        /* ... und zieht den Termin genauso nach wie eine Rueckmeldung ueber das Portal. */
+        if (isset($row['status']))
+          foreach ($before as $b) { try { syncBookingFromDoc($p, $b, (string)$row['status']); } catch (Throwable $e) {} }
       }
       if ($t === 'document_items' && !empty($itemsBefore)) {
         $itemFields = ['description', 'qty', 'unit', 'unit_price', 'discount_value', 'discount_type'];
@@ -3605,9 +3627,12 @@ function handlePortal(string $path, string $method, $body): never {
         ->execute([$accName ?: null, $sig, now(), $d['id']]);
       docAudit($p, $d['id'], 'angenommen', $d['number'] . ' – vom Kunden angenommen' . ($accName ? ' und unterschrieben: ' . $accName : '') . ' (Portal)');
       try { maybeAutoTechCheck($p, $d['id']); } catch (Throwable $e) {}
+      syncBookingFromDoc($p, $d, 'angenommen');
     }
-    if ($kind === 'decline' && $d['status'] !== 'storniert')
+    if ($kind === 'decline' && $d['status'] !== 'storniert') {
       $p->prepare("update documents set status='abgelehnt', updated_at=? where id=?")->execute([now(), $d['id']]);
+      syncBookingFromDoc($p, $d, 'abgelehnt');
+    }
     $p->prepare('insert into doc_events (id,document_id,kind,message,phone,created_at) values (?,?,?,?,?,?)')
       ->execute([uuid(), $d['id'], $kind, $msg, $phone, now()]);
     $labels = ['accept' => 'Angebot ANGENOMMEN', 'decline' => 'Angebot abgelehnt', 'comment' => 'Frage zum Angebot',
