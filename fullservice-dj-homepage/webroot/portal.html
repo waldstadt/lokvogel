@@ -289,13 +289,26 @@ function renderOffer(){
   var konflikt=istAngebot&&DOC.annahme==='konflikt'&&d.status==='storniert';
   var nachAblauf=istAngebot&&DOC.annahme==='abgelaufen'&&d.status==='angenommen';
   var abgelaufen=istAngebot&&!decided&&!!d.valid_until&&(DOC.today||new Date().toISOString().slice(0,10))>String(d.valid_until).slice(0,10);
+  /* Versionsstand: Markus kann ein versendetes Angebot nachbessern - der Kunde sieht unter
+     demselben Link dann den neuen Stand. Damit das nicht stillschweigend passiert, steht
+     die Version dabei, und wer schon einen aelteren Stand gesehen hat, bekommt einen Hinweis.
+     Gemerkt wird die zuletzt gesehene Version im Browser (localStorage, je Link) - der
+     Kunde kommt in der Regel per Mail in einem neuen Tab wieder, sessionStorage waere da leer. */
+  var ver=Number(d.version)||1,verKey='portal_ver_'+OFFER;
+  try{
+    var seen=Number(localStorage.getItem(verKey)||0);
+    if(seen&&seen<ver)VER_UPDATED=true;
+    localStorage.setItem(verKey,String(ver));
+  }catch(e){}
+  var verLine=ver>1?' · Version '+ver+(d.version_at?' (aktualisiert am '+dt(d.version_at.slice(0,10))+')':''):'';
   var statusLine=d.status==='angenommen'?'<span class="status-b">'+(nachAblauf?'Angenommen – wird noch geprüft':'✓ Angenommen – danke euch!')+'</span>':
     (d.status==='abgelehnt'?'<span class="status-b" style="border-color:var(--mut2);color:var(--mut)">Abgelehnt</span>':'');
   /* Wer aus dem eigenen Kundenkonto kommt (CTOK gesetzt), soll ohne Browser-Zurück
      wieder in seine Unterlagen finden - ohne Konto gibt es dieses Ziel nicht. */
   app(
     (CTOK?'<p class="sub" style="margin:0 0 14px"><a href="portal.html">← Zurück zu meinen Unterlagen</a></p>':'')+
-    '<div class="card"><div class="kicker">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+
+    '<div class="card"><div class="kicker">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+verLine+'</div>'+
+    (VER_UPDATED?'<div class="msg warn" style="margin-top:0">Dieses Angebot wurde seit deinem letzten Besuch aktualisiert – jetzt Version '+ver+'.</div>':'')+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
     '<div><h1>Hallo '+esc(DOC.customer)+'!</h1>'+
     (custAddressLine()?'<p class="sub">'+custAddressLine()+'</p>':'')+
@@ -331,6 +344,7 @@ function renderOffer(){
     })()+
     '<div class="card" id="actionCard">'+
     (konflikt?konfliktCard():decided?
+      (DOC.bande&&istAngebot&&d.status==='abgelehnt'?bandeDoneHtml():'')+
       (nachAblauf?'<div class="msg warn">Danke – das Angebot war allerdings schon abgelaufen (gültig bis '+dt(d.valid_until)+'). Markus prüft es jetzt persönlich und meldet sich kurz – der Termin ist bis dahin noch nicht fest.</div>':'')+
       '<p class="sub">'+(!istAngebot?('Fragen zu'+(d.doc_type==='bestaetigung'?'r Auftragsbestätigung':'r Rechnung')+'? Schreibt mir einfach hier, ich melde mich:')
         :(d.status==='angenommen'?(nachAblauf?'Wenn euch bis dahin noch etwas einfällt, schreibt mir hier:':'Ich melde mich zeitnah bei euch mit den nächsten Schritten. Wenn euch noch etwas einfällt, schreibt mir hier:'):'Ihr habt Fragen oder wollt doch nochmal sprechen? Schreibt mir gerne:'))+'</p>'+
@@ -377,18 +391,24 @@ function konfliktCard(){
     '<p class="sub">Ihr wolltet gerade annehmen, aber seit dem Angebot ist bei mir an dem Tag eine andere Feier fest geworden. Das tut mir wirklich leid – so kann ich das Angebot nicht mehr erfüllen. Allein lasse ich euch damit aber nicht: Über mein Partner-Netzwerk finde ich euch gern einen richtig guten DJ.</p>'+
     '<div class="msg" id="aMsg"></div>'+
     (DOC.bande
-      ?'<div class="msg ok" id="bandeDone">Danke – eure Anfrage nach Vorschlägen ist bei mir. Ich suche passende Kollegen raus und melde mich bei euch.</div>'
+      ?bandeDoneHtml()
       :'<div id="bandeBox">'+bandeOptHtml()+'<div style="margin-top:10px"><button class="btn" onclick="bandeRequest()">Vorschläge anfordern</button></div></div>')+
     '<p class="sub" style="margin-top:14px">Oder ruft mich einfach an'+(phone?': '+esc(phone):'')+' – wir finden eine Lösung.</p>';
 }
+/* Nach dem Opt-in: Dank plus Link zum Vorauswahl-Bogen, den der Server gerade angelegt und
+   gemailt hat - so kann der Kunde sofort loslegen, ohne erst ins Postfach zu schauen. */
+function bandeDoneHtml(){
+  return '<div class="msg ok" id="bandeDone">Danke – eure Anfrage nach Vorschlägen ist bei mir. Ich suche passende Kollegen raus und melde mich bei euch.'+
+    (DOC.bande_link?'<br><br>Damit die Vorschläge wirklich passen: <a href="'+esc(DOC.bande_link)+'"><b>Kurzen Vorauswahl-Bogen ausfüllen</b></a> (keine 5 Minuten) – den Link habt ihr auch per E-Mail bekommen.':'')+'</div>';
+}
 function bandeRequest(){
   if(!document.getElementById('bandeOpt').checked){showMsg('aMsg','err','Bitte setzt den Haken – ohne eure Einwilligung darf ich eure Daten nicht weitergeben.');return}
-  sendAction('bande','Kunde wünscht nach Terminkonflikt DJ-Bande-Vorschläge (Einwilligung zur Datenweitergabe erteilt).',null,function(){DOC.bande=true;renderOffer()});
+  sendAction('bande','Kunde wünscht nach Terminkonflikt DJ-Bande-Vorschläge (Einwilligung zur Datenweitergabe erteilt).',null,function(j){DOC.bande=true;if(j&&j.form_link)DOC.bande_link=j.form_link;renderOffer()});
 }
 function toggle(id){['accBox','cmtBox','cbBox','declBox'].forEach(function(x){
   var el=document.getElementById(x);if(!el)return;
   el.classList.toggle('hidden',x!==id||!el.classList.contains('hidden'))})}
-var accDirty=false;
+var accDirty=false,VER_UPDATED=false;
 function confirmAccept(){
   toggle('accBox');
   if(!document.getElementById('accBox').classList.contains('hidden'))accInit();
@@ -431,8 +451,12 @@ function doAccept(){
 }
 function decline(){
   var opt=document.getElementById('bandeOpt').checked;
-  act('decline',document.getElementById('declMsg').value,null,function(){
-    if(opt)sendAction('bande','Kunde wünscht DJ-Bande-Vorschläge (Einwilligung zur Datenweitergabe erteilt).');
+  /* Erst das Opt-in melden, dann neu laden: Sonst kommt die Seite ohne den frisch
+     angelegten Vorauswahl-Bogen zurueck. */
+  sendAction('decline',document.getElementById('declMsg').value,null,function(){
+    if(opt)sendAction('bande','Kunde wünscht DJ-Bande-Vorschläge (Einwilligung zur Datenweitergabe erteilt).',null,function(j){
+      if(j&&j.form_link)DOC.bande_link=j.form_link;loadOffer()});
+    else loadOffer();
   });
 }
 function act(kind,msg,phone,after){
@@ -451,7 +475,7 @@ function sendAction(kind,msg,phone,cb){
     method:'POST',headers:offerHeaders(),
     body:JSON.stringify({plz:PLZ,action:kind,message:msg||'',phone:phone||''})
   }).then(function(r){
-    if(r.ok){if(cb)cb();return}
+    if(r.ok)return r.json().catch(function(){return null}).then(function(j){if(cb)cb(j)});
     return r.json().catch(function(){return null}).then(function(j){
       throw new Error((j&&j.error)||'Senden fehlgeschlagen – bitte erneut versuchen oder ruft mich direkt an.');
     });
@@ -523,7 +547,7 @@ function downloadPdf(){
   '<div style="text-align:right;color:#555">'+esc(c.street||'')+'<br>'+esc(c.zip_city||'')+'<br>'+esc(c.phone||'')+'<br>'+esc(c.email||'')+'</div></div>'+
   '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px">'+
   '<div style="font-size:17px;font-weight:700">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+
-  '<div style="text-align:right;color:#555">Für: '+esc(DOC.customer)+'<br>Datum: '+dt(d.doc_date)+
+  '<div style="text-align:right;color:#555">Für: '+esc(DOC.customer)+'<br>Datum: '+dt(d.doc_date)+((Number(d.version)||1)>1?'<br>Version '+d.version+(d.version_at?' vom '+dt(d.version_at.slice(0,10)):''):'')+
   (d.valid_until?'<br>Gültig bis: '+dt(d.valid_until):'')+(d.due_date?'<br>Zahlbar bis: '+dt(d.due_date):'')+'</div></div>'+
   (eventInfoLine(d)?'<div style="border:1px solid #ddd;border-left:3px solid #111;border-radius:4px;padding:7px 10px;margin-bottom:16px;color:#333">'+esc(eventInfoLine(d))+'</div>':'')+
   (d.intro_text?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+

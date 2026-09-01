@@ -1290,7 +1290,8 @@ function openWsDetail(id){
     '<td class="num">'+(s.seats||1)+'</td>'+
     '<td style="font-size:11px;line-height:1.6">'+qa+(s.message?'<div><span class="mut">Nachricht:</span> '+esc(s.message)+'</div>':'')+'</td>'+
     '<td>'+(s.status==='angemeldet'
-      ?'<a onclick="wsCancel(\''+s.id+'\',\''+id+'\')" style="color:var(--redl)">stornieren</a>'
+      ?(!s.invoice_id?'<a onclick="wsInvoice(\''+s.id+'\',\''+id+'\')">Rechnung erzeugen</a><br>':'')+
+       '<a onclick="wsCancel(\''+s.id+'\',\''+id+'\')" style="color:var(--redl)">stornieren</a>'
       :(s.status==='warteliste'
         ?'<a onclick="wsPromote(\''+s.id+'\',\''+id+'\')">nachrücken ↑</a>'
         :''))+'</td></tr>';
@@ -1299,8 +1300,74 @@ function openWsDetail(id){
     '<div class="sml mut" style="margin-bottom:10px">Belegt: <b style="color:var(--wh)">'+wsBooked(id)+' / '+(w.capacity||0)+'</b>'+
     (wsWaitlist(id)?' · Warteliste: <b style="color:var(--wh)">'+wsWaitlist(id)+'</b>':'')+
     (w.price_net!=null?' · Preis p. P.: '+euro(w.price_net):'')+' – Rechnung geht automatisch per Mail raus.</div>'+
+    '<div style="margin-bottom:12px"><button class="btn sm" onclick="wsAddModal(\''+id+'\')">+ Teilnehmer erfassen</button></div>'+
     (sg.length?('<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Kontakt</th><th class="num">Plätze</th><th>Antworten</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>')
       :'<span class="mut">Noch keine Anmeldungen.</span>'));
+}
+/* Teilnehmer von Hand erfassen (Anmeldung per Telefon oder Mail): bestehenden Kunden
+   waehlen oder neu eintragen - der Server legt den Kunden nach denselben Regeln an wie
+   das oeffentliche Formular (E-Mail entscheidet, kein Doppelkunde). */
+function wsAddModal(wid){
+  var w=(CACHE.wsEvents||[]).find(function(x){return x.id===wid});if(!w)return;
+  var free=(w.capacity||0)-wsBooked(wid);
+  var opts='<option value="">– neuer Teilnehmer (unten eintragen) –</option>'+
+    (CACHE.customers||[]).slice().sort(function(a,b){return custName(a).localeCompare(custName(b))}).map(function(c){
+      return '<option value="'+c.id+'" data-s="'+esc((custName(c)+' '+(c.email||'')).toLowerCase())+'">'+esc(custName(c))+(c.email?' · '+esc(c.email):'')+'</option>'}).join('');
+  openModal('Teilnehmer erfassen – '+esc(w.title),
+    '<div class="sml mut" style="margin-bottom:10px">Frei: <b style="color:var(--wh)">'+Math.max(0,free)+'</b> von '+(w.capacity||0)+' Plätzen'+(free<=0?' – neue Teilnehmer landen auf der Warteliste.':'')+'</div>'+
+    '<label>Bestehender Kunde</label><input id="waFilter" placeholder="Zum Filtern tippen (Name oder E-Mail)" oninput="wsAddFilter()" style="margin-bottom:6px">'+
+    '<select id="waCust" onchange="wsAddToggle()">'+opts+'</select>'+
+    '<div id="waNew"><div class="grid2"><div><label>Name</label><input id="waName"></div><div><label>E-Mail</label><input id="waMail" type="email"></div></div>'+
+    '<div class="grid3"><div><label>Telefon</label><input id="waPhone"></div><div><label>Straße</label><input id="waStreet"></div><div><label>PLZ / Ort</label><div style="display:flex;gap:6px"><input id="waZip" style="width:80px" placeholder="PLZ"><input id="waCity" placeholder="Ort"></div></div></div></div>'+
+    '<div class="grid2"><div><label>Plätze</label><input id="waSeats" type="number" min="1" max="20" value="1"></div>'+
+    '<div><label>Notiz (optional)</label><input id="waMsg" placeholder="z. B. telefonisch angemeldet"></div></div>'+
+    '<label class="chk" style="margin-top:10px;display:flex;gap:8px;align-items:flex-start;text-transform:none;letter-spacing:0"><input type="checkbox" id="waInv" checked style="width:auto;margin-top:3px"><span>Rechnung sofort erzeugen und per E-Mail senden</span></label>'+
+    '<div class="msg" id="waMsgBox" style="display:none;margin-top:10px"></div>'+
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="waSaveBtn" onclick="wsAddSave(\''+wid+'\',false)">Anmelden</button></div>');
+}
+function wsAddFilter(){
+  var q=(v('waFilter')||'').toLowerCase(),sel=document.getElementById('waCust');
+  Array.prototype.forEach.call(sel.options,function(o){if(!o.value)return;o.hidden=!!q&&(o.getAttribute('data-s')||'').indexOf(q)<0});
+  if(q){var first=Array.prototype.find.call(sel.options,function(o){return o.value&&!o.hidden});sel.value=first?first.value:''}
+  wsAddToggle();
+}
+function wsAddToggle(){document.getElementById('waNew').style.display=v('waCust')?'none':''}
+function wsAddSave(wid,waitlist){
+  var body={customer_id:v('waCust')||null,name:v('waName'),email:v('waMail'),phone:v('waPhone'),street:v('waStreet'),zip:v('waZip'),city:v('waCity'),
+    seats:Number(v('waSeats'))||1,message:v('waMsg'),invoice:document.getElementById('waInv').checked,waitlist:!!waitlist};
+  var box=document.getElementById('waMsgBox');box.style.display='none';
+  document.getElementById('waSaveBtn').disabled=true;
+  fetch('api.php/workshop/'+wid+'/signup',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      document.getElementById('waSaveBtn').disabled=false;
+      if(res.s>=400){
+        box.style.display='block';box.className='msg err';
+        /* Ausgebucht: nicht einfach abweisen, sondern die Warteliste anbieten */
+        box.innerHTML=esc(res.j.error||'Fehler')+(res.j.full?' <button class="btn g sm" style="margin-left:8px" onclick="wsAddSave(\''+wid+'\',true)">Auf die Warteliste</button>':'');
+        return;
+      }
+      var inv=res.j.invoice;
+      var txt=res.j.status==='warteliste'?'Auf die Warteliste gesetzt.'
+        :(inv&&inv.number?(inv.mailed?'Angemeldet – Rechnung '+inv.number+' ist per E-Mail raus.':'Angemeldet – Rechnung '+inv.number+' erstellt, Mail kam nicht an (Wiedervorlage im Dashboard).')
+        :(inv&&inv.error?'Angemeldet – Rechnung nicht erstellt: '+inv.error:'Angemeldet (ohne Rechnung).'));
+      toast(txt,inv&&inv.error?1:0);
+      closeModal();refreshDocs();
+      return Promise.all([api('workshop_signups?select=*&order=created_at.desc'),api('customers?select=*&order=created_at.desc')])
+        .then(function(r){CACHE.wsSignups=r[0]||[];CACHE.customers=r[1]||[];renderWsAdmin();openWsDetail(wid)});
+    }).catch(function(e){document.getElementById('waSaveBtn').disabled=false;toast(e.message,1)});
+}
+/* Rechnung nachtraeglich erzeugen (Anmeldung ohne Rechnung, z. B. weil beim Erfassen abgewaehlt) */
+function wsInvoice(sid,wid){
+  fetch('api.php/workshop/'+sid+'/invoice',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){return r.json()})
+    .then(function(inv){
+      if(inv&&inv.ok)toast(inv.mailed?('Rechnung '+inv.number+' erstellt und per E-Mail raus.'):('Rechnung '+inv.number+' erstellt – Mailversand prüfen/manuell senden.'));
+      else toast('Keine Rechnung: '+((inv&&(inv.reason||inv.error))||'unbekannter Fehler'),1);
+      refreshDocs();
+      return api('workshop_signups?select=*&order=created_at.desc');
+    })
+    .then(function(r){CACHE.wsSignups=r||[];renderWsAdmin();openWsDetail(wid)}).catch(function(e){toast(e.message,1)});
 }
 function wsPromote(sid,wid){
   var w=(CACHE.wsEvents||[]).find(function(x){return x.id===wid});
@@ -1607,6 +1674,11 @@ function openCustDetail(id){
     row('E-Mail',c.email)+row('Telefon',c.phone)+row('WhatsApp',c.whatsapp)+
     row('Adresse',[c.street,[c.zip,c.city].filter(Boolean).join(' ')].filter(Boolean).join(', '))+
     row('Tags',(c.tags||[]).join(', '))+row('Notizen',c.notes)+
+    /* DJ-Vermittlung: 'angefragt' setzt das Portal beim Opt-in, 'vermittelt' Markus von Hand */
+    (c.referral_status?'<div style="padding:3px 0"><span class="mut" style="display:inline-block;width:90px">DJ-Vermittlung</span>'+
+      '<span class="b '+(c.referral_status==='vermittelt'?'green':'gold')+'">'+(c.referral_status==='vermittelt'?'vermittelt':'angefragt')+'</span>'+
+      (c.referral_at?' <span class="mut sml">seit '+dt(c.referral_at.slice(0,10))+'</span>':'')+
+      (c.referral_status!=='vermittelt'?' <button class="btn g sm" style="margin-left:8px" onclick="markReferred()">Als vermittelt markieren</button>':'')+'</div>':'')+
     (custChecks.length?('<div style="padding:3px 0"><span class="mut" style="display:inline-block;width:90px;vertical-align:top">Technik-Checks</span><span>'+
       custChecks.map(function(t){var d=t.data||{};
         return '<a onclick="openTechCheckModal(\''+t.id+'\')">'+(d.date?dt(d.date):'Entwurf')+(d.recommendation?' – '+esc(d.recommendation):'')+'</a>';
@@ -1631,6 +1703,15 @@ function openCustDetail(id){
   document.getElementById('cdDocs').innerHTML=renderDocList(function(d){return d.customer_id===id})||'Keine Dokumente.';
   renderComms();
   showPage('custd');
+}
+function markReferred(){
+  var c=curCust;if(!c)return;
+  var now=new Date().toISOString();
+  api('customers?id=eq.'+c.id,{method:'PATCH',body:{referral_status:'vermittelt',referral_at:now}})
+    .then(function(){return api('communications',{method:'POST',body:{customer_id:c.id,channel:'note',direction:'out',
+      subject:'An Partner-DJ vermittelt',content:'DJ-Vermittlung abgeschlossen – der Kunde wurde an einen Partner-DJ (DJ Bande) vermittelt.',occurred_at:now}})})
+    .then(function(){c.referral_status='vermittelt';c.referral_at=now;toast('Als vermittelt markiert ✓');return refreshComms()})
+    .then(function(){openCustDetail(c.id)}).catch(function(e){toast(e.message,1)});
 }
 function row(l,v){return v?('<div style="padding:3px 0"><span class="mut" style="display:inline-block;width:90px">'+l+'</span>'+esc(v).replace(/\n/g,'<br>')+'</div>'):''}
 var CH_ICON={email:'',whatsapp:'',phone:'',meeting:'',note:''};
@@ -1880,7 +1961,15 @@ document.addEventListener('click',function(e){
 function newDocForBooking(){
   var b=curBook;if(!b)return;
   openDocEditor(null,'angebot');
-  setTimeout(function(){presetDocFromBooking(b);renderTotals()},30);
+  setTimeout(function(){
+    presetDocFromBooking(b);renderTotals();
+    /* Miet-Anfragen bringen ihre Positionen mit - die standen bisher nur im Gig, im neuen
+       Angebot musste Markus sie per Knopf nachholen (und vergass es gern). */
+    if((b.kind==='technik'||b.kind==='dj_technik')&&(CACHE.be||[]).some(function(x){return x.booking_id===b.id})){
+      curItems=curItems.filter(function(it){return it.description});   /* leere Startzeile weg, Technik ab Position 1 */
+      addBookingEquip(true);
+    }
+  },30);
 }
 function renderBe(){
   var list=CACHE.be.filter(function(x){return x.booking_id===curBook.id});
@@ -2799,7 +2888,13 @@ function renderDocSub(){
   var d=curDoc;
   var b=d.booking_id?(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id}):null;
   var offen=d.doc_type==='angebot'&&d.status==='angenommen'&&b&&['anfrage','angebot'].indexOf(b.status)>=0;
-  document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(d.status)+'">'+d.status+'</span>'+
+  /* Versionsstand: Angebote/ABs bleiben nach dem Versand aenderbar - jede inhaltliche
+     Aenderung zaehlt serverseitig als neue Version, die der Kunde im Portal sieht. */
+  var ver=Number(d.version)||1;
+  var verTxt=ver>1?' · <b style="color:var(--wh)">Version '+ver+'</b>'+(d.version_at?' – geändert am '+dt(d.version_at.slice(0,10)):''):'';
+  if(d.accepted_version&&Number(d.accepted_version)!==ver)
+    verTxt+=' <span style="color:var(--yel)">(angenommen: Version '+d.accepted_version+' – der Kunde hat nicht diesen Stand angenommen)</span>';
+  document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(d.status)+'">'+d.status+'</span>'+verTxt+
     (d.accepted_name?' · digital angenommen von <b style="color:var(--wh)">'+esc(d.accepted_name)+'</b>'+
       (d.accept_signature?' <a onclick="showAcceptSig()">Unterschrift ansehen</a>':''):'')+
     (offen?'<div id="docExpiredHint" style="margin-top:6px;color:var(--yel)">Angenommen nach Ablauf – Gig noch nicht bestätigt '+
@@ -2850,9 +2945,15 @@ function showAcceptSig(){
   openModal('Unterschrift – '+esc(curDoc.number)+' · '+esc(curDoc.accepted_name||''),
     '<img src="'+esc(curDoc.accept_signature)+'" style="background:#fff;border-radius:8px;max-width:100%;max-height:180px;display:block">');
 }
-function docLockedJs(d){return !!(d&&d.id&&istZahlbeleg(d.doc_type)&&d.status!=='entwurf')}
+/* Gesperrt: Zahlbelege nach dem Versand (GoBD) und angenommene Angebote (der Kunde hat
+   genau diesen Stand unterschrieben - Aenderungen laufen ueber ein neues Angebot). */
+function docAcceptedJs(d){return !!(d&&d.id&&d.doc_type==='angebot'&&d.status==='angenommen')}
+function docLockedJs(d){return !!(d&&d.id&&((istZahlbeleg(d.doc_type)&&d.status!=='entwurf')||docAcceptedJs(d)))}
 function applyDocLock(){
   var locked=docLockedJs(curDoc);
+  document.getElementById('docLockNote').innerHTML=docAcceptedJs(curDoc)
+    ?' <b>Angenommenes Angebot:</b> Der Kunde hat genau diesen Stand angenommen – Inhalte lassen sich deshalb nicht mehr ändern. Für Änderungen <a onclick="copyAsNewOffer()">als neues Angebot kopieren</a>. <a onclick="openAuditModal()" style="float:right">Änderungsprotokoll</a>'
+    :' <b>Festgeschrieben (GoBD):</b> Diese Rechnung wurde versendet – Inhalte lassen sich nicht mehr ändern. Für Änderungen eine <a onclick="korrekturDoc()">Korrekturrechnung erstellen</a> oder die Rechnung stornieren. <a onclick="openAuditModal()" style="float:right">Änderungsprotokoll</a>';
   ['docType','docCust','docBook','docDate','docDate2','docTax','docNetto','docRentFrom','docRentTo','docDiscVal','docDiscType','docDep','docTotalOverride','docIntro','docOutro']
     .forEach(function(i){var el=document.getElementById(i);if(el)el.disabled=locked});
   document.querySelectorAll('#docItems input, #docItems select').forEach(function(el){el.disabled=locked});
@@ -2879,6 +2980,23 @@ function korrekturDoc(){
   curItems=items;
   fillDocForm();
   toast('Korrektur-Entwurf angelegt – Original '+src.number+' ggf. noch stornieren.');
+}
+/* Angebot als neues Angebot kopieren: sauberer Weg fuer Aenderungen nach der Annahme
+   (und fuer "gleiches Angebot, neuer Anlauf"). Reine Kopie von Kopf und Positionen als
+   Entwurf mit neuer Nummer - kein Bezug zum Original, kein Abschlag, keine Korrektur. */
+function copyAsNewOffer(){
+  var src=curDoc,items=curItems.map(function(it){var c=Object.assign({},it);delete c.id;delete c.document_id;return c});
+  openDocEditor(null,'angebot');
+  curDoc.customer_id=src.customer_id;curDoc.booking_id=src.booking_id;
+  curDoc.tax_rate=src.tax_rate;curDoc.price_mode=src.price_mode;
+  curDoc.total_override=src.total_override;curDoc.is_small_business=src.is_small_business;
+  curDoc.discount_value=src.discount_value;curDoc.discount_type=src.discount_type;
+  curDoc.intro_text=src.intro_text;curDoc.outro_text=src.outro_text;
+  curDoc.rental_from=src.rental_from;curDoc.rental_to=src.rental_to;
+  curDoc.event_info=evOf(src);
+  curItems=items;
+  fillDocForm();
+  toast('Kopie von '+src.number+' als neuer Angebots-Entwurf – Nummer wird beim Speichern vergeben.');
 }
 /* "feld: alt → neu"-Paare (durch Kommas getrennt, mit optionalem "Praefix · " davor,
    z.B. Belegnummer oder Positionsbezeichnung) hervorgehoben statt als Fliesstext -
@@ -2932,6 +3050,7 @@ function renderStatusBtns(){
   if(istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
     btns+='<button class="btn g sm" onclick="composeReminderMail()">Zahlungserinnerung</button>';
   if(d.status!=='storniert')btns+='<button class="btn g sm" onclick="setDocStatus(\'storniert\')">Storno</button> ';
+  if(d.doc_type==='angebot')btns+='<button class="btn g sm" onclick="copyAsNewOffer()">Als neues Angebot kopieren</button> ';
   document.getElementById('docStatusBtns').innerHTML=btns;
 }
 function exportInvoicesCsv(){
@@ -3254,6 +3373,12 @@ function saveDoc(){
   }).then(function(){
     return syncVeranstaltung();
   }).then(function(){
+    /* Die Version springt erst, wenn auch die Positionen geschrieben sind - deshalb
+       hier den Beleg nochmal lesen, damit die Statuszeile den echten Stand zeigt. */
+    return api('documents?id=eq.'+curDoc.id+'&select=version,version_at,accepted_version').then(function(r){
+      if(r&&r[0]){curDoc.version=r[0].version;curDoc.version_at=r[0].version_at;curDoc.accepted_version=r[0].accepted_version;renderDocSub()}
+    }).catch(function(){});
+  }).then(function(){
     toast('Gespeichert ✓ '+curDoc.number);
     document.getElementById('docTitle').textContent=docTypeName(curDoc.doc_type)+' '+curDoc.number;
     renderStatusBtns();refreshDocs();
@@ -3469,7 +3594,7 @@ function renderDocExtraBtns(){
   el.innerHTML=(hatTechnik?'<button class="btn g sm" onclick="addBookingEquip()">+ Technik aus dem Gig</button> ':'')+
     (hatWeg?'<button class="btn g sm" onclick="addBookingTravel()">+ Anfahrt</button>':'');
 }
-function addBookingEquip(){
+function addBookingEquip(auto){
   var b=(CACHE.bookings||[]).find(function(x){return x.id===v('docBook')});if(!b)return;
   var days=rentDays(b),n=0;
   (CACHE.be||[]).filter(function(x){return x.booking_id===b.id}).forEach(function(x){
@@ -3484,6 +3609,7 @@ function addBookingEquip(){
     n++;
   });
   renderItems();renderTotals();
+  if(auto){if(n)toast(n+' Technik-Position'+(n>1?'en':'')+' aus dem Gig übernommen – Preise frei änderbar');return}
   toast(n?(n+' Artikel aus dem Gig übernommen ✓ – Preise wie immer frei änderbar'):'Dem Gig ist keine Technik zugeordnet.',n?0:1);
 }
 function addBookingTravel(){
@@ -4056,7 +4182,7 @@ function buildDocHtml(){
   '<div style="margin-bottom:30px">'+esc(custName(cust))+'<br>'+esc(cust.street||'')+'<br>'+esc([cust.zip,cust.city].filter(Boolean).join(' '))+'</div>'+
   '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px">'+
   '<div style="font-size:17px;font-weight:700">'+docTypeName(type)+' '+esc(d.number)+'</div>'+
-  '<div style="text-align:right;color:#555">Datum: '+dt(v('docDate'))+(v('docDate2')?('<br>'+(istZahlbeleg(type)?'Zahlbar bis: ':'Gültig bis: ')+dt(v('docDate2'))):'')+(rentalPeriodLabel(v('docRentFrom'),v('docRentTo'))?'<br>'+rentalPeriodLabel(v('docRentFrom'),v('docRentTo')):'')+'</div></div>'+
+  '<div style="text-align:right;color:#555">Datum: '+dt(v('docDate'))+((Number(curDoc.version)||1)>1?'<br>Version '+curDoc.version+(curDoc.version_at?' vom '+dt(curDoc.version_at.slice(0,10)):''):'')+(v('docDate2')?('<br>'+(istZahlbeleg(type)?'Zahlbar bis: ':'Gültig bis: ')+dt(v('docDate2'))):'')+(rentalPeriodLabel(v('docRentFrom'),v('docRentTo'))?'<br>'+rentalPeriodLabel(v('docRentFrom'),v('docRentTo')):'')+'</div></div>'+
   (function(){var e=evVal(),l=e.show?eventInfoLine(e):'';
     return l?'<div style="border:1px solid #ddd;border-left:3px solid #111;border-radius:4px;padding:7px 10px;margin-bottom:16px;color:#333">'+esc(l)+'</div>':''})()+
   (v('docIntro')?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(v('docIntro'))+'</p>':'')+

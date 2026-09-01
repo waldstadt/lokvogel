@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 83;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 84;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -244,7 +244,26 @@ function upgrade(PDO $p): void {
      an, was namentlich noch fehlt): v81 "Angebot angenommen – Bestaetigung", v82 die
      beiden Sonderfaelle bei der Annahme (Termin inzwischen belegt / Angebot abgelaufen),
      v83 "Nachfassen zum Angebot" fuer Kunden, die sich nach dem Angebot nicht melden. */
-  if ($v < 83) seedExtraTemplates($p);
+  if ($v < 84) seedExtraTemplates($p);
+  if ($v < 84) {
+    /* v84: Angebots-Versionen (der Kunde sah bisher stillschweigend den geaenderten
+       Stand unter demselben Link), Kennzeichen fuer die DJ-Vermittlung am Kunden. */
+    foreach ([
+      "alter table documents add column version integer default 1",
+      "alter table documents add column version_at text",
+      "alter table documents add column version_hash text",
+      "alter table documents add column accepted_version integer",
+      "alter table customers add column referral_status text",
+      "alter table customers add column referral_at text",
+    ] as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+    /* Bestehende versendete Angebote/ABs bekommen ihren Inhalts-Fingerabdruck, damit
+       das erste Speichern ohne echte Aenderung nicht als "Version 2" zaehlt. */
+    try {
+      $st = $p->query("select id from documents where doc_type in ('angebot','bestaetigung') and status != 'entwurf' and version_hash is null");
+      foreach ($st->fetchAll() as $row)
+        $p->prepare('update documents set version_hash = ? where id = ?')->execute([docContentHash($p, $row['id']), $row['id']]);
+    } catch (PDOException $e) {}
+  }
   if ($v < 80) {
     /* Technik-Check war bisher ein einzelnes JSON-Feld direkt am Kunden - ein Kunde
        konnte also nie mehr als einen Check je gehabt haben. Jetzt eine eigene Tabelle,
@@ -1002,13 +1021,147 @@ function docLockedRow(array $d): bool {
   return !in_array($d['doc_type'] ?? '', ['angebot', 'bestaetigung', 'lieferschein'])
     && ($d['status'] ?? 'entwurf') !== 'entwurf';
 }
+/* Ein angenommenes Angebot ist eine Vereinbarung: Was der Kunde unterschrieben hat, darf
+   sich danach nicht mehr stillschweigend aendern. Aenderungen laufen ueber ein neues
+   Angebot ("Als neues Angebot kopieren" im Editor); Status-/Versandfelder bleiben frei. */
+function docAcceptedRow(array $d): bool {
+  return ($d['doc_type'] ?? '') === 'angebot' && ($d['status'] ?? '') === 'angenommen';
+}
+function acceptedLockMsg(array $d): string {
+  return 'Angenommenes Angebot ' . ($d['number'] ?? '') . ' – Änderungen bitte als neues Angebot (im Editor „Als neues Angebot kopieren“).';
+}
 /* Positionen dürfen nur geändert werden, solange das zugehörige Dokument nicht festgeschrieben ist */
 function assertItemsUnlocked(PDO $p, string $wsql, array $args): void {
   $st = $p->prepare("select distinct d.number, d.doc_type, d.status from documents d
     where d.id in (select document_id from document_items" . ($wsql ?: '') . ")");
   $st->execute($args);
-  foreach ($st->fetchAll() as $d) if (docLockedRow($d))
-    fail('Rechnung ' . $d['number'] . ' ist festgeschrieben (GoBD): Positionen können nicht mehr geändert werden.', 409);
+  foreach ($st->fetchAll() as $d) {
+    if (docLockedRow($d))
+      fail('Rechnung ' . $d['number'] . ' ist festgeschrieben (GoBD): Positionen können nicht mehr geändert werden.', 409);
+    if (docAcceptedRow($d)) fail(acceptedLockMsg($d), 409);
+  }
+}
+
+/* Vergleich Feld alt (aus der DB) gegen neu (aus dem Request), ohne Scheinunterschiede
+   durch Zahlformat ("1190" vs. 1190.0) oder JSON-Schluesselreihenfolge. */
+function docFieldSame(string $t, string $c, $old, $new): bool {
+  if (in_array($c, JSON_COLS[$t] ?? [], true)) {
+    $o = is_string($old) ? json_decode($old, true) : $old;
+    return json_encode($o) === json_encode($new);
+  }
+  if (is_numeric($old) && is_numeric($new)) return abs((float)$old - (float)$new) < 0.000001;
+  return (string)($old ?? '') === (string)(encodeVal($t, $c, $new) ?? '');
+}
+
+/* ---------- Angebots-Versionen ----------
+   Angebote und ABs bleiben nach dem Versand bewusst aenderbar (kein GoBD-Beleg). Der Kunde
+   sieht unter demselben Link aber immer den aktuellen Stand - bisher ohne jeden Hinweis,
+   dass sich etwas getan hat. Deshalb zaehlt jede inhaltliche Aenderung nach dem Versand
+   als neue Version. Was "inhaltlich" heisst, entscheidet ein Fingerabdruck ueber Kopf-
+   felder und Positionen: Der Editor speichert naemlich immer alles (Kopf per PATCH, dann
+   alle Positionen loeschen und neu anlegen) - ohne Fingerabdruck waere jedes Speichern
+   eine neue Version, auch wenn Markus nur den Beleg angeschaut hat. Alle Aenderungen
+   eines Speichervorgangs (mehrere Requests kurz hintereinander) sind EINE Version. */
+const DOC_VERSION_FIELDS = ['customer_id','doc_date','valid_until','due_date','tax_rate','is_small_business',
+  'price_mode','discount_value','discount_type','intro_text','outro_text','rental_from','rental_to',
+  'total_net','total_tax','total_gross','total_override','deposit_deducted','event_info'];
+function docContentHash(PDO $p, string $docId): string {
+  $st = $p->prepare('select * from documents where id = ?'); $st->execute([$docId]);
+  $d = $st->fetch() ?: [];
+  $norm = fn($v) => is_numeric($v) ? (string)(float)$v : (string)($v ?? '');
+  $parts = [];
+  foreach (DOC_VERSION_FIELDS as $c) $parts[] = $norm($d[$c] ?? null);
+  $it = $p->prepare('select description, note, qty, unit, unit_price, discount_value, discount_type, is_header, group_pos from document_items where document_id = ? order by pos, rowid');
+  $it->execute([$docId]);
+  foreach ($it->fetchAll() as $r) $parts[] = implode("\x1f", array_map($norm, array_values($r)));
+  return sha1(implode("\x1e", $parts));
+}
+/* Nach jeder inhaltlichen Schreiboperation aufrufen: bumpt die Version, wenn sich der
+   Inhalt gegenueber dem letzten Stand geaendert hat. Innerhalb von 90 Sekunden nach dem
+   letzten Bump wird nur der Fingerabdruck nachgezogen (derselbe Speichervorgang). */
+function docVersionTouch(PDO $p, ?string $docId): void {
+  static $done = [];
+  if (!$docId || isset($done[$docId])) return;
+  $done[$docId] = true;
+  try {
+    $st = $p->prepare('select doc_type, status, version, version_at, version_hash from documents where id = ?');
+    $st->execute([$docId]);
+    $d = $st->fetch();
+    if (!$d || !in_array($d['doc_type'], ['angebot', 'bestaetigung'], true) || $d['status'] === 'entwurf') return;
+    $hash = docContentHash($p, $docId);
+    if ($hash === (string)$d['version_hash']) return;
+    $recent = !empty($d['version_at']) && (time() - strtotime((string)$d['version_at'])) < 90;
+    if ($recent)
+      $p->prepare('update documents set version_hash = ? where id = ?')->execute([$hash, $docId]);
+    else {
+      $p->prepare('update documents set version = coalesce(version,1) + 1, version_at = ?, version_hash = ? where id = ?')
+        ->execute([now(), $hash, $docId]);
+      docAudit($p, $docId, 'neue Version', 'Version ' . ((int)($d['version'] ?: 1) + 1) . ' – Inhalt nach dem Versand geändert');
+    }
+  } catch (Throwable $e) {}
+}
+/* Beim Versand den Fingerabdruck des versendeten Stands merken (ohne Versionssprung). */
+function docVersionSeal(PDO $p, string $docId): void {
+  try { $p->prepare('update documents set version_hash = ? where id = ?')->execute([docContentHash($p, $docId), $docId]); }
+  catch (Throwable $e) {}
+}
+/* Bei der Annahme festhalten, welche Version der Kunde angenommen hat. */
+function docMarkAccepted(PDO $p, string $docId): void {
+  try { $p->prepare('update documents set accepted_version = coalesce(version,1) where id = ?')->execute([$docId]); }
+  catch (Throwable $e) {}
+}
+
+/* ---------- DJ-Vermittlung: Vorauswahl-Bogen ----------
+   Sobald der Kunde im Portal der Vermittlung zustimmt, soll er nicht auf Markus warten
+   muessen: Der Bogen "DJ-Vorauswahl" wird sofort angelegt und gemailt (bisher ging das
+   nur von Hand ueber die Mailvorlage "Termin belegt"). Je Kunde nur ein offener Bogen -
+   ein zweites Opt-in (z. B. Absage und spaeter nochmal) liefert denselben Link zurueck.
+   Rueckgabe: ['link' => ..., 'created' => bool] oder null (keine Bogen-Vorlage vorhanden). */
+function bandeFormFor(PDO $p, string $custId): ?array {
+  $tpl = $p->query("select * from form_templates where name like 'DJ-Vorauswahl%' order by sort limit 1")->fetch();
+  if (!$tpl) return null;
+  $st = $p->prepare("select token from forms where customer_id = ? and title = ? and status = 'offen' order by created_at desc limit 1");
+  $st->execute([$custId, $tpl['name']]);
+  if ($tok = $st->fetchColumn()) return ['link' => baseUrl() . '/portal.html?f=' . $tok, 'created' => false];
+  $token = bin2hex(random_bytes(24));
+  $p->prepare('insert into forms (id, token, title, intro, fields, status, inquiry_id, customer_id, created_at)
+      values (?,?,?,?,?,?,?,?,?)')
+    ->execute([uuid(), $token, $tpl['name'], $tpl['intro'], $tpl['fields'], 'offen', null, $custId, now()]);
+  return ['link' => baseUrl() . '/portal.html?f=' . $token, 'created' => true];
+}
+/* Opt-in verarbeiten: Kennzeichen am Kunden, Bogen anlegen, Mail mit Link (Vorlage
+   "DJ-Vermittlung – Vorauswahl-Bogen", eingebauter Text als Rueckfall), bei Mailfehler
+   Wiedervorlage. Liefert den Bogen-Link (fuer die Dankesseite im Portal) oder null. */
+function bandeOptIn(PDO $p, string $custId, ?string $bookingId = null): ?string {
+  try {
+    $p->prepare("update customers set referral_status = 'angefragt', referral_at = coalesce(referral_at, ?) where id = ? and coalesce(referral_status,'') != 'vermittelt'")
+      ->execute([now(), $custId]);
+    $f = bandeFormFor($p, $custId);
+    if (!$f) return null;
+    if (!$f['created']) return $f['link'];
+    $cst = $p->prepare('select email, first_name, company from customers where id = ?');
+    $cst->execute([$custId]);
+    $c = $cst->fetch() ?: [];
+    $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+    $vorname = trim((string)($c['first_name'] ?? '')) ?: (trim((string)($c['company'] ?? '')) ?: 'zusammen');
+    $map = ['{vorname}' => $vorname, '{fragebogen}' => $f['link'], '{link}' => $f['link'], '{telefon}' => (string)($comp['phone'] ?? '')];
+    $subject = 'Damit ich euch die passenden DJs raussuchen kann';
+    $body = "Hallo {vorname},\n\ndanke für euer Vertrauen – ich suche euch gern ein paar richtig gute Kollegen aus meinem Partner-Netzwerk raus. Eure Einwilligung zur Weitergabe der Eckdaten habe ich schon notiert.\n\nDamit die Vorschläge wirklich zu euch passen, füllt bitte kurz diesen Bogen aus (keine 5 Minuten):\n{fragebogen}\n\nSobald ich die Antworten habe, melde ich mich mit konkreten Vorschlägen. Fragen vorab? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus";
+    $tst = $p->prepare('select subject, body from email_templates where name = ? limit 1');
+    $tst->execute(['DJ-Vermittlung – Vorauswahl-Bogen']);
+    if ($tpl = $tst->fetch()) { $subject = (string)$tpl['subject']; $body = (string)$tpl['body']; }
+    $subject = strtr($subject, $map); $body = strtr($body, $map);
+    $to = trim((string)($c['email'] ?? ''));
+    $mailed = $to !== '' && sendMailSafe($to, $subject, $body);
+    $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
+        values (?,?,?,?,?,?,?,?,?,?)')
+      ->execute([uuid(), $custId, $bookingId ?: null, $mailed ? 'email' : 'note', 'out',
+        $mailed ? $subject : 'Vorauswahl-Bogen konnte NICHT gemailt werden – bitte Link selbst schicken',
+        $mailed ? $body : "Der Kunde hat der DJ-Vermittlung zugestimmt, die Mail mit dem Vorauswahl-Bogen an " .
+          ($to !== '' ? $to : '(keine E-Mail-Adresse hinterlegt)') . " ist aber nicht rausgegangen.\n\nLink zum Bogen:\n" . $f['link'],
+        now(), $mailed ? null : gmdate('Y-m-d'), now()]);
+    return $f['link'];
+  } catch (Throwable $e) { return null; }
 }
 
 /* Nachträgliche E-Mail-Vorlagen, nur wenn noch nicht vorhanden */
@@ -1035,6 +1188,14 @@ function seedExtraTemplates(PDO $p): void {
        Druck, nur ein freundliches "Ich bin noch da" - mit Link, damit er direkt reagieren kann. */
     [99, 'Nachfassen zum Angebot', 'Kurze Frage zu eurem Angebot {nummer}',
       "Hallo {vorname},\n\nich wollte einmal kurz nachhören: Ist mein Angebot {nummer} bei euch angekommen und passt es soweit? Falls etwas unklar ist oder ihr euch etwas anders vorstellt, sagt einfach Bescheid – das lässt sich meistens mit einem kurzen Telefonat klären.\n\nDas Angebot findet ihr weiterhin hier (Login ist eure Postleitzahl):\n{link}\n\nGültig ist es bis {gueltig}, ich halte euch den Termin bis dahin frei. Und falls ihr euch anders entschieden habt: auch kein Problem, dann freue ich mich über eine kurze Nachricht.\n\nViele Grüße\nMarkus"],
+    /* Eingangsbestaetigung zur Miet-Anfrage aus dem Tourcase: Bisher ging nur eine Mail an
+       Markus - der Kunde sah nach dem Absenden nichts mehr von seiner Anfrage. */
+    [100, 'Miet-Anfrage eingegangen', 'Deine Miet-Anfrage ist da – {zeitraum}',
+      "Hallo {vorname},\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet. Das hast du angefragt:\n\nZeitraum: {zeitraum}\n{positionen}\n\nIch schaue mir das an und melde mich innerhalb von 24 Stunden mit Verfügbarkeit und Preis. Die Anfrage findest du jederzeit in deinem Kundenkonto:\n{link}\n\nWenn es eilig ist: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nBis gleich!\nMarkus"],
+    /* Der Kunde hat im Portal der DJ-Vermittlung zugestimmt - jetzt braucht Markus die
+       Eckdaten, um passende Kollegen auszusuchen. Der Bogen wird automatisch angelegt. */
+    [101, 'DJ-Vermittlung – Vorauswahl-Bogen', 'Damit ich euch die passenden DJs raussuchen kann',
+      "Hallo {vorname},\n\ndanke für euer Vertrauen – ich suche euch gern ein paar richtig gute Kollegen aus meinem Partner-Netzwerk raus. Eure Einwilligung zur Weitergabe der Eckdaten habe ich schon notiert.\n\nDamit die Vorschläge wirklich zu euch passen, füllt bitte kurz diesen Bogen aus (keine 5 Minuten):\n{fragebogen}\n\nSobald ich die Antworten habe, melde ich mich mit konkreten Vorschlägen. Fragen vorab? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
     [92, 'Workshop-Bestätigung (Zahlung eingegangen)', 'Dein Platz ist fix!',
       "Hallo {vorname},\n\ndeine Zahlung ist da – damit ist dein Workshop-Platz verbindlich reserviert!\n\nWann: {datum}\nWo: Lager Hemer, Büttmecker Weg 35c\n\nBring gern dein eigenes Equipment-Problem mit – wir schauen uns echte Fälle an. Getränke gehen auf mich.\n\nBis bald!\nMarkus"],
     /* Absage-Bausteine: Jede Absage soll persönlich klingen und möglichst in eine
@@ -2202,6 +2363,7 @@ create table customers (id text primary key, kind text default 'privat', status 
   first_name text, last_name text, company text, email text, phone text, whatsapp text,
   street text, zip text, city text, source text, tags text default '[]', notes text, tech_check text,
   partner_name text, portal_hash text, portal_invite text, portal_invite_expires integer,
+  referral_status text, referral_at text,
   created_at text, updated_at text);
 create table communications (id text primary key,
   customer_id text not null references customers(id) on delete cascade,
@@ -2233,7 +2395,9 @@ create table documents (id text primary key, share_token text, doc_type text not
   rental_from text, rental_to text,
   total_net real default 0, total_tax real default 0, total_gross real default 0,
   deposit_deducted real default 0, total_override real, sent_at text, paid_at text,
-  accepted_name text, accept_signature text, event_info text, created_at text, updated_at text);
+  accepted_name text, accept_signature text, event_info text,
+  version integer default 1, version_at text, version_hash text, accepted_version integer,
+  created_at text, updated_at text);
 create table tech_checks (id text primary key,
   customer_id text not null references customers(id) on delete cascade,
   document_id text references documents(id) on delete set null,
@@ -2797,6 +2961,9 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
             ($row['description'] ?? '') . ' (' . ($row['qty'] ?? 1) . ' ' . ($row['unit'] ?? '') . ' à ' . number_format((float)($row['unit_price'] ?? 0), 2, ',', '.') . ' €)');
         $result[] = decodeRow($t, array_map(fn($v) => $v, $row));
       }
+      /* Positionen neu angelegt (der Editor loescht und schreibt beim Speichern alle
+         Positionen neu): jetzt steht der neue Stand komplett da - Version pruefen. */
+      if ($t === 'document_items') foreach (array_keys($docStatusMap) as $did) docVersionTouch($p, $did);
       if (in_array('return=representation', $prefer)) {
         /* frisch lesen, damit Defaults enthalten sind */
         $ids = array_column($result, $pk);
@@ -2814,10 +2981,17 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       if ($t === 'documents') {
         $chk = $p->prepare("select * from documents$wsql"); $chk->execute($args);
         $before = $chk->fetchAll();
-        $allowed = ['status','paid_at','sent_at','share_token'];
+        $allowed = ['status','paid_at','sent_at','share_token','version','version_at','version_hash','accepted_version'];
         foreach ($before as $b) {
           if (docLockedRow($b) && array_diff(array_keys($row), $allowed))
             fail('Rechnung ' . $b['number'] . ' ist festgeschrieben (GoBD): Inhalte können nach dem Versand nicht mehr geändert werden. Erstelle eine Korrekturrechnung oder storniere sie.', 409);
+          /* Angenommenes Angebot: Inhalte nur sperren, wenn sich wirklich etwas aendert -
+             der Editor schickt beim Speichern immer alle Felder mit. */
+          if (docAcceptedRow($b)) {
+            foreach (array_diff(array_keys($row), $allowed) as $c)
+              if (!in_array($c, ['updated_at','booking_id'], true) && !docFieldSame($t, $c, $b[$c] ?? null, $row[$c]))
+                fail(acceptedLockMsg($b), 409);
+          }
         }
       }
       if ($t === 'document_items') assertItemsUnlocked($p, $wsql, $args);
@@ -2839,6 +3013,11 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
             if ((string)$old !== (string)$vNew && $c !== 'updated_at') $changes[] = "$c: " . ($old ?? '–') . ' → ' . ($vNew ?? '–');
           }
           if ($changes) docAudit($p, $b['id'], 'geändert', $b['number'] . ' · ' . implode(', ', $changes));
+          /* Inhaltliche Aenderung nach dem Versand = neue Version (Fingerabdruck entscheidet) */
+          if (array_intersect(array_keys($row), DOC_VERSION_FIELDS)) docVersionTouch($p, $b['id']);
+          /* Versand: Stand des Belegs merken; Annahme: angenommene Version festhalten. */
+          if (($row['status'] ?? null) === 'versendet' && ($b['status'] ?? '') === 'entwurf') docVersionSeal($p, $b['id']);
+          if (($row['status'] ?? null) === 'angenommen' && ($b['status'] ?? '') !== 'angenommen') docMarkAccepted($p, $b['id']);
         }
         /* Angebots-Annahme direkt im Backoffice (Status-Buttons) loest denselben
            Technik-Check-Automatismus aus wie die Annahme im Kundenportal. */
@@ -2867,6 +3046,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
           if ($changes) docAudit($p, $ib['document_id'], 'Position geändert',
             ($ib['description'] ?? '') . ' · ' . implode(', ', $changes));
         }
+        foreach (array_unique(array_column($itemsBefore, 'document_id')) as $did) docVersionTouch($p, $did);
       }
       if (in_array('return=representation', $prefer)) {
         $st = $p->prepare("select * from \"$t\"$wsql"); $st->execute($args);
@@ -2885,6 +3065,9 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         }
       }
       if ($t === 'document_items') {
+        /* Bewusst KEIN docVersionTouch beim Loeschen: Der Editor loescht beim Speichern
+           erst alle Positionen und legt sie dann neu an - die Versionspruefung laeuft
+           beim anschliessenden Anlegen ueber den kompletten neuen Stand. */
         assertItemsUnlocked($p, $wsql, $args);
         $chkI = $p->prepare("select * from document_items$wsql"); $chkI->execute($args);
         foreach ($chkI->fetchAll() as $ib)
@@ -3071,6 +3254,33 @@ function baseUrl(): string {
   return ($https ? 'https' : 'http') . "://$host$dir";
 }
 
+/* Kunde zu einer Workshop-Anmeldung finden (per E-Mail, bevorzugt der mit Kundenkonto)
+   oder neu anlegen - dieselbe Regel fuer die oeffentliche Anmeldung und die manuelle
+   Erfassung im Backoffice. Rueckgabe: [customer_id, PLZ des Kunden]. */
+function workshopCustomer(PDO $p, array $s): array {
+  $cst = $p->prepare("select id, zip from customers where email = ?
+    order by (portal_hash is not null) desc, coalesce(created_at,'') asc limit 1");
+  $cst->execute([$s['email']]);
+  $cust = $cst->fetch();
+  $parts = preg_split('/\s+/', trim((string)$s['name']), 2);
+  if (!$cust) {
+    $cid = uuid();
+    $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, phone, street, zip, city, source, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?)')
+      ->execute([$cid, 'privat', 'kunde', $parts[0] ?? '', $parts[1] ?? '', $s['email'], $s['phone'] ?? null,
+        $s['street'] ?? null, $s['zip'] ?? null, $s['city'] ?? null, 'workshop', now()]);
+    return [$cid, (string)($s['zip'] ?? '')];
+  }
+  $cid = $cust['id'];
+  $custZip = trim((string)$cust['zip']);
+  if ($custZip === '' && trim((string)($s['zip'] ?? '')) !== '') {
+    $p->prepare('update customers set zip = ?, street = coalesce(street, ?), city = coalesce(city, ?) where id = ?')
+      ->execute([$s['zip'], $s['street'] ?? null, $s['city'] ?? null, $cid]);
+    $custZip = (string)$s['zip'];
+  }
+  return [$cid, $custZip];
+}
+
 /* Erstellt (einmalig) die Rechnung zu einer Workshop-Anmeldung und mailt den Portal-Link. */
 function workshopInvoice(PDO $p, string $signupId): array {
   $st = $p->prepare('select s.*, w.title as w_title, w.event_date as w_date, w.price_net as w_price
@@ -3093,27 +3303,8 @@ function workshopInvoice(PDO $p, string $signupId): array {
   $comp = $get('company'); $defs = $get('defaults');
 
   /* Kunde finden oder anlegen */
-  $cst = $p->prepare("select id, zip from customers where email = ?
-    order by (portal_hash is not null) desc, coalesce(created_at,'') asc limit 1");
-  $cst->execute([$s['email']]);
-  $cust = $cst->fetch();
+  [$cid, $custZip] = workshopCustomer($p, $s);
   $parts = preg_split('/\s+/', trim($s['name']), 2);
-  if (!$cust) {
-    $cid = uuid();
-    $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, phone, street, zip, city, source, created_at)
-        values (?,?,?,?,?,?,?,?,?,?,?,?)')
-      ->execute([$cid, 'privat', 'kunde', $parts[0] ?? '', $parts[1] ?? '', $s['email'], $s['phone'],
-        $s['street'], $s['zip'], $s['city'], 'workshop', now()]);
-    $custZip = (string)$s['zip'];
-  } else {
-    $cid = $cust['id'];
-    $custZip = trim((string)$cust['zip']);
-    if ($custZip === '' && trim((string)$s['zip']) !== '') {
-      $p->prepare('update customers set zip = ?, street = coalesce(street, ?), city = coalesce(city, ?) where id = ?')
-        ->execute([$s['zip'], $s['street'], $s['city'], $cid]);
-      $custZip = (string)$s['zip'];
-    }
-  }
 
   /* Nummernkreis fortschreiben + Rechnung anlegen (atomar) */
   $p->beginTransaction();
@@ -3186,6 +3377,33 @@ function workshopInvoice(PDO $p, string $signupId): array {
       ($mailed ? '' : "\n\nDer automatische Mailversand an " . $s['email'] . " ist fehlgeschlagen. Die Rechnung steht als 'versendet' im System (Nummer vergeben, Kunde informiert) – bitte im Dokument über „Per E-Mail senden“ nachschicken."),
       now(), $mailed ? null : gmdate('Y-m-d'), now()]);
   return ['ok' => true, 'number' => $number, 'mailed' => $mailed, 'portal' => $portal];
+}
+
+/* Eingangsbestaetigung zur Miet-Anfrage (Vorlage "Miet-Anfrage eingegangen", eingebauter
+   Text als Rueckfall). Scheitert der Versand, Wiedervorlage auf heute - dann ruft Markus an. */
+function rentalRequestMail(PDO $p, array $me, string $bookingId, string $from, string $to, array $lines): bool {
+  $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+  $zeitraum = date('d.m.Y', strtotime($from)) . ($to !== $from ? ' bis ' . date('d.m.Y', strtotime($to)) : '');
+  $pos = implode("\n", array_map(fn($l) => '– ' . $l['name'] . ' × ' . $l['qty'], $lines));
+  $vorname = trim((string)($me['first_name'] ?? '')) ?: (trim((string)($me['company'] ?? '')) ?: 'zusammen');
+  $map = ['{vorname}' => $vorname, '{name}' => trim((string)($me['company'] ?? '')) ?: trim(($me['first_name'] ?? '') . ' ' . ($me['last_name'] ?? '')),
+    '{zeitraum}' => $zeitraum, '{positionen}' => $pos, '{link}' => baseUrl() . '/portal.html', '{telefon}' => (string)($comp['phone'] ?? '')];
+  $subject = 'Deine Miet-Anfrage ist da – {zeitraum}';
+  $body = "Hallo {vorname},\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet. Das hast du angefragt:\n\nZeitraum: {zeitraum}\n{positionen}\n\nIch schaue mir das an und melde mich innerhalb von 24 Stunden mit Verfügbarkeit und Preis. Die Anfrage findest du jederzeit in deinem Kundenkonto:\n{link}\n\nWenn es eilig ist: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nBis gleich!\nMarkus";
+  $tst = $p->prepare('select subject, body from email_templates where name = ? limit 1');
+  $tst->execute(['Miet-Anfrage eingegangen']);
+  if ($tpl = $tst->fetch()) { $subject = (string)$tpl['subject']; $body = (string)$tpl['body']; }
+  $subject = strtr($subject, $map); $body = strtr($body, $map);
+  $to_ = trim((string)($me['email'] ?? ''));
+  $mailed = $to_ !== '' && sendMailSafe($to_, $subject, $body);
+  $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
+      values (?,?,?,?,?,?,?,?,?,?)')
+    ->execute([uuid(), $me['id'], $bookingId, $mailed ? 'email' : 'note', 'out',
+      $mailed ? $subject : 'Eingangsbestätigung zur Miet-Anfrage konnte NICHT gemailt werden – bitte kurz anrufen',
+      $mailed ? $body : "Die automatische Bestätigung an " . ($to_ !== '' ? $to_ : '(keine E-Mail-Adresse hinterlegt)') .
+        " ist nicht rausgegangen. Der Kunde weiß also nur aus der Seite, dass die Anfrage angekommen ist.\n\nAngefragt ($zeitraum):\n$pos",
+      now(), $mailed ? null : gmdate('Y-m-d'), now()]);
+  return $mailed;
 }
 
 /* ---------- Telegram (Benachrichtigungen aufs Handy) ----------
@@ -3894,7 +4112,10 @@ function handlePortal(string $path, string $method, $body): never {
         'tax_rate','is_small_business','intro_text','outro_text','total_net','total_tax','total_gross','deposit_deducted',
         /* rental_from/rental_to standen bisher nicht in der Liste - die Mietzeitraum-Zeile
            im Portal blieb deshalb immer leer. */
-        'price_mode','discount_value','discount_type','event_info','rental_from','rental_to'])),
+        'price_mode','discount_value','discount_type','event_info','rental_from','rental_to',
+        /* Versionsstand: Der Kunde soll sehen, wenn sich das Angebot seit seinem letzten
+           Besuch geaendert hat (bisher stillschweigend derselbe Link, neuer Inhalt). */
+        'version','version_at','accepted_version'])),
       'customer' => trim(($d['company'] ? $d['company'] : ($d['first_name'].' '.$d['last_name']))),
       /* Rechnungsadresse fuer den Briefkopf im Portal - fehlte bisher komplett, weil
          das SQL oben nur die PLZ (fuer die Zugangspruefung) mitgeladen hat. */
@@ -3908,6 +4129,14 @@ function handlePortal(string $path, string $method, $body): never {
          nach Ablauf angenommen, Markus prueft noch. 'bande' = Vermittlung schon gewuenscht. */
       'annahme' => portalAcceptCase($p, $d['id']),
       'bande' => (bool)$p->query("select 1 from doc_events where document_id = " . $p->quote($d['id']) . " and kind = 'bande' limit 1")->fetchColumn(),
+      /* Link zum offenen Vorauswahl-Bogen (nach Opt-in), damit er auch nach Neuladen dasteht */
+      'bande_link' => (function () use ($p, $d) {
+        $st = $p->prepare("select f.token from forms f join form_templates t on t.name = f.title
+          where f.customer_id = ? and f.status = 'offen' and t.name like 'DJ-Vorauswahl%' order by f.created_at desc limit 1");
+        $st->execute([$d['customer_id']]);
+        $tok = $st->fetchColumn();
+        return $tok ? baseUrl() . '/portal.html?f=' . $tok : null;
+      })(),
       'today' => date('Y-m-d'),
       'items' => $it->fetchAll(),
       'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city','iban','bic','bank','tax_id'])),
@@ -3969,6 +4198,7 @@ function handlePortal(string $path, string $method, $body): never {
       } else {
         $p->prepare("update documents set status='angenommen', accepted_name=?, accept_signature=?, updated_at=? where id=?")
           ->execute([$accName ?: null, $sig, now(), $d['id']]);
+        docMarkAccepted($p, $d['id']);
         docAudit($p, $d['id'], 'angenommen', $d['number'] . ' – vom Kunden angenommen' . ($accName ? ' und unterschrieben: ' . $accName : '') . ' (Portal)');
         try { maybeAutoTechCheck($p, $d['id']); } catch (Throwable $e) {}
         /* Nach Ablauf der Gueltigkeit bleibt die Annahme moeglich, aber der Termin wird nicht
@@ -3999,6 +4229,12 @@ function handlePortal(string $path, string $method, $body): never {
     if ($kind === 'decline' && $d['status'] !== 'storniert') {
       $p->prepare("update documents set status='abgelehnt', updated_at=? where id=?")->execute([now(), $d['id']]);
       syncBookingFromDoc($p, $d, 'abgelehnt');
+    }
+    /* Opt-in zur DJ-Vermittlung: Kunde kennzeichnen, Vorauswahl-Bogen anlegen und mailen,
+       Link gleich mit zurueckgeben, damit die Dankesseite ihn sofort zeigt. */
+    if ($kind === 'bande') {
+      $formLink = bandeOptIn($p, $d['customer_id'], $d['booking_id'] ?: null);
+      if ($formLink) { $resp['form_link'] = $formLink; $ownerExtra .= "\n\nVorauswahl-Bogen wurde angelegt und dem Kunden gemailt:\n$formLink"; }
     }
     $p->prepare('insert into doc_events (id,document_id,kind,message,phone,created_at) values (?,?,?,?,?,?)')
       ->execute([uuid(), $d['id'], $evKind, $evMsg, $phone, now()]);
@@ -4306,7 +4542,11 @@ function handlePortal(string $path, string $method, $body): never {
       "Zeitraum: $from" . ($to !== $from ? " bis $to" : '') . "\n\n" .
       implode("\n", array_map(fn($l) => '- ' . $l['name'] . ' × ' . $l['qty'] . ' = ' . number_format($l['price'], 2, ',', '.') . ' €', $lines)) .
       "\n\nGesamt (inkl. MwSt.): " . number_format($total, 2, ',', '.') . " €" . ($isPartner ? "\n(Partnerpreis angewendet" . (($partnerInfo['provisional'] ?? false) ? ', Partner noch nicht final freigeschaltet' : '') . ')' : ''));
+    /* Eingangsbestaetigung an den Kunden mit seinen Positionen - bisher bekam nur Markus
+       eine Mail, der Kunde hatte nach dem Absenden nichts in der Hand. */
+    try { rentalRequestMail($p, $me, $bookingId, $from, $to, $lines); } catch (Throwable $e) {}
     out(['ok' => true, 'booking_id' => $bookingId, 'items' => $lines, 'total' => round($total, 2),
+      'from' => $from, 'to' => $to,
       'partner' => $isPartner, 'partner_provisional' => $isPartner ? ($partnerInfo['provisional'] ?? false) : false], 201);
   }
   /* Newsletter: Anmeldung mit Double-Opt-in, Bestätigung und Ein-Klick-Abmeldung */
@@ -4833,6 +5073,57 @@ try {
     header('Content-Type: ' . $mime);
     header('Content-Disposition: inline; filename="' . rawurlencode((string)$f['invoice_name']) . '"');
     readfile(DATA_DIR . '/eqfiles/' . $f['invoice_file']); exit;
+  }
+  /* Teilnehmer von Hand erfassen (Backoffice): Anmeldung per Telefon/Mail, die nicht ueber das
+     oeffentliche Formular kam. Gleiche Regeln wie dort (Kapazitaet, Dublette, Kunde per E-Mail
+     finden oder anlegen), auf Wunsch sofort Rechnung erzeugen und mailen. */
+  if (preg_match('#^workshop/([a-f0-9-]{30,40})/signup$#', $path, $m) && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    $st = $p->prepare("select w.*, coalesce((select sum(s.seats) from workshop_signups s
+        where s.workshop_id = w.id and s.status = 'angemeldet'), 0) as booked from workshop_events w where w.id = ?");
+    $st->execute([$m[1]]);
+    $w = $st->fetch();
+    if (!$w) fail('Workshop-Termin nicht gefunden.', 404);
+    $custId = trim((string)($body['customer_id'] ?? ''));
+    $c = null;
+    if ($custId !== '') {
+      $cst = $p->prepare('select * from customers where id = ?'); $cst->execute([$custId]);
+      $c = $cst->fetch();
+      if (!$c) fail('Kunde nicht gefunden.', 404);
+    }
+    $name = $c ? trim(($c['company'] ?: trim(($c['first_name'] ?? '') . ' ' . ($c['last_name'] ?? '')))) : mb_substr(trim((string)($body['name'] ?? '')), 0, 120);
+    $email = $c ? trim((string)$c['email']) : mb_substr(trim((string)($body['email'] ?? '')), 0, 160);
+    if ($name === '') fail('Bitte einen Namen angeben.');
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL))
+      fail($c ? 'Beim Kunden ist keine gültige E-Mail-Adresse hinterlegt – bitte erst am Kunden nachtragen.' : 'Bitte eine gültige E-Mail-Adresse angeben – sonst kommt die Rechnung nicht an.');
+    $dup = $p->prepare("select count(*) from workshop_signups where workshop_id = ? and email = ? and status in ('angemeldet','warteliste')");
+    $dup->execute([$w['id'], $email]);
+    if ((int)$dup->fetchColumn()) fail('Mit dieser E-Mail-Adresse ist schon jemand für diesen Termin angemeldet bzw. auf der Warteliste.', 409);
+    $seats = max(1, min(20, (int)($body['seats'] ?? 1)));
+    $free = max(0, (int)$w['capacity'] - (int)$w['booked']);
+    $wantWaitlist = !empty($body['waitlist']);
+    if ($seats > $free && !$wantWaitlist)
+      out(['error' => ($free ? "Nur noch $free Platz/Plätze frei." : 'Der Termin ist ausgebucht.') . ' Auf die Warteliste setzen?', 'full' => true, 'free' => $free], 409);
+    $status = ($seats > $free) ? 'warteliste' : 'angemeldet';
+    $row = ['name' => $name, 'email' => $email,
+      'phone' => $c ? (string)$c['phone'] : mb_substr(trim((string)($body['phone'] ?? '')), 0, 60),
+      'street' => $c ? (string)$c['street'] : mb_substr(trim((string)($body['street'] ?? '')), 0, 160),
+      'zip' => $c ? (string)$c['zip'] : mb_substr(trim((string)($body['zip'] ?? '')), 0, 10),
+      'city' => $c ? (string)$c['city'] : mb_substr(trim((string)($body['city'] ?? '')), 0, 80)];
+    $sid = uuid();
+    $p->prepare('insert into workshop_signups (id, workshop_id, name, email, phone, seats, message, street, zip, city, status, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?)')
+      ->execute([$sid, $w['id'], $row['name'], $row['email'], $row['phone'], $seats,
+        mb_substr(trim((string)($body['message'] ?? '')), 0, 2000), $row['street'], $row['zip'], $row['city'], $status, now()]);
+    /* Kunde immer anlegen/zuordnen - auch ohne Rechnung soll der Teilnehmer in der Kundenliste stehen. */
+    [$cid] = $c ? [$c['id']] : workshopCustomer($p, $row);
+    $inv = null;
+    if ($status === 'angemeldet' && !empty($body['invoice'])) {
+      $r = workshopInvoice($p, $sid);
+      $inv = !empty($r['ok']) ? ['number' => $r['number'], 'mailed' => !empty($r['mailed'])] : ['error' => (string)($r['reason'] ?? 'Rechnung konnte nicht erstellt werden.')];
+    }
+    out(['ok' => true, 'signup_id' => $sid, 'status' => $status, 'customer_id' => $cid, 'invoice' => $inv], 201);
   }
   /* Rechnung zu einer Workshop-Anmeldung erzeugen + mailen (z. B. beim Nachrücken) – nur angemeldet */
   if (preg_match('#^workshop/([a-f0-9-]{30,40})/invoice$#', $path, $m) && $method === 'POST') {

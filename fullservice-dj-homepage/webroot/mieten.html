@@ -958,7 +958,15 @@ function submitCart(){
         document.getElementById('cartSubmitBtn').disabled=false;
         m.style.display='block';
         if(res.s>=400){m.className='msg err';m.textContent=res.j.error||'Anfrage fehlgeschlagen – bitte später erneut versuchen.';return}
-        m.className='msg ok';m.textContent='Danke! Eure Anfrage ist eingegangen – ihr bekommt in der Regel innerhalb von 24 Stunden eine Antwort mit Verfügbarkeit und Preis.';
+        /* Die angefragten Positionen bleiben in der Erfolgsmeldung sichtbar - der Tourcase
+           wird danach geleert, sonst stuende die Anfrage beim naechsten Besuch nochmal drin. */
+        var dtDe=function(x){var p=String(x||'').split('-');return p.length===3?p[2]+'.'+p[1]+'.'+p[0]:x};
+        var von=res.j.from||from,bis=res.j.to||to;
+        var pos=(res.j.items||[]).map(function(l){return '<li>'+esc(l.name)+' × '+l.qty+'</li>'}).join('');
+        m.className='msg ok';
+        m.innerHTML='<b>Danke! Eure Anfrage ist eingegangen.</b> Ihr bekommt in der Regel innerhalb von 24 Stunden eine Antwort mit Verfügbarkeit und Preis – eine Eingangsbestätigung ist gerade per E-Mail rausgegangen.'+
+          '<div style="margin-top:10px">Angefragt für '+esc(dtDe(von))+(bis&&bis!==von?' bis '+esc(dtDe(bis)):'')+':</div>'+
+          (pos?'<ul style="margin:6px 0 0 18px;padding:0">'+pos+'</ul>':'');
         CART=[];saveCart();renderRent();
       });
   }).catch(function(){document.getElementById('cartSubmitBtn').disabled=false});
