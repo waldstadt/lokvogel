@@ -130,6 +130,9 @@ footer a:hover{color:var(--acc)}
 .tc-panel.open{right:0}
 .tc-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:155;display:none}
 .tc-backdrop.open{display:block}
+/* Mobil liegt der Tourcase-Knopf (z-index 170) ueber dem offenen Seitenfenster und
+   verdeckte dort den Absenden-Knopf - solange das Fenster offen ist, weicht er aus. */
+@media(max-width:700px){body.tc-open .tc-fab{display:none}}
 .tc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
 .tc-head h3{font-size:19px}
 .tc-head h3 span{display:block;font-size:12px;font-weight:400;color:var(--mut);letter-spacing:0;text-transform:none;margin-top:2px}
@@ -800,9 +803,9 @@ function renderTcBadge(){
   var badge=document.getElementById('tcCount');
   badge.textContent=n;badge.style.display=n>0?'inline-block':'none';
 }
-function openTourcase(){document.getElementById('tcPanel').classList.add('open');document.getElementById('tcBackdrop').classList.add('open');
+function openTourcase(){document.getElementById('tcPanel').classList.add('open');document.getElementById('tcBackdrop').classList.add('open');document.body.classList.add('tc-open');
   var closeBtn=document.querySelector('#tcPanel .tc-close');if(closeBtn)closeBtn.focus();}
-function closeTourcase(){document.getElementById('tcPanel').classList.remove('open');document.getElementById('tcBackdrop').classList.remove('open');
+function closeTourcase(){document.getElementById('tcPanel').classList.remove('open');document.getElementById('tcBackdrop').classList.remove('open');document.body.classList.remove('tc-open');
   var btn=document.getElementById('tcBtn');if(btn)btn.focus();}
 function toggleTourcase(){document.getElementById('tcPanel').classList.contains('open')?closeTourcase():openTourcase()}
 var _toastT;

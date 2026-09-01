@@ -85,6 +85,11 @@ footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
   #printArea{display:block!important;background:#fff;color:#111}
 }
 .chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--mut);margin:14px 0}
+/* Mietvertrag mobil: "Pos" und die Zahlenspalten sollen nicht mitten im Wort umbrechen -
+   die Tabelle bekommt dafuer ihren eigenen Scrollbereich. */
+.items th,.items td:first-child,.items .num{white-space:nowrap}
+.items th:first-child,.items td:first-child{width:1%;padding-right:4px}
+.items-wrap{overflow-x:auto}
 .chk input{width:auto;margin-top:3px}
 </style>
 </head>
@@ -168,7 +173,7 @@ function submitPlz(){
   sessionStorage.setItem('portal_plz',PLZ);
   loadOffer();
 }
-var TYPE_NAME={angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'};
+var TYPE_NAME={angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein',gutschrift:'Gutschrift'};
 /* Eckdaten der Veranstaltung, wie sie am Beleg hinterlegt sind. Kommen als JSON-Text
    vom Server, deshalb beides annehmen. */
 var EV_KIND_LABEL={dj:'DJ',technik:'Technikvermietung',dj_technik:'DJ + Technik'};
@@ -317,18 +322,26 @@ function renderOffer(){
     localStorage.setItem(verKey,String(ver));
   }catch(e){}
   var verLine=ver>1?' · Version '+ver+(d.version_at?' (aktualisiert am '+dt(d.version_at.slice(0,10))+')':''):'';
+  /* Storno und Gutschrift muessen auch hier eindeutig sein: Banner "STORNIERT am ..." (plus
+     Korrekturbelege), Gutschrift mit "zu Rechnung ... vom ..." - und bei Storno keine
+     Zahlungsaufforderung ("Zahlbar bis") mehr. */
+  var bz=DOC.bezug||{},storniert=d.status==='storniert';
+  var stornoBox=storniert?'<div class="msg err" style="margin:0 0 12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Storniert'+(d.storno_at?' am '+dt(d.storno_at.slice(0,10)):'')+
+    ((bz.korrigiert_durch||[]).length?'<div style="font-weight:400;letter-spacing:0;text-transform:none;margin-top:3px">Korrigiert durch '+bz.korrigiert_durch.map(function(x){return (TYPE_NAME[x.doc_type]||'Beleg')+' '+esc(x.number)}).join(', ')+' – dieser Beleg ist nicht mehr zu bezahlen.</div>':
+      '<div style="font-weight:400;letter-spacing:0;text-transform:none;margin-top:3px">Dieser Beleg ist ungültig und nicht zu bezahlen.</div>')+'</div>':'';
+  var parentLine=d.doc_type==='gutschrift'&&bz.parent?' · zu '+(TYPE_NAME[bz.parent.doc_type]||'Rechnung')+' '+esc(bz.parent.number)+' vom '+dt(bz.parent.doc_date):'';
   var statusLine=d.status==='angenommen'?'<span class="status-b">'+(nachAblauf?'Angenommen – wird noch geprüft':'✓ Angenommen – danke euch!')+'</span>':
     (d.status==='abgelehnt'?'<span class="status-b" style="border-color:var(--mut2);color:var(--mut)">Abgelehnt</span>':'');
   /* Wer aus dem eigenen Kundenkonto kommt (CTOK gesetzt), soll ohne Browser-Zurück
      wieder in seine Unterlagen finden - ohne Konto gibt es dieses Ziel nicht. */
   app(
     (CTOK?'<p class="sub" style="margin:0 0 14px"><a href="portal.html">← Zurück zu meinen Unterlagen</a></p>':'')+
-    '<div class="card"><div class="kicker">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+verLine+'</div>'+
+    '<div class="card">'+stornoBox+'<div class="kicker">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+verLine+parentLine+'</div>'+
     (VER_UPDATED?'<div class="msg warn" style="margin-top:0">Dieses Angebot wurde seit deinem letzten Besuch aktualisiert – jetzt Version '+ver+'.</div>':'')+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
     '<div><h1>Hallo '+esc(DOC.customer)+'!</h1>'+
     (custAddressLine()?'<p class="sub">'+custAddressLine()+'</p>':'')+
-    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until?' · gültig bis '+dt(d.valid_until):'')+(rentalPeriodLabel(d.rental_from,d.rental_to)?' · '+rentalPeriodLabel(d.rental_from,d.rental_to):'')+'</p></div>'+
+    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until&&!storniert?' · gültig bis '+dt(d.valid_until):'')+(d.due_date&&!storniert&&d.doc_type!=='gutschrift'?' · zahlbar bis '+dt(d.due_date):'')+(rentalPeriodLabel(d.rental_from,d.rental_to)?' · '+rentalPeriodLabel(d.rental_from,d.rental_to):'')+'</p></div>'+
     '<button class="btn g" onclick="downloadPdf()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Als PDF speichern</button></div>'+
     (eventInfoRows(d)?'<div class="sub" style="margin-top:12px;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:9px 12px">'+eventInfoRows(d)+'</div>':'')+
     (statusLine?'<div style="margin-top:12px">'+statusLine+'</div>':'')+
@@ -561,16 +574,20 @@ function downloadPdf(){
     if(!d.is_small_business)totals+='<tr><td colspan="3" style="text-align:right;padding:6px">USt. '+Number(d.tax_rate)+' %</td><td style="text-align:right;padding:6px">'+euro(d.total_tax)+'</td></tr>';
     totals+='<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700">Gesamt</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(d.total_gross)+'</td></tr>';
   }
+  var bz=DOC.bezug||{},storniert=d.status==='storniert';
+  var banner=storniert?'<div style="border:2px solid #b00000;color:#b00000;padding:8px 12px;margin-bottom:18px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:13px">Storniert'+(d.storno_at?' am '+dt(d.storno_at.slice(0,10)):'')+
+    ((bz.korrigiert_durch||[]).length?'<div style="font-weight:400;letter-spacing:0;text-transform:none;font-size:11px;margin-top:2px">Korrigiert durch '+bz.korrigiert_durch.map(function(x){return (TYPE_NAME[x.doc_type]||'Beleg')+' '+esc(x.number)}).join(', ')+'</div>':'')+'</div>':'';
+  var parentSub=d.doc_type==='gutschrift'&&bz.parent?'<div style="color:#555;font-size:11px">zu '+(TYPE_NAME[bz.parent.doc_type]||'Rechnung')+' '+esc(bz.parent.number)+' vom '+dt(bz.parent.doc_date)+'</div>':'';
   document.getElementById('printArea').innerHTML=
-  '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-family:Inter,Arial,sans-serif;font-size:12px;line-height:1.55;color:#111">'+
+  '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-family:Inter,Arial,sans-serif;font-size:12px;line-height:1.55;color:#111">'+banner+
   '<div style="display:flex;justify-content:space-between;margin-bottom:36px"><div>'+
   '<div style="font-size:20px;font-weight:700">'+esc(c.name||'')+'</div>'+
   '<div style="color:#555">'+esc(c.owner||'')+'</div></div>'+
   '<div style="text-align:right;color:#555">'+esc(c.street||'')+'<br>'+esc(c.zip_city||'')+'<br>'+esc(c.phone||'')+'<br>'+esc(c.email||'')+'</div></div>'+
   '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px">'+
-  '<div style="font-size:17px;font-weight:700">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+
+  '<div><div style="font-size:17px;font-weight:700">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+parentSub+'</div>'+
   '<div style="text-align:right;color:#555">Für: '+esc(DOC.customer)+'<br>Datum: '+dt(d.doc_date)+((Number(d.version)||1)>1?'<br>Version '+d.version+(d.version_at?' vom '+dt(d.version_at.slice(0,10)):''):'')+
-  (d.valid_until?'<br>Gültig bis: '+dt(d.valid_until):'')+(d.due_date?'<br>Zahlbar bis: '+dt(d.due_date):'')+'</div></div>'+
+  (d.valid_until&&!storniert?'<br>Gültig bis: '+dt(d.valid_until):'')+(d.due_date&&!storniert?'<br>Zahlbar bis: '+dt(d.due_date):'')+'</div></div>'+
   (eventInfoLine(d)?'<div style="border:1px solid #ddd;border-left:3px solid #111;border-radius:4px;padding:7px 10px;margin-bottom:16px;color:#333">'+esc(eventInfoLine(d))+'</div>':'')+
   (d.intro_text?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
   '<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2">'+
@@ -580,7 +597,8 @@ function downloadPdf(){
   (d.outro_text?'<p style="margin-bottom:20px;white-space:pre-wrap">'+esc(d.outro_text)+'</p>':'')+
   '<div style="margin-top:36px;padding-top:10px;border-top:1px solid #ccc;font-size:10px;color:#666;display:flex;justify-content:space-between;gap:20px">'+
   '<div>'+esc(c.name||'')+(c.tax_id?'<br>St.-Nr.: '+esc(c.tax_id):'')+'</div>'+
-  '<div>'+(c.bank?esc(c.bank)+'<br>':'')+(c.iban?'IBAN: '+esc(c.iban)+'<br>':'')+(c.bic?'BIC: '+esc(c.bic):'')+'</div>'+
+  /* Bankverbindung nicht auf einem stornierten Beleg - da soll niemand mehr ueberweisen. */
+  '<div>'+(storniert?'':(c.bank?esc(c.bank)+'<br>':'')+(c.iban?'IBAN: '+esc(c.iban)+'<br>':'')+(c.bic?'BIC: '+esc(c.bic):''))+'</div>'+
   '<div>'+esc(c.phone||'')+'<br>'+esc(c.email||'')+'</div></div></div>';
   window.print();
 }
@@ -595,31 +613,82 @@ function loadForm(){
     });
 }
 function renderForm(){
-  if(FDEF.done){app('<div class="card"><h1>Danke euch!</h1><p class="sub" style="margin-top:8px">Dieser Fragebogen wurde bereits beantwortet – ich melde mich zeitnah bei euch.</p></div>');return}
+  if(FDEF.done){
+    /* Beantworteter Bogen: Antworten zum Nachlesen (aus dem Kundenkonto "Ansehen"),
+       statt nur "wurde bereits beantwortet" ohne Inhalt. */
+    var ans=FDEF.answers||[];
+    app('<div class="card"><div class="kicker">Ein paar Fragen</div><h1>'+esc(FDEF.title)+'</h1>'+
+      '<p class="sub" style="margin-top:8px">Beantwortet am '+dt(FDEF.submitted_at)+' – danke euch! Ich melde mich mit den nächsten Schritten. Hier sind eure Antworten zum Nachlesen:</p>'+
+      '<div style="margin-top:14px">'+(FDEF.fields||[]).map(function(f,i){
+        return '<div class="form-answer" style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)"><div class="sub" style="font-size:12.5px">'+esc(f.label)+'</div><div style="white-space:pre-wrap">'+esc(ans[i]||'–')+'</div></div>';
+      }).join('')+'</div>'+
+      (CTOK?'<p class="sub" style="margin-top:14px"><a href="portal.html">← Zurück zu meinen Unterlagen</a></p>':'')+'</div>');
+    return;
+  }
+  var req=function(f){return f.required?' <span style="color:var(--acc)" title="Pflichtfrage">*</span>':''};
   var fields=(FDEF.fields||[]).map(function(f,i){
     var t=f.type||'text';
-    if(t==='textarea')return '<label for="qf'+i+'">'+esc(f.label)+'</label><textarea id="qf'+i+'" data-i="'+i+'"></textarea>';
-    if(t==='select')return '<label for="qf'+i+'">'+esc(f.label)+'</label><select id="qf'+i+'" data-i="'+i+'"><option value="">– bitte wählen –</option>'+
+    if(t==='textarea')return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><textarea id="qf'+i+'" data-i="'+i+'"></textarea>';
+    if(t==='select')return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><select id="qf'+i+'" data-i="'+i+'"><option value="">– bitte wählen –</option>'+
       (f.options||[]).map(function(o){return '<option>'+esc(o)+'</option>'}).join('')+'</select>';
-    if(t==='checkbox')return '<label class="chk"><input type="checkbox" data-i="'+i+'"><span>'+esc(f.label)+'</span></label>';
-    return '<label for="qf'+i+'">'+esc(f.label)+'</label><input type="text" id="qf'+i+'" data-i="'+i+'">';
+    if(t==='multiselect')return '<div class="qlbl" style="margin-top:14px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut2)">'+esc(f.label)+req(f)+'</div><div data-i="'+i+'" data-multi="1">'+
+      (f.options||[]).map(function(o){return '<label class="chk" style="margin:6px 0;text-transform:none;letter-spacing:0;font-weight:400"><input type="checkbox" value="'+esc(o)+'"><span>'+esc(o)+'</span></label>'}).join('')+'</div>';
+    if(t==='checkbox')return '<label class="chk"><input type="checkbox" data-i="'+i+'"><span>'+esc(f.label)+req(f)+'</span></label>';
+    if(t==='date')return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><input type="date" id="qf'+i+'" data-i="'+i+'">';
+    return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><input type="text" id="qf'+i+'" data-i="'+i+'">';
   }).join('');
+  var hasReq=(FDEF.fields||[]).some(function(f){return f.required});
   app('<div class="card"><div class="kicker">Ein paar Fragen</div><h1>'+esc(FDEF.title)+'</h1>'+
     (FDEF.intro?'<p class="sub" style="margin-top:8px">'+esc(FDEF.intro)+'</p>':'')+
-    '<div class="msg" id="fMsg"></div><div style="margin-top:6px">'+fields+'</div>'+
-    '<div style="margin-top:22px"><button class="btn" id="fSend" onclick="submitForm()">Antworten absenden</button></div></div>');
+    (hasReq?'<p class="sub" style="font-size:12.5px">Fragen mit <span style="color:var(--acc)">*</span> brauche ich auf jeden Fall.</p>':'')+
+    '<div class="msg" id="fMsg"></div><div style="margin-top:6px" id="fFields">'+fields+'</div>'+
+    '<div style="margin-top:22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap"><button class="btn" id="fSend" onclick="submitForm()">Antworten absenden</button>'+
+    '<span class="sub" id="fProgress" style="font-size:13px"></span></div></div>');
+  var box=document.getElementById('fFields');
+  box.addEventListener('input',formProgress);box.addEventListener('change',formProgress);
+  formProgress();
+}
+/* Antworten einsammeln - Mehrfachauswahl als Liste, Haken als Ja/Nein. */
+function formAnswers(){
+  return (FDEF.fields||[]).map(function(f,i){
+    var el=document.querySelector('[data-i="'+i+'"]');
+    if(!el)return '';
+    if(el.getAttribute('data-multi'))return Array.prototype.map.call(el.querySelectorAll('input:checked'),function(x){return x.value});
+    if(el.type==='checkbox')return el.checked?'Ja':'Nein';
+    return el.value.trim();
+  });
+}
+function formAnswered(f,a){
+  if(Array.isArray(a))return a.length>0;
+  if((f.type||'text')==='checkbox')return a==='Ja';
+  return a!=='';
+}
+function formProgress(){
+  var el=document.getElementById('fProgress');if(!el||!FDEF)return;
+  var fs=FDEF.fields||[],a=formAnswers(),n=fs.filter(function(f,i){return formAnswered(f,a[i])}).length;
+  el.textContent=n+' von '+fs.length+' beantwortet';
 }
 function submitForm(){
-  var answers=[];
-  (FDEF.fields||[]).forEach(function(f,i){
-    var el=document.querySelector('[data-i="'+i+'"]');
-    answers[i]=el?(el.type==='checkbox'?(el.checked?'Ja':'Nein'):el.value.trim()):'';
-  });
-  document.getElementById('fSend').disabled=true;
+  var fs=FDEF.fields||[],answers=formAnswers();
+  /* Pflichtfragen vorab pruefen - der Server prueft nochmal, aber die Meldung hier
+     nennt gleich die Frage und springt hin. */
+  for(var i=0;i<fs.length;i++){
+    if(fs[i].required&&!formAnswered(fs[i],answers[i])){
+      showMsg('fMsg','err','Bitte beantwortet noch „'+fs[i].label+'“ – die Frage brauche ich für die Planung.');
+      var el=document.querySelector('[data-i="'+i+'"]');if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
+      if(el&&el.focus&&!el.getAttribute('data-multi'))el.focus();
+      return;
+    }
+  }
+  var btn=document.getElementById('fSend');btn.disabled=true;btn.textContent='Wird gesendet …';
   fetch(API+'/portal/form/'+FORM,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers:answers})})
-    .then(function(r){if(!r.ok)throw new Error();
+    .then(function(r){return r.json().catch(function(){return {}}).then(function(j){return {ok:r.ok,j:j}})})
+    .then(function(res){
+      /* Den Text des Servers zeigen ("Bitte fülle wenigstens eine Frage aus …") statt
+         eines pauschalen "Senden fehlgeschlagen". */
+      if(!res.ok)throw new Error((res.j&&res.j.error)||'Senden fehlgeschlagen – bitte erneut versuchen.');
       app('<div class="card"><h1>Danke euch!</h1><p class="sub" style="margin-top:8px">Eure Antworten sind angekommen. Ich melde mich in der Regel innerhalb von 24 Stunden mit den nächsten Schritten.</p></div>');
-    }).catch(function(){document.getElementById('fSend').disabled=false;showMsg('fMsg','err','Senden fehlgeschlagen – bitte erneut versuchen.')});
+    }).catch(function(e){btn.disabled=false;btn.textContent='Antworten absenden';showMsg('fMsg','err',e.message||'Senden fehlgeschlagen – bitte erneut versuchen.')});
 }
 
 /* ===================== DIGITALER MIETVERTRAG ===================== */
@@ -661,10 +730,10 @@ function renderRental(){
       '<div class="card"><div class="kicker">'+esc(d.company.name||'')+'</div><h2>Eure Ausfertigung</h2>'+
       '<p class="sub" style="margin-top:6px">'+esc(b.title||'Vermietung')+' · Mietzeitraum: <b>'+dt(b.event_date)+(b.end_date?' bis '+dt(b.end_date):'')+'</b> ('+b.days+' Miettag'+(b.days>1?'e':'')+')</p>'+
       '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:14px 0">'+
-      '<div style="flex:1;min-width:200px"><div class="kicker">Vermieter</div>'+esc(d.company.name||'')+'<br>'+esc(d.company.owner||'')+'<br>'+esc(d.company.street||'')+'<br>'+esc(d.company.zip_city||'')+'</div>'+
+      '<div style="flex:1;min-width:200px"><div class="kicker">Vermieter</div>'+esc(d.company.name||'')+'<br>'+esc(d.company.owner||'')+'<br>'+esc(d.company.street||'')+'<br>'+esc(d.company.zip_city||'')+(d.company.phone?'<br>Tel. '+esc(d.company.phone):'')+(d.company.email?'<br>'+esc(d.company.email):'')+'</div>'+
       '<div style="flex:1;min-width:200px"><div class="kicker">Mieter</div>'+esc(d.customer.name)+'<br>'+esc(d.customer.street||'')+'<br>'+esc(d.customer.zip_city||'')+'</div></div>'+
-      (d.items.length?('<table class="items"><thead><tr><th>Pos</th><th>Mietgegenstand</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead><tbody>'+rowsU+
-        '</tbody></table><div style="text-align:right;margin:8px 0 4px"><b>Gesamt: '+euro(total)+' inkl. MwSt.</b></div>'):'')+
+      (d.items.length?('<div class="items-wrap"><table class="items"><thead><tr><th>Pos</th><th>Mietgegenstand</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead><tbody>'+rowsU+
+        '</tbody></table></div><div style="text-align:right;margin:8px 0 4px"><b>Gesamt: '+euro(total)+' inkl. MwSt.</b></div>'):'')+
       (d.deposit_amount?('<div style="text-align:right;margin:0 0 4px">Vereinbarte Kaution: <b>'+euro(d.deposit_amount)+'</b> · wird bei vollständiger, unbeschädigter Rückgabe erstattet</div>'):'')+
       '<details style="margin:14px 0"><summary style="cursor:pointer;font-weight:600">Vertragsbedingungen anzeigen</summary>'+
       '<div class="sub" style="white-space:pre-wrap;margin-top:10px;font-size:13px">'+esc(d.terms)+'</div></details></div>');
@@ -676,10 +745,10 @@ function renderRental(){
   app('<div class="card"><div class="kicker">'+esc(d.company.name||'')+'</div><h1>Mietvertrag über Veranstaltungstechnik</h1>'+
     '<p class="sub" style="margin-top:6px">'+esc(b.title||'Vermietung')+' · Mietzeitraum: <b>'+dt(b.event_date)+(b.end_date?' bis '+dt(b.end_date):'')+'</b> ('+b.days+' Miettag'+(b.days>1?'e':'')+')</p>'+
     '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:14px 0">'+
-    '<div style="flex:1;min-width:200px"><div class="kicker">Vermieter</div>'+esc(d.company.name||'')+'<br>'+esc(d.company.owner||'')+'<br>'+esc(d.company.street||'')+'<br>'+esc(d.company.zip_city||'')+'</div>'+
+    '<div style="flex:1;min-width:200px"><div class="kicker">Vermieter</div>'+esc(d.company.name||'')+'<br>'+esc(d.company.owner||'')+'<br>'+esc(d.company.street||'')+'<br>'+esc(d.company.zip_city||'')+(d.company.phone?'<br>Tel. '+esc(d.company.phone):'')+(d.company.email?'<br>'+esc(d.company.email):'')+'</div>'+
     '<div style="flex:1;min-width:200px"><div class="kicker">Mieter</div>'+esc(d.customer.name)+'<br>'+esc(d.customer.street||'')+'<br>'+esc(d.customer.zip_city||'')+'</div></div>'+
-    (d.items.length?('<table class="items"><thead><tr><th>Pos</th><th>Mietgegenstand</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead><tbody>'+rows+
-      '</tbody></table><div style="text-align:right;margin:8px 0 4px"><b>Gesamt: '+euro(total)+' inkl. MwSt.</b></div>'):'')+
+    (d.items.length?('<div class="items-wrap"><table class="items"><thead><tr><th>Pos</th><th>Mietgegenstand</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead><tbody>'+rows+
+      '</tbody></table></div><div style="text-align:right;margin:8px 0 4px"><b>Gesamt: '+euro(total)+' inkl. MwSt.</b></div>'):'')+
     (d.deposit_amount?('<div style="text-align:right;margin:0 0 4px">Vereinbarte Kaution: <b>'+euro(d.deposit_amount)+'</b> · wird bei vollständiger, unbeschädigter Rückgabe erstattet</div>'):'')+
     '<details style="margin:14px 0"><summary style="cursor:pointer;font-weight:600">Vertragsbedingungen anzeigen</summary>'+
     '<div class="sub" style="white-space:pre-wrap;margin-top:10px;font-size:13px">'+esc(d.terms)+'</div></details></div>'+
@@ -861,7 +930,7 @@ function doForgot(){
       m.textContent='Wenn zu dieser Adresse ein Zugang existiert, ist gerade eine E-Mail mit einem Link unterwegs.'});
 }
 function logout(){CTOK='';localStorage.removeItem('cust_tok');renderLogin()}
-var TYPE_LABEL={angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein'};
+var TYPE_LABEL={angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein',gutschrift:'Gutschrift'};
 function loadAccount(){
   cfetch('portal/account/me').then(function(r){
     if(r.status===401){renderLogin();return null}

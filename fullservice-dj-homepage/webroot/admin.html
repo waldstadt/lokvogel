@@ -161,6 +161,8 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .tile.click{cursor:pointer}.tile.click:hover{border-color:var(--acc)}
 .tile .tv{font-size:24px;font-weight:700;color:var(--acc)}
 .tile .tl{font-size:10px;color:var(--gl);letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
+/* Fussnote unter Statistik-Kacheln: --gl auf --cd = 5,3:1 */
+.tile .tn{font-size:10.5px;color:var(--gl);margin-top:6px;line-height:1.4}
 /* Hinweiskaesten (Anfrage-Dialog, Storno-Rueckfrage) und GoBD-Kurzhinweise. Farben gegen
    --cd (#17181c) gerechnet: #8cc98c 9,2:1, --redl 6,5:1, --gll 7,9:1. */
 .msg{border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--gll)}
@@ -283,8 +285,11 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
 .totals{margin-top:12px;text-align:right;font-size:12px}
 .totals b{font-size:15px;color:var(--acc)}
 
-.toast{position:fixed;bottom:20px;right:20px;background:var(--cd2);border:1px solid var(--acc);color:var(--wh);padding:11px 18px;font-size:12px;z-index:300;display:none;max-width:420px;cursor:pointer;user-select:text}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--cd2);border:1px solid var(--acc);color:var(--wh);padding:11px 34px 11px 18px;font-size:12px;z-index:300;display:none;max-width:420px;cursor:pointer;user-select:text}
 .toast.err{border-color:var(--red)}
+/* Schliessen-Kreuz als Pseudo-Element: der Toast-Text bleibt reiner Text (textContent),
+   das Kreuz ist trotzdem immer sichtbar - Klick irgendwo auf den Toast blendet aus. */
+.toast::after{content:'\2715';position:absolute;right:12px;top:10px;color:var(--gll);font-size:12px}
 .mut{color:var(--gl)}.sml{font-size:11px}
 .theme-sw{display:inline-block;width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;margin-right:6px;vertical-align:middle}
 /* Schriftauswahl: jede Kachel zeigt denselben Satz in der jeweiligen Schrift - so sieht
@@ -310,7 +315,14 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
   html,body{background:#fff!important}
   body>*{display:none!important}
   #printArea{display:block!important;background:#fff;color:#111;font-family:'Inter',sans-serif}
+  /* Mehrseitige Belege: Tabellenkopf auf jeder Seite wiederholen, Positionen nicht
+     mitten in der Zeile umbrechen, Seitenzahl in der Fusszeile (wo der Browser
+     @page-Randfelder kann). */
+  #printArea thead{display:table-header-group}
+  #printArea tr{page-break-inside:avoid;break-inside:avoid}
+  #printArea .pb-avoid{page-break-inside:avoid;break-inside:avoid}
 }
+@page{margin:16mm 14mm 18mm;@bottom-right{content:"Seite " counter(page) " von " counter(pages);font-size:9px;color:#666}}
 </style>
 </head>
 <body>
@@ -409,6 +421,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="cdName"></div><div class="ps" id="cdSub"></div></div>
       <div><button class="btn g sm" onclick="openCustModal(curCust)">Bearbeiten</button>
       <button class="btn g sm" onclick="custComposeMail()">E-Mail schreiben</button>
+      <button class="btn g sm" onclick="custFormSend()">Fragebogen senden</button>
       <button class="btn sm" onclick="newDocFor('angebot')">Angebot erstellen</button></div></div>
     <div class="grid2" style="gap:16px;align-items:start">
       <div>
@@ -472,7 +485,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
 
   <!-- E-MAIL-VORLAGEN -->
   <div class="pg" id="pg-tpl">
-    <div class="phead"><div><div class="pt">E-Mail-Vorlagen</div><div class="ps">Antwort-Bausteine für Anfragen – Platzhalter: {vorname} {name} {datum} {anlass} {ort} · in Rechnungs-/Angebotsmails außerdem {nr} {betrag} {faellig} {link} {fragebogen} {bewertungen}</div></div>
+    <div class="phead"><div><div class="pt">E-Mail-Vorlagen</div><div class="ps">Antwort-Bausteine für Anfragen, Belege und Fragebögen – Platzhalter werden beim Schreiben automatisch gefüllt: <span id="tplPhHead"></span></div></div>
       <button class="btn" onclick="openTplModal()">+ Neue Vorlage</button></div>
     <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Betreff</th><th class="num">Sortierung</th></tr></thead><tbody id="tplRows"></tbody></table></div>
     <div class="card"><h3>Upsell-Extras <span class="mut sml" style="font-weight:400">– erscheinen im Kundenkonto unter jedem Angebot und per „+ Extra“ im Editor</span> <button class="btn sm" style="float:right" onclick="openUpModal()">+ Extra</button></h3><div id="upList" class="sml"></div></div>
@@ -726,10 +739,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
       <button class="btn" onclick="openModulModal()">+ Modul</button></div>
     <div class="mut sml" style="margin-bottom:12px">Jedes Modul hängt hinter einem festen Bereich. Reihenfolge innerhalb desselben Ankers per Ziehen am ⠿-Griff, Klick aufs Badge schaltet live/aus. Ist der Bereich davor ausgeschaltet, wird das Modul mit ausgeblendet.</div>
     <div id="blockList" class="sml"></div>
-
-    <div class="card" style="margin-top:22px"><h3>Veranstaltungsberichte <button class="btn sm" style="float:right" onclick="openReportModal()">+ Bericht</button></h3>
-      <div class="mut sml" style="margin-bottom:8px">Echte Feiern mit kurzem Text und Fotos. Auf der Seite erscheinen nur Kacheln – der ganze Text steht erst im Detailfenster, damit die Startseite kompakt bleibt. Angezeigt werden sie über ein Modul der Art „Veranstaltungsberichte". Reihenfolge per Ziehen am ⠿-Griff.</div>
-      <div id="reportList" class="sml"></div></div>
+    <div class="mut sml" style="margin-top:14px">Die Veranstaltungsberichte selbst pflegst du unter <a onclick="gotoSetting('cms-reports')">Inhalte → Sammlungen &amp; Listen</a> – hier legst du nur das Modul an, das sie auf der Startseite zeigt.</div>
   </div>
 
   <!-- CMS -->
@@ -823,6 +833,9 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <label>Adresse</label><input id="cCtAddr">
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('contact')">Speichern</button></div></div>
     <div class="sec-label">Sammlungen &amp; Listen</div>
+        <div class="card" id="cms-reports"><h3>Veranstaltungsberichte <button class="btn sm" style="float:right" onclick="openReportModal()">+ Bericht</button></h3>
+          <div class="mut sml" style="margin-bottom:8px">Echte Feiern mit kurzem Text und Fotos. Auf der Seite erscheinen nur Kacheln – der ganze Text steht erst im Detailfenster, damit die Startseite kompakt bleibt. Erscheint auf der Startseite über das Modul „Berichte“ (Module → + Modul → Veranstaltungsberichte). Reihenfolge per Ziehen am ⠿-Griff.</div>
+          <div id="reportList" class="sml"></div></div>
         <div class="card"><h3>Leistungspakete <button class="btn sm" style="float:right" onclick="openPackModal()">+ Paket</button></h3>
           <label style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cPackImgs" style="width:auto;margin-right:6px" onchange="savePackSec()">Bilder in den Paketkacheln anzeigen</label>
           <div class="mut sml" style="margin-bottom:8px">Ohne Haken sehen die Kacheln aus wie bisher – nützlich, solange noch nicht jedes Paket ein Bild hat. Reihenfolge per Ziehen am ⠿-Griff ändern, Klick aufs Badge schaltet live/aus.</div>
@@ -1023,6 +1036,10 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
             <div><label>Nachfassen nach (Tage ohne Reaktion auf ein Angebot)</label><input type="number" id="sFollowDays" min="1"></div>
           </div>
           <div class="grid2">
+            <div><label>Fragebogen-Erinnerung nach (Tage ohne Antwort)</label><input type="number" id="sFormRemind" min="1"></div>
+            <div></div>
+          </div>
+          <div class="grid2">
             <div><label>Standard-Technik bei DJ-Gigs</label><select id="sDjSet"><option value="">– keine –</option></select>
               <div class="mut sml" style="margin-top:3px">Wird jedem neuen DJ-Gig automatisch zugeordnet (im Gig änderbar). Sets legst du unter Technik an.</div></div>
           </div>
@@ -1164,7 +1181,8 @@ function toast(msg,err){
   t.onclick=function(){t.style.display='none';if(TOAST_HIDE_T)clearTimeout(TOAST_HIDE_T)};
   t.style.display='block';
   if(TOAST_HIDE_T)clearTimeout(TOAST_HIDE_T);
-  TOAST_HIDE_T=setTimeout(function(){t.style.display='none'},err?20000:3200);
+  /* Fehler bleiben 8 s stehen - 20 s hingen wie ein Dauerhinweis auf jeder Seite. */
+  TOAST_HIDE_T=setTimeout(function(){t.style.display='none'},err?8000:3200);
 }
 /* Bildpfade und Positionsangaben gehen in CSS-Deklarationen - Anfuehrungszeichen,
    Klammern und Semikola erlauben dort den Ausbruch aus der Deklaration. */
@@ -1403,9 +1421,46 @@ function openWsDetail(id){
     '<div class="sml mut" style="margin-bottom:10px">Belegt: <b style="color:var(--wh)">'+wsBooked(id)+' / '+(w.capacity||0)+'</b>'+
     (wsWaitlist(id)?' · Warteliste: <b style="color:var(--wh)">'+wsWaitlist(id)+'</b>':'')+
     (w.price_net!=null?' · Preis p. P.: '+euro(w.price_net):'')+' – Rechnung geht automatisch per Mail raus.</div>'+
-    '<div style="margin-bottom:12px"><button class="btn sm" onclick="wsAddModal(\''+id+'\')">+ Teilnehmer erfassen</button></div>'+
+    '<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" onclick="wsAddModal(\''+id+'\')">+ Teilnehmer erfassen</button>'+
+    (sg.length?'<button class="btn g sm" onclick="wsPrintList(\''+id+'\')">Teilnehmerliste drucken</button><button class="btn g sm" onclick="wsCsv(\''+id+'\')">CSV-Export</button>':'')+'</div>'+
     (sg.length?('<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Kontakt</th><th class="num">Plätze</th><th>Antworten</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>')
       :'<span class="mut">Noch keine Anmeldungen.</span>'));
+}
+/* Teilnehmerliste fuer den Workshop-Tag: Name, Plaetze, Status, bezahlt - zum Abhaken. */
+function wsListRows(wid){
+  var order={angemeldet:0,warteliste:1,storniert:2};
+  return (CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===wid&&s.status!=='storniert'})
+    .sort(function(a,b){return (order[a.status]||0)-(order[b.status]||0)||String(a.name).localeCompare(String(b.name),'de')})
+    .map(function(s){
+      var inv=s.invoice_id?(CACHE.documents||[]).find(function(d){return d.id===s.invoice_id}):null;
+      return {name:s.name,email:s.email||'',phone:s.phone||'',seats:s.seats||1,status:s.status,
+        paid:inv?(inv.status==='bezahlt'?'bezahlt':'offen ('+inv.number+')'):'–'};
+    });
+}
+function wsPrintList(wid){
+  var w=(CACHE.wsEvents||[]).find(function(x){return x.id===wid});if(!w)return;
+  var comp=S.company||{},rows=wsListRows(wid);
+  document.getElementById('printArea').innerHTML=
+  '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
+  '<div style="font-size:18px;font-weight:700">Teilnehmerliste</div>'+
+  '<div style="color:#555;margin-bottom:16px">'+esc(w.title)+' · '+dt(w.event_date)+(w.start_time?' · '+w.start_time.slice(0,5)+' Uhr':'')+(w.location?' · '+esc(w.location):'')+
+  ' · '+wsBooked(wid)+' / '+(w.capacity||0)+' Plätze belegt</div>'+
+  '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f2f2f2">'+
+  '<th style="padding:6px;text-align:left">Name</th><th style="padding:6px;text-align:left">Kontakt</th><th style="padding:6px;text-align:right">Plätze</th><th style="padding:6px;text-align:left">Status</th><th style="padding:6px;text-align:left">Bezahlt</th><th style="padding:6px;text-align:center">Da</th></tr></thead><tbody>'+
+  rows.map(function(r){return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+esc(r.name)+'</td><td style="padding:6px;border-bottom:1px solid #ddd;color:#555">'+esc(r.email)+(r.phone?'<br>'+esc(r.phone):'')+'</td>'+
+    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+r.seats+'</td><td style="padding:6px;border-bottom:1px solid #ddd">'+esc(r.status)+'</td><td style="padding:6px;border-bottom:1px solid #ddd">'+esc(r.paid)+'</td>'+
+    '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:center"><span style="display:inline-block;width:14px;height:14px;border:1px solid #111"></span></td></tr>'}).join('')+
+  '</tbody></table>'+
+  '<div style="margin-top:24px;color:#777;border-top:1px solid #ddd;padding-top:10px">'+esc(comp.name||'')+(comp.phone?' · '+esc(comp.phone):'')+'</div></div>';
+  window.print();
+}
+function wsCsv(wid){
+  var w=(CACHE.wsEvents||[]).find(function(x){return x.id===wid});if(!w)return;
+  var rows=[['Name','E-Mail','Telefon','Plätze','Status','Bezahlt'].join(';')].concat(wsListRows(wid).map(function(r){
+    return [r.name,r.email,r.phone,r.seats,r.status,r.paid].map(function(x){return String(x==null?'':x).replace(/;/g,',').replace(/[\r\n]+/g,' ')}).join(';')}));
+  var blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='teilnehmer-'+String(w.event_date||'').slice(0,10)+'.csv';a.click();
+  toast('Teilnehmerliste als CSV exportiert ✓');
 }
 /* Teilnehmer von Hand erfassen (Anmeldung per Telefon oder Mail): bestehenden Kunden
    waehlen oder neu eintragen - der Server legt den Kunden nach denselben Regeln an wie
@@ -1477,16 +1532,17 @@ function wsPromote(sid,wid){
   var s=(CACHE.wsSignups||[]).find(function(x){return x.id===sid});
   var free=(w.capacity||0)-wsBooked(wid);
   if((s.seats||1)>free&&!confirm('Achtung: Der Termin hat nur noch '+free+' freie Plätze – nachrücken lassen und überbuchen?'))return;
-  api('workshop_signups?id=eq.'+sid,{method:'PATCH',body:{status:'angemeldet'}})
-    .then(function(){
-      return fetch('api.php/workshop/'+sid+'/invoice',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}})
-        .then(function(r){return r.json()}).catch(function(){return {}});
-    })
-    .then(function(inv){
-      if(inv&&inv.ok)toast(inv.mailed?('Nachgerückt ✓ Rechnung '+inv.number+'wurde automatisch gemailt.')
-        :('Nachgerückt ✓ Rechnung '+inv.number+' erstellt – Mailversand prüfen/manuell senden.'));
-      else toast('Nachgerückt ✓ (keine Rechnung: '+((inv&&inv.reason)||'siehe Termin-Preis')+')');
-      refreshDocs();
+  /* Der Server setzt den Status, legt bei Preis die Rechnung an und schickt EINE Mail
+     (Vorlage "Nachgerückt"), die Platz und Rechnungslink zusammen erklaert. */
+  fetch('api.php/workshop/'+sid+'/promote',{method:'POST',headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j})})
+    .then(function(j){
+      var inv=j.invoice;
+      var txt='Nachgerückt ✓ '+(j.mailed?'Der Teilnehmer ist per E-Mail informiert':'Mail kam nicht raus – Wiedervorlage im Dashboard');
+      if(inv&&inv.ok)txt+=' · Rechnung '+inv.number+(j.mailed?' ist im selben Schreiben verlinkt.':' erstellt.');
+      else if(inv&&inv.reason)txt+=' · keine Rechnung: '+inv.reason;
+      toast(txt,j.mailed?0:1);
+      refreshDocs();refreshComms();
       return api('workshop_signups?select=*&order=created_at.desc');
     })
     .then(function(r){CACHE.wsSignups=r||[];renderWsAdmin();openWsDetail(wid)}).catch(function(e){toast(e.message,1)});
@@ -1554,6 +1610,19 @@ function renderDash(){
     else if(/nicht versendet|nicht zugestellt|nicht rausgegangen|NICHT gemailt/i.test(c.subject||''))again=' <button class="btn g sm" onclick="composeFromNote(\''+c.id+'\')">Selbst schreiben</button>';
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openCustDetail(\''+c.customer_id+'\')">'+esc(custName(cu))+'</a> <span class="mut">'+esc(c.subject||c.channel)+' · fällig '+dt(c.followup_at)+'</span>'+again+' <span id="fud-'+c.id+'"><a class="sml" onclick="askFollowDone(\''+c.id+'\')">✓ erledigt</a></span></div>';
   }).join('')||'Nichts fällig.';
+  /* Frageboegen, die laenger als die Erinnerungsfrist offen sind: hier erinnern, statt
+     dass sie still auf der Fragebogen-Seite liegen. */
+  var frDays=Number((S.defaults||{}).form_reminder_days)||7;
+  var frGrenze=new Date(Date.now()-frDays*86400000).toISOString();
+  var oldForms=(CACHE.forms||[]).filter(function(f){return f.status==='offen'&&f.created_at&&f.created_at<frGrenze})
+    .sort(function(a,b){return a.created_at<b.created_at?-1:1});
+  if(oldForms.length)document.getElementById('dashFollow').innerHTML+='<div class="sml" style="margin-top:10px;color:var(--gll)">Fragebögen ohne Antwort <span class="mut">(älter als '+frDays+' Tage)</span></div>'+
+    oldForms.slice(0,6).map(function(f){
+      var fc=f.customer_id?CACHE.customers.find(function(x){return x.id===f.customer_id}):null;
+      var tage=Math.round((Date.now()-new Date(f.created_at))/86400000);
+      return '<div class="form-remind" style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="showPage(\'forms\')">'+esc(f.title)+'</a> <span class="mut">'+(fc?esc(custName(fc))+' · ':'')+'seit '+tage+' Tagen offen</span>'+
+        ' <span style="white-space:nowrap;float:right"><button class="btn g sm" onclick="formSendMail(\''+f.id+'\',true)">Erinnern</button> <button class="btn g sm" onclick="copyFormLink(\''+f.token+'\')">Link</button></span><div style="clear:both"></div></div>';
+    }).join('');
   /* Angebote/ABs, die raus sind und auf die nichts zurueckkam - nach Wartezeit sortiert.
      Ab der Nachfassen-Frist (Einstellungen) oder nach Ablauf der Gueltigkeit hervorgehoben. */
   var fuDays=Number((S.defaults||{}).followup_days)||7;
@@ -1701,7 +1770,7 @@ function openEventDoc(evId,docId){
 }
 /* Kacheln mit Ziel sind klickbar und fuehren direkt in die passende Liste - vorher war
    die Zahl eine Sackgasse und man musste den Weg ueber die Navigation suchen. */
-function tile(v,l,go){return '<div class="tile'+(go?' click':'')+'"'+(go?' onclick="'+go+'"':'')+'><div class="tv">'+v+'</div><div class="tl">'+l+'</div></div>'}
+function tile(v,l,go,note){return '<div class="tile'+(go?' click':'')+'"'+(go?' onclick="'+go+'"':'')+'><div class="tv">'+v+'</div><div class="tl">'+l+'</div>'+(note?'<div class="tn">'+note+'</div>':'')+'</div>'}
 function gotoDocs(type,status){showPage('docs');document.getElementById('docsFType').value=type||'';document.getElementById('docsFStatus').value=status||'';document.getElementById('docsFCust').value='';renderDocsPage()}
 function markFollowDone(id){api('communications?id=eq.'+id,{method:'PATCH',body:{followup_done:true}}).then(function(){loadAll();toast('Erledigt ✓')})}
 /* Leichte Rueckfrage direkt in der Zeile - ein Fehlklick auf "erledigt" liess die
@@ -2151,7 +2220,7 @@ function openBookDetail(id){
   document.getElementById('bdData').innerHTML=
     row('Anlass',b.event_type)+row('Zeit',[b.start_time,b.end_time].filter(Boolean).join(' – '))+
     row('Location',b.venue_name)+row('Adresse',b.venue_address)+row('Gäste',b.guests)+
-    row('Gig-Wert',bookingValue(b)?euro(bookingValue(b)):'')+row('Notizen',b.notes)+
+    (bookingValue(b)?'<div style="padding:3px 0"><span class="mut" style="display:inline-block;width:90px;cursor:help;border-bottom:1px dotted var(--gl)" title="Wert laut Beleg (Auftragsbestätigung/Angebot), nicht Gesamtsumme aller Belege">Gig-Wert</span>'+euro(bookingValue(b))+'</div>':'')+row('Notizen',b.notes)+
     (b.customer_notes&&(b.customer_notes.schedule||b.customer_notes.music||b.customer_notes.agreements)
       ?'<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b style="color:var(--acc)">Vom Kunden gepflegt'+(b.customer_notes.updated_at?' ('+dt(b.customer_notes.updated_at)+')':'')+':</b>'+
        row('Programmablauf',b.customer_notes.schedule)+row('Musikwünsche',b.customer_notes.music)+row('Vereinbarungen',b.customer_notes.agreements)+'</div>':'');
@@ -2616,6 +2685,14 @@ function saveRider(){
     Object.assign(curBook,sync);closeModal();toast('Rider gespeichert ✓');openBookDetail(curBook.id);
   }).catch(function(e){toast(e.message,1)});
 }
+/* Uebernachtung laut Schwelle aus den Einstellungen (Fahrzeit oder Strecke) - nur wenn
+   erreicht, sonst leer, damit die Zeile im Rider wegfaellt. */
+function riderOvernight(r){
+  if(!overnightEnabled())return '';
+  var val=overnightThresholdType()==='zeit'?Number(r.travel_minutes):Number(r.distance_km),th=overnightThresholdValue();
+  if(!val||!th||val<th)return '';
+  return 'eingeplant (ab '+th+(overnightThresholdType()==='zeit'?' Min. Fahrzeit':' km')+(overnightPrice()?', '+euro(overnightPrice()):'')+')';
+}
 function printRider(){
   var b=curBook,r=riderOf(b),comp=S.company||{},cust=b.customers||CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
   var tech=CACHE.be.filter(function(x){return x.booking_id===b.id}).map(function(x){
@@ -2640,6 +2717,8 @@ function printRider(){
   pr('Musikwünsche',r.music)+
   pr('No-Gos',r.nogos)+
   pr('Entfernung (einfach)',r.distance_km?r.distance_km+' km':'')+
+  pr('Fahrzeit (einfach)',r.travel_minutes?r.travel_minutes+' Min.':'')+
+  pr('Übernachtung',riderOvernight(r))+
   pr('Technik',tech)+
   pr('Sonstiges / Ablauf',r.notes)+
   '</table>'+
@@ -3358,13 +3437,15 @@ function composeReminderMail(){
     return;
   }
   var cust=CACHE.customers.find(function(c){return c.id===d.customer_id})||{};
-  var tpl=(CACHE.tpls||[]).find(function(t){return /zahlungserinnerung/i.test(t.name)})||{subject:'Kleine Erinnerung: Rechnung {nr}',body:''};
+  var tpl=tplKey('zahlungserinnerung')||{subject:'Kleine Erinnerung: Rechnung {nr}',
+    body:'Hallo {vorname},\n\nmir ist aufgefallen, dass die Rechnung {nr} über {betrag} (fällig am {faellig}) noch offen ist. Hier ist der Link zum Ansehen und als PDF:\n{link}\n\nFalls die Zahlung schon unterwegs ist: einfach ignorieren.\n\nViele Grüße\n{inhaber}'};
   var link=portalUrl('a',d.share_token);
-  var map={'{vorname}':cust.first_name||'','{name}':custName(cust),'{nr}':d.number,'{nummer}':d.number,
-    '{betrag}':euro(d.total_gross),'{faellig}':dt(d.due_date),'{link}':link,'{datum}':dt(d.due_date),
-    '{telefon}':(S.company&&S.company.phone)||'','{inhaber}':ownerName(),'{firma}':(S.company&&S.company.name)||''};
-  var fill=function(s){return (s||'').replace(/\{vorname\}|\{name\}|\{nr\}|\{nummer\}|\{betrag\}|\{faellig\}|\{link\}|\{datum\}|\{telefon\}|\{inhaber\}|\{firma\}/g,function(m){return map[m]!==undefined?map[m]:m})};
-  var subj=fill(tpl.subject),body=fill(tpl.body);
+  /* Dieselbe Fuellung wie alle anderen Vorlagen (fillTpl): {faellig} ist das Zahlungsziel,
+     {datum} bleibt der Veranstaltungstermin - vorher hiess {datum} hier still "faellig am". */
+  var b=(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id})||{};
+  var ctx={name:custName(cust),email:cust.email,customer_id:cust.id,booking_id:d.booking_id||null,event_date:b.event_date||null,
+    location:b.venue_name||'',event_type:b.event_type||b.title||'',_nummer:d.number,_link:link,_betrag:euro(d.total_gross),_faellig:dt(d.due_date),_gueltig:'–',_doc:true};
+  var subj=fillTpl(tpl.subject,ctx),body=fillTpl(tpl.body,ctx);
   openModal('Zahlungserinnerung – '+esc(d.number),
     '<label>An</label><input id="remTo" value="'+esc(cust.email||'')+'">'+
     '<label>Betreff</label><input id="remSubject" value="'+esc(subj)+'">'+
@@ -4258,8 +4339,9 @@ function createLieferschein(){
     printLieferschein(d,list);
   }).catch(function(e){toast(e.message,1)});
 }
-function printLieferschein(d,list){
-  var b=curBook,comp=S.company||{},cust=CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
+function printLieferschein(d,list,b){
+  b=b||curBook;
+  var comp=S.company||{},cust=CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
   var rows=list.map(function(it,i){
     return '<tr><td style="padding:8px;border-bottom:1px solid #ddd">'+(i+1)+'</td>'+
     '<td style="padding:8px;border-bottom:1px solid #ddd">'+esc(it.name)+(it.notes?'<div style="font-size:10px;color:#666">'+esc(it.notes)+'</div>':'')+'</td>'+
@@ -4306,7 +4388,7 @@ function printMietvertrag(rc){
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:11px;line-height:1.55">'+
   '<div style="font-size:18px;font-weight:700;margin-bottom:16px">Mietvertrag über Veranstaltungstechnik</div>'+
   '<div style="display:flex;gap:30px;margin-bottom:18px">'+
-  '<div style="flex:1"><b>Vermieter</b><br>'+esc(comp.name||'')+'<br>'+esc(comp.owner||'')+'<br>'+esc(comp.street||'')+'<br>'+esc(comp.zip_city||'')+'</div>'+
+  '<div style="flex:1"><b>Vermieter</b><br>'+esc(comp.name||'')+'<br>'+esc(comp.owner||'')+'<br>'+esc(comp.street||'')+'<br>'+esc(comp.zip_city||'')+(comp.phone?'<br>Tel. '+esc(comp.phone):'')+(comp.email?'<br>'+esc(comp.email):'')+'</div>'+
   '<div style="flex:1"><b>Mieter</b><br>'+esc(custName(cust))+'<br>'+esc(cust.street||'')+'<br>'+esc([cust.zip,cust.city].filter(Boolean).join(' '))+'<br>'+esc(cust.phone||'')+'</div></div>'+
   '<div style="margin-bottom:14px"><b>Mietzeitraum:</b> '+dt(b.event_date)+(b.end_date?' bis '+dt(b.end_date):'')+' ('+days+' Miettag'+(days>1?'e':'')+', 1 Miettag = 24 Stunden ab Übergabe)'+
   (b.venue_name?'<br><b>Einsatzort:</b> '+esc(b.venue_name):'')+'</div>'+
@@ -4453,7 +4535,31 @@ function docPrintedSum(items,f){
   var filtered=items.filter(function(it){return it.description});
   return groupDocItems(filtered).reduce(function(s,g){return s+printedGroupTotal(filtered,g,f)},0);
 }
-function printDoc(){
+/* Ohne Steuernummer/USt-IdNr. oder IBAN darf kein Zahlbeleg raus (Pflichtangaben). Drucken
+   laesst sich mit "Trotzdem drucken" erzwingen (z. B. Entwurf fuer die eigene Ablage),
+   Versand und Kundenlink nicht. */
+function docSendBlockers(){
+  var c=S.company||{},out=[];
+  if(!String(c.tax_id||'').trim()&&!String(c.vat_id||'').trim())out.push({text:'Steuernummer oder USt-IdNr.',go:'set-company'});
+  if(!String(c.iban||'').trim())out.push({text:'IBAN',go:'set-bank'});
+  return out;
+}
+function showSendBlockers(list,mode){
+  openModal('Vor dem Versand fehlt noch etwas',
+    '<div class="msg err" style="margin-bottom:10px"><b>Vor dem Versand fehlt: '+list.map(function(x){return esc(x.text)}).join(', ')+'</b> (Einstellungen → Firmendaten)</div>'+
+    '<div class="sml mut" style="margin-bottom:14px">Auf einer Rechnung müssen Steuernummer oder USt-IdNr. und die Bankverbindung stehen – sonst kann der Kunde nicht überweisen und das Finanzamt beanstandet den Beleg.</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="closeModal();gotoSetting(\''+list[0].go+'\')">Zu den Einstellungen</button>'+
+    (mode==='print'?'<button class="btn g" onclick="closeModal();printDoc(true)">Trotzdem drucken</button>':'')+
+    '<button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+}
+function printDoc(force){
+  /* Lieferschein = Uebergabeprotokoll ohne Preise, nie das Rechnungslayout. */
+  if(curDoc&&curDoc.doc_type==='lieferschein'){
+    var b=(CACHE.bookings||[]).find(function(x){return x.id===curDoc.booking_id})||{customer_id:curDoc.customer_id||v('docCust')};
+    printLieferschein(curDoc,curItems.filter(function(it){return it.description&&!it.is_header}).map(function(it){return {name:it.description,qty:it.qty,notes:it.note||''}}),b);
+    return;
+  }
+  if(!force&&istZahlbeleg(v('docType'))){var bl=docSendBlockers();if(bl.length){showSendBlockers(bl,'print');return}}
   document.getElementById('printArea').innerHTML=buildDocHtml();
   window.print();
 }
@@ -4505,7 +4611,11 @@ function buildDocHtml(){
     totals+='<tr><td colspan="4" style="text-align:right;padding:6px">abzgl. erhaltener Abschläge</td><td style="text-align:right;padding:6px">−'+euro(r2(c.dep))+'</td></tr>'+
     '<tr><td colspan="4" style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">Verbleibender Restbetrag</td><td style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">'+euro(r2(dGross-r2(c.dep)))+'</td></tr>';
   }
+  /* Storno/Korrektur unuebersehbar auf dem Beleg: "STORNIERT am ..." plus die Belege,
+     die ihn korrigieren; Gutschriften nennen ihre Ursprungsrechnung. */
+  var bezug=docBezugHtml(d,type,'#b00000');
   return '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
+  bezug.banner+
   '<div style="display:flex;justify-content:space-between;margin-bottom:36px"><div>'+
   (comp.logo_url?'<img src="'+esc(comp.logo_url)+'" style="max-height:48px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block">':'')+
   '<div style="font-size:20px;font-weight:700">'+esc(comp.name||'')+'</div>'+
@@ -4514,8 +4624,8 @@ function buildDocHtml(){
   '<div style="font-size:9px;color:#888;border-bottom:1px solid #ccc;padding-bottom:2px;margin-bottom:8px">'+esc(comp.name||'')+' · '+esc(comp.street||'')+' · '+esc(comp.zip_city||'')+'</div>'+
   '<div style="margin-bottom:30px">'+esc(custName(cust))+'<br>'+esc(cust.street||'')+'<br>'+esc([cust.zip,cust.city].filter(Boolean).join(' '))+'</div>'+
   '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px">'+
-  '<div style="font-size:17px;font-weight:700">'+docTypeName(type)+' '+esc(d.number)+'</div>'+
-  '<div style="text-align:right;color:#555">Datum: '+dt(v('docDate'))+((Number(curDoc.version)||1)>1?'<br>Version '+curDoc.version+(curDoc.version_at?' vom '+dt(curDoc.version_at.slice(0,10)):''):'')+(v('docDate2')?('<br>'+(istZahlbeleg(type)?'Zahlbar bis: ':'Gültig bis: ')+dt(v('docDate2'))):'')+(rentalPeriodLabel(v('docRentFrom'),v('docRentTo'))?'<br>'+rentalPeriodLabel(v('docRentFrom'),v('docRentTo')):'')+'</div></div>'+
+  '<div><div style="font-size:17px;font-weight:700">'+docTypeName(type)+' '+esc(d.number)+'</div>'+bezug.sub+'</div>'+
+  '<div style="text-align:right;color:#555">Datum: '+dt(v('docDate'))+((Number(curDoc.version)||1)>1?'<br>Version '+curDoc.version+(curDoc.version_at?' vom '+dt(curDoc.version_at.slice(0,10)):''):'')+(v('docDate2')&&d.status!=='storniert'?('<br>'+(istZahlbeleg(type)?'Zahlbar bis: ':'Gültig bis: ')+dt(v('docDate2'))):'')+(rentalPeriodLabel(v('docRentFrom'),v('docRentTo'))?'<br>'+rentalPeriodLabel(v('docRentFrom'),v('docRentTo')):'')+'</div></div>'+
   (function(){var e=evVal(),l=e.show?eventInfoLine(e):'';
     return l?'<div style="border:1px solid #ddd;border-left:3px solid #111;border-radius:4px;padding:7px 10px;margin-bottom:16px;color:#333">'+esc(l)+'</div>':''})()+
   (v('docIntro')?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(v('docIntro'))+'</p>':'')+
@@ -4528,6 +4638,21 @@ function buildDocHtml(){
   '<div>'+esc(comp.name||'')+'<br>'+(comp.tax_id?'St.-Nr.: '+esc(comp.tax_id):'')+(comp.vat_id?'<br>USt-IdNr.: '+esc(comp.vat_id):'')+'</div>'+
   '<div>'+(comp.bank?esc(comp.bank)+'<br>':'')+(comp.iban?'IBAN: '+esc(comp.iban)+'<br>':'')+(comp.bic?'BIC: '+esc(comp.bic):'')+(comp.paypal?(comp.bic?'<br>':'')+'PayPal: '+esc(comp.paypal):'')+'</div>'+
   '<div>'+esc(comp.phone||'')+'<br>'+esc(comp.email||'')+'</div></div></div>';
+}
+/* Storno-Banner und Bezugszeilen fuer den Beleg (Druck + Kundenansicht). */
+function docBezugHtml(d,type,col){
+  var out={banner:'',sub:''};
+  if(!d)return out;
+  if(d.status==='storniert'){
+    var korr=(CACHE.documents||[]).filter(function(x){return x.parent_id===d.id&&x.status!=='storniert'&&['gutschrift','rechnung','abschlag','schluss'].indexOf(x.doc_type)>=0});
+    out.banner='<div class="pb-avoid" style="border:2px solid '+col+';color:'+col+';padding:8px 12px;margin-bottom:18px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:13px">Storniert am '+dt((d.storno_at||d.updated_at||'').slice(0,10))+
+      (korr.length?'<div style="font-weight:400;letter-spacing:0;text-transform:none;font-size:11px;margin-top:2px">Korrigiert durch '+korr.map(function(x){return docTypeName(x.doc_type)+' '+esc(x.number)}).join(', ')+'</div>':'')+'</div>';
+  }
+  if(type==='gutschrift'&&d.parent_id){
+    var par=(CACHE.documents||[]).find(function(x){return x.id===d.parent_id});
+    if(par)out.sub='<div style="color:#555;font-size:11px">zu '+docTypeName(par.doc_type)+' '+esc(par.number)+' vom '+dt(par.doc_date)+'</div>';
+  }
+  return out;
 }
 /* Zeigt buildDocHtml() in einem Modal an, statt zu drucken - "so sieht der Kunde das wirklich
    im Browser", ohne Drucken/PDF-Export auszuloesen. */
@@ -4555,9 +4680,10 @@ function renderStats(){
   var qAcc=quotes.filter(function(d){return d.status==='angenommen'});
   var avg=paid.length?rev/paid.length:0;
   document.getElementById('statTiles').innerHTML=
-    tile(euro(rev),'Umsatz brutto')+tile(books.length,'Gigs')+
-    tile(qSent.length?Math.round(qAcc.length/qSent.length*100)+' %':'–','Angebots-Annahme')+
-    tile(euro(avg),'Ø Rechnungswert');
+    tile(euro(rev),'Umsatz brutto',null,'Bezahlte Rechnungen nach Zahldatum im Jahr '+esc(year)+', abzüglich verrechneter Abschläge')+
+    tile(books.length,'Gigs',null,'Veranstaltungen mit Termin im Jahr '+esc(year)+' (ohne stornierte, inkl. Anfragen und Angebote)')+
+    tile(qSent.length?Math.round(qAcc.length/qSent.length*100)+' %':'–','Angebots-Annahme',null,'Angenommene von allen entschiedenen bzw. versendeten Angeboten mit Belegdatum '+esc(year))+
+    tile(euro(avg),'Ø Rechnungswert',null,'Umsatz geteilt durch die Zahl der bezahlten Rechnungen');
   var months=Array(12).fill(0);
   paid.forEach(function(d){months[new Date(d.paid_at).getMonth()]+=Number(d.total_gross)-Number(d.deposit_deducted||0)});
   var max=Math.max.apply(null,months.concat([1]));
@@ -6452,7 +6578,7 @@ function printTechCheck(){
 function renderTechCheckPrint(t,comp,c,pr,scale,picUrls){
   var picHtml=picUrls.length?('<div style="font-weight:700;margin:16px 0 6px">Fotodokumentation</div>'+
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'+
-    picUrls.map(function(u){return '<img src="'+esc(u)+'" style="width:100%;border-radius:6px">'}).join('')+'</div>'):'';
+    picUrls.map(function(u,i){return '<figure class="pb-avoid" style="margin:0"><img src="'+esc(u)+'" style="width:100%;border-radius:6px;display:block"><figcaption style="font-size:10px;color:#666;margin-top:3px">Foto '+(i+1)+' von '+picUrls.length+'</figcaption></figure>'}).join('')+'</div>'):'';
   var personal=t.personal?('<div style="border-left:3px solid #111;padding:8px 0 8px 16px;margin:12px 0;font-size:12.5px"><b>Meine persönliche Empfehlung</b><br>'+esc(t.personal).replace(/\n/g,'<br>')+'</div>'):'';
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.6">'+
@@ -6835,6 +6961,7 @@ function renderSet(){
   document.getElementById('sValidDays').value=d.quote_valid_days!=null?d.quote_valid_days:30;
   document.getElementById('sPlanLock').value=d.plan_lock_days!=null?d.plan_lock_days:3;
   document.getElementById('sFollowDays').value=d.followup_days!=null?d.followup_days:7;
+  document.getElementById('sFormRemind').value=d.form_reminder_days!=null?d.form_reminder_days:7;
   var djSet=document.getElementById('sDjSet');
   djSet.innerHTML='<option value="">– keine –</option>'+(CACHE.equipmentSets||[]).map(function(x){
     var n=(CACHE.setItems||[]).filter(function(i){return i.set_id===x.id}).length;
@@ -6891,7 +7018,7 @@ function saveNumbering(){
   n.gutschrift={prefix:v('sGPre')||'GS-',next:Number(v('sGNext'))||1};
   n.year_in_number=true;
   var d=S.defaults||{};d.payment_days=Number(v('sPayDays'))||14;d.quote_valid_days=Number(v('sValidDays'))||30;
-  d.plan_lock_days=Number(v('sPlanLock'))||0;d.followup_days=Number(v('sFollowDays'))||7;
+  d.plan_lock_days=Number(v('sPlanLock'))||0;d.followup_days=Number(v('sFollowDays'))||7;d.form_reminder_days=Number(v('sFormRemind'))||7;
   d.tax_rate=Number(v('sTaxRate'))||19;d.partner_discount_pct=Number(v('sPartnerPct'))||20;
   d.tier_week_pct=Number(v('sTierWeek'))||0;d.tier_2week_pct=Number(v('sTier2Week'))||0;d.tier_month_pct=Number(v('sTierMonth'))||0;
   d.travel_rate_km=Number(v('sKmRate'))||0;d.travel_free_km=Number(v('sKmFree'))||0;
@@ -6928,6 +7055,7 @@ function ensureDocShare(){
   }).then(function(t){return {url:portalUrl('a',t),cust:cust}});
 }
 function shareDoc(){
+  if(istZahlbeleg(curDoc.doc_type)){var bl=docSendBlockers();if(bl.length){showSendBlockers(bl,'share');return}}
   ensureDocShare().then(function(r){
     navigator.clipboard.writeText(r.url).then(function(){toast('Kundenlink kopiert ✓ – Login: PLZ '+r.cust.zip)})
       .catch(function(){prompt('Kundenlink (kopieren mit Strg+C):',r.url)});
@@ -6938,16 +7066,17 @@ function shareDoc(){
    api.php/sendmail) nutzen. Erst wenn die Mail wirklich raus ist, wird ein Entwurf
    auf "versendet" gesetzt - nichts geht ohne Klick auf "Direkt senden" los. */
 function docSendMail(mode){
+  if(istZahlbeleg(curDoc.doc_type)){var bl=docSendBlockers();if(bl.length){showSendBlockers(bl,'send');return}}
   ensureDocShare().then(function(r){
     var d=curDoc,cust=r.cust;
     if(!cust.email){toast('Der Kunde hat keine E-Mail-Adresse – bitte erst am Kunden eintragen.',1);return}
     var b=(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id})||{};
     var tpl;
     if(mode==='nachfassen'){
-      tpl=(CACHE.tpls||[]).find(function(t){return /nachfassen zum angebot/i.test(t.name)})
+      tpl=tplKey('nachfassen')
         ||{subject:'Kurze Frage zu eurem Angebot {nummer}',body:'Hallo {vorname},\n\nich wollte einmal kurz nachhören: Ist mein Angebot {nummer} bei euch angekommen und passt es soweit? Falls etwas unklar ist, sagt einfach Bescheid.\n\nDas Angebot findet ihr weiterhin hier (Login ist eure Postleitzahl):\n{link}\n\nGültig ist es bis {gueltig}, bis dahin halte ich euch den Termin frei.\n\nViele Grüße\n{inhaber}'};
     }else if(d.doc_type==='angebot'){
-      tpl=(CACHE.tpls||[]).find(function(t){return /angebots-begleitmail/i.test(t.name)})
+      tpl=tplKey('begleitmail')
         ||{subject:'Euer Angebot {nummer} ist fertig',body:'Hallo {vorname},\n\neuer Angebot {nummer} ist fertig und wartet hier auf euch:\n{link}\n\nLogin ist eure Postleitzahl. Wenn euch etwas nicht passt: sagt es mir einfach.\n\nViele Grüße\n{inhaber}'};
     }else if(d.doc_type==='bestaetigung'){
       tpl={subject:'Auftragsbestätigung {nummer}',body:'Hallo {vorname},\n\nhier ist eure Auftragsbestätigung {nummer} – damit ist der Termin am {datum} fest bei mir eingetragen:\n{link}\n\nLogin ist eure Postleitzahl. Bei Fragen einfach melden.\n\nViele Grüße\n{inhaber}'};
@@ -6989,7 +7118,7 @@ function renderForms(){
     '<td><span class="b '+(STB[f.status]||'grey')+'">'+f.status+'</span></td>'+
     '<td style="white-space:nowrap">'+
     (f.status==='beantwortet'?'<button class="btn sm" onclick="viewFormAnswers(\''+f.id+'\')">Antworten</button> ':
-      '<button class="btn g sm" onclick="copyFormLink(\''+f.token+'\')">Link</button> ')+
+      '<button class="btn g sm" onclick="copyFormLink(\''+f.token+'\')">Link</button> <button class="btn g sm" onclick="formSendMail(\''+f.id+'\')">Per E-Mail</button> ')+
     '<button class="btn g sm" onclick="previewForm(\''+f.id+'\')">Vorschau</button> '+
     '<a onclick="delRow(\'forms\',\''+f.id+'\',reloadForms)" style="color:var(--redl)">✕</a></td></tr>';
   }).join('')||'<tr><td colspan="5" class="mut">Noch keine Fragebögen verschickt.</td></tr>';
@@ -7011,7 +7140,36 @@ function openNewFormModal(){
     '<label>Vorlage</label><select id="nfTpl">'+(CACHE.formTpls||[]).map(function(t){return '<option value="'+t.id+'">'+esc(t.name)+'</option>'}).join('')+'</select>'+
     '<label>Kunde (optional – Antworten landen dann in der Timeline)</label><select id="nfCust"><option value="">–</option>'+
     CACHE.customers.map(function(c){return '<option value="'+c.id+'">'+esc(custOptionLabel(c))+'</option>'}).join('')+'</select>'+
-    '<div style="margin-top:14px"><button class="btn" onclick="createForm()">Erstellen &amp; Link kopieren</button></div>');
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="createForm()">Erstellen &amp; Link kopieren</button>'+
+    '<button class="btn g" onclick="createForm(undefined,null,undefined,function(f){formSendMail(f.id)})">Erstellen &amp; per E-Mail senden</button></div>'+
+    '<div class="mut sml" style="margin-top:8px">Per E-Mail geht nur mit zugeordnetem Kunden, der eine E-Mail-Adresse hat – Vorlage „Fragebogen zusenden“.</div>');
+}
+/* Bogen per Mail an den zugeordneten Kunden: Compose-Dialog mit der Vorlage "Fragebogen
+   zusenden" bzw. "Erinnerung Fragebogen" (reminder=true, aus dem Dashboard). */
+function formSendMail(formId,reminder){
+  var f=(CACHE.forms||[]).find(function(x){return x.id===formId});if(!f)return;
+  var c=f.customer_id?CACHE.customers.find(function(x){return x.id===f.customer_id}):null;
+  var link=portalUrl('f',f.token);
+  if(!c||!c.email){
+    toast(c?'Der Kunde hat keine E-Mail-Adresse – Link ist kopiert, bitte selbst schicken.':'Dem Bogen ist kein Kunde zugeordnet – Link ist kopiert, bitte selbst schicken.',1);
+    copyFormLink(f.token);return;
+  }
+  var tpl=tplKey(reminder?'form_reminder':'form_send')||(reminder
+    ?{subject:'Kurze Erinnerung: {titel}',body:'Hallo {vorname},\n\nvor ein paar Tagen habe ich euch den Bogen „{titel}“ geschickt – bisher ist noch nichts angekommen. Je früher ich eure Antworten habe, desto besser kann ich planen:\n{link}\n\nViele Grüße\n{inhaber}'}
+    :{subject:'Ein paar Fragen zu eurer Feier – {titel}',body:'Hallo {vorname},\n\ndamit ich eure Feier gut vorbereiten kann, habe ich ein paar Fragen für euch: „{titel}“. Geht direkt online:\n{link}\n\nViele Grüße\n{inhaber}'});
+  var b=(CACHE.bookings||[]).filter(function(x){return x.customer_id===c.id&&x.status!=='storniert'}).sort(function(x,y){return x.event_date<y.event_date?1:-1})[0]||{};
+  openCompose({name:custName(c),email:c.email,customer_id:c.id,booking_id:b.id||null,event_date:b.event_date||null,location:b.venue_name||'',event_type:b.event_type||b.title||'',
+    _link:link,_titel:f.title,_title:(reminder?'Erinnerung: ':'')+'Fragebogen „'+esc(f.title)+'“ per E-Mail',_doc:true},tpl,link,null);
+}
+/* Kundenseite: Vorlage waehlen, Bogen fuer diesen Kunden anlegen, Compose oeffnen. */
+function custFormSend(){
+  var c=curCust;if(!c)return;
+  if(!(CACHE.formTpls||[]).length){toast('Noch keine Bogen-Vorlage – unter Fragebögen anlegen.',1);return}
+  openModal('Fragebogen senden – '+esc(custName(c)),
+    '<label>Vorlage</label><select id="cfTpl">'+(CACHE.formTpls||[]).map(function(t){return '<option value="'+t.id+'">'+esc(t.name)+' ('+(t.fields||[]).length+' Fragen)</option>'}).join('')+'</select>'+
+    (c.email?'':'<div class="msg err" style="margin-top:10px">Der Kunde hat keine E-Mail-Adresse – der Link wird stattdessen kopiert.</div>')+
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="createForm(v(\'cfTpl\'),null,\''+c.id+'\',function(f){formSendMail(f.id)})">Bogen anlegen &amp; per E-Mail senden</button>'+
+    '<button class="btn g" onclick="createForm(v(\'cfTpl\'),null,\''+c.id+'\',function(f){closeModal();copyFormLink(f.token)})">Nur Link kopieren</button></div>');
 }
 function createForm(tplId,inqId,custId,cb){
   tplId=tplId||v('nfTpl');
@@ -7035,26 +7193,51 @@ function viewFormAnswers(id){
   }).join('');
   openModal('Antworten: '+esc(f.title),'<div class="sml">'+html+'</div>');
 }
+/* Fragen als Zeilen mit Feldern statt "Frage | Typ | Optionen" in einem Textfeld - das
+   Format musste man kennen, ein Tippfehler machte still ein Textfeld daraus. Gespeichert
+   wird weiterhin dasselbe fields-JSON ({label,type,options,required}). */
+var FT_TYPES=[['text','Kurztext'],['textarea','Langtext'],['select','Auswahl (eine)'],['multiselect','Auswahl (mehrere)'],['checkbox','Ja/Nein-Haken'],['date','Datum']];
+var FT_ROWS=[];
 function openFtModal(id){
   var t=id?(CACHE.formTpls||[]).find(function(x){return x.id===id}):{};t=t||{};
-  var lines=(t.fields||[]).map(function(f){return f.label+' | '+(f.type||'text')+(f.options?' | '+f.options.join(', '):'')}).join('\n');
+  FT_ROWS=(t.fields||[]).map(function(f){return {label:f.label||'',type:f.type||'text',options:(f.options||[]).join(', '),required:!!f.required}});
+  if(!FT_ROWS.length)FT_ROWS.push({label:'',type:'text',options:'',required:false});
   openModal(id?'Bogen-Vorlage bearbeiten':'Neue Bogen-Vorlage',
     '<label>Name *</label><input id="ftName" value="'+esc(t.name||'')+'">'+
     '<label>Einleitung</label><textarea id="ftIntro" style="min-height:56px">'+esc(t.intro||'')+'</textarea>'+edBtn('ftIntro')+
-    '<label>Fragen – eine pro Zeile: Frage | Typ | Optionen (Typ: text, textarea, select, checkbox)</label>'+
-    '<textarea id="ftFields" style="min-height:180px;font-size:11px">'+esc(lines)+'</textarea>'+
+    '<label>Fragen</label><div id="ftRows"></div>'+
+    '<div style="margin-top:8px"><button class="btn g sm" onclick="ftAdd()">+ Frage</button> <span class="mut sml">Reihenfolge mit ↑ ↓, Pflichtfragen mit Haken – der Kunde kann dann nicht ohne Antwort absenden.</span></div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveFt(\''+(id||'')+'\')">Speichern</button> '+
     '<button class="btn g" onclick="previewFt()">Vorschau</button>'+
     (id?' <button class="btn r" onclick="delRow(\'form_templates\',\''+id+'\',reloadForms)">Löschen</button>':'')+'</div>');
+  ftRender();
 }
-/* Aus den Zeilen "Frage | Typ | Optionen" im Editor die Feld-Objekte bauen -
-   von saveFt() UND der Vorschau genutzt, damit beide exakt dasselbe parsen. */
+function ftRender(){
+  var el=document.getElementById('ftRows');if(!el)return;
+  el.innerHTML=FT_ROWS.map(function(r,i){
+    var opt=r.type==='select'||r.type==='multiselect';
+    return '<div class="ft-row" style="border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;margin-bottom:6px">'+
+      '<div style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap">'+
+      '<input class="ft-label" placeholder="Frage '+(i+1)+'" value="'+esc(r.label)+'" oninput="ftUpd('+i+',\'label\',this.value)" style="flex:1 1 220px;margin:0">'+
+      '<select class="ft-type" onchange="ftUpd('+i+',\'type\',this.value);ftRender()" style="flex:0 0 150px;margin:0">'+FT_TYPES.map(function(t){return '<option value="'+t[0]+'"'+(t[0]===r.type?' selected':'')+'>'+t[1]+'</option>'}).join('')+'</select>'+
+      '<label class="ft-req" style="display:flex;align-items:center;gap:4px;margin:0;text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh);white-space:nowrap"><input type="checkbox" '+(r.required?'checked':'')+' onchange="ftUpd('+i+',\'required\',this.checked)" style="width:auto;margin:0">Pflicht</label>'+
+      '<span style="white-space:nowrap"><button class="btn g sm" title="nach oben" onclick="ftMove('+i+',-1)"'+(i===0?' disabled':'')+'>↑</button> <button class="btn g sm" title="nach unten" onclick="ftMove('+i+',1)"'+(i===FT_ROWS.length-1?' disabled':'')+'>↓</button> <button class="btn g sm" title="Frage entfernen" onclick="ftDel('+i+')" style="color:var(--redl)">✕</button></span></div>'+
+      (opt?'<input class="ft-opts" placeholder="Optionen, mit Komma getrennt (z. B. Ja, Nein, Weiß noch nicht)" value="'+esc(r.options)+'" oninput="ftUpd('+i+',\'options\',this.value)" style="margin:6px 0 0">':'')+
+      '</div>';
+  }).join('');
+}
+function ftUpd(i,k,val){if(FT_ROWS[i])FT_ROWS[i][k]=val}
+function ftAdd(){FT_ROWS.push({label:'',type:'text',options:'',required:false});ftRender();var l=document.querySelectorAll('#ftRows .ft-label');if(l.length)l[l.length-1].focus()}
+function ftDel(i){FT_ROWS.splice(i,1);ftRender()}
+function ftMove(i,d){var j=i+d;if(j<0||j>=FT_ROWS.length)return;var t=FT_ROWS[i];FT_ROWS[i]=FT_ROWS[j];FT_ROWS[j]=t;ftRender()}
+/* Feld-Objekte aus dem Zeileneditor - von saveFt() UND der Vorschau genutzt, damit
+   beide exakt dasselbe speichern bzw. zeigen. Leere Fragen fallen weg. */
 function parseFtFields(){
-  return document.getElementById('ftFields').value.split('\n').map(function(l){
-    var p=l.split('|').map(function(s){return s.trim()});
-    if(!p[0])return null;
-    var f={label:p[0],type:p[1]||'text'};
-    if(p[2])f.options=p[2].split(',').map(function(s){return s.trim()}).filter(Boolean);
+  return FT_ROWS.map(function(r){
+    var label=(r.label||'').trim();if(!label)return null;
+    var f={label:label,type:r.type||'text'};
+    if(f.type==='select'||f.type==='multiselect')f.options=(r.options||'').split(',').map(function(x){return x.trim()}).filter(Boolean);
+    if(r.required)f.required=true;
     return f;
   }).filter(Boolean);
 }
@@ -7076,12 +7259,14 @@ function previewFt(){
 function buildFormHtml(title,intro,fields){
   var fieldStyle='display:block;width:100%;box-sizing:border-box;padding:9px 10px;margin:4px 0 14px;border:1px solid #ccc;border-radius:6px;font-size:14px;font-family:inherit';
   var body=(fields||[]).map(function(f,i){
-    var t=f.type||'text';
-    if(t==='textarea')return '<label style="display:block;font-weight:600;font-size:13px">'+esc(f.label)+'</label><textarea disabled style="'+fieldStyle+';min-height:70px"></textarea>';
-    if(t==='select')return '<label style="display:block;font-weight:600;font-size:13px">'+esc(f.label)+'</label><select disabled style="'+fieldStyle+'"><option value="">– bitte wählen –</option>'+
+    var t=f.type||'text',lbl=esc(f.label)+(f.required?' <span style="color:#b00000" title="Pflichtfrage">*</span>':'');
+    if(t==='textarea')return '<label style="display:block;font-weight:600;font-size:13px">'+lbl+'</label><textarea disabled style="'+fieldStyle+';min-height:70px"></textarea>';
+    if(t==='select')return '<label style="display:block;font-weight:600;font-size:13px">'+lbl+'</label><select disabled style="'+fieldStyle+'"><option value="">– bitte wählen –</option>'+
       (f.options||[]).map(function(o){return '<option>'+esc(o)+'</option>'}).join('')+'</select>';
-    if(t==='checkbox')return '<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0 14px"><input type="checkbox" disabled style="width:auto"><span>'+esc(f.label)+'</span></label>';
-    return '<label style="display:block;font-weight:600;font-size:13px">'+esc(f.label)+'</label><input type="text" disabled style="'+fieldStyle+'">';
+    if(t==='multiselect')return '<div style="font-weight:600;font-size:13px">'+lbl+'</div><div style="margin:4px 0 14px">'+(f.options||[]).map(function(o){return '<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:3px 0"><input type="checkbox" disabled style="width:auto"><span>'+esc(o)+'</span></label>'}).join('')+'</div>';
+    if(t==='checkbox')return '<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0 14px"><input type="checkbox" disabled style="width:auto"><span>'+lbl+'</span></label>';
+    if(t==='date')return '<label style="display:block;font-weight:600;font-size:13px">'+lbl+'</label><input type="date" disabled style="'+fieldStyle+'">';
+    return '<label style="display:block;font-weight:600;font-size:13px">'+lbl+'</label><input type="text" disabled style="'+fieldStyle+'">';
   }).join('');
   return '<div style="max-width:560px;margin:0 auto;padding:30px 20px;font-family:sans-serif;color:#111">'+
     '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px">Ein paar Fragen</div>'+
@@ -7103,21 +7288,114 @@ function reloadForms(){
 }
 
 /* ===== E-Mail-Vorlagen ===== */
+/* Die eine Platzhalterliste: Seitenkopf, Vorlagen-Editor und fillTpl() lesen alle hier.
+   Server-Automatiken (tplMap() und die Mail-Funktionen in api.php) fuellen dieselben Namen. */
+var TPL_PLACEHOLDERS=[
+  ['{vorname}','Vorname des Kunden (bei Firmen „zusammen“)'],
+  ['{name}','Voller Name bzw. Firma des Kunden'],
+  ['{datum}','Termin der Veranstaltung (TT.MM.JJJJ)'],
+  ['{termin}','Termin mit Location, z. B. „der 15.05.2027 – Gut Kump“'],
+  ['{anlass}','Anlass aus der Anfrage'],
+  ['{ort}','Ort bzw. Location aus der Anfrage'],
+  ['{nummer}','Belegnummer (Angebot, Rechnung …)'],
+  ['{nr}','Belegnummer, Kurzform von {nummer}'],
+  ['{betrag}','Gesamtbetrag des Belegs'],
+  ['{faellig}','Zahlbar bis (Rechnungen)'],
+  ['{gueltig}','Gültig bis (Angebote)'],
+  ['{link}','Kundenlink zum Beleg, zum Fragebogen oder ins Kundenkonto'],
+  ['{fragebogen}','Link zum Vorauswahl-Bogen (wird beim Antworten angelegt)'],
+  ['{titel}','Titel des Fragebogens'],
+  ['{bewertungen}','Link zu deinen Google-Bewertungen (Inhalte → Bewertungen)'],
+  ['{nachricht}','Nachricht des Kunden aus dem Portal (automatische Mails)'],
+  ['{rueckruf}','Rückrufwunsch mit Nummer und Zeit (automatische Mails)'],
+  ['{zeitraum}','Mietzeitraum der Miet-Anfrage (automatische Mails)'],
+  ['{positionen}','Angefragte Artikel der Miet-Anfrage (automatische Mails)'],
+  ['{workshop}','Titel des Workshops (automatische Mails)'],
+  ['{rechnungszeile}','Rechnungshinweis beim Nachrücken (automatische Mails)'],
+  ['{inhaber}','Dein Name (Einstellungen → Firmendaten)'],
+  ['{firma}','Firmenname'],
+  ['{telefon}','Deine Telefonnummer'],
+  ['{adresse}','Firmenanschrift'],
+  ['{firmenort}','Dein Ort ohne PLZ'],
+  ['{agentur}','Partner-Agentur für die DJ-Vermittlung (Einstellungen → Betreiber)']
+];
+/* Vorlagen, die das System selbst zieht - ueber den Schluessel (key), den der Server beim
+   Anlegen vergibt. Umbenennen ist deshalb erlaubt; die Automatik haengt nicht am Namen. */
+var TPL_AUTO={
+  accept_ok:'Bestätigung, wenn der Kunde ein Angebot im Portal annimmt',
+  accept_konflikt:'Annahme im Portal, aber der Termin ist inzwischen belegt',
+  accept_abgelaufen:'Annahme im Portal nach Ablauf der Gültigkeit',
+  reaction_decline:'Eingangsbestätigung bei Absage im Portal',
+  reaction_comment:'Eingangsbestätigung bei Frage im Portal',
+  reaction_callback:'Eingangsbestätigung bei Rückrufwunsch im Portal',
+  nachfassen:'„Nachfassen per E-Mail“ im Dashboard und im Dokument',
+  begleitmail:'„Per E-Mail senden“ im Angebot',
+  zahlungserinnerung:'„Zahlungserinnerung“ in der Rechnung',
+  miete_eingang:'Eingangsbestätigung zur Miet-Anfrage aus dem Tourcase',
+  bande_bogen:'Vorauswahl-Bogen nach dem Vermittlungs-Opt-in im Portal',
+  bande_belegt:'Vorschlag bei Terminkonflikt in der Anfrage',
+  review:'„Danke &amp; Bewertung“ nach der Feier',
+  ws_promoted:'Nachrücken von der Workshop-Warteliste',
+  form_send:'„Fragebogen senden“ (Fragebögen, Kundenseite)',
+  form_reminder:'„Erinnern“ bei offenen Fragebögen im Dashboard'};
+/* Rueckfall ueber den Namen fuer Zeilen, die noch keinen Schluessel haben. */
+var TPL_KEY_NAME={zahlungserinnerung:/zahlungserinnerung/i,nachfassen:/nachfassen zum angebot/i,begleitmail:/angebots-begleitmail/i,
+  review:/bewertung/i,form_send:/^fragebogen zusenden/i,form_reminder:/^erinnerung fragebogen/i,ws_promoted:/^nachgerückt/i};
+function tplKey(key){
+  var t=(CACHE.tpls||[]).find(function(x){return x.key===key});
+  if(t)return t;
+  var rx=TPL_KEY_NAME[key];
+  return rx?(CACHE.tpls||[]).find(function(x){return rx.test(x.name||'')}):null;
+}
+function tplPlaceholderHtml(mode){
+  if(mode==='head')return TPL_PLACEHOLDERS.map(function(p){return '<code title="'+esc(p[1])+'" style="cursor:help">'+esc(p[0])+'</code>'}).join(' ');
+  return '<details class="sml" style="margin-top:8px"><summary style="cursor:pointer;color:var(--gll)">Alle Platzhalter ('+TPL_PLACEHOLDERS.length+') mit Bedeutung</summary>'+
+    '<div class="grid2" style="margin-top:6px;gap:2px 14px">'+TPL_PLACEHOLDERS.map(function(p){return '<div><code>'+esc(p[0])+'</code> <span class="mut">'+esc(p[1])+'</span></div>'}).join('')+'</div></details>';
+}
+function renderTplPhHead(){var el=document.getElementById('tplPhHead');if(el)el.innerHTML=tplPlaceholderHtml('head')}
 function renderTpls(){
+  renderTplPhHead();
   document.getElementById('tplRows').innerHTML=(CACHE.tpls||[]).map(function(t){
-    return '<tr class="click" onclick="openTplModal(\''+t.id+'\')"><td><b>'+esc(t.name)+'</b></td><td class="sml mut">'+esc(t.subject||'')+'</td><td class="num">'+(t.sort||0)+'</td></tr>';
+    var auto=t.key&&TPL_AUTO[t.key];
+    return '<tr class="click" onclick="openTplModal(\''+t.id+'\')"><td><b>'+esc(t.name)+'</b>'+
+      (auto?'<div class="sml" style="margin-top:3px"><span class="b blue" title="Diese Vorlage zieht das System automatisch – der Name darf geändert werden.">Wird automatisch benutzt für</span> <span class="mut">'+auto+'</span></div>':'')+
+      '</td><td class="sml mut">'+esc(t.subject||'')+'</td><td class="num">'+(t.sort||0)+'</td></tr>';
   }).join('')||'<tr><td colspan="3" class="mut">Noch keine Vorlagen.</td></tr>';
 }
 function openTplModal(id){
   var t=id?(CACHE.tpls||[]).find(function(x){return x.id===id}):{};t=t||{};
+  var auto=t.key&&TPL_AUTO[t.key];
   openModal(id?'Vorlage bearbeiten':'Neue Vorlage',
+    (auto?'<div class="msg" style="margin-bottom:10px"><span class="b blue">Wird automatisch benutzt für</span> '+auto+'<div class="mut sml" style="margin-top:4px">Der Name ist frei änderbar – die Automatik hängt am internen Schlüssel „'+esc(t.key)+'“.</div></div>':'')+
     '<div class="grid2"><div><label>Name *</label><input id="tName" value="'+esc(t.name||'')+'"></div>'+
     '<div><label>Sortierung</label><input type="number" id="tSort" value="'+(t.sort||0)+'"></div></div>'+
     '<label>Betreff</label><input id="tSubject" value="'+esc(t.subject||'')+'">'+
     '<label>Text</label><textarea id="tBody" style="min-height:260px">'+esc(t.body||'')+'</textarea>'+edBtn('tBody')+
-    '<div class="sml mut" style="margin-top:6px">Platzhalter: {vorname} {name} {datum} {anlass} {ort} – werden beim Antworten automatisch aus der Anfrage gefüllt.</div>'+
-    '<div style="margin-top:14px"><button class="btn" onclick="saveTpl(\''+(id||'')+'\')">Speichern</button>'+
+    tplPlaceholderHtml('modal')+
+    '<div id="tplPreview" style="display:none;margin-top:10px;border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;background:var(--cd2)"></div>'+
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="saveTpl(\''+(id||'')+'\')">Speichern</button>'+
+    '<button class="btn g" onclick="tplPreview()">Vorschau mit Beispieldaten</button>'+
     (id?' <button class="btn r" onclick="delRow(\'email_templates\',\''+id+'\',reloadTpls)">Löschen</button>':'')+'</div>');
+}
+/* Vorschau: Betreff und Text mit Beispielwerten fuellen - so sieht man vor dem Speichern,
+   ob die Platzhalter richtig sitzen. Server-Platzhalter bekommen ebenfalls Beispieltexte. */
+function tplSampleCtx(){
+  var y=new Date().getFullYear()+1;
+  return {name:'Lena Berger',email:'lena@example.de',event_date:y+'-05-15',location:'Gut Kump, Hamm',event_type:'Hochzeit',
+    _nummer:'AN-'+y+'-0042',_link:portalUrl('a','beispiel'),_betrag:euro(1499),_faellig:dt(y+'-05-01'),_gueltig:dt(y+'-04-15'),
+    _termin:'der '+dt(y+'-05-15')+' – Gut Kump, Hamm',_titel:'Hochzeits-Planungsbogen',_doc:true};
+}
+var TPL_SAMPLE_EXTRA={'{fragebogen}':'…/portal.html?f=beispiel','{nachricht}':'Könnt ihr auch den Sektempfang beschallen?','{rueckruf}':'0171 1234567, abends ab 18 Uhr',
+  '{zeitraum}':'12.06. bis 14.06.','{positionen}':'– PA-Set klein × 1\n– Funkmikrofon × 2','{workshop}':'Tontechnik-Grundlagen für Vereine',
+  '{rechnungszeile}':'Hier ist deine Rechnung RE-0001 (89,00 €): …/portal.html?a=beispiel'};
+function tplPreview(){
+  var i=tplSampleCtx(),fill=function(x){return fillTpl(x,i).replace(/\{[a-z_]+\}/g,function(m){return TPL_SAMPLE_EXTRA[m]!==undefined?TPL_SAMPLE_EXTRA[m]:m})};
+  var subj=fill(v('tSubject')),body=fill(document.getElementById('tBody').value);
+  var offen=(subj+' '+body).match(/\{[a-z_]+\}/g)||[];
+  var box=document.getElementById('tplPreview');box.style.display='';
+  box.innerHTML='<div class="sml mut" style="margin-bottom:6px">Vorschau mit Beispieldaten (Lena Berger, Hochzeit, Gut Kump) – so kommt die Mail beim Kunden an.</div>'+
+    '<div><b>Betreff:</b> '+esc(subj)+'</div><div style="white-space:pre-wrap;margin-top:8px;font-size:12.5px">'+esc(body)+'</div>'+
+    (offen.length?'<div class="msg err" style="margin-top:8px">Unbekannte Platzhalter bleiben stehen: '+esc(offen.join(' '))+'</div>':'');
 }
 function saveTpl(id){
   if(!v('tName')){toast('Name fehlt.',1);return}
@@ -7623,8 +7901,8 @@ function reloadRevs(){api('reviews?select=*&order=sort').then(function(r){CACHE.
 function composeReviewMail(bookingId){
   var b=CACHE.bookings.find(function(x){return x.id===bookingId});if(!b)return;
   var c=CACHE.customers.find(function(x){return x.id===b.customer_id})||{};
-  var t=(CACHE.tpls||[]).find(function(x){return x.name.indexOf('Bewertung')>=0});
-  if(!t){toast('Vorlage „Nach der Feier“ nicht gefunden.',1);return}
+  var t=tplKey('review');
+  if(!t){toast('Vorlage „Nach der Feier – Danke & Bewertung“ nicht gefunden.',1);return}
   /* Erst wenn die Mail wirklich raus ist, gilt der Gig als abgeschlossen und die
      Bewertung als angefragt - wer das Fenster nur zumacht, hat noch nichts verschickt. */
   var markDone=function(){
@@ -7699,9 +7977,13 @@ function fillTpl(text,i){
     /* Betreiber-Platzhalter - dieselben wie tplMap() in api.php, damit Vorlagen ohne
        festen Namen auskommen und fuer jeden Betreiber passen. */
     '{inhaber}':ownerName(),'{firma}':(S.company&&S.company.name)||'','{agentur}':agencyName(),
-    '{adresse}':companyAddress(),'{firmenort}':String((S.company||{}).zip_city||'').replace(/^\d{4,5}\s*/,'')
+    '{adresse}':companyAddress(),'{firmenort}':String((S.company||{}).zip_city||'').replace(/^\d{4,5}\s*/,''),
+    '{termin}':i._termin||((i.event_date||i._datum)?'der '+dt(i.event_date||i._datum)+(i.location?' – '+i.location:''):'euer Termin'),
+    '{titel}':i._titel||''
   };
-  return (text||'').replace(/\{vorname\}|\{name\}|\{datum\}|\{anlass\}|\{ort\}|\{bewertungen\}|\{link\}|\{nummer\}|\{nr\}|\{betrag\}|\{faellig\}|\{gueltig\}|\{telefon\}|\{inhaber\}|\{firma\}|\{agentur\}|\{adresse\}|\{firmenort\}/g,function(m){return map[m]});
+  /* Nur bekannte Platzhalter mit Wert ersetzen - Server-Platzhalter ({nachricht} usw.)
+     bleiben stehen und werden dort gefuellt. */
+  return (text||'').replace(/\{[a-z_]+\}/g,function(m){return map[m]!==undefined?map[m]:m});
 }
 function composeReply(inqId){
   var i=CACHE.inquiries.find(function(x){return x.id===inqId});if(!i)return;
