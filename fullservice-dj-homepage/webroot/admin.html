@@ -162,6 +162,38 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .tile .tv{font-size:24px;font-weight:700;color:var(--acc)}
 .tile .tl{font-size:10px;color:var(--gl);letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
 
+/* Einsatzplan: Artikel x Tage. Frei = dunkle Zelle ohne Wert, teilweise = Gelb,
+   voll = helles Rot, ueber Bestand = helles Rot mit heller Kante und fettem Wert.
+   Dunkle Schrift auf den Farbflaechen: 8,4:1 (Gelb) und 6,8:1 (Rot). */
+.ep-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.ep{width:auto;min-width:100%;border-collapse:separate;border-spacing:2px;font-size:10px}
+table.ep th,table.ep td{padding:0;border:0;vertical-align:middle}
+table.ep th.ep-name,table.ep td.ep-name{position:sticky;left:0;z-index:2;background:var(--cd);text-align:left;padding:3px 10px 3px 0;min-width:160px;max-width:230px;font-size:12px}
+table.ep th.ep-name{font-size:9px}
+table.ep th.ep-d{width:30px;min-width:30px;text-align:center;cursor:pointer;color:var(--gl);padding:2px 0;line-height:1.15;font-size:10px;letter-spacing:0;user-select:none}
+table.ep th.ep-d span{display:block;font-size:8px}
+table.ep th.ep-d.we{color:var(--gll)}
+table.ep th.ep-d:hover,table.ep th.ep-d.sel{color:var(--acc)}
+table.ep th.ep-d.today{color:var(--acc);text-decoration:underline}
+table.ep td.ep-c{height:26px;text-align:center;background:var(--cd2);color:var(--gl);border-radius:2px;font-variant-numeric:tabular-nums}
+table.ep td.ep-c.today{box-shadow:inset 0 0 0 1px var(--acc)}
+table.ep td.ep-c.part{background:var(--yel);color:#141414;cursor:pointer;font-weight:600}
+table.ep td.ep-c.full{background:var(--redl);color:#141414;cursor:pointer;font-weight:600}
+table.ep td.ep-c.over{background:var(--redl);color:#141414;cursor:pointer;font-weight:700;box-shadow:inset 0 0 0 2px var(--wh)}
+table.ep td.ep-c.sel{box-shadow:inset 0 0 0 2px var(--wh)}
+table.ep td.ep-c.pick{box-shadow:inset 0 0 0 2px var(--acc)}
+table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
+.ep-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:10.5px;color:var(--gll)}
+.ep-legend span{display:flex;align-items:center;gap:5px}
+.ep-legend i{display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--cd2)}
+.ep-legend i.part{background:var(--yel)}.ep-legend i.full{background:var(--redl)}.ep-legend i.over{background:var(--redl);box-shadow:inset 0 0 0 2px var(--wh)}
+.ep-legend i.today{box-shadow:inset 0 0 0 1px var(--acc)}
+.ep-ctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.ep-ctl input,.ep-ctl select{width:auto}
+.ep-ctl label{display:flex;align-items:center;gap:5px;margin:0;font-weight:400;text-transform:none;letter-spacing:normal;font-size:11px;color:var(--gll);cursor:pointer}
+.ep-ctl label input{width:auto;margin:0}
+.ep-list div{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+
 /* Timeline */
 .tl-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
 .tl-ico{width:30px;height:30px;border-radius:50%;background:var(--cd2);border:1px solid var(--bdr);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
@@ -303,6 +335,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <a data-pg="stats"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>Statistik</a>
       <div class="grp">Betrieb</div>
       <a data-pg="tech"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>Technik</a>
+      <a data-pg="einsatz"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>Einsatzplan</a>
       <a data-pg="techchecks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Technik-Checks</a>
       <a data-pg="workshops"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Workshops</a>
       <a data-pg="partners"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Miet-Partner</a>
@@ -557,6 +590,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
       <div class="card"><h3>Gigs nach Anlass</h3><div id="statTypes" class="sml"></div></div>
       <div class="card"><h3>Anfrage-Quellen</h3><div id="statSources" class="sml"></div></div>
     </div>
+    <div class="card"><h3>Technik-Einsätze <span id="statEqYear"></span></h3>
+      <div id="statEqTop" class="sml" style="margin-bottom:10px"></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Artikel</th><th class="num">Einsätze</th><th class="num">Einsatztage</th><th class="num">davon Vermietung</th><th class="num">davon DJ-Gig</th><th class="num">Mietumsatz</th></tr></thead><tbody id="statEqRows"></tbody></table></div>
+      <div class="mut sml" style="margin-top:8px">Bei DJ-Gigs steckt die Technik in der Gage – dafür gibt es keinen eigenen Mietumsatz, deshalb steht dort „–“.</div></div>
     <div class="card"><h3>Website-Besucher <span class="mut sml" style="font-weight:400">(anonym gezählt – ohne Cookies, ohne IP-Speicherung)</span>
       <select id="webDays" style="width:120px;float:right" onchange="loadWebStats()"><option value="30">30 Tage</option><option value="7">7 Tage</option><option value="90">90 Tage</option><option value="365">365 Tage</option></select></h3>
       <div class="tiles" id="webTiles" style="margin-top:8px"></div>
@@ -586,6 +623,29 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <div class="tbl-wrap card" id="eqBatchWrap" hidden><table class="batch"><thead><tr><th class="chk"><input type="checkbox" id="eqBatchAll" onclick="eqBatchToggleAll(this.checked)"></th><th>Name</th><th>Kategorie</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th class="num">Bestand</th><th>Status</th><th class="chk">Auf Anfrage</th><th class="chk">Sichtbar</th></tr></thead><tbody id="eqBatchRows"></tbody></table></div>
     <div class="card"><h3>Sets <span class="mut sml" style="font-weight:400">– mehrere Artikel als ein buchbares Paket (z. B. Lautsprecher + Kabel + Endstufe)</span> <button class="btn sm" style="float:right" onclick="openSetModal()">+ Set</button></h3>
       <div id="setAdminList" class="sml"></div></div>
+  </div>
+
+  <!-- EINSATZPLAN -->
+  <div class="pg" id="pg-einsatz">
+    <div class="phead"><div><div class="pt">Einsatzplan</div><div class="ps">Welche Technik wann unterwegs ist – Tag für Tag</div></div>
+      <div><button class="btn g sm" onclick="epShift(-1)">‹</button> <span id="epTitle" style="font-weight:700;margin:0 6px"></span> <button class="btn g sm" onclick="epShift(1)">›</button>
+      &nbsp;<button class="btn g sm" onclick="epToday()">Heute</button></div></div>
+    <div class="card">
+      <div class="ep-ctl">
+        <select id="epCat" onchange="renderEinsatz()"><option value="">Alle Kategorien</option></select>
+        <input type="text" id="epSearch" placeholder="Artikel suchen …" oninput="epHighlight=null;renderEinsatz()" style="min-width:180px">
+        <label><input type="checkbox" id="epOnlyUsed" onchange="renderEinsatz()">nur Artikel mit Einsatz</label>
+        <span class="mut sml" id="epCount"></span>
+        <span style="flex:1"></span>
+        <label style="cursor:default">Was ist am <input type="date" id="epDay" onchange="epJump()"> frei?</label>
+      </div>
+      <div class="ep-wrap" id="epGrid"></div>
+      <div class="ep-legend"><span><i></i>frei</span><span><i class="part"></i>teilweise im Einsatz</span><span><i class="full"></i>komplett unterwegs</span><span><i class="over"></i>über Bestand</span><span><i class="today"></i>heute</span><span class="mut">Zelle anklicken zeigt die Gigs, Spaltenkopf wählt den Tag.</span></div>
+    </div>
+    <div class="grid2" style="gap:16px;align-items:start">
+      <div class="card" id="epCellCard" hidden><h3 id="epCellTitle">Einsatz</h3><div id="epCellPanel" class="sml ep-list"></div></div>
+      <div class="card"><h3 id="epDayTitle">Tag auswählen</h3><div id="epDayPanel" class="sml"></div></div>
+    </div>
   </div>
 
   <!-- WORKSHOPS -->
@@ -928,6 +988,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
             <div><label>Nachfassen nach (Tage ohne Reaktion auf ein Angebot)</label><input type="number" id="sFollowDays" min="1"></div>
           </div>
           <div class="grid2">
+            <div><label>Standard-Technik bei DJ-Gigs</label><select id="sDjSet"><option value="">– keine –</option></select>
+              <div class="mut sml" style="margin-top:3px">Wird jedem neuen DJ-Gig automatisch zugeordnet (im Gig änderbar). Sets legst du unter Technik an.</div></div>
+          </div>
+          <div class="grid2">
             <div><label>USt.-Satz Standard (%)</label><input type="number" step="0.1" id="sTaxRate"></div>
             <div><label>Partner-Rabatt Technik-Miete (%)</label><input type="number" id="sPartnerPct"></div>
           </div>
@@ -1137,6 +1201,7 @@ function showPage(id){
   var navId=SUBPAGE_PARENT[id]||id;
   document.querySelectorAll('#nav a').forEach(function(a){a.classList.toggle('a',a.dataset.pg===navId)});
   if(id==='stats')loadWebStats();
+  if(id==='einsatz')renderEinsatz();
   if(id==='workshops')loadNewsletter();
   if(id==='media')loadMediaPage();
   window.scrollTo(0,0);
@@ -1207,7 +1272,7 @@ function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderDocsPage();
   renderEq();renderSetsAdmin();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
   renderProducts();renderPartners();renderWsAdmin();renderCampaigns();renderModulAdmin();renderReportAdmin();
-  renderTplSettings();renderTechChecks();
+  renderTplSettings();renderTechChecks();renderEinsatz();
   initSort();
 }
 /* ===== Workshop-Termine & Anmeldungen ===== */
@@ -1973,11 +2038,17 @@ function newDocForBooking(){
 }
 function renderBe(){
   var list=CACHE.be.filter(function(x){return x.booking_id===curBook.id});
-  document.getElementById('bdEquip').innerHTML=list.length?('<table><thead><tr><th>Artikel</th><th class="num">Menge</th><th class="num">Preis</th><th>Raus</th><th>Zurück</th><th></th></tr></thead><tbody>'+
+  /* Ueber Bestand: mehr zugeordnet, als im Zeitraum neben den anderen Gigs uebrig ist
+     (Standard-Set haengt auch bei Engpass dran - hier faellt es auf). */
+  var over=list.filter(function(x){return x.equipment_id&&Number(x.qty)>eqAvailable(x.equipment_id,curBook)});
+  var warn=over.length?'<div style="margin-bottom:8px"><span class="b red">Über Bestand</span> '+over.length+(over.length===1?' Artikel ist':' Artikel sind')+
+    ' im Zeitraum mehr zugeordnet, als frei ist – <a onclick="openEinsatzplan(\''+over[0].equipment_id+'\',\''+curBook.event_date+'\')">im Einsatzplan prüfen</a>.</div>':'';
+  document.getElementById('bdEquip').innerHTML=list.length?(warn+'<table><thead><tr><th>Artikel</th><th class="num">Menge</th><th class="num">Preis</th><th>Raus</th><th>Zurück</th><th></th></tr></thead><tbody>'+
     list.map(function(x){
       var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};
       var price=x.price_override!=null?x.price_override:rentPrice(eq,curBook);
-      return '<tr><td>'+esc(eq.name||'?')+'</td><td class="num">'+x.qty+'</td><td class="num">'+euro(price)+'</td>'+
+      var ueber=over.indexOf(x)>=0?' <span class="b red" title="Mehr zugeordnet, als im Zeitraum frei ist">über Bestand</span>':'';
+      return '<tr><td>'+esc(eq.name||'?')+ueber+'</td><td class="num">'+x.qty+'</td><td class="num">'+euro(price)+'</td>'+
       '<td><input type="checkbox" style="width:auto" '+(x.out_done?'checked':'')+' onchange="beFlag(\''+x.id+'\',\'out_done\',this.checked)"></td>'+
       '<td><input type="checkbox" style="width:auto" '+(x.back_done?'checked':'')+' onchange="beFlag(\''+x.id+'\',\'back_done\',this.checked)"></td>'+
       '<td><a onclick="beDel(\''+x.id+'\')" style="color:var(--redl)">✕</a></td></tr>';
@@ -2207,13 +2278,13 @@ function saveBe(){
   api('booking_equipment',{method:'POST',body:{booking_id:curBook.id,equipment_id:eqId,qty:qty,
     price_override:v('bePrice')?Number(v('bePrice')):null,notes:v('beNote')}})
     .then(function(){closeModal();toast('Zugeordnet ✓');
-      api('booking_equipment?select=*').then(function(r){CACHE.be=r||[];renderBe();renderEq()})})
+      api('booking_equipment?select=*').then(function(r){CACHE.be=r||[];renderBe();renderEq();renderEinsatz()})})
     .catch(function(e){toast(e.message,1)});
 }
 function beFlag(id,k,val){var b={};b[k]=val;api('booking_equipment?id=eq.'+id,{method:'PATCH',body:b}).then(function(){
   api('booking_equipment?select=*').then(function(r){CACHE.be=r||[];renderBe()})})}
 function beDel(id){api('booking_equipment?id=eq.'+id,{method:'DELETE'}).then(function(){
-  api('booking_equipment?select=*').then(function(r){CACHE.be=r||[];renderBe();renderEq()})})}
+  api('booking_equipment?select=*').then(function(r){CACHE.be=r||[];renderBe();renderEq();renderEinsatz()})})}
 
 /* Beleg aus dem Kunden heraus anlegen. Bewusst derselbe Editor wie unter "Angebote" bzw.
    "Rechnungen" - es gibt nur eine Belegmaske, hier ist lediglich der Kunde schon gesetzt
@@ -2284,8 +2355,15 @@ function saveBook(id){
     notes:v('bNotes'),
     billable_days:v('bBillDays')?Number(v('bBillDays')):null,
     open_ended:document.getElementById('bOpenEnded').checked};
-  (id?api('bookings?id=eq.'+id,{method:'PATCH',body:body}):api('bookings',{method:'POST',body:body}))
-    .then(function(){closeModal();toast('Gespeichert ✓');loadAll();if(id)setTimeout(function(){openBookDetail(id)},400)})
+  (id?api('bookings?id=eq.'+id,{method:'PATCH',body:body}):api('bookings',{method:'POST',prefer:'return=representation',body:body}))
+    .then(function(r){closeModal();toast('Gespeichert ✓');loadAll();if(id)setTimeout(function(){openBookDetail(id)},400);
+      /* Neuer DJ-Gig: der Server haengt das Standard-Set an - kurz sagen, dass (und wie viel)
+         Technik jetzt dranhaengt, sonst wundert sich Markus spaeter ueber die Zeilen im Gig. */
+      var neu=!id&&r&&r[0]&&r[0].id;
+      if(neu&&(body.kind==='dj'||body.kind==='dj_technik')&&(S.defaults||{}).dj_default_set)
+        api('booking_equipment?booking_id=eq.'+r[0].id).then(function(rows){
+          if(rows&&rows.length)setTimeout(function(){toast('Standard-Technik zugeordnet ('+rows.length+' Artikel)')},1500)});
+    })
     .catch(function(e){toast(e.message,1)});
 }
 function delBook(id){if(!confirm('Gig löschen?'))return;
@@ -4240,6 +4318,49 @@ function renderStats(){
   var src={};CACHE.customers.forEach(function(c){var k=c.source||'Unbekannt';src[k]=(src[k]||0)+1});
   document.getElementById('statSources').innerHTML=Object.keys(src).sort(function(a,b){return src[b]-src[a]})
     .map(function(k){return '<div style="padding:3px 0">'+esc(k)+' <b style="float:right">'+src[k]+'</b></div>'}).join('')||'<span class="mut">Keine Daten.</span>';
+  renderStatEq(year);
+}
+/* Technik-Einsaetze je Artikel: Ein "Einsatz" ist ein Gig (nicht storniert) des Jahres,
+   in dem der Artikel haengt. Einsatztage = abrechenbare Tage, sonst Kalendertage des Gigs
+   im Jahr (offenes Ende bis heute). Mietumsatz nur aus Vermietungen (technik/dj_technik),
+   die fest gebucht oder abgeschlossen sind; reine DJ-Gigs bringen keinen eigenen Mietumsatz. */
+function statDaysInYear(b,yStart,yEnd,today){
+  if(b.billable_days)return Math.max(1,Number(b.billable_days));
+  var s=b.event_date,e=b.open_ended?(today>s?today:s):(b.end_date||s);
+  if(e<s)e=s;if(s<yStart)s=yStart;if(e>yEnd)e=yEnd;
+  if(e<s)return 0;
+  return Math.round((new Date(e)-new Date(s))/86400000)+1;
+}
+function statEqRows(year){
+  var y=String(year),yStart=y+'-01-01',yEnd=y+'-12-31',today=new Date().toISOString().slice(0,10);
+  var bIdx={};(CACHE.bookings||[]).forEach(function(b){bIdx[b.id]=b});
+  var eIdx={};(CACHE.equipment||[]).forEach(function(e){eIdx[e.id]=e});
+  var per={};
+  (CACHE.be||[]).forEach(function(x){
+    var b=bIdx[x.booking_id],eq=eIdx[x.equipment_id];
+    if(!b||!eq||b.status==='storniert'||String(b.event_date).slice(0,4)!==y)return;
+    var r=per[eq.id]||(per[eq.id]={eq:eq,books:{},n:0,days:0,rent:0,dj:0,rev:0,hasRent:false});
+    var isRent=b.kind==='technik'||b.kind==='dj_technik'||b.kind==='miete';
+    if(!r.books[b.id]){r.books[b.id]=1;r.n++;
+      if(b.kind==='technik'||b.kind==='miete')r.rent++;else r.dj++;
+      r.days+=statDaysInYear(b,yStart,yEnd,today)}
+    if(isRent){r.hasRent=true;
+      if(b.status==='gebucht'||b.status==='abgeschlossen')
+        r.rev+=x.price_override!=null?Number(x.price_override):rentPrice(eq,b)*(Number(x.qty)||1)}
+  });
+  return Object.keys(per).map(function(k){return per[k]});
+}
+function renderStatEq(year){
+  var rows=statEqRows(year);
+  document.getElementById('statEqYear').textContent=year;
+  document.getElementById('statEqRows').innerHTML=applySort(rows,'stateq').map(function(r){
+    return '<tr><td><a onclick="openEinsatzplan(\''+r.eq.id+'\')">'+esc(r.eq.name)+'</a></td><td class="num">'+r.n+'</td><td class="num">'+r.days+'</td>'+
+      '<td class="num">'+r.rent+'</td><td class="num">'+r.dj+'</td><td class="num">'+(r.hasRent?euro(r.rev):'–')+'</td></tr>';
+  }).join('')||'<tr><td colspan="6" class="mut">Keine Technik-Einsätze in '+esc(year)+'.</td></tr>';
+  var top=rows.slice().sort(function(a,b){return b.n-a.n||String(a.eq.name).localeCompare(String(b.eq.name),'de')}).slice(0,3);
+  document.getElementById('statEqTop').innerHTML=top.length?'Meistgenutzt: '+top.map(function(r){
+    return '<b>'+esc(r.eq.name)+'</b> ('+r.n+(r.n===1?' Einsatz':' Einsätze')+')'}).join(', '):'<span class="mut">Noch keine Einsätze in diesem Jahr.</span>';
+  updateSortIndicators('stateq');
 }
 
 /* ===== Sortierbare Tabellen ===== */
@@ -4287,6 +4408,13 @@ var SORTDEFS={
     {get:function(w){return w.price_net},type:'num'},
     {get:function(w){return wsBooked(w.id)},type:'num'},
     {get:function(w){return w.public?1:0},type:'num'},null]},
+  stateq:{rowsId:'statEqRows',render:function(){renderStats()},cols:[
+    {get:function(r){return r.eq.name},type:'text'},
+    {get:function(r){return r.n},type:'num'},
+    {get:function(r){return r.days},type:'num'},
+    {get:function(r){return r.rent},type:'num'},
+    {get:function(r){return r.dj},type:'num'},
+    {get:function(r){return r.hasRent?r.rev:null},type:'num'}]},
   equipment:{rowsId:'eqRows',render:function(){renderEq()},cols:[
     {get:function(e){return e.name},type:'text'},
     {get:function(e){return e.category},type:'text'},
@@ -4301,6 +4429,7 @@ var SORTDEFS={
 SORT.equipment={col:0,dir:1};   // Name
 SORT.customers={col:0,dir:1};   // Name
 SORT.products={col:1,dir:1};    // Name
+SORT.stateq={col:1,dir:-1};     // Einsaetze, meistgenutzt zuerst
 function sortTable(name){var d=SORTDEFS[name];if(d.tableEl)return d.tableEl();var tb=document.getElementById(d.rowsId);return tb?tb.closest('table'):null}
 function applySort(list,name){
   var s=SORT[name];if(!s)return list;
@@ -4341,6 +4470,116 @@ function wireTable(name){
   updateSortIndicators(name);
 }
 function initSort(){for(var name in SORTDEFS){if(name==='workshops')continue;wireTable(name)}}
+
+/* ===== Einsatzplan (Technik x Tage) =====
+   Alles aus dem Cache gerechnet: je Monat einmal eine Karte Artikel -> Tag -> {belegt, Gigs}.
+   Stornierte Gigs zaehlen nicht, offenes Ende gilt bis zum Monatsende. */
+var epBase=new Date();epBase.setDate(1);
+var epSelDay=null,epHighlight=null,epCell=null;
+function epIso(y,m,d){return y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0')}
+function epShift(n){epBase.setDate(1);epBase.setMonth(epBase.getMonth()+n);epCell=null;renderEinsatz()}
+function epToday(){var t=new Date();epBase=new Date(t.getFullYear(),t.getMonth(),1);epSelDay=epIso(t.getFullYear(),t.getMonth(),t.getDate());epCell=null;renderEinsatz()}
+function epJump(){var d=v('epDay');if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return;
+  epBase=new Date(Number(d.slice(0,4)),Number(d.slice(5,7))-1,1);epSelDay=d;epCell=null;renderEinsatz()}
+function epSelectDay(ds){epSelDay=ds;renderEinsatz()}
+function epShowCell(eqId,ds){epCell={eq:eqId,day:ds};renderEinsatz()}
+function epCloseCell(){epCell=null;renderEinsatz()}
+function epMonthMap(y,m){
+  var days=new Date(y,m+1,0).getDate(),mStart=epIso(y,m,1),mEnd=epIso(y,m,days);
+  var bIdx={};(CACHE.bookings||[]).forEach(function(b){bIdx[b.id]=b});
+  var map={};
+  (CACHE.be||[]).forEach(function(x){
+    var b=bIdx[x.booking_id];if(!b||b.status==='storniert')return;
+    var s=String(b.event_date||'').slice(0,10),e=b.open_ended?mEnd:String(b.end_date||b.event_date).slice(0,10);
+    if(!s)return;if(e<s)e=s;
+    if(s>mEnd||e<mStart)return;
+    var from=s<mStart?1:Number(s.slice(8,10)),to=e>mEnd?days:Number(e.slice(8,10));
+    var row=map[x.equipment_id]||(map[x.equipment_id]=[]);
+    for(var d=from;d<=to;d++){var c=row[d]||(row[d]={used:0,gigs:[]});c.used+=Number(x.qty)||0;c.gigs.push({b:b,qty:Number(x.qty)||0})}
+  });
+  return {y:y,m:m,days:days,map:map};
+}
+function epGigLabel(b){return (b.title||b.event_type||'Gig')}
+function epGigLine(g,withQty){
+  var b=g.b;
+  return (withQty?'×'+g.qty+' – ':'')+'<a onclick="openBookDetail(\''+b.id+'\')">'+esc(epGigLabel(b))+'</a> <span class="mut">('+esc(custName(b.customers))+(b.venue_name?', '+esc(b.venue_name):'')+
+    ', '+dt(b.event_date)+(b.open_ended?' – offen':b.end_date&&b.end_date!==b.event_date?' – '+dt(b.end_date):'')+')</span>';
+}
+function renderEinsatz(){
+  var el=document.getElementById('epGrid');if(!el)return;
+  var y=epBase.getFullYear(),m=epBase.getMonth();
+  document.getElementById('epTitle').textContent=epBase.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+  var data=epMonthMap(y,m),days=data.days,map=data.map;
+  var t=new Date(),today=epIso(t.getFullYear(),t.getMonth(),t.getDate());
+  var catSel=document.getElementById('epCat'),curCat=catSel.value;
+  var cats={};(CACHE.equipment||[]).forEach(function(e){if(e.category&&e.status==='aktiv')cats[e.category]=1});
+  catSel.innerHTML='<option value="">Alle Kategorien</option>'+Object.keys(cats).sort(function(a,b){return a.localeCompare(b,'de')}).map(function(c){
+    return '<option value="'+esc(c)+'"'+(c===curCat?' selected':'')+'>'+esc(c)+'</option>'}).join('');
+  var q=(v('epSearch')||'').toLowerCase(),onlyUsed=document.getElementById('epOnlyUsed').checked;
+  var list=(CACHE.equipment||[]).filter(function(e){
+    if(e.status!=='aktiv')return false;
+    if(catSel.value&&e.category!==catSel.value)return false;
+    if(q&&[e.name,e.category,e.sku].join(' ').toLowerCase().indexOf(q)<0)return false;
+    if(onlyUsed&&!map[e.id])return false;
+    return true;
+  }).sort(function(a,b){return String(a.name).localeCompare(String(b.name),'de',{numeric:true})});
+  var DOW=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  var head='<tr><th class="ep-name">Artikel</th>';
+  for(var d=1;d<=days;d++){var ds=epIso(y,m,d),dow=new Date(y,m,d).getDay();
+    head+='<th class="ep-d'+(ds===today?' today':'')+(ds===epSelDay?' sel':'')+(dow===0||dow===6?' we':'')+'" onclick="epSelectDay(\''+ds+'\')" title="Tag auswählen"><span>'+DOW[dow]+'</span>'+d+'</th>'}
+  head+='</tr>';
+  var body=list.map(function(e){
+    var row=map[e.id],tot=Math.max(1,Number(e.qty_total)||1);
+    var h='<tr'+(e.id===epHighlight?' class="hl"':'')+' data-eq="'+e.id+'"><td class="ep-name"><a onclick="openEqModal(\''+e.id+'\')">'+esc(e.name)+'</a><div class="mut" style="font-size:10px">'+esc(e.category||'')+(e.category?' · ':'')+tot+' Stück</div></td>';
+    for(var d=1;d<=days;d++){var ds=epIso(y,m,d),c=row&&row[d];
+      var cls='ep-c'+(ds===today?' today':'')+(ds===epSelDay?' sel':'')+(epCell&&epCell.eq===e.id&&epCell.day===ds?' pick':'');
+      if(c)cls+=c.used>tot?' over':c.used>=tot?' full':' part';
+      h+='<td class="'+cls+'" data-day="'+ds+'"'+(c?' onclick="epShowCell(\''+e.id+'\',\''+ds+'\')" title="'+esc(c.gigs.map(function(g){return epGigLabel(g.b)+' ×'+g.qty}).join(', '))+'"':'')+'>'+(c?c.used+'/'+tot:'')+'</td>'}
+    return h+'</tr>';
+  }).join('')||'<tr><td colspan="'+(days+1)+'" class="mut" style="padding:8px">'+(onlyUsed||q||catSel.value?'Nichts gefunden.':'Keine aktiven Artikel.')+'</td></tr>';
+  el.innerHTML='<table class="ep"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
+  document.getElementById('epCount').textContent=list.length+(list.length===1?' Artikel':' Artikel');
+  renderEpCell();renderEpDay();
+}
+function renderEpCell(){
+  var card=document.getElementById('epCellCard');
+  if(!epCell){card.hidden=true;return}
+  var eq=(CACHE.equipment||[]).find(function(e){return e.id===epCell.eq});
+  var sd=new Date(epCell.day+'T00:00:00'),data=epMonthMap(sd.getFullYear(),sd.getMonth());
+  var c=(data.map[epCell.eq]||[])[sd.getDate()];
+  if(!eq||!c){card.hidden=true;return}
+  card.hidden=false;
+  var tot=Math.max(1,Number(eq.qty_total)||1);
+  document.getElementById('epCellTitle').innerHTML=esc(eq.name)+' am '+dt(epCell.day)+' <span class="mut sml" style="font-weight:400">– '+c.used+' von '+tot+' im Einsatz'+(c.used>tot?', <span style="color:var(--redl)">'+(c.used-tot)+' über Bestand</span>':'')+'</span>'+
+    '<a class="sml" style="float:right" onclick="epCloseCell()">Schließen</a>';
+  document.getElementById('epCellPanel').innerHTML=c.gigs.map(function(g){return '<div>'+epGigLine(g,true)+'</div>'}).join('');
+}
+function renderEpDay(){
+  var title=document.getElementById('epDayTitle'),panel=document.getElementById('epDayPanel');
+  if(!epSelDay){title.textContent='Tag auswählen';panel.innerHTML='<span class="mut">Spaltenkopf anklicken oder oben ein Datum eingeben – dann steht hier, was an dem Tag unterwegs ist und was noch frei wäre.</span>';return}
+  var sd=new Date(epSelDay+'T00:00:00'),data=epMonthMap(sd.getFullYear(),sd.getMonth()),dn=sd.getDate();
+  var unterwegs=[],frei=[];
+  (CACHE.equipment||[]).filter(function(e){return e.status==='aktiv'}).sort(function(a,b){return String(a.name).localeCompare(String(b.name),'de',{numeric:true})}).forEach(function(e){
+    var tot=Math.max(1,Number(e.qty_total)||1),c=(data.map[e.id]||[])[dn];
+    if(c)c.gigs.forEach(function(g){unterwegs.push('<div>'+esc(e.name)+' ×'+g.qty+' – '+epGigLine(g,false)+'</div>')});
+    var rest=tot-(c?c.used:0);
+    if(rest>0)frei.push(esc(e.name)+' ×'+rest);
+  });
+  title.textContent='Am '+dt(epSelDay);
+  panel.innerHTML='<div style="margin-bottom:10px"><b>Unterwegs am '+dt(epSelDay)+':</b><div class="ep-list">'+(unterwegs.join('')||'<div class="mut">Nichts – alles im Lager.</div>')+'</div></div>'+
+    '<div><b>Noch frei am '+dt(epSelDay)+':</b><div style="margin-top:3px">'+(frei.length?frei.join(' · '):'<span class="mut">Nichts mehr frei.</span>')+'</div></div>';
+}
+/* Aus der Technik-Liste, dem Gig oder der Statistik in den Einsatzplan springen:
+   Monat des Termins, Artikel gefiltert und markiert. */
+function openEinsatzplan(eqId,date){
+  var e=(CACHE.equipment||[]).find(function(x){return x.id===eqId});
+  epHighlight=eqId||null;epCell=null;
+  if(date&&/^\d{4}-\d{2}-\d{2}/.test(date)){epBase=new Date(Number(date.slice(0,4)),Number(date.slice(5,7))-1,1);epSelDay=date.slice(0,10)}
+  document.getElementById('epSearch').value=e?e.name:'';
+  document.getElementById('epCat').value='';
+  document.getElementById('epOnlyUsed').checked=false;
+  showPage('einsatz');
+}
 
 /* ===== Technik ===== */
 /* Nächster (laufender oder kommender) Einsatz eines Artikels - für Spalte "Nächstes Mal im
@@ -4397,7 +4636,7 @@ function renderEq(){
     '<td class="num">'+(e.partner_rate!=null?euro(e.partner_rate):'<span class="mut">auto</span>')+'</td>'+
     '<td>'+(e.public&&e.rentable?'<span class="b green">sichtbar</span>':'<span class="b grey">verborgen</span>')+'</td>'+
     '<td><span class="b '+({aktiv:'green',wartung:'yel',inaktiv:'grey'}[e.status]||'grey')+'">'+e.status+'</span></td>'+
-    '<td>'+(nu?'<span class="b blue">'+lbl+'</span>':'–')+'</td></tr>';
+    '<td>'+(nu?'<a class="b blue" onclick="event.stopPropagation();openEinsatzplan(\''+e.id+'\',\''+nu.date+'\')" title="Im Einsatzplan zeigen">'+lbl+'</a>':'–')+'</td></tr>';
   }).join('')||'<tr><td colspan="8" class="mut">'+(q?'Nichts gefunden.':'Noch keine Artikel.')+'</td></tr>';
   updateSortIndicators('equipment');
 }
@@ -6333,6 +6572,12 @@ function renderSet(){
   document.getElementById('sValidDays').value=d.quote_valid_days!=null?d.quote_valid_days:30;
   document.getElementById('sPlanLock').value=d.plan_lock_days!=null?d.plan_lock_days:3;
   document.getElementById('sFollowDays').value=d.followup_days!=null?d.followup_days:7;
+  var djSet=document.getElementById('sDjSet');
+  djSet.innerHTML='<option value="">– keine –</option>'+(CACHE.equipmentSets||[]).map(function(x){
+    var n=(CACHE.setItems||[]).filter(function(i){return i.set_id===x.id}).length;
+    return '<option value="'+x.id+'">'+esc(x.name)+' ('+n+' Artikel)</option>'}).join('');
+  djSet.value=d.dj_default_set||'';
+  if(djSet.value!==(d.dj_default_set||''))djSet.value='';   /* Set inzwischen geloescht */
   document.getElementById('sRental').value=(S.rental_contract&&S.rental_contract.text)||'';
 }
 function saveRental(){
@@ -6379,6 +6624,7 @@ function saveNumbering(){
   d.travel_free_mode=v('sKmFreeMode')||'schwelle';d.travel_roundtrip=document.getElementById('sKmRoundtrip').checked;
   d.overnight_enabled=document.getElementById('sOnEnabled').checked;d.overnight_price=Number(v('sOnPrice'))||0;
   d.overnight_threshold_type=v('sOnType')||'zeit';d.overnight_threshold_value=Number(v('sOnValue'))||60;
+  d.dj_default_set=v('sDjSet')||'';
   Promise.all([
     api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'numbering',value:n}}),
     api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'defaults',value:d}})

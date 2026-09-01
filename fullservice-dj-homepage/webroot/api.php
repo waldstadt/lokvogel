@@ -1512,6 +1512,7 @@ function autoInquiryPlanner(PDO $p, array $row): void {
       trim((($row['event_type'] ?? '') ?: 'Anfrage') . ' ' . $row['name']), $row['event_date'],
       $row['location'] ?? null, null, $guests,   /* Adresse bleibt leer statt den Ortsnamen zu doppeln */
       json_encode(['basics' => $basics], JSON_UNESCAPED_UNICODE), now(), now()]);
+  applyDefaultSet($p, $bookingId, $kind);
 }
 
 /* Spiegelt die Entscheidung zum Angebot auf den Termin - dieselben Regeln wie
@@ -2948,8 +2949,16 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
           $upd = implode(',', array_map(fn($c) => "\"$c\"=excluded.\"$c\"", array_diff($cols, [$pk])));
           $sql .= " on conflict(\"$pk\") do update set $upd";
         }
+        /* Standard-Technik nur fuer einen wirklich neuen Gig - bei merge-duplicates kann
+           die Zeile schon existieren, dann bleibt die Technik, wie Markus sie gesetzt hat. */
+        $bookingNeu = false;
+        if ($t === 'bookings' && !empty($row['id'])) {
+          $chk = $p->prepare('select 1 from bookings where id = ?'); $chk->execute([$row['id']]);
+          $bookingNeu = !$chk->fetchColumn();
+        }
         try { $p->prepare($sql)->execute(array_values($row)); }
         catch (PDOException $e) { fail('Konflikt: ' . $e->getMessage(), 409); }
+        if ($bookingNeu) applyDefaultSet($p, (string)$row['id'], (string)($row['kind'] ?? 'dj'));
         if ($t === 'documents') docAudit($p, $row['id'] ?? null, 'erstellt', ($row['number'] ?? '') . ' (' . ($row['doc_type'] ?? '') . ')');
         /* Nur protokollieren, wenn der Beleg schon versendet ist - sonst wuerde jede
            normale Ersterfassung eines Angebots das Protokoll mit "Position hinzugefuegt"
@@ -3198,6 +3207,32 @@ function equipmentAvailability(PDO $p, string $eq, string $from, string $to): ?a
   $st->execute([$eq, $to, $from]);
   $used = (int)$st->fetchColumn();
   return ['total' => $total, 'available' => max(0, $total - $used), 'on_request' => false];
+}
+/* Standard-Technik fuer DJ-Gigs (Einstellungen -> defaults.dj_default_set): Wenn ein
+   DJ-Gig neu entsteht (Backoffice-Formular oder Anfrage von der Homepage), bekommt er die
+   Artikel des Sets automatisch als Technik-Zeilen. Nur bei "dj"/"dj_technik", nur wenn
+   der Gig noch keine Technik hat - ein zweiter Aufruf legt also nichts doppelt an.
+   Kapazitaet wird bewusst nicht geprueft: Der Einsatzplan zeigt eine Ueberbuchung rot,
+   Markus entscheidet dann im Gig. Rueckgabe: Zahl der angelegten Zeilen. */
+function applyDefaultSet(PDO $p, string $bookingId, string $kind): int {
+  if (!in_array($kind, ['dj', 'dj_technik'], true)) return 0;
+  $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
+  $setId = trim((string)($defs['dj_default_set'] ?? ''));
+  if ($setId === '') return 0;
+  $st = $p->prepare('select count(*) from booking_equipment where booking_id = ?');
+  $st->execute([$bookingId]);
+  if ((int)$st->fetchColumn() > 0) return 0;
+  $st = $p->prepare("select si.equipment_id, si.qty from equipment_set_items si
+    join equipment e on e.id = si.equipment_id
+    where si.set_id = ? and e.status = 'aktiv'");
+  $st->execute([$setId]);
+  $ins = $p->prepare('insert into booking_equipment (id, booking_id, equipment_id, qty) values (?,?,?,?)');
+  $n = 0;
+  foreach ($st->fetchAll() as $it) {
+    $ins->execute([uuid(), $bookingId, $it['equipment_id'], max(1, (int)$it['qty'])]);
+    $n++;
+  }
+  return $n;
 }
 function rentalTierDefaults(PDO $p): array {
   $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
