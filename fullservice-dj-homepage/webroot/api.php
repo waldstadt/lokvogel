@@ -2715,7 +2715,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
 function portalDoc(string $token, string $plz): array {
   $p = db();
   if (!preg_match('/^[a-f0-9]{24,64}$/', $token)) fail('Ungültiger Link.', 404);
-  $st = $p->prepare('select d.*, c.first_name, c.last_name, c.company, c.zip
+  $st = $p->prepare('select d.*, c.first_name, c.last_name, c.company, c.street, c.zip, c.city
     from documents d join customers c on c.id = d.customer_id where d.share_token = ?');
   $st->execute([$token]);
   $d = $st->fetch();
@@ -3493,6 +3493,10 @@ function handlePortal(string $path, string $method, $body): never {
            im Portal blieb deshalb immer leer. */
         'price_mode','discount_value','discount_type','event_info','rental_from','rental_to'])),
       'customer' => trim(($d['company'] ? $d['company'] : ($d['first_name'].' '.$d['last_name']))),
+      /* Rechnungsadresse fuer den Briefkopf im Portal - fehlte bisher komplett, weil
+         das SQL oben nur die PLZ (fuer die Zugangspruefung) mitgeladen hat. */
+      'customer_address' => (trim((string)$d['street']) !== '' || trim((string)$d['city']) !== '')
+        ? ['street' => $d['street'], 'zip' => $d['zip'], 'city' => $d['city']] : null,
       'items' => $it->fetchAll(),
       'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city','iban','bic','bank','tax_id'])),
       'upsells' => $ups,

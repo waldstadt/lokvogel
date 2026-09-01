@@ -165,6 +165,31 @@ function eventInfoLine(d){
   if(e.guests)t.push('ca. '+e.guests+' Gäste');
   return t.join(' · ');
 }
+/* Rechnungsadresse ueber dem Angebot - stand bisher gar nicht in den vom Server
+   gelieferten Daten, deshalb blieb sie im Angebot immer unsichtbar (siehe
+   portalDoc()/portal/offer in api.php). */
+function custAddressLine(){
+  var a=DOC.customer_address;if(!a)return '';
+  var zc=[a.zip,a.city].filter(Boolean).join(' ');
+  return [a.street,zc].filter(Boolean).map(esc).join('<br>');
+}
+/* Zeigt die Eckdaten der Veranstaltung als klar beschriftete Zeilen statt als ein
+   einzelner, schwer lesbarer Kommasatz - "alle wichtigen Infos" sollen auf einen
+   Blick auffindbar sein, nicht nur irgendwo in einem Fliesstext stehen. */
+function eventInfoRows(d){
+  var e=d&&d.event_info;
+  if(typeof e==='string'){try{e=JSON.parse(e)}catch(err){e=null}}
+  if(!e||!Number(e.show))return '';
+  var rows=[];
+  if(e.kind&&EV_KIND_LABEL[e.kind])rows.push(['Art',EV_KIND_LABEL[e.kind]]);
+  if(e.occasion)rows.push(['Anlass',e.occasion]);
+  if(e.date)rows.push(['Termin',dt(e.date)+(e.time_from?', ab '+e.time_from+' Uhr':'')]);
+  else if(e.time_from)rows.push(['Beginn','ab '+e.time_from+' Uhr']);
+  if(e.venue||e.address)rows.push(['Ort',[e.venue,e.address].filter(Boolean).join(', ')]);
+  if(e.guests)rows.push(['Gäste','ca. '+e.guests]);
+  if(!rows.length)return '';
+  return rows.map(function(r){return '<div><b>'+esc(r[0])+':</b> '+esc(r[1])+'</div>'}).join('');
+}
 function lineTotal(it){
   if(it.is_header)return 0; /* reine Kopfzeile (Artikel/Stückzahl/Tagespreis) - Summe steckt in den Unterpositionen */
   var g=(Number(it.qty)||0)*(Number(it.unit_price)||0);
@@ -260,9 +285,10 @@ function renderOffer(){
     '<div class="card"><div class="kicker">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
     '<div><h1>Hallo '+esc(DOC.customer)+'!</h1>'+
+    (custAddressLine()?'<p class="sub">'+custAddressLine()+'</p>':'')+
     '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until?' · gültig bis '+dt(d.valid_until):'')+(rentalPeriodLabel(d.rental_from,d.rental_to)?' · '+rentalPeriodLabel(d.rental_from,d.rental_to):'')+'</p></div>'+
     '<button class="btn g" onclick="downloadPdf()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Als PDF speichern</button></div>'+
-    (eventInfoLine(d)?'<div class="sub" style="margin-top:12px;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:9px 12px">'+esc(eventInfoLine(d))+'</div>':'')+
+    (eventInfoRows(d)?'<div class="sub" style="margin-top:12px;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:9px 12px">'+eventInfoRows(d)+'</div>':'')+
     (statusLine?'<div style="margin-top:12px">'+statusLine+'</div>':'')+
     (d.intro_text?'<p style="margin-top:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
     '</div>'+
