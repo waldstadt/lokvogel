@@ -954,6 +954,20 @@ function docAudit(PDO $p, ?string $docId, string $action, string $detail = ''): 
   } catch (PDOException $e) {}
 }
 
+/* Status eines Dokuments nachschlagen (mit Cache) - entscheidet, ob eine Positions-
+   Aenderung protokollierenswert ist (siehe document_items PATCH/DELETE): waehrend der
+   ganz normalen Ersterfassung (entwurf) soll das Protokoll nicht vollgeschrieben werden. */
+function docStatusFor(PDO $p, ?string $docId): string {
+  static $cache = [];
+  if ($docId === null) return 'entwurf';
+  if (!array_key_exists($docId, $cache)) {
+    $st = $p->prepare('select status from documents where id = ?');
+    $st->execute([$docId]);
+    $cache[$docId] = $st->fetchColumn() ?: 'entwurf';
+  }
+  return $cache[$docId];
+}
+
 /* Festgeschrieben = Rechnungsartige Dokumente, die den Entwurfsstatus verlassen haben */
 function docLockedRow(array $d): bool {
   return !in_array($d['doc_type'] ?? '', ['angebot', 'bestaetigung', 'lieferschein'])
@@ -2567,14 +2581,18 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       $items = is_array($body) && array_is_list($body) ? $body : [$body];
       $merge = in_array('resolution=merge-duplicates', $prefer);
       $pk = PK[$t] ?? 'id';
+      $docStatusMap = [];
       if ($t === 'document_items') {
         $docIds = array_values(array_unique(array_filter(array_map(fn($r) => is_array($r) ? ($r['document_id'] ?? null) : null, $items))));
         if ($docIds) {
           $in = implode(',', array_fill(0, count($docIds), '?'));
-          $chk = $p->prepare("select number, doc_type, status from documents where id in ($in)");
+          $chk = $p->prepare("select id, number, doc_type, status from documents where id in ($in)");
           $chk->execute($docIds);
-          foreach ($chk->fetchAll() as $d) if (docLockedRow($d))
-            fail('Rechnung ' . $d['number'] . ' ist festgeschrieben (GoBD): Positionen können nicht mehr geändert werden.', 409);
+          foreach ($chk->fetchAll() as $d) {
+            if (docLockedRow($d))
+              fail('Rechnung ' . $d['number'] . ' ist festgeschrieben (GoBD): Positionen können nicht mehr geändert werden.', 409);
+            $docStatusMap[$d['id']] = $d['status'];
+          }
         }
       }
       $result = [];
@@ -2595,6 +2613,14 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         try { $p->prepare($sql)->execute(array_values($row)); }
         catch (PDOException $e) { fail('Konflikt: ' . $e->getMessage(), 409); }
         if ($t === 'documents') docAudit($p, $row['id'] ?? null, 'erstellt', ($row['number'] ?? '') . ' (' . ($row['doc_type'] ?? '') . ')');
+        /* Nur protokollieren, wenn der Beleg schon versendet ist - sonst wuerde jede
+           normale Ersterfassung eines Angebots das Protokoll mit "Position hinzugefuegt"
+           je Zeile zumuellen. Genau der gemeinte Fall ist die nachtraegliche Korrektur
+           eines Angebots, das der Kunde schon gesehen hat. */
+        if ($t === 'document_items' && !empty($row['document_id'])
+          && ($docStatusMap[$row['document_id']] ?? 'entwurf') !== 'entwurf')
+          docAudit($p, $row['document_id'], 'Position hinzugefügt',
+            ($row['description'] ?? '') . ' (' . ($row['qty'] ?? 1) . ' ' . ($row['unit'] ?? '') . ' à ' . number_format((float)($row['unit_price'] ?? 0), 2, ',', '.') . ' €)');
         $result[] = decodeRow($t, array_map(fn($v) => $v, $row));
       }
       if (in_array('return=representation', $prefer)) {
@@ -2621,6 +2647,11 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         }
       }
       if ($t === 'document_items') assertItemsUnlocked($p, $wsql, $args);
+      $itemsBefore = null;
+      if ($t === 'document_items') {
+        $chkI = $p->prepare("select * from document_items$wsql"); $chkI->execute($args);
+        $itemsBefore = $chkI->fetchAll();
+      }
       if (in_array('updated_at', tableCols($t))) $row['updated_at'] = now();
       foreach ($row as $c => $v) $row[$c] = encodeVal($t, $c, $v);
       $set = implode(',', array_map(fn($c) => "\"$c\"=?", array_keys($row)));
@@ -2634,6 +2665,20 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
             if ((string)$old !== (string)$vNew && $c !== 'updated_at') $changes[] = "$c: " . ($old ?? '–') . ' → ' . ($vNew ?? '–');
           }
           if ($changes) docAudit($p, $b['id'], 'geändert', $b['number'] . ' · ' . implode(', ', $changes));
+        }
+      }
+      if ($t === 'document_items' && !empty($itemsBefore)) {
+        $itemFields = ['description', 'qty', 'unit', 'unit_price', 'discount_value', 'discount_type'];
+        foreach ($itemsBefore as $ib) {
+          if (docStatusFor($p, $ib['document_id']) === 'entwurf') continue;
+          $changes = [];
+          foreach ($row as $c => $vNew) {
+            if (!in_array($c, $itemFields)) continue;
+            $old = $ib[$c] ?? null;
+            if ((string)$old !== (string)$vNew) $changes[] = "$c: " . ($old ?? '–') . ' → ' . ($vNew ?? '–');
+          }
+          if ($changes) docAudit($p, $ib['document_id'], 'Position geändert',
+            ($ib['description'] ?? '') . ' · ' . implode(', ', $changes));
         }
       }
       if (in_array('return=representation', $prefer)) {
@@ -2652,7 +2697,13 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
           docAudit($p, $b['id'], 'gelöscht', $b['number'] . ' (' . $b['doc_type'] . ', Entwurf)');
         }
       }
-      if ($t === 'document_items') assertItemsUnlocked($p, $wsql, $args);
+      if ($t === 'document_items') {
+        assertItemsUnlocked($p, $wsql, $args);
+        $chkI = $p->prepare("select * from document_items$wsql"); $chkI->execute($args);
+        foreach ($chkI->fetchAll() as $ib)
+          if (docStatusFor($p, $ib['document_id']) !== 'entwurf')
+            docAudit($p, $ib['document_id'], 'Position entfernt', (string)($ib['description'] ?? ''));
+      }
       try { $st = $p->prepare("delete from \"$t\"$wsql"); $st->execute($args); }
       catch (PDOException $e) { fail('Löschen nicht möglich (verknüpfte Daten): ' . $e->getMessage(), 409); }
       out(null, 204);

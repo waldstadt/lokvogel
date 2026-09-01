@@ -2676,6 +2676,22 @@ function korrekturDoc(){
   fillDocForm();
   toast('Korrektur-Entwurf angelegt – Original '+src.number+' ggf. noch stornieren.');
 }
+/* "feld: alt → neu"-Paare (durch Kommas getrennt, mit optionalem "Praefix · " davor,
+   z.B. Belegnummer oder Positionsbezeichnung) hervorgehoben statt als Fliesstext -
+   sonst geht eine Aenderung im Protokoll unter statt auf den ersten Blick aufzufallen. */
+function renderAuditDetail(action,detail){
+  detail=String(detail||'');
+  if(action!=='geändert'&&action!=='Position geändert')return esc(detail);
+  var i=detail.indexOf(' · ');
+  var prefix=i>=0?detail.slice(0,i):'',rest=i>=0?detail.slice(i+3):detail;
+  var segs=rest.split(/, (?=[a-zA-Z_]+: )/);
+  var html=segs.map(function(seg){
+    var m=seg.match(/^([a-zA-Z_]+): (.*) → (.*)$/);
+    if(!m)return esc(seg);
+    return '<b>'+esc(m[1])+':</b> <span style="color:var(--redl);text-decoration:line-through">'+esc(m[2])+'</span> → <span style="color:var(--grn);font-weight:600">'+esc(m[3])+'</span>';
+  }).join(', ');
+  return (prefix?esc(prefix)+' · ':'')+html;
+}
 function openAuditModal(){
   if(!curDoc.id)return;
   api('doc_audit?document_id=eq.'+curDoc.id+'&order=created_at.desc').then(function(rows){
@@ -2683,9 +2699,9 @@ function openAuditModal(){
       (rows&&rows.length?rows.map(function(a){
         return '<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)" class="sml">'+
         '<span class="mut">'+new Date(a.created_at).toLocaleString('de-DE')+' · '+esc(a.user_email||'')+'</span><br>'+
-        '<b>'+esc(a.action)+'</b> – '+esc(a.detail||'')+'</div>';
+        '<b>'+esc(a.action)+'</b> – '+renderAuditDetail(a.action,a.detail)+'</div>';
       }).join(''):'<span class="mut sml">Keine Einträge.</span>')+
-      '<div class="mut sml" style="margin-top:10px">Automatisch geführt (GoBD): Anlage, Statuswechsel und Änderungsversuche.</div>');
+      '<div class="mut sml" style="margin-top:10px">Automatisch geführt (GoBD): Anlage, Statuswechsel, Positionsänderungen (ab dem ersten Versand) und Änderungsversuche.</div>');
   }).catch(function(e){toast(e.message,1)});
 }
 function renderStatusBtns(){
