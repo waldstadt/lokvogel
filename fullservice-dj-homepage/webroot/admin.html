@@ -167,7 +167,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 /* Kalender */
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .cal .ch{font-size:9px;color:var(--gl);text-transform:uppercase;text-align:center;padding:4px}
-.cal .cd-c{min-height:74px;background:var(--cd);border:1px solid var(--bdr);padding:4px;font-size:10px}
+.cal .cd-c{min-height:74px;min-width:0;overflow:hidden;background:var(--cd);border:1px solid var(--bdr);padding:4px;font-size:10px}
 .cal .cd-c.out{opacity:.32}
 .cal .cd-c.today{border-color:var(--acc)}
 .cal .cdn{color:var(--gl);font-size:9px}
@@ -500,18 +500,18 @@ table.batch td.chk,table.batch th.chk{text-align:center}
         <div><label>Preisanzeige</label><label style="display:flex;align-items:center;gap:8px;margin-top:9px;font-weight:400;text-transform:none;letter-spacing:normal;cursor:pointer"><input type="checkbox" id="docNetto" style="width:auto" onchange="renderTotals()">Netto anzeigen (für Geschäftskunden)</label></div>
         <div id="docDepWrap" style="display:none"><label>Verrechnete Abschläge (brutto €)</label><input type="number" id="docDep" step="0.01" value="0"></div>
       </div>
-      <div class="grid4" id="docDiscGrid">
-        <div><label>Rabatt aufs Gesamtdokument</label><input type="number" step="0.01" id="docDiscVal" value="0"></div>
-        <div><label>Rabatt-Art</label><select id="docDiscType"><option value="pct">%</option><option value="eur">€ (brutto)</option></select></div>
-        <div><label>Pauschal-Gesamtpreis (brutto €) <span class="mut sml" style="text-transform:none;letter-spacing:0">– überschreibt die Positionssumme</span></label><input type="number" step="0.01" id="docTotalOverride" placeholder="leer = aus Positionen berechnet"></div>
-        <div></div>
-      </div>
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
       <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('docIntro')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
     </div>
     <div class="card"><h3>Positionen <span class="doc-add" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()"> + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()"> + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button> <span id="docBookBtns"></span> <span id="docTplBtns"></span></span></h3>
       <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel brutto</div><div>Gesamt</div><div></div></div>
       <div id="docItems"></div>
+      <div class="grid4" id="docDiscGrid" style="margin-top:10px">
+        <div><label>Rabatt aufs Gesamtdokument</label><input type="number" step="0.01" id="docDiscVal" value="0"></div>
+        <div><label>Rabatt-Art</label><select id="docDiscType"><option value="pct">%</option><option value="eur">€ (brutto)</option></select></div>
+        <div><label>Pauschal-Gesamtpreis (brutto €) <span class="mut sml" style="text-transform:none;letter-spacing:0">– überschreibt die Positionssumme</span></label><input type="number" step="0.01" id="docTotalOverride" placeholder="leer = aus Positionen berechnet"></div>
+        <div></div>
+      </div>
       <div class="totals" id="docTotals"></div>
     </div>
     <div class="card"><label>Schlusstext</label><textarea id="docOutro" style="min-height:46px"></textarea>
@@ -2733,7 +2733,7 @@ function itemRowHtml(it,i,posLabel,locked,sml){
   return '<div class="it-row" style="margin-bottom:3px">'+
   '<div'+(locked?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':'grab')+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked?'':'<span style="opacity:.55">⠿</span>')+posLabel+'</div>'+
   '<input value="'+esc(it.description)+'" placeholder="Beschreibung" oninput="itSet('+i+',\'description\',this.value)">'+
-  '<input type="number" step="0.5" value="'+it.qty+'" placeholder="Menge" title="Menge" oninput="itSet('+i+',\'qty\',this.value)">'+
+  '<input type="number" step="1" value="'+it.qty+'" placeholder="Menge" title="Menge" oninput="itSet('+i+',\'qty\',this.value)">'+
   '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
   '<input type="number" step="0.01" value="'+it.unit_price+'" placeholder="Einzelpreis" title="Einzelpreis brutto" oninput="itSet('+i+',\'unit_price\',this.value)">'+
   '<input value="'+euro(sum)+'" disabled class="num" title="Gesamt" data-sum="'+i+'">'+
