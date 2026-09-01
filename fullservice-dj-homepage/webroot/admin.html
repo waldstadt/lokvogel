@@ -449,6 +449,7 @@ table.batch td.chk,table.batch th.chk{text-align:center}
     <div class="phead" style="margin-top:8px"><div><div class="pt" id="docTitle">Dokument</div><div class="ps" id="docSub"></div></div>
       <div>
         <span id="docDocBtns"><button class="btn g sm" onclick="printDoc()">Drucken / PDF</button>
+        <button class="btn g sm" onclick="openKundenansicht()">Kundenansicht</button>
         <button class="btn g sm" onclick="shareDoc()">Kundenlink</button>
         <span id="docStatusBtns"></span></span>
         <button class="btn sm" id="docSaveBtn" onclick="saveDoc()">Speichern</button>
@@ -3645,6 +3646,12 @@ function docPrintedSum(items,f){
   return groupDocItems(filtered).reduce(function(s,g){return s+printedGroupTotal(filtered,g,f)},0);
 }
 function printDoc(){
+  document.getElementById('printArea').innerHTML=buildDocHtml();
+  window.print();
+}
+/* Baut den Beleg-HTML-String, wie ihn der Kunde ueber den Freigabe-Link sieht - von printDoc()
+   und der Kundenansicht-Vorschau (openKundenansicht) gemeinsam genutzt. */
+function buildDocHtml(){
   var d=curDoc,c=docCalc(),comp=S.company||{};
   var cust=CACHE.customers.find(function(x){return x.id===v('docCust')})||{};
   var type=v('docType');
@@ -3690,8 +3697,7 @@ function printDoc(){
     totals+='<tr><td colspan="4" style="text-align:right;padding:6px">abzgl. erhaltener Abschläge</td><td style="text-align:right;padding:6px">−'+euro(r2(c.dep))+'</td></tr>'+
     '<tr><td colspan="4" style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">Verbleibender Restbetrag</td><td style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">'+euro(r2(dGross-r2(c.dep)))+'</td></tr>';
   }
-  document.getElementById('printArea').innerHTML=
-  '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
+  return '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+
   '<div style="display:flex;justify-content:space-between;margin-bottom:36px"><div>'+
   (comp.logo_url?'<img src="'+esc(comp.logo_url)+'" style="max-height:48px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block">':'')+
   '<div style="font-size:20px;font-weight:700">'+esc(comp.name||'DJ Lauschgift')+'</div>'+
@@ -3714,7 +3720,15 @@ function printDoc(){
   '<div>'+esc(comp.name||'')+'<br>'+(comp.tax_id?'St.-Nr.: '+esc(comp.tax_id):'')+(comp.vat_id?'<br>USt-IdNr.: '+esc(comp.vat_id):'')+'</div>'+
   '<div>'+(comp.bank?esc(comp.bank)+'<br>':'')+(comp.iban?'IBAN: '+esc(comp.iban)+'<br>':'')+(comp.bic?'BIC: '+esc(comp.bic):'')+(comp.paypal?(comp.bic?'<br>':'')+'PayPal: '+esc(comp.paypal):'')+'</div>'+
   '<div>'+esc(comp.phone||'')+'<br>'+esc(comp.email||'')+'</div></div></div>';
-  window.print();
+}
+/* Zeigt buildDocHtml() in einem Modal an, statt zu drucken - "so sieht der Kunde das wirklich
+   im Browser", ohne Drucken/PDF-Export auszuloesen. */
+function openKundenansicht(){
+  var html=buildDocHtml();
+  openModal('Kundenansicht – '+esc(curDoc.number||docTypeName(v('docType'))),
+    '<iframe id="kaFrame" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:8px;background:#fff" sandbox=""></iframe>');
+  var frame=document.getElementById('kaFrame');
+  frame.srcdoc='<!doctype html><html><head><meta charset="utf-8"><style>body{color:#111;background:#fff;margin:0}</style></head><body>'+html+'</body></html>';
 }
 
 /* ===== Statistik ===== */
