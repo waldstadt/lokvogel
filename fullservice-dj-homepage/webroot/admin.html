@@ -1353,7 +1353,7 @@ function renderDash(){
   document.getElementById('dashOpenInv').innerHTML=openInv.slice(0,6).map(function(d){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> <span class="mut">'+esc(custName(d.customers))+' · '+euro(d.total_gross)+(d.due_date?' · fällig '+dt(d.due_date):'')+'</span></div>';
   }).join('')||'Alles bezahlt.';
-  var EV_LBL={accept:'Angenommen',decline:'Abgelehnt',comment:'Kommentar',callback:'Rückruf-Wunsch',bande:'DJ-Bande-Opt-in'};
+  var EV_LBL={accept:'Angenommen',decline:'Abgelehnt',comment:'Kommentar',callback:'Rückruf-Wunsch',bande:'DJ-Bande-Opt-in',konflikt:'Annahme bei belegtem Termin'};
   var unseen=(CACHE.docEvents||[]).filter(function(e){return !e.seen});
   document.getElementById('dashPortal').innerHTML=unseen.slice(0,8).map(function(e){
     var d=CACHE.documents.find(function(x){return x.id===e.document_id});
@@ -2698,12 +2698,27 @@ function updateDocTypeUI(t){
   document.getElementById('docTplBtns').innerHTML=t==='angebot'?
     '<button class="btn sm" onclick="openTplPicker()">Vorlage laden</button> <button class="btn sm" onclick="saveAsTpl()">Als Vorlage speichern</button>':'';
 }
+/* Statuszeile im Beleg-Editor. Ein angenommenes Angebot, dessen Termin noch auf
+   anfrage/angebot steht, ist der Fall "nach Ablauf angenommen" (das Portal zieht den
+   Termin dann bewusst nicht auf gebucht) - hier sieht Markus das und entscheidet. */
+function renderDocSub(){
+  var d=curDoc;
+  var b=d.booking_id?(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id}):null;
+  var offen=d.doc_type==='angebot'&&d.status==='angenommen'&&b&&['anfrage','angebot'].indexOf(b.status)>=0;
+  document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(d.status)+'">'+d.status+'</span>'+
+    (d.accepted_name?' · digital angenommen von <b style="color:var(--wh)">'+esc(d.accepted_name)+'</b>'+
+      (d.accept_signature?' <a onclick="showAcceptSig()">Unterschrift ansehen</a>':''):'')+
+    (offen?'<div id="docExpiredHint" style="margin-top:6px;color:var(--yel)">Angenommen nach Ablauf – Gig noch nicht bestätigt '+
+      '<button class="btn g sm" onclick="confirmGigFromDoc()">Gig bestätigen</button> '+
+      '<button class="btn g sm" onclick="setDocStatus(\'abgelehnt\')">Absagen</button></div>':'');
+}
+function confirmGigFromDoc(){
+  syncVeranstaltungStatus('angenommen').then(renderDocSub).catch(function(e){toast(e.message,1)});
+}
 function fillDocForm(){
   var d=curDoc;
   document.getElementById('docTitle').textContent=docTypeName(d.doc_type)+' '+d.number;
-  document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(d.status)+'">'+d.status+'</span>'+
-    (d.accepted_name?' · digital angenommen von <b style="color:var(--wh)">'+esc(d.accepted_name)+'</b>'+
-      (d.accept_signature?' <a onclick="showAcceptSig()">Unterschrift ansehen</a>':''):'');
+  renderDocSub();
   document.getElementById('docType').value=d.doc_type;
   document.getElementById('docCust').value=d.customer_id||'';
   refreshBookOpts();
@@ -2879,9 +2894,9 @@ function setDocStatus(st){
   if(st==='bezahlt')patch.paid_at=new Date().toISOString();
   api('documents?id=eq.'+curDoc.id,{method:'PATCH',body:patch}).then(function(){
     curDoc.status=st;toast('Status: '+st+' ✓');
-    document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(st)+'">'+st+'</span>';
+    renderDocSub();
     renderStatusBtns();renderItems();applyDocLock();refreshDocs();
-    return syncVeranstaltungStatus(st);
+    return syncVeranstaltungStatus(st).then(renderDocSub);
   }).catch(function(e){toast(e.message,1)});
 }
 function refreshDocs(){api('documents?select=*,customers(*)&order=created_at.desc').then(function(r){CACHE.documents=r||[];renderDocsPage();renderDash()})}

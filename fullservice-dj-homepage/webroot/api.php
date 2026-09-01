@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 81;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 82;   // frisches Schema in migrate() muss diesem Stand entsprechen
 
 /* KI-Textassistent: Vorgabe-Basis-URL/Modell je Anbieter. Nur "claude" spricht die native
    Anthropic-Messages-API (anderer Header/Antwortformat) - alle anderen sind OpenAI-kompatibel
@@ -235,9 +235,10 @@ function db(): PDO {
 function upgrade(PDO $p): void {
   $v = (int)$p->query('PRAGMA user_version')->fetchColumn();
   if ($v >= SCHEMA_VERSION) return;
-  /* Neue Vorlage "Angebot angenommen – Bestaetigung" fuer bestehende Datenbanken
-     nachziehen (seedExtraTemplates legt nur an, was namentlich noch fehlt). */
-  if ($v < 81) seedExtraTemplates($p);
+  /* Neue Vorlagen fuer bestehende Datenbanken nachziehen (seedExtraTemplates legt nur
+     an, was namentlich noch fehlt): v81 "Angebot angenommen – Bestaetigung", v82 die
+     beiden Sonderfaelle bei der Annahme (Termin inzwischen belegt / Angebot abgelaufen). */
+  if ($v < 82) seedExtraTemplates($p);
   if ($v < 80) {
     /* Technik-Check war bisher ein einzelnes JSON-Feld direkt am Kunden - ein Kunde
        konnte also nie mehr als einen Check je gehabt haben. Jetzt eine eigene Tabelle,
@@ -1015,6 +1016,15 @@ function seedExtraTemplates(PDO $p): void {
        verspricht ihm an der Stelle ausdruecklich eine Bestaetigung. */
     [96, 'Angebot angenommen – Bestätigung', 'Angebot {nummer} angenommen – danke!',
       "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen, damit ist {termin} fest bei mir reserviert.\n\nWie es weitergeht: Ihr bekommt von mir noch die Auftragsbestätigung und ggf. eine Abschlagsrechnung. Alles Weitere (Musikwünsche, Ablauf, Fragen) klären wir dann ganz entspannt bis zum Termin.\n\nEuer Angebot findet ihr jederzeit hier – Login ist eure Postleitzahl:\n{link}\n\nWenn euch vorher etwas einfällt: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
+    /* Sonderfaelle bei der Annahme im Portal: Der Termin ist seit dem Angebot anderweitig
+       fest gebucht worden - dann kann Markus nicht liefern, will den Kunden aber nicht
+       ohne Alternative stehen lassen. */
+    [97, 'Termin nicht mehr verfügbar – DJ-Vermittlung', 'Euer Termin am {datum} – leider inzwischen vergeben',
+      "Hallo {vorname},\n\nihr wolltet gerade das Angebot {nummer} annehmen – und genau das tut mir jetzt richtig leid: euer Termin am {datum} ist bei mir in der Zwischenzeit fest gebucht worden. Das Angebot kann ich deshalb nicht mehr erfüllen, so ehrlich muss ich sein.\n\nWas ich euch aber anbieten kann: Ich kenne über meine Partner-Agentur DJ Bande (Münster) richtig gute Kollegen und suche euch gern persönlich einen passenden DJ raus – kostenlos, ihr müsst nur kurz zustimmen. Das geht direkt hier:\n{link}\n\nWenn ihr lieber erst sprechen wollt: ruft mich einfach an ({telefon}) oder antwortet auf diese Mail.\n\nViele Grüße\nMarkus"],
+    /* Der Kunde nimmt nach Ablauf der Gueltigkeit an: Annahme wird festgehalten, aber
+       der Termin ist noch nicht fest - Markus prueft erst Verfuegbarkeit und Preis. */
+    [98, 'Angebot angenommen – abgelaufen, wird geprüft', 'Angebot {nummer} angenommen – ich prüfe das kurz',
+      "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen. Eine Kleinigkeit muss ich dazu sagen: Das Angebot war schon abgelaufen (gültig bis {gueltig}). Ich schaue mir deshalb kurz an, ob {termin} bei mir noch frei ist und ob die Preise noch so passen, und melde mich dann ganz schnell bei euch.\n\nBis dahin gilt: Der Termin ist noch nicht fest zugesagt – ich will euch nichts versprechen, was ich dann nicht halten kann.\n\nEuer Angebot findet ihr weiterhin hier – Login ist eure Postleitzahl:\n{link}\n\nFragen? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
     [92, 'Workshop-Bestätigung (Zahlung eingegangen)', 'Dein Platz ist fix!',
       "Hallo {vorname},\n\ndeine Zahlung ist da – damit ist dein Workshop-Platz verbindlich reserviert!\n\nWann: {datum}\nWo: Lager Hemer, Büttmecker Weg 35c\n\nBring gern dein eigenes Equipment-Problem mit – wir schauen uns echte Fälle an. Getränke gehen auf mich.\n\nBis bald!\nMarkus"],
     /* Absage-Bausteine: Jede Absage soll persönlich klingen und möglichst in eine
@@ -1350,6 +1360,35 @@ function syncBookingFromDoc(PDO $p, array $doc, string $newStatus): void {
   if ($type === 'bestaetigung' && $newStatus === 'versendet') $neu = 'gebucht';
   if (!$neu || $neu === $cur) return;
   $p->prepare('update bookings set status=?, updated_at=? where id=?')->execute([$neu, now(), $doc['booking_id']]);
+}
+
+/* Ist Markus an dem Termin schon anderweitig unterwegs? Serverseitiges Gegenstueck zu
+   konflikteAm() im Backoffice - dort nur als Warnung beim Tippen, hier als harte Pruefung,
+   bevor eine Annahme im Portal einen Termin fest macht. Zaehlt: eine andere feste oder
+   abgeschlossene Veranstaltung mit DJ-Einsatz (reine Technikvermietung nicht - da ist
+   Markus nicht vor Ort) und jeder Kalender-Blocker, jeweils mit Zeitraum-Ueberschneidung.
+   Rueckgabe: Liste kurzer Beschreibungen, leer = frei. */
+function bookingConflicts(PDO $p, array $booking): array {
+  $von = (string)($booking['event_date'] ?? '');
+  if ($von === '') return [];
+  $bis = (string)($booking['end_date'] ?? '') ?: $von;
+  if ($bis < $von) $bis = $von;
+  $out = [];
+  try {
+    $st = $p->prepare("select id, title, event_date, end_date, kind, status from bookings
+      where id != ? and status in ('gebucht','abgeschlossen') and kind in ('dj','dj_technik')
+        and event_date is not null and event_date != ''
+        and event_date <= ? and coalesce(nullif(end_date,''), event_date) >= ?");
+    $st->execute([(string)($booking['id'] ?? ''), $bis, $von]);
+    foreach ($st->fetchAll() as $b)
+      $out[] = ($b['title'] ?: 'Veranstaltung') . ' am ' . date('d.m.Y', strtotime((string)$b['event_date'])) . ' (' . $b['status'] . ')';
+    $st = $p->prepare("select title, start_date, end_date from calendar_blocks
+      where start_date <= ? and coalesce(nullif(end_date,''), start_date) >= ?");
+    $st->execute([$bis, $von]);
+    foreach ($st->fetchAll() as $c)
+      $out[] = ($c['title'] ?: 'Kalender-Blocker') . ' am ' . date('d.m.Y', strtotime((string)$c['start_date']));
+  } catch (PDOException $e) {}
+  return $out;
 }
 
 /* Legt automatisch einen Technik-Check an, sobald ein Angebot mit dem Produkt
@@ -2822,6 +2861,19 @@ function portalDoc(string $token, string $plz): array {
   return $d;
 }
 
+/* Was bei der Annahme im Portal passiert ist (siehe portal/offer/.../action): null =
+   nichts Besonderes, 'konflikt' oder 'abgelaufen'. Steht in doc_events, damit es auch
+   nach einem Neuladen des Portals noch bekannt ist. */
+function portalAcceptCase(PDO $p, string $docId): ?string {
+  $st = $p->prepare("select kind, message from doc_events where document_id = ? and kind in ('konflikt','accept') order by created_at desc");
+  $st->execute([$docId]);
+  foreach ($st->fetchAll() as $e) {
+    if ($e['kind'] === 'konflikt') return 'konflikt';
+    if (str_starts_with((string)$e['message'], 'Angebot war abgelaufen')) return 'abgelaufen';
+  }
+  return null;
+}
+
 /* Bremse gegen das Durchprobieren von Postleitzahlen: zählt Fehlversuche je Vorgang
    in einer kleinen Datei (keine IP-Speicherung). Nach 10 Fehlversuchen ist der Zugang
    15 Minuten gesperrt - fünfstellige PLZ wären sonst durchprobierbar. */
@@ -3088,8 +3140,10 @@ function notifyOwner(string $subject, string $body): bool {
    Text kommt aus der Vorlage "Angebot angenommen – Bestätigung" (unter Vorlagen
    anpassbar), ohne Vorlage greift ein eingebauter Text. Schlaegt der Versand fehl,
    scheitert die Annahme nicht - Markus bekommt eine Timeline-Notiz und einen Hinweis
-   in seiner Benachrichtigung. Rueckgabe: true = raus, false = nicht zustellbar. */
-function acceptConfirmationMail(PDO $p, array $d): bool {
+   in seiner Benachrichtigung. Rueckgabe: true = raus, false = nicht zustellbar.
+   $fall waehlt den Text: 'ok' (Termin fest), 'konflikt' (Termin inzwischen vergeben,
+   DJ-Vermittlung anbieten) oder 'abgelaufen' (Annahme nach Ablauf, wird geprueft). */
+function acceptConfirmationMail(PDO $p, array $d, string $fall = 'ok'): bool {
   try {
     $cst = $p->prepare('select email, first_name, last_name, company from customers where id = ?');
     $cst->execute([$d['customer_id']]);
@@ -3097,26 +3151,33 @@ function acceptConfirmationMail(PDO $p, array $d): bool {
     $to = trim((string)($c['email'] ?? ''));
     $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
     $link = baseUrl() . '/portal.html?a=' . $d['share_token'];
-    $termin = 'euer Termin';
+    $termin = 'euer Termin'; $datum = 'eurem Wunschtermin';
     if (!empty($d['booking_id'])) {
       $bst = $p->prepare('select event_date, venue_name from bookings where id = ?');
       $bst->execute([$d['booking_id']]);
       if ($b = $bst->fetch()) {
-        if (!empty($b['event_date'])) $termin = 'der ' . date('d.m.Y', strtotime((string)$b['event_date']));
+        if (!empty($b['event_date'])) { $datum = date('d.m.Y', strtotime((string)$b['event_date'])); $termin = 'der ' . $datum; }
         if (!empty($b['venue_name'])) $termin .= ($termin === 'euer Termin' ? ' in ' : ' – ') . $b['venue_name'];
       }
     }
     $vorname = trim((string)($c['first_name'] ?? '')) ?: (trim((string)($c['company'] ?? '')) ?: 'zusammen');
     $name = trim((string)($c['company'] ?? '')) ?: trim(($c['first_name'] ?? '') . ' ' . ($c['last_name'] ?? ''));
     $map = ['{vorname}' => $vorname, '{name}' => $name, '{nummer}' => (string)$d['number'], '{nr}' => (string)$d['number'],
-      '{termin}' => $termin, '{link}' => $link, '{telefon}' => (string)($comp['phone'] ?? ''),
+      '{termin}' => $termin, '{datum}' => $datum, '{link}' => $link, '{telefon}' => (string)($comp['phone'] ?? ''),
+      '{gueltig}' => !empty($d['valid_until']) ? date('d.m.Y', strtotime((string)$d['valid_until'])) : '–',
       '{betrag}' => number_format((float)$d['total_gross'], 2, ',', '.') . ' €'];
+    $texte = [
+      'ok' => ['Angebot angenommen – Bestätigung', 'Angebot {nummer} angenommen – danke!',
+        "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen, damit ist {termin} fest bei mir reserviert.\n\nWie es weitergeht: Ihr bekommt von mir noch die Auftragsbestätigung und ggf. eine Abschlagsrechnung.\n\nEuer Angebot findet ihr jederzeit hier – Login ist eure Postleitzahl:\n{link}\n\nBei Fragen: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
+      'konflikt' => ['Termin nicht mehr verfügbar – DJ-Vermittlung', 'Euer Termin am {datum} – leider inzwischen vergeben',
+        "Hallo {vorname},\n\nihr wolltet gerade das Angebot {nummer} annehmen – und genau das tut mir jetzt richtig leid: euer Termin am {datum} ist bei mir in der Zwischenzeit fest gebucht worden. Das Angebot kann ich deshalb nicht mehr erfüllen.\n\nWas ich euch anbieten kann: Über meine Partner-Agentur DJ Bande (Münster) suche ich euch gern persönlich einen passenden DJ raus – kostenlos, ihr müsst nur kurz zustimmen. Das geht direkt hier:\n{link}\n\nOder ruft mich einfach an ({telefon}).\n\nViele Grüße\nMarkus"],
+      'abgelaufen' => ['Angebot angenommen – abgelaufen, wird geprüft', 'Angebot {nummer} angenommen – ich prüfe das kurz',
+        "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen. Das Angebot war allerdings schon abgelaufen (gültig bis {gueltig}). Ich prüfe deshalb kurz, ob {termin} noch frei ist und die Preise noch passen, und melde mich schnell bei euch. Bis dahin ist der Termin noch nicht fest zugesagt.\n\nEuer Angebot: {link}\n\nFragen? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus"],
+    ];
+    [$tplName, $subject, $body] = $texte[$fall] ?? $texte['ok'];
     $tst = $p->prepare('select subject, body from email_templates where name = ? limit 1');
-    $tst->execute(['Angebot angenommen – Bestätigung']);
-    $tpl = $tst->fetch();
-    $subject = $tpl ? (string)$tpl['subject'] : 'Angebot {nummer} angenommen – danke!';
-    $body = $tpl ? (string)$tpl['body'] :
-      "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen, damit ist {termin} fest bei mir reserviert.\n\nWie es weitergeht: Ihr bekommt von mir noch die Auftragsbestätigung und ggf. eine Abschlagsrechnung.\n\nEuer Angebot findet ihr jederzeit hier – Login ist eure Postleitzahl:\n{link}\n\nBei Fragen: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\nMarkus";
+    $tst->execute([$tplName]);
+    if ($tpl = $tst->fetch()) { $subject = (string)$tpl['subject']; $body = (string)$tpl['body']; }
     $subject = strtr($subject, $map);
     $body = strtr($body, $map);
     $mailed = $to !== '' && sendMailSafe($to, $subject, $body);
@@ -3653,6 +3714,12 @@ function handlePortal(string $path, string $method, $body): never {
       /* Fuer die Erinnerung "leg dir ein Kundenkonto an" im Angebot - ohne Konto
          muss beim naechsten Besuch wieder die PLZ eingetippt werden. */
       'has_account' => !empty($d['portal_hash']),
+      /* Sonderfaelle der Annahme, damit das Portal auch beim Neuladen die richtige Karte
+         zeigt: 'konflikt' = Termin war inzwischen belegt (Beleg storniert), 'abgelaufen' =
+         nach Ablauf angenommen, Markus prueft noch. 'bande' = Vermittlung schon gewuenscht. */
+      'annahme' => portalAcceptCase($p, $d['id']),
+      'bande' => (bool)$p->query("select 1 from doc_events where document_id = " . $p->quote($d['id']) . " and kind = 'bande' limit 1")->fetchColumn(),
+      'today' => date('Y-m-d'),
       'items' => $it->fetchAll(),
       'company' => array_intersect_key($comp, array_flip(['name','owner','phone','email','street','zip_city','iban','bic','bank','tax_id'])),
       'upsells' => $ups,
@@ -3674,6 +3741,8 @@ function handlePortal(string $path, string $method, $body): never {
     /* Annehmen/Ablehnen gibt es nur beim Angebot. Eine Rechnung ist keine Entscheidung,
        die der Kunde trifft - und sie ist ab "versendet" auch buchhalterisch festgeschrieben. */
     $bestMail = null;   /* null = keine Bestaetigungsmail faellig, sonst true/false */
+    $evKind = $kind; $evMsg = $msg;
+    $ownerSubject = null; $ownerExtra = ''; $resp = ['ok' => true];
     if (in_array($kind, ['accept','decline'], true)) {
       if (($d['doc_type'] ?? '') !== 'angebot')
         fail('Das ist eine Rechnung – die kann man nicht annehmen oder ablehnen. Bei Fragen dazu schreib mir einfach über „Frage stellen“.', 409);
@@ -3686,28 +3755,73 @@ function handlePortal(string $path, string $method, $body): never {
       $accName = mb_substr(trim((string)($body['name'] ?? '')), 0, 120);
       $sigRaw = (string)($body['signature'] ?? '');
       $sig = ($sigRaw !== '' && decodeDataUrl($sigRaw, ['png'], 400 * 1024)) ? $sigRaw : null;
-      $p->prepare("update documents set status='angenommen', accepted_name=?, accept_signature=?, updated_at=? where id=?")
-        ->execute([$accName ?: null, $sig, now(), $d['id']]);
-      docAudit($p, $d['id'], 'angenommen', $d['number'] . ' – vom Kunden angenommen' . ($accName ? ' und unterschrieben: ' . $accName : '') . ' (Portal)');
-      try { maybeAutoTechCheck($p, $d['id']); } catch (Throwable $e) {}
-      syncBookingFromDoc($p, $d, 'angenommen');
-      $bestMail = acceptConfirmationMail($p, $d);
+      /* Erst pruefen, ob Markus den Termin ueberhaupt noch hat: Seit dem Angebot kann eine
+         andere Feier fest geworden sein. Dann darf die Annahme den Termin nicht auf
+         "gebucht" ziehen - der Kunde bekommt stattdessen ehrlich Bescheid plus das
+         Vermittlungsangebot, Markus eine deutliche Warnung. */
+      $booking = null; $konflikte = [];
+      if (!empty($d['booking_id'])) {
+        $bst = $p->prepare('select * from bookings where id = ?');
+        $bst->execute([$d['booking_id']]);
+        if ($booking = $bst->fetch() ?: null) $konflikte = bookingConflicts($p, $booking);
+      }
+      if ($konflikte) {
+        $p->prepare("update documents set status='storniert', accepted_name=?, updated_at=? where id=?")
+          ->execute([$accName ?: null, now(), $d['id']]);
+        docAudit($p, $d['id'], 'storniert', $d['number'] . ' – Termin inzwischen vergeben – Annahme nicht möglich (Portal' . ($accName ? ', Kunde: ' . $accName : '') . ')');
+        if ($booking && !in_array($booking['status'], ['storniert','abgeschlossen'], true))
+          $p->prepare("update bookings set status='storniert', updated_at=? where id=?")->execute([now(), $booking['id']]);
+        $evKind = 'konflikt';
+        $evMsg = 'Kunde wollte annehmen, der Termin ist aber inzwischen belegt: ' . implode(' · ', $konflikte);
+        $bestMail = acceptConfirmationMail($p, $d, 'konflikt');
+        $ownerSubject = 'ACHTUNG: Annahme bei belegtem Termin – ' . $d['number'] . ' – Kunde informiert';
+        $ownerExtra = "\n\nBelegt durch: " . implode(' · ', $konflikte) . "\nAngebot und Termin sind storniert, der Kunde hat die Vermittlungs-Mail bekommen.";
+        $resp['conflict'] = true;
+      } else {
+        $p->prepare("update documents set status='angenommen', accepted_name=?, accept_signature=?, updated_at=? where id=?")
+          ->execute([$accName ?: null, $sig, now(), $d['id']]);
+        docAudit($p, $d['id'], 'angenommen', $d['number'] . ' – vom Kunden angenommen' . ($accName ? ' und unterschrieben: ' . $accName : '') . ' (Portal)');
+        try { maybeAutoTechCheck($p, $d['id']); } catch (Throwable $e) {}
+        /* Nach Ablauf der Gueltigkeit bleibt die Annahme moeglich, aber der Termin wird nicht
+           automatisch fest: Preise und Verfuegbarkeit koennen sich geaendert haben, das
+           entscheidet Markus von Hand (Wiedervorlage im Dashboard). */
+        $abgelaufen = !empty($d['valid_until']) && date('Y-m-d') > substr((string)$d['valid_until'], 0, 10);
+        if ($abgelaufen) {
+          $gueltig = date('d.m.Y', strtotime((string)$d['valid_until']));
+          $evMsg = 'Angebot war abgelaufen (gültig bis ' . $gueltig . ') – manuelle Prüfung nötig' . ($msg !== '' ? "\n" . $msg : '');
+          try {
+            $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, followup_at, created_at)
+                values (?,?,?,?,?,?,?,?,?,?)')
+              ->execute([uuid(), $d['customer_id'], $d['booking_id'] ?: null, 'note', 'in',
+                'Abgelaufenes Angebot ' . $d['number'] . ' angenommen – bitte prüfen und Gig bestätigen oder absagen',
+                'Der Kunde hat das Angebot ' . $d['number'] . ' im Portal angenommen, es war aber nur bis ' . $gueltig . ' gültig. Der Termin steht deshalb noch nicht auf gebucht – bitte Verfügbarkeit und Preise prüfen und den Gig im Beleg bestätigen oder absagen.',
+                now(), date('Y-m-d'), now()]);
+          } catch (PDOException $e) {}
+          $bestMail = acceptConfirmationMail($p, $d, 'abgelaufen');
+          $ownerSubject = 'Abgelaufenes Angebot angenommen – bitte prüfen: ' . $d['number'];
+          $ownerExtra = "\n\nDas Angebot war nur bis $gueltig gültig. Der Termin steht noch NICHT auf gebucht – bitte im Beleg prüfen und den Gig bestätigen oder absagen (Wiedervorlage im Dashboard).";
+          $resp['expired'] = true;
+        } else {
+          syncBookingFromDoc($p, $d, 'angenommen');
+          $bestMail = acceptConfirmationMail($p, $d);
+        }
+      }
     }
     if ($kind === 'decline' && $d['status'] !== 'storniert') {
       $p->prepare("update documents set status='abgelehnt', updated_at=? where id=?")->execute([now(), $d['id']]);
       syncBookingFromDoc($p, $d, 'abgelehnt');
     }
     $p->prepare('insert into doc_events (id,document_id,kind,message,phone,created_at) values (?,?,?,?,?,?)')
-      ->execute([uuid(), $d['id'], $kind, $msg, $phone, now()]);
+      ->execute([uuid(), $d['id'], $evKind, $evMsg, $phone, now()]);
     $labels = ['accept' => 'Angebot ANGENOMMEN', 'decline' => 'Angebot abgelehnt', 'comment' => 'Frage zum Angebot',
       'callback' => 'Rückruf gewünscht', 'bande' => 'DJ-Vermittlung gewünscht'];
-    notifyOwner($labels[$kind] . ': ' . $d['number'],
+    notifyOwner($ownerSubject ?: ($labels[$kind] . ': ' . $d['number']),
       'Kunde: ' . trim(($d['company'] ?: $d['first_name'] . ' ' . $d['last_name'])) .
       "\nDokument: " . $d['number'] . ' über ' . number_format((float)$d['total_gross'], 2, ',', '.') . ' €' .
-      ($msg !== '' ? "\n\nNachricht:\n$msg" : '') . ($phone !== '' ? "\nTelefon: $phone" : '') .
+      ($msg !== '' ? "\n\nNachricht:\n$msg" : '') . ($phone !== '' ? "\nTelefon: $phone" : '') . $ownerExtra .
       ($bestMail === false ? "\n\nACHTUNG: Die Bestätigungsmail an den Kunden konnte nicht versendet werden – bitte selbst bestätigen (Timeline-Notiz vorhanden)." : '') .
       ($bestMail === true ? "\n\nBestätigungsmail an den Kunden ist raus." : ''));
-    out(['ok' => true], 201);
+    out($resp, 201);
   }
   if (preg_match('#^portal/form/([a-f0-9]+)$#', $path, $m)) {
     if (!preg_match('/^[a-f0-9]{24,64}$/', $m[1])) fail('Ungültiger Link.', 404);
