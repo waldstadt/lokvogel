@@ -1,6 +1,7 @@
 /* Gemeinsames Layout aller Aktionsseiten (Kampagnen-Minipages).
-   Farbakzent (--acc/--acc2/--btn-txt) setzt kampagne.js aus der Datenbank,
-   die Werte hier sind nur Fallback, bis die Inhalte geladen sind. */
+   Farben setzt kampagne.js ueber theme.js: Hintergrund und Schrift wie die
+   zugehoerige Website-Seite, Akzent aus der Aktionsseite selbst. Die Werte hier
+   sind nur Fallback, bis die Inhalte geladen sind. */
 *{margin:0;padding:0;box-sizing:border-box}
 .ic{width:17px;height:17px;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block}
 
@@ -12,29 +13,29 @@
 html{scroll-behavior:smooth}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased}
 h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;letter-spacing:-.01em}
-a{color:var(--acc);text-decoration:none}
+a{color:var(--acc-txt,var(--acc));text-decoration:none}
 .wrap{max-width:900px;margin:0 auto;padding:0 24px}
 section{padding:72px 0}
-.kicker{font-family:'Space Grotesk',sans-serif;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--acc);margin-bottom:14px;font-weight:600}
+.kicker{font-family:'Space Grotesk',sans-serif;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--acc-txt,var(--acc));margin-bottom:14px;font-weight:600}
 h2{font-size:clamp(26px,4vw,36px);font-weight:700;line-height:1.14;margin-bottom:16px}
 .lead{color:var(--mut);max-width:640px}
 .btn{display:inline-block;background:var(--acc);color:var(--btn-txt);padding:14px 30px;font-size:13px;font-weight:600;letter-spacing:.04em;border:none;border-radius:8px;cursor:pointer;transition:background .2s;font-family:'Space Grotesk',sans-serif}
 .btn:hover{background:var(--acc2)}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(15,16,18,.88);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--nav-bg,rgba(15,16,18,.88));backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .nav-in{max-width:900px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between}
 .logo{display:flex;align-items:center;gap:9px;color:var(--txt)}
 .logo svg{width:24px;height:24px}
 .logo .wm{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700}
-.logo .wm i{font-style:normal;color:var(--acc)}
+.logo .wm i{font-style:normal;color:var(--acc-txt,var(--acc))}
 .hero{min-height:78vh;display:flex;align-items:center;padding-top:100px;position:relative;overflow:hidden}
 .hero::before{content:"";position:absolute;inset:0;background:
-  radial-gradient(ellipse 60% 50% at 80% 15%,var(--glow1,rgba(217,168,78,.10)),transparent 60%),
-  radial-gradient(ellipse 50% 45% at 5% 95%,var(--glow2,rgba(217,168,78,.05)),transparent 60%)}
+  radial-gradient(ellipse 60% 50% at 80% 15%,rgba(var(--acc-rgb,217,168,78),.10),transparent 60%),
+  radial-gradient(ellipse 50% 45% at 5% 95%,rgba(var(--acc-rgb,217,168,78),.05),transparent 60%)}
 .hero .wrap{position:relative;z-index:1}
 .hero h1{font-size:clamp(34px,6vw,58px);font-weight:700;line-height:1.08;letter-spacing:-.03em;margin-bottom:18px}
-.hero h1 em{font-style:normal;color:var(--acc)}
+.hero h1 em{font-style:normal;color:var(--acc-txt,var(--acc))}
 .hero .sub{font-size:clamp(16px,2.1vw,18px);color:var(--mut);max-width:600px;margin-bottom:30px}
-.badge{display:inline-block;font-size:13px;border:1px solid var(--badge-line,rgba(217,168,78,.45));border-radius:20px;padding:7px 16px;color:var(--acc);margin-bottom:22px;background:var(--badge-bg,rgba(217,168,78,.07))}
+.badge{display:inline-block;font-size:13px;border:1px solid rgba(var(--acc-rgb,217,168,78),.45);border-radius:20px;padding:7px 16px;color:var(--acc-txt,var(--acc));margin-bottom:22px;background:rgba(var(--acc-rgb,217,168,78),.07)}
 .pts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:40px}
 .pt{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 24px}
 .pt h3{font-size:16px;margin-bottom:10px}
@@ -43,19 +44,19 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(15,16,18,.88
 .inc ul{list-style:none;margin-top:26px;display:grid;grid-template-columns:1fr 1fr;gap:10px 32px}
 @media(max-width:640px){.inc ul{grid-template-columns:1fr}}
 .inc li{padding:7px 0 7px 26px;font-size:14.5px;color:var(--mut);position:relative}
-.inc li::before{content:"✓";position:absolute;left:0;color:var(--acc);font-weight:700}
+.inc li::before{content:"✓";position:absolute;left:0;color:var(--acc-txt,var(--acc));font-weight:700}
 .pricenote{margin-top:26px;font-size:14px;color:var(--mut2);max-width:640px}
 form{margin-top:36px}
 label{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut2);margin:16px 0 6px;font-weight:600}
 input,select,textarea{width:100%;background:var(--card);border:1px solid var(--line);border-radius:9px;color:var(--txt);padding:12px 14px;font-family:'Inter',sans-serif;font-size:14px}
 ::placeholder{color:var(--mut)}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc-txt,var(--acc))}
 textarea{min-height:110px;resize:vertical}
 form .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:560px){form .row{grid-template-columns:1fr}}
 .form-msg{padding:14px 16px;font-size:14px;margin-bottom:18px;display:none;border:1px solid;border-radius:9px}
-.form-msg.ok{display:block;border-color:#3d6b3d;background:rgba(60,120,60,.12);color:#9fd49f}
-.form-msg.err{display:block;border-color:#7a3a3a;background:rgba(150,60,60,.12);color:#e0a0a0}
+.form-msg.ok{display:block;border-color:var(--ok-line,#3d6b3d);background:var(--ok-bg,rgba(60,120,60,.12));color:var(--ok,#9fd49f)}
+.form-msg.err{display:block;border-color:var(--err-line,#7a3a3a);background:var(--err-bg,rgba(150,60,60,.12));color:var(--err,#e0a0a0)}
 form .btn{margin-top:22px}
 footer{border-top:1px solid var(--line);padding:34px 0;font-size:13px;color:var(--mut2)}
 footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}

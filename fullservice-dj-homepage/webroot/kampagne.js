@@ -5,6 +5,16 @@
 (function(){
 var API='api.php';
 var SLUG=(location.pathname.split('/').pop()||'').replace(/\.html$/,'');
+/* Farben und Schrift kommen aus theme.js (gemeinsam mit allen anderen Seiten). Ist es
+   nicht schon im <head> eingebunden, wird es hier nachgeladen; das zuletzt gesehene
+   Schema dieser Aktionsseite liegt im localStorage und gilt sofort - kein Aufblitzen. */
+var FONT_SEL='h1,h2,h3,h4,.kicker,.btn,.logo .wm',THEME_KEY='camp:'+SLUG;
+function loadTheme(){
+  if(window.applyTheme)return Promise.resolve();
+  return new Promise(function(res){var sc=document.createElement('script');sc.src='theme.js';sc.onload=res;sc.onerror=res;document.head.appendChild(sc)})
+    .then(function(){if(window.applyCachedTheme)applyCachedTheme(THEME_KEY,{fontSelector:FONT_SEL})});
+}
+if(window.applyCachedTheme)applyCachedTheme(THEME_KEY,{fontSelector:FONT_SEL});
 /* Betreiber-Basisdaten aus dem Backoffice (public/company): Marke, Inhaber, Telefon,
    WhatsApp - nichts davon steht mehr fest im Code. */
 var CO={};
@@ -14,7 +24,6 @@ function coWordmark(){var h=String(CO.website||'').replace(/^https?:\/\//,'').re
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 /* Nur für die Preis-Notiz: erlaubt [Text](seite.html) als internen Link, sonst reiner Text */
 function noteHtml(s){return esc(s).replace(/\[([^\]]+)\]\(([a-z0-9\-]+\.html(?:#[a-z0-9\-]*)?)\)/g,'<a href="$2">$1</a>')}
-function hexRgb(h){h=(h||'#d9a84e').replace('#','');return parseInt(h.slice(0,2),16)+','+parseInt(h.slice(2,4),16)+','+parseInt(h.slice(4,6),16)}
 
 /* Icon-Satz im Linienstil - Schlüssel wählbar im Backoffice-Editor */
 var ICONS={
@@ -40,18 +49,14 @@ var ICONS={
 };
 function ic(k){return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">'+(ICONS[k]||ICONS.check)+'</svg> '}
 
-var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif",poppins:"'Poppins',sans-serif",montserrat:"'Montserrat',sans-serif",bebas:"'Bebas Neue',cursive",merriweather:"'Merriweather',serif",oswald:"'Oswald',sans-serif",caveat:"'Caveat',cursive",anton:"'Anton',sans-serif"};
-
-function render(pg){
-  var acc=pg.accent||'#d9a84e',rgb=hexRgb(acc);
-  var rs=document.documentElement.style;
-  rs.setProperty('--acc',acc);
-  rs.setProperty('--acc2',pg.accent2||acc);
-  rs.setProperty('--btn-txt',pg.btn_txt||'#1a1408');
-  rs.setProperty('--glow1','rgba('+rgb+',.10)');
-  rs.setProperty('--glow2','rgba('+rgb+',.05)');
-  rs.setProperty('--badge-line','rgba('+rgb+',.45)');
-  rs.setProperty('--badge-bg','rgba('+rgb+',.07)');
+/* Schema der Aktionsseite: Hintergrund, Schrift und Zweit-Akzent von der Website-Seite,
+   zu der die Seite gehoert (footer_target), der Akzent von der Aktionsseite selbst.
+   Button-Schrift und Akzent-als-Text rechnet theme.js kontrastsicher aus. */
+function render(pg,site){
+  var base=themeFromContent(site||{},pg.footer_target==='technik'?'technik':'dj');
+  var th={primary:pg.accent||base.primary,bg:base.bg,font:base.font,alt:base.alt};
+  var d=applyTheme(th,{fontSelector:FONT_SEL,favicon:false});rememberTheme(THEME_KEY,th);
+  var acc=d.vars['--acc'];
   if(pg.page_title)document.title=pg.page_title;
   if(pg.meta_desc){
     var md=document.querySelector('meta[name="description"]');
@@ -220,18 +225,13 @@ navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{
 Promise.all([
   fetch(API+'/rest/campaign_pages?slug=eq.'+encodeURIComponent(SLUG)).then(function(r){return r.json()}),
   fetch(API+'/rest/site_content?select=key,value').then(function(r){return r.json()}).catch(function(){return[]}),
-  fetch(API+'/public/company').then(function(r){return r.json()}).catch(function(){return{}})
+  fetch(API+'/public/company').then(function(r){return r.json()}).catch(function(){return{}}),
+  loadTheme()
 ]).then(function(res){
   var rows=res[0]||[],pg=rows[0];
   CO=res[2]||{};
   if(!pg||!Number(pg.enabled)){location.replace('index.html');return}
-  (res[1]||[]).forEach(function(row){
-    if(row.key==='theme'&&row.value&&FONT_HEADS[row.value.font]&&row.value.font!=='grotesk'){
-      var s=document.createElement('style');
-      s.textContent='h1,h2,h3,h4,.kicker,.btn,.logo .wm{font-family:'+FONT_HEADS[row.value.font]+' !important}';
-      document.head.appendChild(s);
-    }
-  });
-  render(pg);
+  var site={};(res[1]||[]).forEach(function(row){site[row.key]=row.value});
+  render(pg,site);
 }).catch(function(){location.replace('index.html')});
 })();

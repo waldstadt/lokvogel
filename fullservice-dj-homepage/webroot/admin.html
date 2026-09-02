@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Backoffice</title>
 <link href="fonts.css" rel="stylesheet">
+<script src="theme.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 .ic{width:15px;height:15px;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;margin-right:7px;opacity:.85}
@@ -768,15 +769,17 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
       <label class="sml mut" style="text-transform:none;letter-spacing:0;font-weight:400">Farben DJ-Seite (index.html)</label>
       <div id="themeRow" style="margin:6px 0 8px"></div>
       <div class="grid2">
-        <div><label>Akzentfarbe</label><input type="color" id="thPrimary" style="height:36px;padding:2px"></div>
-        <div><label>Hintergrund</label><input type="color" id="thBg" style="height:36px;padding:2px"></div>
+        <div><label>Akzentfarbe</label><input type="color" id="thPrimary" style="height:36px;padding:2px" oninput="themeNote('dj')"></div>
+        <div><label>Hintergrund</label><input type="color" id="thBg" style="height:36px;padding:2px" oninput="themeNote('dj')"></div>
       </div>
+      <div id="thNote" class="sml mut" style="margin-top:6px"></div>
       <label class="sml mut" style="text-transform:none;letter-spacing:0;font-weight:400;margin-top:16px">Farben Technik-Seite (technik.html &amp; Mietkatalog)</label>
       <div id="themeRowTech" style="margin:6px 0 8px"></div>
       <div class="grid2">
-        <div><label>Akzentfarbe</label><input type="color" id="thPrimaryTech" style="height:36px;padding:2px"></div>
-        <div><label>Hintergrund</label><input type="color" id="thBgTech" style="height:36px;padding:2px"></div>
+        <div><label>Akzentfarbe</label><input type="color" id="thPrimaryTech" style="height:36px;padding:2px" oninput="themeNote('technik')"></div>
+        <div><label>Hintergrund</label><input type="color" id="thBgTech" style="height:36px;padding:2px" oninput="themeNote('technik')"></div>
       </div>
+      <div id="thNoteTech" class="sml mut" style="margin-top:6px"></div>
       <label style="margin-top:16px">Schriftstil <span class="mut sml" style="text-transform:none;letter-spacing:0">(Überschriften, gilt für alle Seiten)</span></label>
       <input type="hidden" id="thFont" value="grotesk">
       <div id="fontPick" class="font-pick"></div>
@@ -5414,14 +5417,16 @@ function renderCms(){
   document.getElementById('thFont').value=FONT_IDS.indexOf(th.font)>=0?th.font:'grotesk';
   renderFontRow();
   document.getElementById('themeRow').innerHTML=THEMES.map(function(t){
-    return '<span class="theme-sw'+(th.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+t.n+'" onclick="pickTheme(\'dj\',\''+t.n+'\')"></span>';
+    return '<span class="theme-sw'+(th.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+esc(t.n+' – '+themeNoteText(t.p,t.bg))+'" onclick="pickTheme(\'dj\',\''+t.n+'\')"></span>';
   }).join('')+'<span class="sml mut" style="margin-left:8px">Preset wählen oder Farben frei einstellen</span>';
+  themeNote('dj');
   var tt=c.theme_technik||{};
   document.getElementById('thPrimaryTech').value=tt.primary||'#3cc8b4';
   document.getElementById('thBgTech').value=tt.bg||'#0e1213';
   document.getElementById('themeRowTech').innerHTML=THEMES.map(function(t){
-    return '<span class="theme-sw'+(tt.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+t.n+'" onclick="pickTheme(\'technik\',\''+t.n+'\')"></span>';
+    return '<span class="theme-sw'+(tt.preset===t.n?' sel':'')+'" style="background:'+t.p+'" title="'+esc(t.n+' – '+themeNoteText(t.p,t.bg))+'" onclick="pickTheme(\'technik\',\''+t.n+'\')"></span>';
   }).join('')+'<span class="sml mut" style="margin-left:8px">Preset wählen oder Farben frei einstellen</span>';
+  themeNote('technik');
   var pi=document.getElementById('cPackImgs');
   if(pi)pi.checked=!((CACHE.content.pack_sec||{}).images===false);
   renderPackAdmin();renderFaqAdmin();reloadLocs();reloadFriends();reloadBadges();renderBadgeSec();
@@ -5540,7 +5545,21 @@ function pickTheme(target,name){
   document.getElementById(bId).value=t.bg;
   var key=target==='technik'?'theme_technik':'theme';
   CACHE.content[key]=CACHE.content[key]||{};CACHE.content[key].preset=name;
-  document.querySelectorAll(rowSel).forEach(function(el){el.classList.toggle('sel',el.title===name)});
+  document.querySelectorAll(rowSel).forEach(function(el){el.classList.toggle('sel',el.title.split(' – ')[0]===name)});
+  themeNote(target);
+}
+/* Kontrast-Notiz zum Farbschema: dieselbe Rechnung wie auf der Website (theme.js),
+   damit Markus vor dem Speichern sieht, was ein Schema mit der Lesbarkeit macht.
+   Die Website zieht Akzent-Text notfalls selbst nach - der Hinweis warnt nur, blockiert nicht. */
+function themeNoteText(p,bg){
+  var c=deriveTheme({primary:p,bg:bg}).contrast,f=themeTools.fmt;
+  return 'Kontrast: Text '+f(c.txt_bg)+' · Button '+f(c.btn_acc)+' · Akzent als Text '+f(c.acc_bg)+' · Nebentext '+f(c.mut_card);
+}
+function themeNote(target){
+  var el=document.getElementById(target==='technik'?'thNoteTech':'thNote');if(!el)return;
+  var p=v(target==='technik'?'thPrimaryTech':'thPrimary'),bg=v(target==='technik'?'thBgTech':'thBg');
+  var d=deriveTheme({primary:p,bg:bg});
+  el.innerHTML=esc(themeNoteText(p,bg))+(d.warn.length?'<div style="color:#f0cf7a;margin-top:4px">Hinweis: '+d.warn.map(esc).join(' · ')+'</div>':'');
 }
 function saveGallery(){
   upsertContent('gallery',buildContentVal('gallery'));

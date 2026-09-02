@@ -7,17 +7,19 @@
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23ff6f5b'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
 <link href="fonts.css" rel="stylesheet">
+<script src="theme.js"></script>
+<script>applyCachedTheme(/[?&]mv=/.test(location.search)?'technik':'dj',{fontSelector:''})</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 .ic{width:17px;height:17px;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block}
 
 :root{--bg:#0f1012;--card:#1a1c21;--card2:#212429;--line:#282b32;--acc:#ff6f5b;--acc2:#ff8d7c;
 --txt:#f2f0ec;--mut:#a3a29b;--mut2:#8f8e88;--grn:#5aa05a;
-/* Ab hier: Farben, die applyPortalDesign() aus dem Website-Design ableitet - Werte hier
+/* Ab hier: Farben, die theme.js aus dem Website-Design ableitet - Werte hier
    sind nur der Stand, bis das Design vom Server da ist (oder wenn es nicht laedt).
    --acc-txt: Akzent als Textfarbe (Links, Summen), notfalls fuer Kontrast nachgedunkelt/
    aufgehellt. --btn-txt: Schrift auf dem Akzent-Button. --line-soft: zarte Trennlinien. */
---acc-txt:#ff6f5b;--btn-txt:#16110f;--acc-soft:rgba(255,111,91,.15);--line-soft:var(--line-soft);
+--acc-txt:#ff6f5b;--btn-txt:#16110f;--acc-soft:rgba(255,111,91,.15);--line-soft:rgba(255,255,255,.06);
 --ok-txt:#9fd49f;--err-txt:#e0a0a0;--warn-txt:#f0cf7a;--hf:'Space Grotesk',sans-serif}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
 h1,h2,h3,h4{font-family:var(--hf);letter-spacing:-.01em}
@@ -47,9 +49,9 @@ textarea{min-height:100px;resize:vertical}
 .btn.green{background:#4f9a4f;color:#0c150c}
 .btn:disabled{opacity:.5;cursor:default}
 .msg{padding:14px 16px;font-size:14px;border:1px solid;border-radius:4px;margin:14px 0;display:none}
-.msg.ok{display:block;border-color:#3d6b3d;background:rgba(60,120,60,.12);color:var(--ok-txt)}
-.msg.err{display:block;border-color:#7a3535;background:rgba(150,60,60,.12);color:var(--err-txt)}
-.msg.warn{display:block;border-color:#8a6d1f;background:rgba(200,160,40,.12);color:var(--warn-txt)}
+.msg.ok{display:block;border-color:var(--ok-line,#3d6b3d);background:var(--ok-bg,rgba(60,120,60,.12));color:var(--ok-txt)}
+.msg.err{display:block;border-color:var(--err-line,#7a3535);background:var(--err-bg,rgba(150,60,60,.12));color:var(--err-txt)}
+.msg.warn{display:block;border-color:var(--warn-line,#8a6d1f);background:var(--warn-bg,rgba(200,160,40,.12));color:var(--warn-txt)}
 
 /* Angebots-Tabelle */
 table{width:100%;border-collapse:collapse;font-size:14px}
@@ -62,7 +64,7 @@ td{padding:11px 8px;border-bottom:1px solid var(--line-soft);vertical-align:top}
 th.num{text-align:right}
 .pos-desc{position:relative;cursor:default}
 .pos-desc .info{display:inline-block;margin-left:6px;width:17px;height:17px;line-height:17px;text-align:center;border-radius:50%;background:var(--acc-soft);color:var(--acc-txt);font-size:11px;font-weight:700;cursor:help}
-.tip{display:none;position:absolute;left:0;top:100%;z-index:20;background:var(--card2);border:1px solid var(--acc);border-radius:4px;padding:12px 14px;font-size:13px;color:var(--txt);max-width:380px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-top:4px}
+.tip{display:none;position:absolute;left:0;top:100%;z-index:20;background:var(--card2);border:1px solid var(--acc);border-radius:4px;padding:12px 14px;font-size:13px;color:var(--txt);max-width:380px;box-shadow:0 8px 30px var(--shadow,rgba(0,0,0,.5));margin-top:4px}
 .pos-desc:hover .tip,.pos-desc.open .tip{display:block}
 /* Auf schmalen Displays war die Sprechblase nur so breit wie die Positionsspalte und
    ueberlappte die naechste Zeile - dort ueber die volle Breite und im Fluss. */
@@ -131,34 +133,14 @@ function coOf(){return (DOC&&DOC.company)||CO||{}}
 /* ===== Design von der Website uebernehmen =====
    Quelle sind dieselben site_content-Eintraege, die index.html und technik.html lesen:
    "theme" (DJ-Seite: primary, bg, font) und "theme_technik" (Technik-Seite: primary, bg).
-   Daraus leitet applyPortalDesign() alle Portal-Farben ab - nicht nur Akzent und
-   Hintergrund, sondern auch Karte, Linien, Text und gedaempften Text, damit auch ein
-   heller Hintergrund funktioniert. Jede wichtige Farbkombination wird rechnerisch auf
-   WCAG-AA-Kontrast geprueft (4,5:1; Vordergrund wird notfalls Richtung Weiss/Schwarz
-   gezogen), egal welches Farbschema Markus im Backoffice waehlt.
+   Die Ableitung aller Farben (Karte, Linien, Text, gedaempfter Text, Button-Schrift) und
+   die WCAG-Kontrastpruefung (4,5:1) macht theme.js - gemeinsam mit allen anderen Seiten.
 
    Welche Palette? Standard ist die DJ-Palette (Hauptseite). Die Technik-Palette gilt nur,
    wenn der angezeigte Vorgang eindeutig Technik ist: Mietvertrag (?mv=), ein Beleg zu
    einer Technik-/Miet-Buchung (booking_kind bzw. event_info.kind = technik) oder im
    Kundenkonto, wenn die neueste Buchung technik/miete ist. "dj_technik" zaehlt als DJ. */
 var DESIGN=null,DESIGN_KIND=MV?'technik':'dj';
-var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif",poppins:"'Poppins',sans-serif",montserrat:"'Montserrat',sans-serif",bebas:"'Bebas Neue',cursive",merriweather:"'Merriweather',serif",oswald:"'Oswald',sans-serif",caveat:"'Caveat',cursive",anton:"'Anton',sans-serif"};
-function hexRgb(h){h=String(h||'').trim().replace('#','');if(h.length===3)h=h.replace(/(.)/g,'$1$1');
-  if(!/^[0-9a-f]{6}$/i.test(h))return null;return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]}
-function rgbHex(c){return '#'+c.map(function(v){v=Math.max(0,Math.min(255,Math.round(v)));return (v<16?'0':'')+v.toString(16)}).join('')}
-function lum(c){var a=c.map(function(v){v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return .2126*a[0]+.7152*a[1]+.0722*a[2]}
-function ratio(a,b){var l1=lum(a),l2=lum(b);return (Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05)}
-function mix(a,b,t){return [0,1,2].map(function(i){return a[i]+(b[i]-a[i])*t})}
-var WHITE=[255,255,255],INK=[22,17,15];
-/* Weiss oder Fast-Schwarz - was auf dieser Flaeche besser lesbar ist. */
-function pickFg(bg){return ratio(INK,bg)>=ratio(WHITE,bg)?INK:WHITE}
-/* Vordergrund in kleinen Schritten Richtung Weiss (dunkle Flaeche) bzw. Schwarz (helle
-   Flaeche) ziehen, bis das Mindestverhaeltnis erreicht ist - Farbton bleibt erhalten. */
-function fitTo(fg,bg,min){var target=lum(bg)<.18?WHITE:[0,0,0],c=fg,i=0;while(ratio(c,bg)<min&&i<60){c=mix(c,target,.06);i++}return c}
-/* Flaeche, auf der weder Weiss noch Fast-Schwarz 4,5:1 erreicht (Mittelgrau): so lange
-   Richtung Schwarz bzw. Weiss schieben, bis Text darauf lesbar ist. Bei den ueblichen
-   dunklen oder hellen Hintergruenden aendert das nichts. */
-function safeSurface(c){var i=0;while(ratio(pickFg(c),c)<4.5&&i<60){c=mix(c,lum(c)<.18?[0,0,0]:WHITE,.06);i++}return c}
 function isTechnikKind(k){return k==='technik'||k==='miete'}
 function docKind(doc){
   var e=doc&&doc.doc&&doc.doc.event_info;if(typeof e==='string'){try{e=JSON.parse(e)}catch(err){e=null}}
@@ -167,31 +149,15 @@ function docKind(doc){
 function setDesignKind(k){DESIGN_KIND=k==='technik'?'technik':'dj';applyPortalDesign()}
 function applyPortalDesign(){
   if(!DESIGN)return;
-  var th=DESIGN.theme||{},tt=DESIGN.theme_technik||{};
-  var src=DESIGN_KIND==='technik'&&tt.primary?tt:th;
-  var bg=safeSurface(hexRgb(src.bg)||hexRgb('#0f1012')),acc=hexRgb(src.primary)||hexRgb('#ff6f5b');
-  var dark=pickFg(bg)===WHITE,to=dark?WHITE:[0,0,0];
-  var card=safeSurface(mix(bg,to,dark?.045:.04)),card2=safeSurface(mix(bg,to,dark?.08:.075)),line=mix(bg,to,dark?.14:.16);
-  var txt=fitTo(dark?[242,240,236]:INK,card,4.5);txt=fitTo(txt,bg,4.5);
-  var mut=fitTo(dark?[163,162,155]:[92,90,85],card,4.5);mut=fitTo(mut,bg,4.5);
-  var mut2=fitTo(dark?[143,142,136]:[107,105,100],card,4.5);mut2=fitTo(mut2,bg,4.5);
-  var accTxt=fitTo(fitTo(acc,bg,4.5),card,4.5);
-  var btnTxt=pickFg(acc),acc2=mix(acc,dark?WHITE:[0,0,0],.15);
-  var grn=fitTo(dark?[90,160,90]:[46,125,50],card,4.5);
-  var okT=fitTo(dark?[159,212,159]:[31,107,31],card,4.5),errT=fitTo(dark?[224,160,160]:[143,42,42],card,4.5),warnT=fitTo(dark?[240,207,122]:[110,82,16],card,4.5);
-  var r=document.documentElement.style,set=function(k,v){r.setProperty(k,Array.isArray(v)?rgbHex(v):v)};
-  set('--bg',bg);set('--card',card);set('--card2',card2);set('--line',line);set('--acc',acc);set('--acc2',acc2);
-  set('--txt',txt);set('--mut',mut);set('--mut2',mut2);set('--grn',grn);set('--acc-txt',accTxt);set('--btn-txt',btnTxt);
-  set('--acc-soft','rgba('+Math.round(acc[0])+','+Math.round(acc[1])+','+Math.round(acc[2])+',.15)');
-  set('--line-soft',dark?'rgba(255,255,255,.06)':'rgba(0,0,0,.08)');
-  set('--ok-txt',okT);set('--err-txt',errT);set('--warn-txt',warnT);
-  /* Schrift wie auf der Website: Ueberschriften, Kicker und Buttons in der gewaehlten
-     Schrift, Fliesstext bleibt Inter (so machen es index.html/technik.html auch). */
-  set('--hf',FONT_HEADS[th.font]||FONT_HEADS.grotesk);
-  var ico=document.querySelector('link[rel=icon]');if(ico)ico.href=ico.href.replace(/%23[0-9a-f]{6}/i,'%23'+rgbHex(acc).slice(1));
-  document.documentElement.style.colorScheme=dark?'dark':'light';
+  var tt=DESIGN.theme_technik||{};
+  /* Ohne eigene Technik-Farben bleibt es bei der DJ-Palette. */
+  var kind=DESIGN_KIND==='technik'&&tt.primary?'technik':'dj';
+  var th=themeFromContent(DESIGN,kind);
+  /* Ueberschriften nutzen hier var(--hf), deshalb keine extra Schrift-Regel (fontSelector leer). */
+  var d=applyTheme(th,{fontSelector:''});rememberTheme(kind,th);
+  var c=d.contrast;
   /* Fuer Tests/Diagnose: die gepruefte Kontrast-Tabelle. */
-  window.PORTAL_CONTRAST={kind:DESIGN_KIND,txt_bg:ratio(txt,bg),txt_card:ratio(txt,card),btn_acc:ratio(btnTxt,acc),mut_card:ratio(mut,card),acc_bg:ratio(accTxt,bg),acc_card:ratio(accTxt,card)};
+  window.PORTAL_CONTRAST={kind:DESIGN_KIND,txt_bg:c.txt_bg,txt_card:c.txt_card,btn_acc:c.btn_acc,mut_card:c.mut_card,acc_bg:c.acc_bg,acc_card:c.acc_card};
 }
 fetch(API+'/rest/site_content?select=key,value').then(function(r){return r.json()}).then(function(rows){
   var c={};(rows||[]).forEach(function(x){c[x.key]=x.value});DESIGN=c;applyPortalDesign();
