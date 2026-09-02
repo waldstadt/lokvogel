@@ -2119,6 +2119,17 @@ function openCustDetail(id){
       '<span class="b '+(c.referral_status==='vermittelt'?'green':'gold')+'">'+(c.referral_status==='vermittelt'?'vermittelt':'angefragt')+'</span>'+
       (c.referral_at?' <span class="mut sml">seit '+dt(c.referral_at.slice(0,10))+'</span>':'')+
       (c.referral_status!=='vermittelt'?' <button class="btn g sm" style="margin-left:8px" onclick="markReferred()">Als vermittelt markieren</button>':'')+'</div>':'')+
+    /* Fragebögen dieses Kunden: Antworten ansehen und - beim Vermittlungs-Bogen - fuer
+       die Agentur kopieren, ohne erst die Fragebogen-Seite zu suchen. */
+    (function(){
+      var fs=(CACHE.forms||[]).filter(function(f){return f.customer_id===id});
+      if(!fs.length)return '';
+      return '<div style="padding:3px 0"><span class="mut" style="display:inline-block;width:90px;vertical-align:top">Fragebögen</span><span style="display:inline-block;max-width:calc(100% - 96px)">'+
+        fs.map(function(f){
+          return '<div class="cd-form" style="margin:2px 0">'+esc(f.title)+' <span class="b '+(f.status==='beantwortet'?'green':'gold')+'">'+f.status+'</span> '+
+            (f.status==='beantwortet'?'<button class="btn g sm" onclick="viewFormAnswers(\''+f.id+'\')">Antworten</button> '+formAgencyCopyBtn(f):'<button class="btn g sm" onclick="copyFormLink(\''+f.token+'\')">Link</button>')+'</div>';
+        }).join('')+'</span></div>';
+    })()+
     (custChecks.length?('<div style="padding:3px 0"><span class="mut" style="display:inline-block;width:90px;vertical-align:top">Technik-Checks</span><span>'+
       custChecks.map(function(t){var d=t.data||{};
         return '<a onclick="openTechCheckModal(\''+t.id+'\')">'+(d.date?dt(d.date):'Entwurf')+(d.recommendation?' – '+esc(d.recommendation):'')+'</a>';
@@ -7461,7 +7472,7 @@ function renderForms(){
     return '<tr><td>'+dtt(f.created_at)+'</td><td><b>'+esc(f.title)+'</b></td><td class="sml">'+who+'</td>'+
     '<td><span class="b '+(STB[f.status]||'grey')+'">'+f.status+'</span></td>'+
     '<td style="white-space:nowrap">'+
-    (f.status==='beantwortet'?'<button class="btn sm" onclick="viewFormAnswers(\''+f.id+'\')">Antworten</button> ':
+    (f.status==='beantwortet'?'<button class="btn sm" onclick="viewFormAnswers(\''+f.id+'\')">Antworten</button> '+formAgencyCopyBtn(f):
       '<button class="btn g sm" onclick="copyFormLink(\''+f.token+'\')">Link</button> <button class="btn g sm" onclick="formSendMail(\''+f.id+'\')">Per E-Mail</button> ')+
     '<button class="btn g sm" onclick="previewForm(\''+f.id+'\')">Vorschau</button> '+
     '<a onclick="delRow(\'forms\',\''+f.id+'\',reloadForms)" style="color:var(--redl)">✕</a></td></tr>';
@@ -7536,22 +7547,59 @@ function viewFormAnswers(id){
   var html=(f.fields||[]).map(function(fl,i){
     return '<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div class="mut sml">'+esc(fl.label)+'</div><div style="white-space:pre-wrap">'+esc((f.answers||[])[i]||'–')+'</div></div>';
   }).join('');
-  openModal('Antworten: '+esc(f.title),'<div class="sml">'+html+'</div>');
+  var copy=formAgencyCopyBtn(f);
+  openModal('Antworten: '+esc(f.title),'<div class="sml">'+html+'</div>'+(copy?'<div style="margin-top:12px">'+copy+'</div>':''));
+}
+/* "Fuer DJ Bande kopieren": alle Antworten als Klartext, Name und Kontakt zuerst - damit
+   Markus die Anfrage mit einem Klick an die Agentur weiterleiten kann. Nur bei
+   beantworteten Boegen und eingerichteter Agentur. */
+function formAgencyCopyBtn(f){
+  if(!f||f.status!=='beantwortet'||!agencyEnabled())return '';
+  var ag=(S.company&&S.company.agency_name)||'die Agentur';
+  return '<button class="btn g sm" onclick="copyFormForAgency(\''+f.id+'\')" title="Alle Antworten als Text in die Zwischenablage">Für '+esc(ag)+' kopieren</button> ';
+}
+function formAgencyText(f){
+  var c=f.customer_id?CACHE.customers.find(function(x){return x.id===f.customer_id}):null;
+  var order=['name','email','phone','address','event_type','event_date','location','guests'];
+  var rows=(f.fields||[]).map(function(fl,i){
+    var a=(f.answers||[])[i];
+    if(Array.isArray(a))a=a.join(', ');
+    a=(a==null?'':String(a)).trim();
+    if(fl.key==='event_date'&&/^\d{4}-\d{2}-\d{2}$/.test(a))a=dt(a);
+    return {key:fl.key||'',label:fl.label||('Frage '+(i+1)),val:a||'–'};
+  });
+  var first=order.map(function(k){return rows.find(function(r){return r.key===k})}).filter(Boolean);
+  var rest=rows.filter(function(r){return first.indexOf(r)<0});
+  var lines=['DJ-Vermittlung – Anfrage'+(c?' von '+custName(c):''),''];
+  first.forEach(function(r){lines.push(r.label+': '+r.val)});
+  if(first.length&&rest.length)lines.push('');
+  rest.forEach(function(r){lines.push(r.label+': '+r.val)});
+  if(f.submitted_at)lines.push('','Bogen ausgefüllt am '+dtt(f.submitted_at));
+  return lines.join('\n');
+}
+function copyFormForAgency(id){
+  var f=(CACHE.forms||[]).find(function(x){return x.id===id});if(!f)return;
+  var txt=formAgencyText(f);
+  navigator.clipboard.writeText(txt).then(function(){toast('Antworten kopiert ✓')})
+    .catch(function(){prompt('Antworten:',txt)});
 }
 /* Fragen als Zeilen mit Feldern statt "Frage | Typ | Optionen" in einem Textfeld - das
    Format musste man kennen, ein Tippfehler machte still ein Textfeld daraus. Gespeichert
    wird weiterhin dasselbe fields-JSON ({label,type,options,required}). */
 var FT_TYPES=[['text','Kurztext'],['textarea','Langtext'],['select','Auswahl (eine)'],['multiselect','Auswahl (mehrere)'],['checkbox','Ja/Nein-Haken'],['date','Datum']];
+/* Vorbelegung aus Kundendaten: Der Server fuellt Felder mit diesem Schluessel aus Kunde,
+   Gig und Beleg vor (formPrefill in api.php). Gleiche Liste wie dort. */
+var FT_KEYS=[['','– keine –'],['name','Name'],['email','E-Mail'],['phone','Telefon'],['address','Anschrift'],['event_type','Art der Veranstaltung'],['event_date','Datum der Feier'],['location','Location'],['guests','Gästezahl']];
 var FT_ROWS=[];
 function openFtModal(id){
   var t=id?(CACHE.formTpls||[]).find(function(x){return x.id===id}):{};t=t||{};
-  FT_ROWS=(t.fields||[]).map(function(f){return {label:f.label||'',type:f.type||'text',options:(f.options||[]).join(', '),required:!!f.required}});
-  if(!FT_ROWS.length)FT_ROWS.push({label:'',type:'text',options:'',required:false});
+  FT_ROWS=(t.fields||[]).map(function(f){return {label:f.label||'',type:f.type||'text',options:(f.options||[]).join(', '),required:!!f.required,key:f.key||''}});
+  if(!FT_ROWS.length)FT_ROWS.push({label:'',type:'text',options:'',required:false,key:''});
   openModal(id?'Bogen-Vorlage bearbeiten':'Neue Bogen-Vorlage',
     '<label>Name *</label><input id="ftName" value="'+esc(t.name||'')+'">'+
     '<label>Einleitung</label><textarea id="ftIntro" style="min-height:56px">'+esc(t.intro||'')+'</textarea>'+edBtn('ftIntro')+
     '<label>Fragen</label><div id="ftRows"></div>'+
-    '<div style="margin-top:8px"><button class="btn g sm" onclick="ftAdd()">+ Frage</button> <span class="mut sml">Reihenfolge mit ↑ ↓, Pflichtfragen mit Haken – der Kunde kann dann nicht ohne Antwort absenden.</span></div>'+
+    '<div style="margin-top:8px"><button class="btn g sm" onclick="ftAdd()">+ Frage</button> <span class="mut sml">Reihenfolge mit ↑ ↓, Pflichtfragen mit Haken – der Kunde kann dann nicht ohne Antwort absenden. „Vorbelegung“: das Feld wird mit dem gefüllt, was schon vom Kunden bzw. Gig bekannt ist. Platzhalter {agentur} und {agentur_ort} gehen in Einleitung und Fragen.</span></div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveFt(\''+(id||'')+'\')">Speichern</button> '+
     '<button class="btn g" onclick="previewFt()">Vorschau</button>'+
     (id?' <button class="btn r" onclick="delRow(\'form_templates\',\''+id+'\',reloadForms)">Löschen</button>':'')+'</div>');
@@ -7568,11 +7616,13 @@ function ftRender(){
       '<label class="ft-req" style="display:flex;align-items:center;gap:4px;margin:0;text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh);white-space:nowrap"><input type="checkbox" '+(r.required?'checked':'')+' onchange="ftUpd('+i+',\'required\',this.checked)" style="width:auto;margin:0">Pflicht</label>'+
       '<span style="white-space:nowrap"><button class="btn g sm" title="nach oben" onclick="ftMove('+i+',-1)"'+(i===0?' disabled':'')+'>↑</button> <button class="btn g sm" title="nach unten" onclick="ftMove('+i+',1)"'+(i===FT_ROWS.length-1?' disabled':'')+'>↓</button> <button class="btn g sm" title="Frage entfernen" onclick="ftDel('+i+')" style="color:var(--redl)">✕</button></span></div>'+
       (opt?'<input class="ft-opts" placeholder="Optionen, mit Komma getrennt (z. B. Ja, Nein, Weiß noch nicht)" value="'+esc(r.options)+'" oninput="ftUpd('+i+',\'options\',this.value)" style="margin:6px 0 0">':'')+
+      (r.type==='checkbox'||r.type==='multiselect'?'':'<label class="ft-key" style="display:flex;align-items:center;gap:6px;margin:6px 0 0;text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)">Vorbelegung aus Kundendaten '+
+        '<select class="ft-keysel" onchange="ftUpd('+i+',\'key\',this.value)" style="flex:0 0 200px;margin:0">'+FT_KEYS.map(function(k){return '<option value="'+k[0]+'"'+(k[0]===(r.key||'')?' selected':'')+'>'+k[1]+'</option>'}).join('')+'</select></label>')+
       '</div>';
   }).join('');
 }
 function ftUpd(i,k,val){if(FT_ROWS[i])FT_ROWS[i][k]=val}
-function ftAdd(){FT_ROWS.push({label:'',type:'text',options:'',required:false});ftRender();var l=document.querySelectorAll('#ftRows .ft-label');if(l.length)l[l.length-1].focus()}
+function ftAdd(){FT_ROWS.push({label:'',type:'text',options:'',required:false,key:''});ftRender();var l=document.querySelectorAll('#ftRows .ft-label');if(l.length)l[l.length-1].focus()}
 function ftDel(i){FT_ROWS.splice(i,1);ftRender()}
 function ftMove(i,d){var j=i+d;if(j<0||j>=FT_ROWS.length)return;var t=FT_ROWS[i];FT_ROWS[i]=FT_ROWS[j];FT_ROWS[j]=t;ftRender()}
 /* Feld-Objekte aus dem Zeileneditor - von saveFt() UND der Vorschau genutzt, damit
@@ -7583,6 +7633,7 @@ function parseFtFields(){
     var f={label:label,type:r.type||'text'};
     if(f.type==='select'||f.type==='multiselect')f.options=(r.options||'').split(',').map(function(x){return x.trim()}).filter(Boolean);
     if(r.required)f.required=true;
+    if(r.key&&f.type!=='checkbox'&&f.type!=='multiselect')f.key=r.key;
     return f;
   }).filter(Boolean);
 }

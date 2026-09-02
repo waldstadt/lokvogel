@@ -493,7 +493,20 @@ function bandeDoneHtml(){
 }
 function bandeRequest(){
   if(!document.getElementById('bandeOpt').checked){showMsg('aMsg','err','Bitte setzt den Haken – ohne eure Einwilligung darf ich eure Daten nicht weitergeben.');return}
-  sendAction('bande','Kunde wünscht nach Terminkonflikt DJ-Bande-Vorschläge (Einwilligung zur Datenweitergabe erteilt).',null,function(j){DOC.bande=true;if(j&&j.form_link)DOC.bande_link=j.form_link;renderOffer()});
+  sendAction('bande','Kunde wünscht nach Terminkonflikt DJ-Bande-Vorschläge (Einwilligung zur Datenweitergabe erteilt).',null,function(j){
+    DOC.bande=true;if(j&&j.form_link)DOC.bande_link=j.form_link;
+    if(j&&j.form_link)openFormInline(j.form_link);else renderOffer()});
+}
+/* Nach dem Opt-in sofort in den Vorauswahl-Bogen - auf derselben Seite, ohne Umweg
+   ueber das Postfach (die Mail mit dem Link bleibt als Rueckfall). Der Bogen liest den
+   Token aus dem Link; die Adresszeile wird mitgezogen, damit ein Neuladen im Bogen bleibt. */
+function openFormInline(link){
+  var m=/[?&]f=([a-f0-9]+)/.exec(link||'');
+  if(!m){location.href=link;return}
+  FORM=m[1];
+  try{history.replaceState(null,'','portal.html?f='+FORM)}catch(e){}
+  window.scrollTo(0,0);
+  loadForm();
 }
 function toggle(id){['accBox','cmtBox','cbBox','declBox'].forEach(function(x){
   var el=document.getElementById(x);if(!el)return;
@@ -547,7 +560,7 @@ function decline(){
      er zur Absage keine eigene Bestaetigung, sonst kaemen zwei Mails in derselben Minute. */
   sendAction('decline',document.getElementById('declMsg').value,null,function(){
     if(opt)sendAction('bande','Kunde wünscht DJ-Bande-Vorschläge (Einwilligung zur Datenweitergabe erteilt).',null,function(j){
-      if(j&&j.form_link)DOC.bande_link=j.form_link;loadOffer()});
+      if(j&&j.form_link){DOC.bande_link=j.form_link;openFormInline(j.form_link)}else loadOffer()});
     else loadOffer();
   },{bande:opt});
 }
@@ -681,7 +694,7 @@ function renderForm(){
        statt nur "wurde bereits beantwortet" ohne Inhalt. */
     var ans=FDEF.answers||[];
     app('<div class="card"><div class="kicker">Ein paar Fragen</div><h1>'+esc(FDEF.title)+'</h1>'+
-      '<p class="sub" style="margin-top:8px">Beantwortet am '+dt(FDEF.submitted_at)+' – danke euch! Ich melde mich mit den nächsten Schritten. Hier sind eure Antworten zum Nachlesen:</p>'+
+      '<p class="sub" style="margin-top:8px">'+(FDEF.bande?'Der Bogen ist schon bei mir (abgeschickt am '+dt(FDEF.submitted_at)+') – danke euch! Die Anfrage liegt bei '+esc(FDEF.agentur||'meiner Partner-Agentur')+', ich suche die DJs persönlich vor und alles Weitere läuft dann direkt über die Agentur.':'Beantwortet am '+dt(FDEF.submitted_at)+' – danke euch! Ich melde mich mit den nächsten Schritten.')+' Hier sind eure Antworten zum Nachlesen:</p>'+
       '<div style="margin-top:14px">'+(FDEF.fields||[]).map(function(f,i){
         return '<div class="form-answer" style="padding:9px 0;border-bottom:1px solid var(--line-soft)"><div class="sub" style="font-size:12.5px">'+esc(f.label)+'</div><div style="white-space:pre-wrap">'+esc(ans[i]||'–')+'</div></div>';
       }).join('')+'</div>'+
@@ -689,16 +702,34 @@ function renderForm(){
     return;
   }
   var req=function(f){return f.required?' <span style="color:var(--acc)" title="Pflichtfrage">*</span>':''};
+  /* Vorbelegung aus Kundendaten (fields[].key -> prefill[key]): Datum als JJJJ-MM-TT fuer
+     Datumsfelder, sonst als TT.MM.JJJJ. Die Felder bleiben frei aenderbar. */
+  var pre=FDEF.prefill||{};
+  var pv=function(f){
+    if(!f.key||pre[f.key]==null||pre[f.key]==='')return '';
+    var val=String(pre[f.key]);
+    if(f.key==='event_date'&&/^\d{4}-\d{2}-\d{2}/.test(val)){
+      if((f.type||'text')==='date')return val.slice(0,10);
+      return val.slice(8,10)+'.'+val.slice(5,7)+'.'+val.slice(0,4);
+    }
+    return val;
+  };
   var fields=(FDEF.fields||[]).map(function(f,i){
-    var t=f.type||'text';
-    if(t==='textarea')return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><textarea id="qf'+i+'" data-i="'+i+'"></textarea>';
-    if(t==='select')return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><select id="qf'+i+'" data-i="'+i+'"><option value="">– bitte wählen –</option>'+
-      (f.options||[]).map(function(o){return '<option>'+esc(o)+'</option>'}).join('')+'</select>';
+    var t=f.type||'text',val=pv(f);
+    if(t==='textarea')return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><textarea id="qf'+i+'" data-i="'+i+'">'+esc(val)+'</textarea>';
+    if(t==='select'){
+      var opts=(f.options||[]).slice(),hit=opts.filter(function(o){return o.toLowerCase()===val.toLowerCase()})[0];
+      /* Der bekannte Wert steht nicht in der Liste (z. B. "Polterabend"): als eigene
+         Option dazu, damit die Vorbelegung nicht still verloren geht. */
+      if(val&&!hit){opts.push(val);hit=val}
+      return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><select id="qf'+i+'" data-i="'+i+'"><option value="">– bitte wählen –</option>'+
+        opts.map(function(o){return '<option'+(o===hit?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select>';
+    }
     if(t==='multiselect')return '<div class="qlbl" style="margin-top:14px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut2)">'+esc(f.label)+req(f)+'</div><div data-i="'+i+'" data-multi="1">'+
       (f.options||[]).map(function(o){return '<label class="chk" style="margin:6px 0;text-transform:none;letter-spacing:0;font-weight:400"><input type="checkbox" value="'+esc(o)+'"><span>'+esc(o)+'</span></label>'}).join('')+'</div>';
     if(t==='checkbox')return '<label class="chk"><input type="checkbox" data-i="'+i+'"><span>'+esc(f.label)+req(f)+'</span></label>';
-    if(t==='date')return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><input type="date" id="qf'+i+'" data-i="'+i+'">';
-    return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><input type="text" id="qf'+i+'" data-i="'+i+'">';
+    if(t==='date')return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><input type="date" id="qf'+i+'" data-i="'+i+'" value="'+esc(val)+'">';
+    return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><input type="text" id="qf'+i+'" data-i="'+i+'" value="'+esc(val)+'">';
   }).join('');
   var hasReq=(FDEF.fields||[]).some(function(f){return f.required});
   app('<div class="card"><div class="kicker">Ein paar Fragen</div><h1>'+esc(FDEF.title)+'</h1>'+
@@ -750,7 +781,12 @@ function submitForm(){
       /* Den Text des Servers zeigen ("Bitte fülle wenigstens eine Frage aus …") statt
          eines pauschalen "Senden fehlgeschlagen". */
       if(!res.ok)throw new Error((res.j&&res.j.error)||'Senden fehlgeschlagen – bitte erneut versuchen.');
-      app('<div class="card"><h1>Danke euch!</h1><p class="sub" style="margin-top:8px">Eure Antworten sind angekommen. Ich melde mich in der Regel innerhalb von 24 Stunden mit den nächsten Schritten.</p></div>');
+      var ag=res.j&&res.j.bande?(res.j.agentur||'meine Partner-Agentur'):'';
+      app('<div class="card"><h1>Danke euch!</h1><p class="sub" style="margin-top:8px">'+(ag
+        ?'Danke – die Anfrage geht jetzt an '+esc(ag)+'. Ich suche persönlich bis zu fünf passende DJs aus, alles Weitere läuft dann direkt über '+esc(ag)+'.'
+        :'Eure Antworten sind angekommen. Ich melde mich in der Regel innerhalb von 24 Stunden mit den nächsten Schritten.')+'</p>'+
+        (CTOK?'<p class="sub" style="margin-top:14px"><a href="portal.html">← Zurück zu meinen Unterlagen</a></p>':'')+'</div>');
+      window.scrollTo(0,0);
     }).catch(function(e){btn.disabled=false;btn.textContent='Antworten absenden';showMsg('fMsg','err',e.message||'Senden fehlgeschlagen – bitte erneut versuchen.')});
 }
 

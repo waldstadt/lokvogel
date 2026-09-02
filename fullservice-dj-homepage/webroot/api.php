@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 90;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 91;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -315,6 +315,14 @@ function upgrade(PDO $p): void {
        Version (siehe docVersionTouch). Altbestand bereinigen, der durch die fruehere Logik
        schon "Version 2" trug, ohne je beim Kunden gewesen zu sein. */
     try { $p->exec("update documents set version = 1, version_at = null, version_hash = null where sent_at is null and status = 'entwurf'"); } catch (PDOException $e) {}
+  }
+  if ($v < 91) {
+    /* v91: DJ-Vermittlung direkt in den Bogen. Der Bogen merkt sich Gig und Beleg, aus
+       denen er entstanden ist (Vorbelegung), und die Vorlage "DJ-Vorauswahl" bekommt
+       Kontaktfelder mit Schluessel plus Einwilligung als Pflichtfrage. */
+    foreach (['alter table forms add column booking_id text', 'alter table forms add column doc_id text'] as $sql)
+      try { $p->exec($sql); } catch (PDOException $e) {}
+    upgradeBandeForm($p);
   }
   if ($v < 90) {
     /* v90: Die Leiste unter "Ueber mich" beschreibt Markus, nicht sein Lager. Die
@@ -1341,17 +1349,153 @@ function docMarkAccepted(PDO $p, string $docId): void {
    nur von Hand ueber die Mailvorlage "Termin belegt"). Je Kunde nur ein offener Bogen -
    ein zweites Opt-in (z. B. Absage und spaeter nochmal) liefert denselben Link zurueck.
    Rueckgabe: ['link' => ..., 'created' => bool] oder null (keine Bogen-Vorlage vorhanden). */
-function bandeFormFor(PDO $p, string $custId): ?array {
+function bandeFormFor(PDO $p, string $custId, ?string $bookingId = null, ?string $docId = null): ?array {
   $tpl = $p->query("select * from form_templates where name like 'DJ-Vorauswahl%' order by sort limit 1")->fetch();
   if (!$tpl) return null;
   $st = $p->prepare("select token from forms where customer_id = ? and title = ? and status = 'offen' order by created_at desc limit 1");
   $st->execute([$custId, $tpl['name']]);
   if ($tok = $st->fetchColumn()) return ['link' => baseUrl() . '/portal.html?f=' . $tok, 'created' => false];
   $token = bin2hex(random_bytes(24));
-  $p->prepare('insert into forms (id, token, title, intro, fields, status, inquiry_id, customer_id, created_at)
-      values (?,?,?,?,?,?,?,?,?)')
-    ->execute([uuid(), $token, $tpl['name'], $tpl['intro'], $tpl['fields'], 'offen', null, $custId, now()]);
+  /* Platzhalter ({agentur}, {agentur_ort} ...) schon beim Anlegen fuellen - der Bogen
+     soll auch dann noch stimmen, wenn die Agentur spaeter umbenannt wird. */
+  $fields = json_decode((string)$tpl['fields'], true) ?: [];
+  $p->prepare('insert into forms (id, token, title, intro, fields, status, inquiry_id, customer_id, booking_id, doc_id, created_at)
+      values (?,?,?,?,?,?,?,?,?,?,?)')
+    ->execute([uuid(), $token, $tpl['name'], formFillText((string)$tpl['intro']),
+      json_encode(formFillFields($fields), JSON_UNESCAPED_UNICODE), 'offen', null, $custId, $bookingId, $docId, now()]);
   return ['link' => baseUrl() . '/portal.html?f=' . $token, 'created' => true];
+}
+/* Platzhalter in Fragebogen-Texten: alles aus tplMap() plus {agentur_ort} (nur der Ort)
+   und {agentur_name} (nur der Name; {agentur} = Name mit Ort in Klammern). */
+function formTplMap(): array {
+  $c = companySettings();
+  return ['{agentur_ort}' => (string)($c['agency_city'] ?? ''), '{agentur_name}' => (string)($c['agency_name'] ?? '')] + tplMap();
+}
+function formFillText(string $t): string { return strtr($t, formTplMap()); }
+function formFillFields(array $fields): array {
+  $map = formTplMap();
+  foreach ($fields as &$f) if (isset($f['label'])) $f['label'] = strtr((string)$f['label'], $map);
+  return $fields;
+}
+/* Vorbelegung des Bogens aus dem, was schon bekannt ist: Kunde (Name, Kontakt, Anschrift),
+   verknuepfter Gig (Datum, Anlass, Location, Gaeste) und - als Luekenfueller - die Eckdaten
+   auf dem Beleg (documents.event_info). Schluessel = fields[].key aus der Vorlage. */
+function formPrefill(PDO $p, array $f): array {
+  $out = [];
+  if (empty($f['customer_id'])) return $out;
+  $st = $p->prepare('select * from customers where id = ?'); $st->execute([$f['customer_id']]);
+  $c = $st->fetch();
+  if (!$c) return $out;
+  $name = trim((string)$c['company']) !== '' ? trim((string)$c['company']) : trim(trim((string)$c['first_name']) . ' ' . trim((string)$c['last_name']));
+  $zc = trim(trim((string)$c['zip']) . ' ' . trim((string)$c['city']));
+  $addr = implode(', ', array_filter([trim((string)$c['street']), $zc]));
+  foreach (['name' => $name, 'email' => trim((string)$c['email']), 'phone' => trim((string)$c['phone']), 'address' => $addr] as $k => $val)
+    if ($val !== '') $out[$k] = $val;
+  $doc = null;
+  if (!empty($f['doc_id'])) {
+    $st = $p->prepare('select booking_id, event_info from documents where id = ?'); $st->execute([$f['doc_id']]);
+    $doc = $st->fetch() ?: null;
+  }
+  $bookingId = $f['booking_id'] ?: ($doc['booking_id'] ?? null);
+  $b = null;
+  if ($bookingId) {
+    $st = $p->prepare('select * from bookings where id = ?'); $st->execute([$bookingId]);
+    $b = $st->fetch() ?: null;
+  }
+  if (!$b) {
+    /* Kein Gig am Bogen: der naechste nicht stornierte Gig des Kunden */
+    $st = $p->prepare("select * from bookings where customer_id = ? and status != 'storniert' order by event_date desc limit 1");
+    $st->execute([$c['id']]); $b = $st->fetch() ?: null;
+  }
+  if ($b) {
+    if (trim((string)$b['event_date']) !== '') $out['event_date'] = trim((string)$b['event_date']);
+    $et = trim((string)($b['event_type'] ?? '')) !== '' ? trim((string)$b['event_type']) : trim((string)($b['title'] ?? ''));
+    if ($et !== '') $out['event_type'] = $et;
+    $loc = implode(', ', array_filter([trim((string)($b['venue_name'] ?? '')), trim((string)($b['venue_address'] ?? ''))]));
+    if ($loc !== '') $out['location'] = $loc;
+    if (!empty($b['guests'])) $out['guests'] = (string)(int)$b['guests'];
+  }
+  $e = $doc && !empty($doc['event_info']) ? (json_decode((string)$doc['event_info'], true) ?: []) : [];
+  if ($e) {
+    if (empty($out['event_date']) && !empty($e['date'])) $out['event_date'] = (string)$e['date'];
+    if (empty($out['event_type']) && !empty($e['occasion'])) $out['event_type'] = (string)$e['occasion'];
+    $loc = implode(', ', array_filter([trim((string)($e['venue'] ?? '')), trim((string)($e['address'] ?? ''))]));
+    if (empty($out['location']) && $loc !== '') $out['location'] = $loc;
+    if (empty($out['guests']) && !empty($e['guests'])) $out['guests'] = (string)(int)$e['guests'];
+  }
+  return $out;
+}
+/* Ist das der Vermittlungs-Bogen? Gleiche Namenskonvention wie bandeFormFor(). */
+function isBandeForm(array $f): bool { return stripos((string)($f['title'] ?? ''), 'DJ-Vorauswahl') === 0; }
+
+/* Vorauswahl-Bogen: Intro und Felder der Seed-Vorlage - eine Quelle fuer seedFormTemplates()
+   und den Upgrade-Schritt. Platzhalter werden beim Anlegen des Bogens gefuellt. */
+function bandeFormIntro(): string {
+  return "Ihr wollt, dass ich euch DJs raussuche – gern. So läuft das: Eure Anfrage geht an meine Partner-Agentur {agentur}, bei der ich selbst als DJ unterwegs bin. Dort wähle ich persönlich bis zu fünf Kollegen vor, die zu eurer Feier passen. Alles Weitere – Infogespräch, Preis, Vertrag – läuft danach direkt über die {agentur_name} bzw. den DJ, nicht mehr über mich. Ihr bucht hier also noch nichts, ihr sagt mir nur, wonach ich suchen soll. Dauert keine 5 Minuten.";
+}
+function bandeFormFields(): array {
+  return [
+    ['label'=>'Euer Name (Ansprechpartner)','type'=>'text','key'=>'name','required'=>true],
+    ['label'=>'E-Mail','type'=>'text','key'=>'email','required'=>true],
+    ['label'=>'Telefonnummer','type'=>'text','key'=>'phone','required'=>true],
+    ['label'=>'Eure Anschrift (Straße, PLZ, Ort)','type'=>'text','key'=>'address','required'=>true],
+    ['label'=>'Art der Veranstaltung','type'=>'select','options'=>['Hochzeit','Geburtstag','Firmenfeier','Jubiläum','Abiball','Sonstiges'],'key'=>'event_type','required'=>true],
+    ['label'=>'Datum der Feier','type'=>'date','key'=>'event_date','required'=>true],
+    ['label'=>'Location & Ort (Name reicht)','type'=>'text','key'=>'location'],
+    ['label'=>'Ungefähre Gästezahl','type'=>'text','key'=>'guests'],
+    ['label'=>'Welche Musik hört ihr besonders gern? (Richtungen, Künstler, Lieblingslieder – was auf jeden Fall laufen soll)','type'=>'textarea'],
+    ['label'=>'Und was mögt ihr überhaupt nicht? (darf auf keinen Fall laufen)','type'=>'textarea'],
+    ['label'=>'Wie soll euer DJ auftreten?','type'=>'select','options'=>['Zurückhaltend im Hintergrund','Moderiert & animiert aktiv','Mischung aus beidem','Egal, Hauptsache gute Musik']],
+    ['label'=>'Sonst noch etwas, das der DJ wissen sollte?','type'=>'textarea'],
+    ['label'=>'Ich bin einverstanden, dass Markus meine Angaben aus diesem Bogen und die Eckdaten meiner Anfrage (Termin, Ort, Anlass, Kontaktdaten) zur DJ-Vermittlung an die Partner-Agentur {agentur} weitergibt. Die Weitergabe dient ausschließlich der Vermittlung eines DJs.','type'=>'checkbox','required'=>true],
+  ];
+}
+/* Der Stand der Seed-Vorlage bis v90 - nur zum Vergleich im Upgrade. */
+function bandeFormFieldsV90(): array {
+  return [
+    ['label'=>'Anlass eurer Feier','type'=>'select','options'=>['Hochzeit','Geburtstag','Firmenfeier','Sonstiges']],
+    ['label'=>'Datum der Feier','type'=>'text'],
+    ['label'=>'Location & Ort (Name reicht)','type'=>'text'],
+    ['label'=>'Eure vollständige Anschrift (Straße, PLZ, Ort) – wird für die Vermittlung benötigt','type'=>'text'],
+    ['label'=>'Ungefähre Gästezahl','type'=>'text'],
+    ['label'=>'Welche Musik hört ihr besonders gern? (Richtungen, Künstler, Lieblingslieder – was auf jeden Fall laufen soll)','type'=>'textarea'],
+    ['label'=>'Und was mögt ihr überhaupt nicht? (darf auf keinen Fall laufen)','type'=>'textarea'],
+    ['label'=>'Wie soll euer DJ auftreten?','type'=>'select','options'=>['Zurückhaltend im Hintergrund','Moderiert & animiert aktiv','Mischung aus beidem','Egal, Hauptsache gute Musik']],
+    ['label'=>'Sonst noch etwas, das der DJ wissen sollte?','type'=>'textarea'],
+    ['label'=>'Ich bin einverstanden, dass meine Angaben zur DJ-Vermittlung an die Partner-Agentur DJ Bande (Münster) weitergegeben werden.','type'=>'checkbox'],
+  ];
+}
+/* v91: Vorlage "DJ-Vorauswahl" nachziehen. Entspricht sie noch exakt dem alten Seed, wird
+   sie komplett ersetzt (Markus hat sie nie angefasst, der neue Stand ist der bessere).
+   Hat er sie veraendert, bleiben seine Fragen stehen - nur die Kontaktfelder mit
+   Schluessel, die fuer die Vorbelegung noetig sind, kommen oben dazu, und der alte
+   Einwilligungs-Haken wird zur Pflichtfrage. Fehlt die Vorlage ganz, wird sie angelegt. */
+function upgradeBandeForm(PDO $p): void {
+  try {
+    $tpl = $p->query("select * from form_templates where name like 'DJ-Vorauswahl%' order by sort limit 1")->fetch();
+    if (!$tpl) {
+      $p->prepare('insert into form_templates (id,sort,name,intro,fields) values (?,?,?,?,?)')
+        ->execute([uuid(), 1, 'DJ-Vorauswahl für eure Feier', bandeFormIntro(), json_encode(bandeFormFields(), JSON_UNESCAPED_UNICODE)]);
+      return;
+    }
+    $cur = json_decode((string)$tpl['fields'], true) ?: [];
+    if ($cur === bandeFormFieldsV90()) {
+      $p->prepare('update form_templates set intro = ?, fields = ? where id = ?')
+        ->execute([bandeFormIntro(), json_encode(bandeFormFields(), JSON_UNESCAPED_UNICODE), $tpl['id']]);
+      return;
+    }
+    $have = [];
+    foreach ($cur as $f) if (!empty($f['key'])) $have[$f['key']] = true;
+    $add = [];
+    foreach (bandeFormFields() as $f)
+      if (!empty($f['key']) && in_array($f['key'], ['name','email','phone','address','event_type','event_date'], true) && empty($have[$f['key']])) $add[] = $f;
+    foreach ($cur as &$f)
+      if (($f['type'] ?? '') === 'checkbox' && stripos((string)($f['label'] ?? ''), 'einverstanden') !== false) $f['required'] = true;
+    unset($f);
+    if (!$add && $cur === (json_decode((string)$tpl['fields'], true) ?: [])) return;
+    $p->prepare('update form_templates set fields = ? where id = ?')
+      ->execute([json_encode(array_merge($add, $cur), JSON_UNESCAPED_UNICODE), $tpl['id']]);
+  } catch (Throwable $e) {}
 }
 /* Opt-in verarbeiten: Kennzeichen am Kunden, Bogen anlegen, Mail mit Link (Vorlage
    "DJ-Vermittlung – Vorauswahl-Bogen", eingebauter Text als Rueckfall), bei Mailfehler
@@ -1360,7 +1504,7 @@ function bandeOptIn(PDO $p, string $custId, ?string $bookingId = null, bool $res
   try {
     $p->prepare("update customers set referral_status = 'angefragt', referral_at = coalesce(referral_at, ?) where id = ? and coalesce(referral_status,'') != 'vermittelt'")
       ->execute([now(), $custId]);
-    $f = bandeFormFor($p, $custId);
+    $f = bandeFormFor($p, $custId, $bookingId, $docId);
     if (!$f) return null;
     if (!$f['created'] && !$resend) return $f['link'];
     $cst = $p->prepare('select email, first_name, company, kind from customers where id = ?');
@@ -2765,6 +2909,7 @@ create table form_templates (id text primary key, sort integer default 0, name t
 create table forms (id text primary key, token text unique not null, title text not null,
   intro text, fields text default '[]', answers text,
   status text default 'offen', inquiry_id text, customer_id text,
+  booking_id text, doc_id text,
   created_at text, submitted_at text);
 create table document_items (id text primary key,
   document_id text not null references documents(id) on delete cascade,
@@ -2999,20 +3144,7 @@ Viele Grüße und alles Gute
 
 function seedFormTemplates(PDO $p): void {
   $tpls = [
-    [1, 'DJ-Vorauswahl für eure Feier',
-     "Damit ich euch nicht irgendwelche, sondern wirklich passende DJs vorschlagen kann, beantwortet mir bitte kurz diese Fragen – dauert keine 5 Minuten. Die Vorschläge bekommt ihr danach direkt von mir. Und keine Sorge: Ihr bucht hier noch nichts. Vor einer Buchung führt ihr mit eurem Wunsch-DJ in Ruhe ein persönliches Infogespräch – das solltet ihr auch unbedingt tun. Dort klärt ihr alle Details wie Preis, Ablauf und Technik direkt miteinander.",
-     [
-       ['label'=>'Anlass eurer Feier','type'=>'select','options'=>['Hochzeit','Geburtstag','Firmenfeier','Sonstiges']],
-       ['label'=>'Datum der Feier','type'=>'text'],
-       ['label'=>'Location & Ort (Name reicht)','type'=>'text'],
-       ['label'=>'Eure vollständige Anschrift (Straße, PLZ, Ort) – wird für die Vermittlung benötigt','type'=>'text'],
-       ['label'=>'Ungefähre Gästezahl','type'=>'text'],
-       ['label'=>'Welche Musik hört ihr besonders gern? (Richtungen, Künstler, Lieblingslieder – was auf jeden Fall laufen soll)','type'=>'textarea'],
-       ['label'=>'Und was mögt ihr überhaupt nicht? (darf auf keinen Fall laufen)','type'=>'textarea'],
-       ['label'=>'Wie soll euer DJ auftreten?','type'=>'select','options'=>['Zurückhaltend im Hintergrund','Moderiert & animiert aktiv','Mischung aus beidem','Egal, Hauptsache gute Musik']],
-       ['label'=>'Sonst noch etwas, das der DJ wissen sollte?','type'=>'textarea'],
-       ['label'=>'Ich bin einverstanden, dass meine Angaben zur DJ-Vermittlung an die Partner-Agentur DJ Bande (Münster) weitergegeben werden.','type'=>'checkbox'],
-     ]],
+    [1, 'DJ-Vorauswahl für eure Feier', bandeFormIntro(), bandeFormFields()],
     [2, 'Hochzeits-Planungsbogen',
      "Je besser ich eure Feier kenne, desto besser wird der Abend. Nehmt euch ein paar Minuten – es lohnt sich.",
      [
@@ -5019,9 +5151,14 @@ function handlePortal(string $path, string $method, $body): never {
       /* Nach dem Absenden sieht der Kunde seine Antworten wieder (Kundenkonto "Ansehen") -
          bisher kam nur "wurde bereits beantwortet" ohne Inhalt. */
       $done = $f['status'] === 'beantwortet';
-      out(['title'=>$f['title'],'intro'=>$f['intro'],'fields'=>$fields,'done'=>$done,
+      $bande = isBandeForm($f);
+      /* prefill: was schon bekannt ist (Kunde, Gig, Beleg) - der Kunde tippt nichts doppelt.
+         Platzhalter auch hier fuellen, falls der Bogen von Hand aus der Vorlage kam. */
+      out(['title'=>$f['title'],'intro'=>formFillText((string)$f['intro']),'fields'=>formFillFields($fields),'done'=>$done,
         'answers'=>$done ? (json_decode((string)$f['answers'], true) ?: []) : null,
-        'submitted_at'=>$done ? $f['submitted_at'] : null]);
+        'submitted_at'=>$done ? $f['submitted_at'] : null,
+        'prefill'=>$done ? null : formPrefill($p, $f),
+        'bande'=>$bande, 'agentur'=>$bande ? agencyName() : null]);
     }
     if ($method === 'POST') {
       if ($f['status'] === 'beantwortet') fail('Dieser Fragebogen wurde bereits beantwortet.', 409);
@@ -5043,15 +5180,28 @@ function handlePortal(string $path, string $method, $body): never {
       }
       $p->prepare("update forms set answers=?, status='beantwortet', submitted_at=? where id=?")
         ->execute([json_encode($answers, JSON_UNESCAPED_UNICODE), now(), $f['id']]);
+      $sum = '';
+      foreach ($fields as $i => $fl) $sum .= ($fl['label'] ?? ('Frage '.($i+1))).":\n".($answers[$i] ?? '–')."\n\n";
+      $sum = trim($sum);
       if ($f['customer_id']) {
-        $sum = '';
-        foreach ($fields as $i => $fl) $sum .= ($fl['label'] ?? ('Frage '.($i+1))).":\n".($answers[$i] ?? '–')."\n\n";
-        $p->prepare('insert into communications (id,customer_id,channel,direction,subject,content,occurred_at,created_at)
-          values (?,?,?,?,?,?,?,?)')
-          ->execute([uuid(), $f['customer_id'], 'note', 'in', 'Fragebogen beantwortet: '.$f['title'], trim($sum), now(), now()]);
+        $p->prepare('insert into communications (id,customer_id,booking_id,channel,direction,subject,content,occurred_at,created_at)
+          values (?,?,?,?,?,?,?,?,?)')
+          ->execute([uuid(), $f['customer_id'], $f['booking_id'] ?: null, 'note', 'in', 'Fragebogen beantwortet: '.$f['title'], $sum, now(), now()]);
       }
-      notifyOwner('Fragebogen beantwortet: ' . $f['title'], 'Die Antworten stehen in der Kunden-Timeline im Backoffice.');
-      out(['ok' => true], 201);
+      /* Vermittlungs-Bogen: Betreff mit Namen, Antworten gleich in der Mail - Markus
+         leitet sie von dort an die Agentur weiter, ohne erst ins Backoffice zu muessen. */
+      $bande = isBandeForm($f);
+      $wer = '';
+      foreach ($fields as $i => $fl) if (($fl['key'] ?? '') === 'name' && trim((string)($answers[$i] ?? '')) !== '') { $wer = trim((string)$answers[$i]); break; }
+      if ($wer === '' && $f['customer_id']) {
+        $cst = $p->prepare('select first_name, last_name, company from customers where id = ?'); $cst->execute([$f['customer_id']]);
+        if ($c = $cst->fetch()) $wer = trim((string)$c['company']) !== '' ? trim((string)$c['company']) : trim($c['first_name'] . ' ' . $c['last_name']);
+      }
+      notifyOwner($bande ? 'DJ-Vermittlung: Bogen ausgefüllt – ' . ($wer !== '' ? $wer : $f['title'])
+                         : 'Fragebogen beantwortet: ' . $f['title'] . ($wer !== '' ? ' – ' . $wer : ''),
+        ($bande ? "Der Kunde hat den Vorauswahl-Bogen ausgefüllt und der Weitergabe an " . (agencyName() ?: 'die Partner-Agentur') . " zugestimmt. Zusammenfassung:\n\n" : "Die Antworten:\n\n") . $sum .
+        "\n\nDie Antworten stehen auch in der Kunden-Timeline im Backoffice.");
+      out(['ok' => true, 'bande' => $bande, 'agentur' => $bande ? agencyName() : null], 201);
     }
   }
   /* Digitaler Mietvertrag: ansehen, Ausweis hochladen, unterschreiben */
