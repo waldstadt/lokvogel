@@ -78,7 +78,6 @@ function render(pg,site){
   var homeLabel=pg.footer_target==='technik'?'Zur Technik-Seite':'Zur Hauptseite';
   var brand=CO.name||'';
   var wa=(cfg.wa_text||'Hallo {inhaber}, ').replace(/\{inhaber\}/g,CO.owner_first||'').replace(/^Hallo\s*,/,'Hallo,');
-  var waDigits=CO.whatsapp_digits||'',tel=CO.phone||'';
 
   document.getElementById('app').innerHTML=
   '<nav><div class="nav-in">'+
@@ -135,15 +134,17 @@ function render(pg,site){
         '<input type="text" id="cpWebsite" tabindex="-1" autocomplete="off"></div>'+
       '<button class="btn" type="submit" id="sendBtn">Anfrage senden</button>'+
     '</form>'+
-    ((waDigits||tel)?'<div style="margin-top:18px;font-size:13px;color:var(--mut2)">Lieber direkt schreiben? '+
-      (waDigits?'<a href="https://wa.me/'+waDigits+'?text='+encodeURIComponent(wa)+'" target="_blank" rel="noopener">'+ic('chat')+'WhatsApp</a>':'')+
-      (waDigits&&tel?' &nbsp;·&nbsp; ':'')+(tel?'<a href="tel:'+esc(tel.replace(/[^\d+]/g,''))+'">'+esc(tel)+'</a>':'')+'</div>':'')+
+    /* Kontaktwege (WhatsApp, Rückruf, Nummer nur bei phone_public) - kontakt.js */
+    '<div id="kontaktWege" style="margin-top:36px;padding-top:28px;border-top:1px solid var(--line)"></div>'+
   '</div></section>'+
 
   '<footer><div class="wrap">'+
     '<div>'+esc([brand,CO.owner,coCity()].filter(Boolean).join(' · '))+'</div>'+
     '<div><a href="index.html?legal=impressum">Impressum</a> &nbsp;·&nbsp; <a href="index.html?legal=datenschutz">Datenschutz</a> &nbsp;·&nbsp; <a href="'+homeHref+'">'+esc(homeLabel)+'</a></div>'+
   '</div></footer>';
+  /* Kontaktwege unter dem Formular: WhatsApp mit der Vorbelegung dieser Seite, Rueckruf-Formular,
+     Nummer nur bei phone_public - alles in kontakt.js. */
+  if(window.Kontakt)window.Kontakt.mount(document.getElementById('kontaktWege'),{waText:wa,page:'Aktionsseite '+SLUG}).update(CO);
 
   /* Kein Termin in der Vergangenheit auswählbar */
   var dEl=document.getElementById('cpDate');
@@ -197,7 +198,7 @@ function render(pg,site){
       showRegHint(data);
     }).catch(function(){
       msg.className='form-msg err';
-      msg.textContent='Senden fehlgeschlagen – bitte versucht es später erneut'+(CO.phone?' oder ruft direkt an: '+CO.phone:'')+'.';
+      msg.textContent='Senden fehlgeschlagen – bitte versucht es später erneut oder schreibt mir per WhatsApp (unten).';
     }).finally(function(){btn.disabled=false;btn.textContent='Anfrage senden'});
   });
 }

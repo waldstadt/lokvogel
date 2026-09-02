@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 93;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 94;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -962,7 +962,62 @@ function upgrade(PDO $p): void {
     } catch (Throwable $e) {}
     seedExtraTemplates($p);
   }
+  if ($v < 94) {
+    /* v94: Neue Geschaeftsnummer, Kontaktwege. Markus bekam auf der privaten Nummer zu viele
+       Werbeanrufe - die Website zeigt deshalb keine Telefonnummer mehr (phone_public=false),
+       sondern WhatsApp und Rueckruf; die Nummer steht nur noch in Belegen und Mails an
+       Kunden, mit denen schon Kontakt besteht. Die alte Nummer wird ueberall ersetzt bzw.
+       aus Impressum/Datenschutz entfernt (E-Mail reicht dort). Eine andere, selbst
+       eingetragene Nummer bleibt unangetastet. Dazu inquiries.source fuer "Rueckruf". */
+    try { $p->exec('alter table inquiries add column source text'); } catch (PDOException $e) {}
+    try {
+      $comp = json_decode((string)$p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true) ?: [];
+      $ph = trim((string)($comp['phone'] ?? '')); $wa = trim((string)($comp['whatsapp'] ?? ''));
+      if ($ph === '' || isOldPhone($ph)) $comp['phone'] = NEW_BUSINESS_PHONE;
+      if ($wa === '' || isOldPhone($wa)) $comp['whatsapp'] = NEW_BUSINESS_PHONE;
+      if (!array_key_exists('phone_public', $comp)) $comp['phone_public'] = false;
+      $p->prepare("update settings set value = ?, updated_at = ? where key='company'")->execute([json_encode($comp, JSON_UNESCAPED_UNICODE), now()]);
+      $row = $p->query("select value from site_content where key='contact'")->fetchColumn();
+      $ct = $row ? json_decode((string)$row, true) : null;
+      if (is_array($ct) && isOldPhone((string)($ct['phone'] ?? ''))) {
+        $ct['phone'] = NEW_BUSINESS_PHONE;
+        $p->prepare("update site_content set value = ? where key='contact'")->execute([json_encode($ct, JSON_UNESCAPED_UNICODE)]);
+      }
+      $row = $p->query("select value from site_content where key='legal'")->fetchColumn();
+      $legal = $row ? json_decode((string)$row, true) : null;
+      if (is_array($legal)) {
+        $chg = false;
+        foreach (['impressum', 'datenschutz', 'agb'] as $k) {
+          $t = (string)($legal[$k] ?? ''); if ($t === '') continue;
+          $n = $k === 'agb' ? replaceOldPhone($t) : stripOldPhone($t);
+          if ($n !== $t) { $legal[$k] = $n; $chg = true; }
+        }
+        if ($chg) $p->prepare("update site_content set value = ? where key='legal'")->execute([json_encode($legal, JSON_UNESCAPED_UNICODE)]);
+      }
+    } catch (Throwable $e) {}
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
+}
+
+/* Alte private Nummer (bis Paket 17) in beliebiger Schreibweise erkennen: 01523 6439373,
+   +49 1523 6439373, 0152/36439373 ... - Ziffern mit beliebigen Trennern dazwischen. */
+const NEW_BUSINESS_PHONE = '0179 1716970';
+function oldPhoneRx(): string {
+  $d = str_split('15236439373');
+  return '(?:\+\s?49|0049|0)[\s\/\-.]*' . implode('[\s\/\-.]*', $d);
+}
+function isOldPhone(string $s): bool {
+  $s = trim($s);
+  return $s !== '' && (bool)preg_match('/^' . oldPhoneRx() . '$/u', $s);
+}
+function replaceOldPhone(string $text): string { return preg_replace('/' . oldPhoneRx() . '/u', NEW_BUSINESS_PHONE, $text) ?? $text; }
+/* Telefonangabe aus Rechtstexten entfernen: ", Telefon 01523 6439373" (Datenschutz-Satz),
+   die Zeile "Telefon: 01523 6439373" (Impressum) - was uebrig bleibt, wird ersetzt. */
+function stripOldPhone(string $text): string {
+  $rx = oldPhoneRx();
+  $t = preg_replace('/,\s*Telefon:?\s*' . $rx . '/u', '', $text) ?? $text;
+  $t = preg_replace('/[ \t]*Telefon:?[ \t]*' . $rx . '[ \t]*\.?(?:\r?\n|$)/u', '', $t) ?? $t;
+  return replaceOldPhone($t);
 }
 
 /* Regel von Markus: Keine Angebote ohne vollstaendige Adresse (gilt auch fuer die
@@ -1911,8 +1966,10 @@ function renameEquipmentCategories(PDO $p): void {
    Angaben erscheinen als Luecke zum Ausfuellen statt als fremder Name. */
 function impressumText(array $comp): string {
   $v = fn(string $k, string $leer) => trim((string)($comp[$k] ?? '')) ?: $leer;
+  /* Bewusst ohne Telefonnummer: E-Mail reicht als schnelle Kontaktmoeglichkeit nach § 5 DDG,
+     und die Geschaeftsnummer soll nicht oeffentlich auf der Website stehen (Werbeanrufe). */
   return "Angaben gemäß § 5 DDG\n\n" . $v('owner', '[Inhaber]') . "\n" . $v('name', '[Firma]') . "\n" . $v('street', '[Straße]') . "\n" . $v('zip_city', '[PLZ Ort]') .
-    "\n\nTelefon: " . $v('phone', '[Telefon]') . "\nE-Mail: " . $v('email', '[E-Mail]') .
+    "\n\nE-Mail: " . $v('email', '[E-Mail]') .
     "\n\nVerantwortlich für den Inhalt: " . $v('owner', '[Inhaber]') . " (Anschrift wie oben)";
 }
 function legalComplianceUpdate(PDO $p): void {
@@ -1924,6 +1981,8 @@ function legalComplianceUpdate(PDO $p): void {
      Firmendaten gebaute oder der historische Seed der Erstinstallation. Alles, was der
      Betreiber selbst geschrieben hat, bleibt unangetastet. */
   $comp = json_decode((string)$p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true) ?: [];
+  /* Der zweite Eintrag ist der historische Erst-Seed (mit der damaligen Nummer) - nur als
+     Vergleichswert zum Wiedererkennen, er wird nirgends mehr ausgegeben. */
   $seeds = [impressumText($comp),
     "Angaben gemäß § 5 DDG\n\nMarkus Jankowski\nDJ Lauschgift\nBüttmecker Weg 35c\n58675 Hemer\n\nTelefon: 01523 6439373\nE-Mail: lauschgiftmarkus@gmail.com\n\nVerantwortlich für den Inhalt: Markus Jankowski (Anschrift wie oben)"];
   $cur = (string)($legal['impressum'] ?? '');
@@ -2908,7 +2967,7 @@ function campaignTechCheckBruttoUpdate(PDO $p): void {
 
 /* Datenschutzerklärung – eine Quelle für Seed und Migration (v25) */
 function datenschutzText(): string {
-  return "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer, Telefon 01523 6439373.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Cookies und lokale Speicherung\nDiese Website verwendet keine Cookies zu Werbe- oder Tracking-Zwecken und bindet keine Dienste ein, die solche Cookies setzen. Ein Cookie-Banner ist deshalb nicht erforderlich. Nur im Kundenportal und im Partner-Bereich wird nach eurer aktiven Anmeldung ein technisch notwendiges Sitzungsmerkmal im Browser gespeichert (Local/Session Storage), damit ihr angemeldet bleibt (§ 25 Abs. 2 TDDDG).\n\n4. Schriftarten\nAlle Schriftarten liegen lokal auf dem Server dieser Website. Beim Seitenaufruf wird keine Verbindung zu Google Fonts oder anderen Drittanbietern aufgebaut.\n\n5. Reichweitenmessung\nZur Verbesserung des Angebots wird anonym gezählt, wie oft die einzelnen Seiten aufgerufen werden (nur Datum, Seitenname und ggf. die Domain der verweisenden Website). Dabei werden weder IP-Adressen noch Cookies oder sonstige Kennungen gespeichert – ein Bezug zu einzelnen Personen ist nicht möglich (Art. 6 Abs. 1 lit. f DSGVO).\n\n6. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n7. Newsletter\nFür den Workshop-Newsletter speichere ich eure E-Mail-Adresse erst nach Bestätigung über den zugesandten Link (Double-Opt-in) auf Grundlage eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Jede Mail enthält einen Abmeldelink; nach der Abmeldung erhaltet ihr keine weiteren Mails. Es wird kein Versanddienstleister eingesetzt – der Versand erfolgt über den eigenen Server.\n\n8. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n9. Digitaler Mietvertrag und Ausweiskopie\nBei der Vermietung von Veranstaltungstechnik könnt ihr den Mietvertrag digital abschließen. Dabei werden eure Unterschrift sowie – mit eurer ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 20 PAuswG) – Fotos der Vorder- und Rückseite eures Personalausweises verarbeitet und in einem zugriffsgeschützten Bereich des eigenen Servers gespeichert. Nicht benötigte Angaben dürft ihr vor dem Fotografieren schwärzen. Die Ausweiskopien dienen ausschließlich der Absicherung des Mietverhältnisses und werden nach vollständiger Rückgabe der Mietsachen gelöscht.\n\n10. Kundenportal\nIm Kundenportal könnt ihr euch mit E-Mail-Adresse und Passwort anmelden, um eure Unterlagen einzusehen und Angaben zu eurer Feier zu pflegen. Das Passwort wird ausschließlich verschlüsselt (als Hash) gespeichert; alle Inhalte liegen auf dem eigenen Server dieser Website (Art. 6 Abs. 1 lit. b DSGVO).\n\n11. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: August 2026.";
+  return "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Cookies und lokale Speicherung\nDiese Website verwendet keine Cookies zu Werbe- oder Tracking-Zwecken und bindet keine Dienste ein, die solche Cookies setzen. Ein Cookie-Banner ist deshalb nicht erforderlich. Nur im Kundenportal und im Partner-Bereich wird nach eurer aktiven Anmeldung ein technisch notwendiges Sitzungsmerkmal im Browser gespeichert (Local/Session Storage), damit ihr angemeldet bleibt (§ 25 Abs. 2 TDDDG).\n\n4. Schriftarten\nAlle Schriftarten liegen lokal auf dem Server dieser Website. Beim Seitenaufruf wird keine Verbindung zu Google Fonts oder anderen Drittanbietern aufgebaut.\n\n5. Reichweitenmessung\nZur Verbesserung des Angebots wird anonym gezählt, wie oft die einzelnen Seiten aufgerufen werden (nur Datum, Seitenname und ggf. die Domain der verweisenden Website). Dabei werden weder IP-Adressen noch Cookies oder sonstige Kennungen gespeichert – ein Bezug zu einzelnen Personen ist nicht möglich (Art. 6 Abs. 1 lit. f DSGVO).\n\n6. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n7. Newsletter\nFür den Workshop-Newsletter speichere ich eure E-Mail-Adresse erst nach Bestätigung über den zugesandten Link (Double-Opt-in) auf Grundlage eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Jede Mail enthält einen Abmeldelink; nach der Abmeldung erhaltet ihr keine weiteren Mails. Es wird kein Versanddienstleister eingesetzt – der Versand erfolgt über den eigenen Server.\n\n8. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n9. Digitaler Mietvertrag und Ausweiskopie\nBei der Vermietung von Veranstaltungstechnik könnt ihr den Mietvertrag digital abschließen. Dabei werden eure Unterschrift sowie – mit eurer ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 20 PAuswG) – Fotos der Vorder- und Rückseite eures Personalausweises verarbeitet und in einem zugriffsgeschützten Bereich des eigenen Servers gespeichert. Nicht benötigte Angaben dürft ihr vor dem Fotografieren schwärzen. Die Ausweiskopien dienen ausschließlich der Absicherung des Mietverhältnisses und werden nach vollständiger Rückgabe der Mietsachen gelöscht.\n\n10. Kundenportal\nIm Kundenportal könnt ihr euch mit E-Mail-Adresse und Passwort anmelden, um eure Unterlagen einzusehen und Angaben zu eurer Feier zu pflegen. Das Passwort wird ausschließlich verschlüsselt (als Hash) gespeichert; alle Inhalte liegen auf dem eigenen Server dieser Website (Art. 6 Abs. 1 lit. b DSGVO).\n\n11. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: August 2026.";
 }
 
 function migrate(PDO $p): void {
@@ -2949,7 +3008,7 @@ create table content_versions (id text primary key, key text not null,
   label text, value text not null default '{}', created_at text);
 create table inquiries (id text primary key, name text not null, email text, phone text,
   event_type text, event_date text, location text, guests text, message text,
-  status text default 'neu', customer_id text, created_at text);
+  status text default 'neu', customer_id text, source text, created_at text);
 create table customers (id text primary key, kind text default 'privat', status text default 'lead',
   first_name text, last_name text, company text, email text, phone text, whatsapp text,
   street text, zip text, city text, source text, tags text default '[]', notes text, tech_check text,
@@ -3068,7 +3127,7 @@ function seed(PDO $p): void {
   foreach ([
     /* Frische Installation: keine Betreiber-Details im Code - die traegt der Betreiber
        unter Einstellungen ein (Einrichtungs-Checkliste im Dashboard). Vermittlung aus. */
-    ['company', '{"name":"","owner":"","street":"","zip_city":"","phone":"","email":"","website":"","tax_id":"","vat_id":"","iban":"","bic":"","bank":"","small_business":false,"whatsapp":"","agency_name":"","agency_city":"","agency_enabled":false,"hoster_name":""}'],
+    ['company', '{"name":"","owner":"","street":"","zip_city":"","phone":"","phone_public":false,"email":"","website":"","tax_id":"","vat_id":"","iban":"","bic":"","bank":"","small_business":false,"whatsapp":"","agency_name":"","agency_city":"","agency_enabled":false,"hoster_name":""}'],
     ['numbering', '{"angebot":{"prefix":"AN-","next":1},"rechnung":{"prefix":"RE-","next":1},"lieferschein":{"prefix":"LS-","next":1},"year_in_number":true}'],
     ['rental_contract', json_encode(['text' => rentalContractDefault()], JSON_UNESCAPED_UNICODE)],
     ['defaults', json_encode(['tax_rate' => 19, 'payment_days' => 14, 'quote_valid_days' => 30,
@@ -3086,7 +3145,7 @@ function seed(PDO $p): void {
     ['rental', '{"title":"Technik mieten","text":"Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung."}'],
     ['tech_hero', '{"headline":"Jedes Wort verständlich.\n*Auch in der schwierigsten Location.*","scrim":{"mode":"gleich","pct":30},"badges":[{"value": "24 h", "label": "= 1 Miettag"}, {"value": "50 %", "label": "jeder Folgetag"}, {"value": "Hemer", "label": "Lager & Abholung"}],"subtitle":"Lauschgift Veranstaltungstechnik · Hemer","text":"Große Bühnen mit viel Platz kann jeder beschallen. Die Kunst ist die kleine Location: niedrige Decke, harte Wände, Publikum direkt vor der Box. Genau darauf bin ich spezialisiert – Ton und Licht für Veranstaltungen von 30 bis 200 Gästen, mit hochwertiger Technik, die dafür gebaut ist."}'],
     ['tech_teaser', '{"title":"Lauschgift Veranstaltungstechnik","text":"Ton und Licht gehören für mich untrennbar zum DJ-Sein dazu – deshalb biete ich beides auch unabhängig voneinander an: Technik zum Mieten direkt aus meinem Lager in Hemer, oder mich als Techniker inklusive Equipment, ganz ohne Auflegen. Alle Details dazu auf der Technik-Seite."}'],
-    ['contact', '{"title":"Kontakt","phone":"01523 6439373","email":"lauschgiftmarkus@gmail.com","address":"Büttmecker Weg 35c, 58675 Hemer","instagram":"https://www.instagram.com/dj_lauschgift/","whatsapp":""}'],
+    ['contact', '{"title":"Kontakt","phone":"0179 1716970","email":"lauschgiftmarkus@gmail.com","address":"Büttmecker Weg 35c, 58675 Hemer","instagram":"https://www.instagram.com/dj_lauschgift/","whatsapp":""}'],
     ['theme', '{"preset":"koralle","primary":"#ff6f5b","bg":"#0f1012","font":"grotesk"}'],
     ['reviews', '{"google_url":"","djbande_url":"","tagline":""}'],
     ['loc_section', '{"title":"Orte, an denen ich besonders gerne auflege","text":"Deutschlandweit gibt es Locations, mit denen die Zusammenarbeit einfach herausragend läuft – eingespielte Teams, gute Technik-Bedingungen, tolle Räume. Diese Häuser empfehle ich aus voller Überzeugung."}'],
@@ -3407,6 +3466,70 @@ function attachEmbeds(string $t, array $rows, array $embeds): array {
   return $rows;
 }
 
+/* Rueckruf-Knopf der Website (POST public/callback): Markus will telefonisch nur mit Leuten
+   sprechen, die den Kontakt selbst wollen - deshalb steht keine Nummer auf der Seite, aber
+   jeder kann sagen "ruf mich an, am besten morgen". Legt eine Anfrage mit Quelle "rueckruf"
+   an, haengt sich bei bekannter Nummer an den Kunden (Timeline-Eintrag) und benachrichtigt
+   Markus per Mail/Telegram. Spam-Bremse wie beim Anfrageformular: Honigtopf plus Drossel je
+   Nummer, ohne IP-Speicherung. */
+function phoneDigits(string $s): string {
+  $d = preg_replace('/\D/', '', $s);
+  if (str_starts_with($d, '0049')) $d = '49' . substr($d, 4);
+  elseif (str_starts_with($d, '0')) $d = '49' . substr($d, 1);
+  return $d;
+}
+function publicCallback(PDO $p, array $body): never {
+  if (trim((string)($body['website'] ?? '')) !== '') out(['ok' => true], 201);
+  $name = mb_substr(trim((string)($body['name'] ?? '')), 0, 120);
+  $phone = mb_substr(trim((string)($body['phone'] ?? '')), 0, 60);
+  $when = mb_substr(trim((string)($body['when'] ?? '')), 0, 60);
+  $whenNote = mb_substr(trim((string)($body['when_note'] ?? '')), 0, 200);
+  $note = mb_substr(trim((string)($body['note'] ?? '')), 0, 1000);
+  $page = mb_substr(trim((string)($body['page'] ?? '')), 0, 80);
+  if ($name === '') fail('Bitte sag mir kurz, wer du bist.', 400);
+  if ($phone === '') fail('Ohne Nummer kann ich nicht zurückrufen – bitte Telefonnummer angeben.', 400);
+  $digits = phoneDigits($phone);
+  if (strlen($digits) < 8) fail('Diese Nummer sieht nicht vollständig aus – bitte mit Vorwahl angeben.', 400);
+  $WHEN = ['nachmittag' => 'heute Nachmittag', 'abend' => 'heute Abend', 'morgen' => 'morgen', 'egal' => 'egal, wann es passt'];
+  $whenText = trim(($WHEN[$when] ?? $when) . ($whenNote !== '' ? ' – ' . $whenNote : ''));
+  if ($whenText === '') $whenText = 'egal, wann es passt';
+  /* Drossel + Doppelklick: dieselbe Nummer hoechstens dreimal in zehn Minuten, exakt
+     dieselbe Bitte nur einmal (freundliche 201, fuer den Absender hat es ja geklappt). */
+  $st = $p->prepare("select phone, message from inquiries where source = 'rueckruf' and created_at > ?");
+  $st->execute([gmdate('Y-m-d\TH:i:s\Z', time() - 600)]);
+  $same = 0; $mkMsg = fn() => "Rückruf gewünscht\nTelefon: $phone\nWunschzeit: $whenText" . ($note !== '' ? "\nAnlass: $note" : '') . ($page !== '' ? "\nSeite: $page" : '');
+  $msg = $mkMsg();
+  foreach ($st->fetchAll() as $r) {
+    if (phoneDigits((string)$r['phone']) !== $digits) continue;
+    if ((string)$r['message'] === $msg) out(['ok' => true], 201);
+    $same++;
+  }
+  if ($same >= 3) fail('Dein Rückrufwunsch ist schon bei mir – ich melde mich. Wenn es eilt, schreib mir kurz per WhatsApp.', 429);
+  /* Bekannter Kunde? Ueber die Nummer (Telefon oder WhatsApp) - Kunden sind wenige,
+     deshalb in PHP normalisiert vergleichen statt in SQL. */
+  $custId = null; $custName = '';
+  $cs = $p->query("select id, first_name, last_name, company, phone, whatsapp from customers where coalesce(phone,'') <> '' or coalesce(whatsapp,'') <> ''");
+  foreach ($cs->fetchAll() as $c) {
+    if (phoneDigits((string)$c['phone']) === $digits || phoneDigits((string)$c['whatsapp']) === $digits) {
+      $custId = $c['id']; $custName = trim((string)$c['company']) !== '' ? trim((string)$c['company']) : trim($c['first_name'] . ' ' . $c['last_name']);
+      break;
+    }
+  }
+  $id = uuid();
+  $p->prepare('insert into inquiries (id, name, phone, message, status, customer_id, source, created_at) values (?,?,?,?,?,?,?,?)')
+    ->execute([$id, $name, $phone, $msg, 'neu', $custId, 'rueckruf', now()]);
+  if ($custId) {
+    try {
+      $p->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, created_at) values (?,?,?,?,?,?,?,?)')
+        ->execute([uuid(), $custId, 'note', 'in', 'Rückruf gewünscht: ' . $whenText, "Telefon: $phone" . ($note !== '' ? "\n" . $note : '') . ($page !== '' ? "\nÜber: $page" : ''), now(), now()]);
+    } catch (Throwable $e) {}
+  }
+  notifyOwner('Rückruf gewünscht – ' . $name . ', ' . $phone . ', ' . $whenText,
+    "Name: $name" . ($custName !== '' ? " (Kunde: $custName)" : '') . "\nTelefon: $phone\nWunschzeit: $whenText" .
+    ($note !== '' ? "\nAnlass: $note" : '') . ($page !== '' ? "\nSeite: $page" : ''));
+  out(['ok' => true], 201);
+}
+
 function handleRest(string $t, string $method, array $q, $body, array $prefer): never {
   if (!in_array($t, TABLES)) fail('Unbekannte Tabelle.', 404);
   $auth = currentUser() !== null;
@@ -3438,7 +3561,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         $rl = $p->prepare("select count(*) from inquiries where lower(email) = ? and created_at > ?");
         $rl->execute([strtolower(trim((string)$row['email'])), gmdate('Y-m-d\TH:i:s\Z', time() - 600)]);
         if ((int)$rl->fetchColumn() >= 3)
-          fail('Deine Anfrage ist schon bei mir angekommen – ich melde mich in Kürze. Wenn es eilt, ruf gern direkt an.', 429);
+          fail('Deine Anfrage ist schon bei mir angekommen – ich melde mich in Kürze. Wenn es eilt, schreib mir kurz per WhatsApp.', 429);
       }
       /* E-Mail serverseitig validieren: verhindert, dass krude Zeichenketten gespeichert und
          später im Backoffice weiterverarbeitet werden (Defense-in-Depth gegen Attribut-Ausbruch). */
@@ -3473,8 +3596,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         $cst = $p->prepare('select c.first_name, c.kind from customers c join inquiries i on i.customer_id = c.id where i.id = ?');
         $cst->execute([$row['id']]);
         $anrede = anredeFor(($cst->fetch() ?: []) + ['name' => (string)$row['name']]);
-        $waDigits = preg_replace('/\D/', '', (string)($comp['phone'] ?? ''));
-        if ($waDigits !== '' && $waDigits[0] === '0') $waDigits = '49' . substr($waDigits, 1);
+        $waDigits = publicCompany($comp)['whatsapp_digits'];
         sendMailSafe((string)$row['email'], 'Deine Anfrage ist angekommen',
           "$anrede,\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet!\n\n" .
           "Ich melde mich persönlich bei dir, in der Regel innerhalb von 24 Stunden. " .
@@ -3962,7 +4084,8 @@ function publicCompany(?array $comp = null): array {
   if ($waDigits !== '' && $waDigits[0] === '0') $waDigits = '49' . substr($waDigits, 1);
   return ['name' => trim((string)($c['name'] ?? '')), 'owner' => $owner,
     'owner_first' => $owner !== '' ? (preg_split('/\s+/', $owner, 2)[0] ?? $owner) : '',
-    'phone' => trim((string)($c['phone'] ?? '')), 'whatsapp' => $wa, 'whatsapp_digits' => $waDigits,
+    'phone' => trim((string)($c['phone'] ?? '')), 'phone_public' => !empty($c['phone_public']),
+    'whatsapp' => $wa, 'whatsapp_digits' => $waDigits,
     'email' => trim((string)($c['email'] ?? '')), 'street' => trim((string)($c['street'] ?? '')),
     'zip_city' => trim((string)($c['zip_city'] ?? '')), 'website' => trim((string)($c['website'] ?? '')),
     'agency_name' => trim((string)($c['agency_name'] ?? '')), 'agency_city' => trim((string)($c['agency_city'] ?? '')),
@@ -4892,7 +5015,9 @@ function handlePortal(string $path, string $method, $body): never {
            und Planer-Rechnungsadresse sind sonst zwei getrennte, sich nie sehende Datentoepfe. */
         'company' => $me['company'], 'first_name' => $me['first_name'], 'last_name' => $me['last_name'],
         'phone' => $me['phone'], 'street' => $me['street'], 'zip' => $me['zip'], 'city' => $me['city']],
-        'bookings' => $bookings, 'documents' => $docs, 'rentals' => $rc->fetchAll(), 'files' => $ff->fetchAll(), 'forms' => $fm->fetchAll()]);
+        'bookings' => $bookings, 'documents' => $docs, 'rentals' => $rc->fetchAll(), 'files' => $ff->fetchAll(), 'forms' => $fm->fetchAll(),
+        /* Wer ein Konto hat, hat Kontakt: Telefon und WhatsApp fuer den Kontaktblock im Portal. */
+        'company' => publicCompany()]);
     }
     /* Eigene Stammdaten pflegen: Telefon und Anschrift braucht Markus fuer Rechnung und
        Mietvertrag, und die PLZ ist zugleich der Login fuer Angebotslinks. Bisher konnte
@@ -6441,7 +6566,15 @@ try {
      auf die restlichen (geschützten) Einstellungen. */
   /* Oeffentliche Betreiber-Basisdaten fuer Website-Fuss, WhatsApp-Link, Aktionsseiten und
      Portal - was ohnehin im Impressum steht, nichts Vertrauliches. */
-  if ($path === 'public/company' && $method === 'GET') out(publicCompany());
+  if ($path === 'public/company' && $method === 'GET') {
+    /* Ohne Login nur das, was auf der Website stehen darf: die Telefonnummer bleibt weg,
+       solange "Telefonnummer oeffentlich zeigen" aus ist (WhatsApp-Link und Rueckruf statt
+       Nummer - Werbeanrufe). Portal und Belege bekommen sie ueber ihre eigenen Endpunkte. */
+    $pc = publicCompany();
+    if (empty($pc['phone_public'])) $pc['phone'] = '';
+    out($pc);
+  }
+  if ($path === 'public/callback' && $method === 'POST') publicCallback(db(), is_array($body) ? $body : []);
   /* Beleg-Aktionen mit Rueckfrage (Storno mit Grund, Zahlung mit Datum, Mail erneut senden) */
   if (preg_match('#^doc/([a-f0-9-]{30,40})/(storno|paid|resend)$#', $path, $m) && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);

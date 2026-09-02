@@ -9,6 +9,7 @@
 
 <link href="fonts.css" rel="stylesheet">
 <script src="theme.js"></script>
+<script src="kontakt.js"></script>
 <script>applyCachedTheme('technik')</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -263,6 +264,7 @@ footer a:hover{color:var(--acc-txt)}
 
     <div class="rent-grid" id="rentGrid" style="margin-top:24px"></div>
     <p class="rent-note" id="priceNote">Alle Preise inkl. MwSt. Ab 1 Woche, 2 Wochen und 1 Monat gelten automatisch günstigere Tagessätze – die Staffel-Gesamtsumme seht ihr live im Tourcase.</p>
+    <div id="kontaktWege" style="margin-top:44px;padding-top:32px;border-top:1px solid var(--line);max-width:640px"></div>
   </div>
 </section>
 
@@ -328,6 +330,7 @@ footer a:hover{color:var(--acc-txt)}
 var API='api.php';
 document.getElementById('year').textContent=new Date().getFullYear();
 var WA_THEMA='zur Technik';
+var KW=Kontakt.mount(document.getElementById('kontaktWege'),{thema:'zum Mieten',page:'Mietpark',fallbackWa:'491791716970',lead:'Unsicher, was ihr braucht? Am schnellsten per WhatsApp. Oder ihr sagt mir, wann ich anrufen soll.'});
 /* Betreiber-Basisdaten (Name, Inhaber, Telefon, WhatsApp, Anschrift) aus den Einstellungen
    des Backoffice - die festen Werte im HTML sind nur der Rueckfall fuer den ersten Aufbau. */
 var CO={};
@@ -338,10 +341,7 @@ function applyCompany(co){
   CO=co||{};
   var fo=document.getElementById('footOwner');
   if(fo&&(CO.owner||coCity()))fo.textContent=[CO.owner,coCity()].filter(Boolean).join(' · ');
-  var ph=document.getElementById('cPhone');
-  if(ph&&CO.phone){ph.textContent=CO.phone;ph.href='tel:'+CO.phone.replace(/[^\d+]/g,'')}
-  var wa=document.getElementById('cWa'),h=coWaHref(coWaText(WA_THEMA));
-  if(wa&&h)wa.href=h;
+  KW.update(CO);
   var ad=document.getElementById('cAddr');
   if(ad&&(CO.street||CO.zip_city))ad.textContent=[CO.street,CO.zip_city].filter(Boolean).join(', ');
 }

@@ -21,6 +21,8 @@ h2{font-size:clamp(26px,4vw,36px);font-weight:700;line-height:1.14;margin-bottom
 .lead{color:var(--mut);max-width:640px}
 .btn{display:inline-block;background:var(--acc);color:var(--btn-txt);padding:14px 30px;font-size:13px;font-weight:600;letter-spacing:.04em;border:none;border-radius:8px;cursor:pointer;transition:background .2s;font-family:'Space Grotesk',sans-serif}
 .btn:hover{background:var(--acc2)}
+.btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--acc-txt,var(--acc));color:var(--acc-txt,var(--acc));background:transparent}
 nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--nav-bg,rgba(15,16,18,.88));backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .nav-in{max-width:900px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between}
 .logo{display:flex;align-items:center;gap:9px;color:var(--txt)}

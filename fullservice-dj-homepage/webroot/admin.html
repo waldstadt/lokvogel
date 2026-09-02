@@ -1033,9 +1033,15 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
         <label>Straße</label><input id="sStreet">
         <label>PLZ / Ort</label><input id="sZip">
         <div class="grid2">
-          <div><label>Telefon</label><input id="sPhone"></div>
+          <div><label>Telefon (Geschäftsnummer)</label><input id="sPhone" placeholder="z. B. 0179 1234567"></div>
           <div><label>E-Mail</label><input id="sMail"></div>
         </div>
+        <div class="grid2">
+          <div><label>WhatsApp-Nummer <span class="mut sml" style="text-transform:none;letter-spacing:0">– leer = Telefonnummer</span></label><input id="sWhatsapp" placeholder="z. B. 0179 1234567"></div>
+          <div></div>
+        </div>
+        <label style="margin-top:4px"><input type="checkbox" id="sPhonePublic" style="width:auto;margin-right:6px"><b>Telefonnummer öffentlich auf der Website zeigen</b></label>
+        <div class="mut sml" style="margin:2px 0 12px">Aus: Website zeigt WhatsApp und Rückruf, die Nummer steht nur in Belegen und Mails an Kunden. An: Nummer zusätzlich als Klartext mit Anruf-Link im Kontaktblock und in den Suchmaschinen-Daten.</div>
         <div class="grid2">
           <div><label>Rechtsform</label><input id="sLegal" placeholder="Einzelunternehmen, GbR, GmbH …"></div>
           <div></div>
@@ -1050,8 +1056,8 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
         <div class="card" id="set-operator"><h3>Betreiber &amp; Vermittlung</h3>
           <div class="sml mut" style="margin-bottom:8px">Diese Angaben ersetzen alle früher fest eingebauten Namen: Sie erscheinen in Kundenmails ({inhaber}, {firma}, {agentur}), auf der Website (WhatsApp-Link, Fußzeile) und im Kundenportal.</div>
           <div class="grid2">
-            <div><label>WhatsApp-Nummer <span class="mut sml" style="text-transform:none;letter-spacing:0">– leer = Telefonnummer</span></label><input id="sWhatsapp" placeholder="z. B. 0170 1234567"></div>
             <div><label>Hoster <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional, nur zur Erinnerung)</span></label><input id="sHoster" placeholder="z. B. All-Inkl, Hetzner, IONOS"></div>
+            <div></div>
           </div>
           <label style="margin-top:12px"><input type="checkbox" id="sAgencyOn" style="width:auto;margin-right:6px" onchange="toggleAgencyFields()"><b>DJ-Vermittlung über eine Partner-Agentur anbieten</b></label>
           <div class="mut sml" style="margin:2px 0 8px">Wenn an: Bei Absagen und belegten Terminen bietet das Portal dem Kunden an, über die Agentur einen anderen DJ zu finden (mit Einwilligung zur Datenweitergabe). Wenn aus: Alle Vermittlungs-Texte, -Vorlagen und -Knöpfe bleiben ausgeblendet.</div>
@@ -1746,7 +1752,7 @@ function renderDash(){
      (index.html/technik.html), aber die Priorisierung auf deiner Seite muss trotzdem klappen. */
   var isUrgent=function(d){if(!d)return false;var days=Math.round((new Date(d)-new Date(today))/86400000);return days>=0&&days<=10};
   var newInq=CACHE.inquiries.filter(function(i){return i.status==='neu'})
-    .map(function(i){return {kind:'inquiry',id:i.id,label:i.name,sub:(i.event_type||'')+(i.event_date?(' · '+dt(i.event_date)):''),urgent:isUrgent(i.event_date)}});
+    .map(function(i){return {kind:'inquiry',id:i.id,label:i.name,sub:i.source==='rueckruf'?('Rückruf · '+(i.phone||'')+' · '+((String(i.message||'').match(/Wunschzeit:\s*(.+)/)||[])[1]||'egal')):(i.event_type||'')+(i.event_date?(' · '+dt(i.event_date)):''),urgent:isUrgent(i.event_date)}});
   /* Technik-Mietanfragen aus dem Warenkorb landen direkt als Buchung (status='anfrage'),
      nie in der inquiries-Tabelle - müssen hier separat eingesammelt werden, sonst übersieht
      man sie im Dashboard. */
@@ -1890,9 +1896,12 @@ function setupChecklist(){
     {ok:!!legal.reviewed,text:'Rechtstexte (Impressum, Datenschutz, AGB) geprüft',go:'cms-legal'},
     {ok:!!(S.rental_contract&&String(S.rental_contract.text||'').trim()),text:'Mietvertragsbedingungen',go:'set-rental'},
     {ok:!!st.backup_cron,text:'Backup-Cronjob beim Hoster eingerichtet',go:'set-backup'},
-    {ok:!!String(c.whatsapp||c.phone||'').trim(),text:'WhatsApp-Nummer für die Website (sonst gilt die Telefonnummer)',go:'set-operator',optional:true}
+    /* Geschaeftsnummer: gruen, sobald eine Nummer drinsteht, die nicht mehr die alte private
+       ist (01523 6439373 in beliebiger Schreibweise). */
+    {ok:!!String(c.phone||'').trim()&&!/^(\+\s?49|0049|0)[\s\/\-.]*1[\s\/\-.]*5[\s\/\-.]*2[\s\/\-.]*3[\s\/\-.]*6[\s\/\-.]*4[\s\/\-.]*3[\s\/\-.]*9[\s\/\-.]*3[\s\/\-.]*7[\s\/\-.]*3$/.test(String(c.phone||'').trim()),text:'Geschäftsnummer eingetragen (nicht mehr die alte private Nummer)',go:'set-company'},
+    {ok:!!String(c.whatsapp||c.phone||'').trim(),text:'WhatsApp-Nummer für die Website (sonst gilt die Telefonnummer)',go:'set-company',optional:true}
   ];
-  if(c.agency_enabled)items.splice(7,0,{ok:!!String(c.agency_name||'').trim(),text:'Partner-Agentur für die DJ-Vermittlung benannt',go:'set-operator'});
+  if(c.agency_enabled)items.splice(8,0,{ok:!!String(c.agency_name||'').trim(),text:'Partner-Agentur für die DJ-Vermittlung benannt',go:'set-operator'});
   items.push({ok:!!tg.telegram_enabled,text:'Telegram-Benachrichtigungen',go:'set-telegram',optional:true});
   return items;
 }
@@ -1991,13 +2000,26 @@ function renderInq(){
      Zeile wirkt das wie ein Zählfehler. */
   var alle=(CACHE.inquiries||[]).length,neu=(CACHE.inquiries||[]).filter(function(i){return i.status==='neu'}).length;
   var sub=document.getElementById('inqSub');
-  if(sub)sub.textContent=alle?('Eingegangen über das Homepage-Formular · '+neu+' neu von '+alle+' insgesamt'):'Eingegangen über das Homepage-Formular';
+  if(sub)sub.textContent=alle?('Eingegangen über Website-Formular und Rückruf-Knopf · '+neu+' neu von '+alle+' insgesamt'):'Eingegangen über Website-Formular und Rückruf-Knopf';
   document.getElementById('inqRows').innerHTML=applySort((CACHE.inquiries||[]).slice(),'inquiries').map(function(i){
     /* Dringend (Termin <= 10 Tage) und Terminkonflikt direkt in der Liste zeigen -
        wer über die Liste arbeitet, sieht das sonst nur auf dem Dashboard. */
     var tage=i.event_date?Math.round((new Date(i.event_date)-new Date(new Date().toISOString().slice(0,10)))/86400000):null;
     var eilig=tage!=null&&tage>=0&&tage<=10;
     var konf=dateConflicts(i.event_date,i.customer_id);
+    /* Rueckruf-Wuensche vom Website-Knopf: Telefonnummer gross, Wunschzeit statt Anlass,
+       "Erledigt" direkt in der Zeile - Markus soll nur draufschauen und anrufen. */
+    var rueckruf=i.source==='rueckruf';
+    if(rueckruf){
+      var wz=(String(i.message||'').match(/Wunschzeit:\s*(.+)/)||[])[1]||'';
+      return '<tr><td>'+dtt(i.created_at)+'</td><td><b>'+esc(i.name)+'</b> <span class="b blue">Rückruf</span><br>'+
+        '<a href="tel:'+esc(String(i.phone||'').replace(/[^\d+]/g,''))+'" style="font-size:19px;font-weight:700;letter-spacing:.02em">'+esc(i.phone||'–')+'</a></td>'+
+        '<td>Wunschzeit: '+esc(wz||'egal')+'</td><td>–</td>'+
+        '<td><span class="b '+(INQ_BADGE[i.status]||'grey')+'">'+i.status.replace('_',' ')+'</span></td>'+
+        '<td style="white-space:nowrap"><button class="btn g sm" onclick="viewInq(\''+i.id+'\')">Ansehen</button> '+
+        (i.status==='erledigt'||i.status==='archiviert'?'':'<button class="btn sm" onclick="setInqStatus(\''+i.id+'\',\'erledigt\')">Erledigt</button> ')+
+        (i.customer_id?'<button class="btn g sm" onclick="openCustDetail(\''+i.customer_id+'\')">Zum Kunden</button>':'')+'</td></tr>';
+    }
     return '<tr><td>'+dtt(i.created_at)+'</td><td><b>'+esc(i.name)+'</b><br><span class="mut sml">'+esc(i.email||'')+' '+esc(i.phone||'')+'</span></td>'+
     '<td>'+esc(i.event_type||'–')+'</td>'+
     '<td>'+dt(i.event_date)+
@@ -2022,7 +2044,8 @@ function viewInq(id){
   /* Verfuegbarkeit sofort oben im Dialog: gruen "frei" oder rot "belegt" - vorher stand
      der Hinweis nur im Konfliktfall, und man musste selbst in den Kalender schauen. */
   var frei=!!i.event_date&&!konf.length;
-  openModal('Anfrage von '+esc(i.name),
+  openModal((i.source==='rueckruf'?'Rückruf gewünscht: ':'Anfrage von ')+esc(i.name),
+    (i.source==='rueckruf'&&i.phone?'<div style="font-size:24px;font-weight:700;margin-bottom:10px"><a href="tel:'+esc(String(i.phone).replace(/[^\d+]/g,''))+'">'+esc(i.phone)+'</a></div>':'')+
     (konf.length?'<div class="msg err" style="margin-bottom:10px"><b>Achtung: '+dt(i.event_date)+' ist belegt durch</b> '+esc(konf.join(' · '))+'<div class="sml" style="margin-top:4px">Die Vorlage „Termin belegt“ ist unten vorausgewählt.</div></div>':
       frei?'<div class="msg ok" style="margin-bottom:10px"><b>Termin frei:</b> am '+dt(i.event_date)+' steht nichts im Kalender.</div>':'')+
     (eilig?'<div class="msg" style="margin-bottom:10px;border:1px solid var(--gold,#b8860b)"><b>Kurzfristig:</b> nur noch '+tage+' Tage bis zum Termin.</div>':'')+
@@ -7573,6 +7596,7 @@ function renderSet(){
   document.getElementById('sVatId').value=c.vat_id||'';
   document.getElementById('sSmall').checked=!!c.small_business;
   document.getElementById('sWhatsapp').value=c.whatsapp||'';
+  document.getElementById('sPhonePublic').checked=!!c.phone_public;
   document.getElementById('sHoster').value=c.hoster_name||'';
   document.getElementById('sAgencyOn').checked=!!c.agency_enabled;
   document.getElementById('sAgencyName').value=c.agency_name||'';
@@ -7646,7 +7670,7 @@ function sLogoRemove(){sLogoUrl='';renderSLogoPrev()}
 function saveCompany(){
   /* Bestehende Schluessel (Betreiber-Karte, Website) bleiben erhalten - vorher ueberschrieb
      jedes Speichern der Firmendaten den kompletten Datensatz. */
-  var val=Object.assign({},S.company||{},{name:v('sName'),owner:v('sOwner'),street:v('sStreet'),zip_city:v('sZip'),phone:v('sPhone'),email:v('sMail'),
+  var val=Object.assign({},S.company||{},{name:v('sName'),owner:v('sOwner'),street:v('sStreet'),zip_city:v('sZip'),phone:v('sPhone'),whatsapp:v('sWhatsapp'),phone_public:document.getElementById('sPhonePublic').checked,email:v('sMail'),
     legal_form:v('sLegal'),tax_id:v('sTaxId'),vat_id:v('sVatId'),small_business:document.getElementById('sSmall').checked,
     bank:v('sBank'),iban:v('sIban'),bic:v('sBic'),paypal:v('sPaypal'),website:(S.company&&S.company.website)||'',logo_url:sLogoUrl});
   api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'company',value:val}})
@@ -7656,7 +7680,7 @@ function toggleAgencyFields(){var on=document.getElementById('sAgencyOn').checke
 function saveOperator(){
   var on=document.getElementById('sAgencyOn').checked;
   if(on&&!v('sAgencyName')){toast('Bitte den Namen der Partner-Agentur eintragen – oder die Vermittlung ausschalten.',1);return}
-  var val=Object.assign({},S.company||{},{whatsapp:v('sWhatsapp'),hoster_name:v('sHoster'),agency_enabled:on,agency_name:v('sAgencyName'),agency_city:v('sAgencyCity')});
+  var val=Object.assign({},S.company||{},{hoster_name:v('sHoster'),agency_enabled:on,agency_name:v('sAgencyName'),agency_city:v('sAgencyCity')});
   api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'company',value:val}})
     .then(function(){S.company=val;renderSetupCard();renderTpls();toast('Betreiber-Angaben gespeichert ✓')}).catch(function(e){toast(e.message,1)});
 }

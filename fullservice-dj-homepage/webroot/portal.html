@@ -165,7 +165,19 @@ fetch(API+'/rest/site_content?select=key,value').then(function(r){return r.json(
 
 /* "Alex prüft das" - ohne Inhaber der Firmenname, ohne beides neutral. */
 function ownerFirstPub(){var c=coOf();return c.owner_first||c.name||'der Veranstalter'}
-function phoneHint(){var p=(coOf().phone||'');return p?' Oder ruft mich einfach an: <a href="tel:'+esc(p.replace(/[^\d+]/g,''))+'">'+esc(p)+'</a>.':''}
+function phoneHint(){var c=coOf(),p=(c.phone||'');if(p)return ' Oder ruft mich einfach an: <a href="tel:'+esc(p.replace(/[^\d+]/g,''))+'">'+esc(p)+'</a>.';
+  /* Ohne oeffentliche Nummer (Werbeanrufe) bleibt WhatsApp der schnelle Weg. */
+  return c.whatsapp_digits?' Oder schreibt mir kurz per <a href="https://wa.me/'+esc(c.whatsapp_digits)+'" target="_blank" rel="noopener">WhatsApp</a>.':''}
+function waLink(text){var c=coOf();return c.whatsapp_digits?'https://wa.me/'+esc(c.whatsapp_digits)+'?text='+encodeURIComponent(text||'Hallo'+(c.owner_first?' '+c.owner_first:'')+', '):''}
+/* Kontaktblock im Portal: Wer hier ist, hat schon Kontakt - Telefon plus WhatsApp-Knopf. */
+function contactCard(){
+  var c=coOf(),p=c.phone||'',w=waLink();
+  if(!p&&!w)return '';
+  return '<div class="card"><h2>'+WA_IC+' So erreichst du mich</h2>'+
+    '<p class="sub" style="margin-top:6px">Am schnellsten per WhatsApp. Oder ihr ruft einfach an'+(p?': <a href="tel:'+esc(p.replace(/[^\d+]/g,''))+'"><b>'+esc(p)+'</b></a>':'')+'.</p>'+
+    (w?'<div style="margin-top:10px"><a class="btn g" href="'+w+'" target="_blank" rel="noopener">'+WA_IC+' Per WhatsApp schreiben</a></div>':'')+'</div>';
+}
+var WA_IC='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
 function agencyOn(){var c=coOf();return !!c.agency_enabled&&!!c.agency_name}
 /* Anfuehrungszeichen und Apostrophe mitmaskieren: innerHTML alleine ersetzt nur & < >,
    damit liesse sich aus einem Attribut ausbrechen (style, onfocus und so weiter). */
@@ -450,7 +462,8 @@ function renderOffer(){
       '<button class="btn green" onclick="confirmAccept()">✓ Angebot annehmen</button>'+
       '<button class="btn g" onclick="toggle(\'cmtBox\')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Frage / Anmerkung</button>'+
       '<button class="btn g" onclick="toggle(\'cbBox\')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Rückruf wünschen</button>'+
-      '<button class="btn g" onclick="toggle(\'declBox\')">Eher nicht …</button></div>'+
+      '<button class="btn g" onclick="toggle(\'declBox\')">Eher nicht …</button>'+
+      (waLink('Hallo'+(ownerFirstPub()?' '+ownerFirstPub():'')+', es geht um das Angebot '+d.number+': ')?'<a class="btn g" href="'+waLink('Hallo'+(ownerFirstPub()?' '+ownerFirstPub():'')+', es geht um das Angebot '+d.number+': ')+'" target="_blank" rel="noopener">'+WA_IC+' Per WhatsApp</a>':'')+'</div>'+
       '<div id="accBox" class="hidden"><h3 style="font-size:16px;margin:8px 0 4px">Verbindlich beauftragen</h3>'+
       '<p class="sub" style="font-size:13px">'+(abgelaufen?'Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an – weil es schon abgelaufen ist, schaut '+esc(ownerFirstPub())+' danach noch einmal drüber und meldet sich bei euch.':'Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an – danach ist euer Termin fest reserviert und ihr bekommt eine Bestätigung.')+'</p>'+
       '<label for="accName">Vor- und Nachname</label><input id="accName" autocomplete="name">'+
@@ -1073,7 +1086,7 @@ function loadAccount(){
     return r.json();
   }).then(function(me){
     if(!me)return;
-    ME=me;setDesignKind(me.bookings&&me.bookings[0]&&isTechnikKind(me.bookings[0].kind)?'technik':'dj');renderAccount();
+    ME=me;if(me.company)CO=Object.assign({},CO,me.company);setDesignKind(me.bookings&&me.bookings[0]&&isTechnikKind(me.bookings[0].kind)?'technik':'dj');renderAccount();
   }).catch(function(){renderLogin('Verbindungsfehler – bitte später erneut versuchen.')});
 }
 /* ===== Veranstaltungsplaner =====
@@ -1289,6 +1302,7 @@ function renderAccount(){
     '<p class="sub">Hier findet ihr alle Unterlagen und könnt alles für eure Termine pflegen. <a onclick="logout()" style="cursor:pointer">Abmelden</a></p></div>'+
     '<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Meine Unterlagen</h2>'+docs+rentals+'</div>'+
     profileCard()+
+    contactCard()+
     (forms?'<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Fragebögen</h2>'+forms+'</div>':'')+
     books+
     '<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Fotos &amp; Dokumente</h2>'+
