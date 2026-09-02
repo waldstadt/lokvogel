@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 89;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 90;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -315,6 +315,20 @@ function upgrade(PDO $p): void {
        Version (siehe docVersionTouch). Altbestand bereinigen, der durch die fruehere Logik
        schon "Version 2" trug, ohne je beim Kunden gewesen zu sein. */
     try { $p->exec("update documents set version = 1, version_at = null, version_hash = null where sent_at is null and status = 'entwurf'"); } catch (PDOException $e) {}
+  }
+  if ($v < 90) {
+    /* v90: Die Leiste unter "Ueber mich" beschreibt Markus, nicht sein Lager. Die
+       Technikmarken haben ihre eigene Logo-Leiste; hier standen trotzdem noch die
+       Markennamen aus dem Startbestand. Nur der unveraenderte Startwert wird ersetzt -
+       eigene Eintraege bleiben. */
+    try {
+      $row = $p->query("select value from site_content where key='about'")->fetchColumn();
+      $ab = $row ? json_decode((string)$row, true) : null;
+      if (is_array($ab) && ($ab['gear'] ?? null) === ["Seeburg Acoustic Line","ApeLabs","Sennheiser","Rane","Allen & Heath"]) {
+        $ab['gear'] = ["23 Jahre am Pult","Alle Generationen auf der Tanzfläche","Hochzeiten, Geburtstage, Firmenfeiern","Eigene Ton- und Lichttechnik","Sauerland und ganz NRW"];
+        $p->prepare("update site_content set value = ? where key='about'")->execute([json_encode($ab, JSON_UNESCAPED_UNICODE)]);
+      }
+    } catch (Throwable $e) {}
   }
   if ($v < 88) {
     /* v88: Indizes auf den Spalten, ueber die das Backoffice und das Portal staendig
@@ -2807,7 +2821,7 @@ function seed(PDO $p): void {
 
   foreach ([
     ['hero', '{"title":"DJ Lauschgift","headline":"Volle Tanzfläche.\n*Ohne Schnickschnack.*","scrim":{"mode":"gleich","pct":30},"badges":[{"value": "23", "label": "Jahre hinter den Decks"}, {"value": "Plan B", "label": "immer inklusive"}, {"value": "Seeburg", "label": "Premium-Sound"}],"subtitle":"DJ für Hochzeiten, Geburtstage & Firmenfeiern · deutschlandweit","text":"Ich bin Markus – seit 23 Jahren DJ, quer durch Deutschland unterwegs. Keine Show um meine Person, kein Programm von der Stange: Ich lese den Raum und spiele das, was eure Gäste auf die Tanzfläche bringt. Ihr müsst euch um nichts kümmern – dafür bin ich da.","cta":"Unverbindlich anfragen","image":""}'],
-    ['about', '{"title":"Einfach Markus. Und trotzdem kein Standard-DJ.","gear":["Seeburg Acoustic Line","ApeLabs","Sennheiser","Rane","Allen & Heath"],"text":"Angefangen hat alles mit zwei Plattenspielern und einem alten Mischpult zum 18. Geburtstag. Ein Jahr lang habe ich in der heimischen Garage geübt, bis ich für bekannte DJs das Warm-up in angesagten Clubs übernehmen durfte. Den eigentlichen Wendepunkt gab es aber bei einer ganz anderen Feier: Als meine Tante mich zu ihrem runden Geburtstag fragte, ob ich auch gemischte Musik auflegen könnte, war ich skeptisch – bis Jung und Alt gemeinsam auf der Tanzfläche standen und weitersangen, als ich den Regler runterzog. Seitdem ist mir in 23 Jahren kein einziger Abend langweilig geworden.\\n\\nWas mich von vielen anderen unterscheidet: Ich bin ein echter Technik- und Menschenfreund. Ich nehme euch und eure Gäste bewusst wahr und setze auf Licht- und Tontechnik, die man sonst eher von deutlich größeren Produktionen kennt – weil auch eine Feier mit 40 Gästen großartige Technik verdient. Mein Sound kommt von Seeburg Acoustic Line, einem der deutschen Top-Hersteller für mobile PA-Systeme – das hört man sofort. Dazu passe ich mich flexibel an jede Location an, ob Scheune, Schloss, Industriehalle oder Gartenparty: Ich kenne mein Equipment in- und auswendig und weiß, wie ich jeden Raum klanglich und optisch in Szene setze.","image":"img/markus_1.jpg"}'],
+    ['about', '{"title":"Einfach Markus. Und trotzdem kein Standard-DJ.","gear":["23 Jahre am Pult","Alle Generationen auf der Tanzfläche","Hochzeiten, Geburtstage, Firmenfeiern","Eigene Ton- und Lichttechnik","Sauerland und ganz NRW"],"text":"Angefangen hat alles mit zwei Plattenspielern und einem alten Mischpult zum 18. Geburtstag. Ein Jahr lang habe ich in der heimischen Garage geübt, bis ich für bekannte DJs das Warm-up in angesagten Clubs übernehmen durfte. Den eigentlichen Wendepunkt gab es aber bei einer ganz anderen Feier: Als meine Tante mich zu ihrem runden Geburtstag fragte, ob ich auch gemischte Musik auflegen könnte, war ich skeptisch – bis Jung und Alt gemeinsam auf der Tanzfläche standen und weitersangen, als ich den Regler runterzog. Seitdem ist mir in 23 Jahren kein einziger Abend langweilig geworden.\\n\\nWas mich von vielen anderen unterscheidet: Ich bin ein echter Technik- und Menschenfreund. Ich nehme euch und eure Gäste bewusst wahr und setze auf Licht- und Tontechnik, die man sonst eher von deutlich größeren Produktionen kennt – weil auch eine Feier mit 40 Gästen großartige Technik verdient. Mein Sound kommt von Seeburg Acoustic Line, einem der deutschen Top-Hersteller für mobile PA-Systeme – das hört man sofort. Dazu passe ich mich flexibel an jede Location an, ob Scheune, Schloss, Industriehalle oder Gartenparty: Ich kenne mein Equipment in- und auswendig und weiß, wie ich jeden Raum klanglich und optisch in Szene setze.","image":"img/markus_1.jpg"}'],
     ['services', '{"title":"Das bekommt ihr","text":"Vom Sektempfang bis zum letzten Song: Musik, Ton für die freie Trauung, dezentes Licht passend zur Location – und ein Plan B für alle Fälle. Ihr feiert, ich kümmere mich um den Rest.","image":""}'],
     ['guarantee', '{"title":"Schon ausgebucht? Ihr steht trotzdem nicht ohne DJ da.","text":"Wenn ich an eurem Termin keine Zeit habe – oder merke, dass ich nicht der richtige DJ für eure Feier bin – wähle ich persönlich bis zu fünf Kollegen aus meinem Partner-Netzwerk aus, die wirklich zu euch passen. Keine anonyme Liste: Ich kenne die Kollegen und ihre Stärken, und ihr bekommt die Vorschläge direkt von mir – auch günstigere Optionen sind dabei, falls euer Budget das erfordert. Und Transparenz gehört dazu: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision (Details in den AGB)."}'],
     ['rental', '{"title":"Technik mieten","text":"Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung."}'],

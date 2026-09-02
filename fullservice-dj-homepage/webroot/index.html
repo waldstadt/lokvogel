@@ -743,18 +743,29 @@ function galCleanup(){
 
 /* Auswahl + Rotation: Highlights immer dabei (Position rotiert täglich),
    restliche Plätze aus den Nicht-Highlights – bei rotate täglich weiterrückend. */
-function pickRotate(list,maxCount,rotate,seed){
+/* hasImg (optional): Einträge mit Bild bekommen die freien Plätze zuerst - eine
+   Kachel mit Foto wirkt mehr als drei mit Platzhalter-Icon. Erst wenn alle bebilderten
+   Einträge drin sind, füllen die ohne Bild auf; innerhalb jeder Gruppe wie bisher. */
+function pickRotate(list,maxCount,rotate,seed,hasImg){
   var sd=seed!=null?seed:DAY_SEED;
   var highs=[],rest=[];
   (list||[]).forEach(function(x){(x&&x.highlight?highs:rest).push(x)});
   var max=Number(maxCount)||0;
   var slots=max>0?Math.max(0,max-highs.length):rest.length;
   var chosen=[];
-  if(slots>=rest.length){chosen=rest.slice()}
-  else if(rotate){
-    var off=rest.length?sd%rest.length:0;
-    for(var i=0;i<slots;i++)chosen.push(rest[(off+i)%rest.length]);
-  }else{chosen=rest.slice(0,slots)}
+  function take(pool,n){
+    if(n<=0||!pool.length)return [];
+    if(n>=pool.length)return pool.slice();
+    if(!rotate)return pool.slice(0,n);
+    var out=[],off=sd%pool.length;
+    for(var i=0;i<n;i++)out.push(pool[(off+i)%pool.length]);
+    return out;
+  }
+  if(hasImg){
+    var mit=rest.filter(hasImg),ohne=rest.filter(function(x){return !hasImg(x)});
+    chosen=take(mit,slots);
+    chosen=chosen.concat(take(ohne,slots-chosen.length));
+  }else chosen=take(rest,slots);
   var out=chosen.slice();
   highs.forEach(function(h,idx){
     out.splice((sd+idx)%(out.length+1),0,h);
@@ -1165,7 +1176,7 @@ function renderReviews(){
 }
 function renderLocations(){
   if(!LOC_DATA||!LOC_DATA.length)return;
-  var sel=pickRotate(LOC_DATA,LOC_CFG.max_count,LOC_CFG.rotate,VISIT_SEED);
+  var sel=pickRotate(LOC_DATA,LOC_CFG.max_count,LOC_CFG.rotate,VISIT_SEED,function(l){return !!(l.image_url&&(l.image_source!=='web'||l.image_approved))});
   document.getElementById('locGrid').innerHTML=sel.map(function(l){
     var showImg=l.image_url&&(l.image_source!=='web'||l.image_approved);
     var img=showImg?' style="background-image:url(\''+cssUrl(l.image_url)+'\');background-position:'+cssUrl(l.image_focal||'50% 50%')+'"':'';
