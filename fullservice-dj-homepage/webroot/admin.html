@@ -8212,15 +8212,35 @@ function mpAnsichtSetzen(a){try{localStorage.setItem('mp_ansicht',a)}catch(e){}M
 function loadMediaPage(){
   document.getElementById('mediaPgGrid').textContent='Lade Medien \u2026';
   fetch(API+'/media/list'+(MP_ARCHIV?'?archiv=1':''),{headers:{Authorization:'Bearer '+TOKEN}})
-    .then(function(r){if(!r.ok)throw new Error('list');return r.json()})
+    .then(function(r){
+      if(!r.ok)return r.text().then(function(t){var m='';try{m=JSON.parse(t).error||''}catch(e){m=t.slice(0,160)}
+        throw new Error('Server antwortet mit '+r.status+(m?': '+m:''))});
+      return r.json();
+    })
     .then(function(d){
       /* Aeltere Antwort war eine reine Liste - beides annehmen, dann macht ein halb
          aktualisierter Server keinen leeren Pool. */
       if(Array.isArray(d)){MEDIA_PG_LIST=d;MEDIA_ORDNER=[];MEDIA_ARCHIV_N=0}
       else{MEDIA_PG_LIST=d.files||[];MEDIA_ORDNER=d.folders||[];MEDIA_ARCHIV_N=d.archiv_anzahl||0}
-      MP_SEL={};renderMediaPage();
+      MP_SEL={};MP_FEHLER='';renderMediaPage();
+      if(d&&d.dir_ok===false)toast('Der Ordner uploads/ ist auf dem Server nicht lesbar \u2013 bitte Rechte pr\u00fcfen.',1);
+      mpBilderPruefen();
     })
-    .catch(function(){MEDIA_PG_LIST=[];renderMediaPage()});
+    /* Ein Fehler darf nicht wie ein leerer Pool aussehen - sonst sucht man an der
+       falschen Stelle. Die echte Meldung steht jetzt im Pool. */
+    .catch(function(e){MEDIA_PG_LIST=[];MP_FEHLER=e.message||'Unbekannter Fehler';renderMediaPage()});
+}
+var MP_FEHLER='';
+/* Liefert der Server die Liste, aber die Bilder selbst nicht (z. B. 500 aus einer
+   kaputten .htaccess in uploads/), sah der Pool wie leer aus. Erste Datei laden und
+   bei Fehler deutlich sagen, was los ist. */
+function mpBilderPruefen(){
+  var m=MEDIA_PG_LIST.filter(function(x){return x.kind==='bild'})[0];if(!m)return;
+  fetch(m.url,{method:'HEAD',cache:'no-store'}).then(function(r){
+    if(r.ok)return;
+    var g=document.getElementById('mediaPgGrid');if(!g)return;
+    g.insertAdjacentHTML('afterbegin','<div class="card" style="border-color:var(--red);margin-bottom:12px"><b>Die Dateien liegen auf dem Server, lassen sich aber nicht laden</b> (Antwort '+r.status+' f\u00fcr '+esc(m.url)+'). Meist steckt eine .htaccess im Ordner uploads/ dahinter \u2013 einmal im Backoffice neu laden, dann tauscht der Server sie aus. Bleibt es dabei: Ordnerrechte pr\u00fcfen.</div>');
+  }).catch(function(){});
 }
 function mediaPgUpload(inp){
   var ziel=MP_ORDNER==='__alle__'?'':MP_ORDNER;
@@ -8380,6 +8400,10 @@ function renderMediaPage(){
   renderMediaBar();renderMediaSel();
   var g=document.getElementById('mediaPgGrid');if(!g)return;
   var liste=mpGefiltert();
+  if(MP_FEHLER){
+    g.innerHTML='<div class="card" style="border-color:var(--red)"><b>Medien konnten nicht geladen werden.</b><br><span class="mut">'+esc(MP_FEHLER)+'</span><br><button class="btn g sm" style="margin-top:8px" onclick="loadMediaPage()">Erneut versuchen</button></div>';
+    return;
+  }
   if(!liste.length){
     g.innerHTML='<span class="mut">'+(MEDIA_PG_LIST.length
       ?'Nichts gefunden \u2013 andere Suche, anderer Ordner oder andere Dateiart.'
