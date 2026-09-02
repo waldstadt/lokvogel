@@ -461,6 +461,10 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
           <label for="wsQ3">Was willst du aus dem Workshop mitnehmen?</label><input id="wsQ3" placeholder="z. B. Meine Anlage endlich selbst sauber einstellen können …">
         </div>
         <label for="wsNote">Nachricht (optional)</label><input id="wsNote" placeholder="Sonst noch etwas?">
+        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:16px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--mut)">
+          <input type="checkbox" id="wsConsent" style="width:auto;margin-top:3px;flex:none">
+          <span>Ich habe die <a href="index.html#agb" target="_blank" rel="noopener">AGB</a> und die <a href="index.html#datenschutz" target="_blank" rel="noopener">Datenschutzerklärung</a> gelesen und bin einverstanden. *</span>
+        </label>
         <div style="margin-top:16px;display:flex;gap:10px">
           <button class="btn" id="wsSend" onclick="sendWs()">Platz verbindlich reservieren</button>
           <button class="btn ghost" onclick="document.getElementById('wsForm').style.display='none'">Abbrechen</button>
@@ -811,6 +815,13 @@ function openWsForm(i,wl){
   document.getElementById('wsSend').textContent=wsWl?'Auf die Warteliste setzen':'Platz verbindlich reservieren';
   var m=document.getElementById('wsMsg');m.style.display='none';
   document.getElementById('wsFields').style.display='';
+  /* Nie mehr Plätze anbieten, als am Termin noch frei sind - auf der Warteliste (kein
+     Kapazitätslimit mehr relevant) gilt weiterhin die Obergrenze von 5 aus dem Server. */
+  var max=wsWl?5:Math.max(1,Math.min(Number(wsSel.free)||1,5));
+  var sel=document.getElementById('wsSeats'),opts='';
+  for(var n=1;n<=max;n++)opts+='<option value="'+n+'">'+n+'</option>';
+  sel.innerHTML=opts;
+  document.getElementById('wsConsent').checked=false;
   wsApplyMode();
   var f=document.getElementById('wsForm');f.style.display='';
   f.scrollIntoView({behavior:'smooth',block:'center'});
@@ -839,6 +850,7 @@ function sendWs(){
   if(!name||!mail){err('Bitte Name und E-Mail angeben.');return}
   var street=document.getElementById('wsStreet').value.trim(),zip=document.getElementById('wsZip').value.trim(),city=document.getElementById('wsCity').value.trim();
   if(wsNeedsAddr()&&(!street||!zip||!city)){err('Bitte Anschrift angeben (Straße, PLZ, Ort) – sie wird für die Rechnung benötigt.');return}
+  if(!document.getElementById('wsConsent').checked){err('Bitte AGB und Datenschutzerklärung bestätigen.');return}
   var q1=document.getElementById('wsQ1').value.trim(),q2=document.getElementById('wsQ2').value.trim(),q3=document.getElementById('wsQ3').value.trim();
   if(btn.disabled)return;   /* Doppelklick: die erste Anmeldung ist noch unterwegs */
   btn.disabled=true;var btnText=btn.textContent;btn.textContent='Wird gesendet …';
@@ -846,7 +858,7 @@ function sendWs(){
     body:JSON.stringify({name:name,email:mail,phone:document.getElementById('wsPhone').value.trim(),
       seats:Number(document.getElementById('wsSeats').value)||1,message:document.getElementById('wsNote').value.trim(),
       street:street,zip:zip,city:city,
-      q_music:q1,q_challenge:q2,q_goal:q3,waitlist:wsWl})})
+      q_music:q1,q_challenge:q2,q_goal:q3,waitlist:wsWl,consent:true})})
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
       if(res.s===409&&/Plätze|Platz frei|ausgebucht/.test(res.j.error||'')){

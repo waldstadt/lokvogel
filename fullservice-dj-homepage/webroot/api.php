@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 96;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 97;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1013,6 +1013,13 @@ function upgrade(PDO $p): void {
        selbst liegen wie "ai"/"notify" nur in settings (kein Schema-Bedarf dafuer). */
     try { $p->exec(mailInboxDdl()); } catch (Throwable $e) {}
   }
+  if ($v < 97) {
+    /* v97: Workshop-Infoblatt (optionales PDF am Termin, wird der automatischen Rechnung
+       angehaengt) - Dateiname im Datenspeicher (info_file) und Original-Anzeigename
+       (info_name), gleiches Muster wie equipment.invoice_file/invoice_name. */
+    try { $p->exec("alter table workshop_events add column info_file text"); } catch (PDOException $e) {}
+    try { $p->exec("alter table workshop_events add column info_name text"); } catch (PDOException $e) {}
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1844,7 +1851,7 @@ function workshopsDdl(): array {
     "create table if not exists workshop_events (id text primary key, sort integer default 0,
       title text not null, description text, long_description text, audience text default '', event_date text not null, start_time text, end_time text,
       location text, price_net real, capacity integer default 8, public integer default 0,
-      image_url text, image_focal text default '50% 50%', created_at text)",
+      image_url text, image_focal text default '50% 50%', info_file text, info_name text, created_at text)",
     "create table if not exists workshop_signups (id text primary key,
       workshop_id text not null references workshop_events(id) on delete cascade,
       name text not null, email text, phone text, seats integer default 1, message text,
@@ -3186,7 +3193,7 @@ function seed(PDO $p): void {
       'datenschutz' => datenschutzText(),
       'reviewed' => false,
       'widerrufsformular' => widerrufsformularText([]),
-      'agb' => agbIntro() . "Allgemeine Geschäftsbedingungen (AGB)\n\n1. Geltungsbereich\nDiese AGB gelten ausschließlich für Verträge über DJ-Leistungen und Technikvermietung, die unmittelbar mit Markus Jankowski (DJ Lauschgift), Büttmecker Weg 35c, 58675 Hemer, geschlossen werden.\n\nSie gelten nicht für Verträge, die der Auftraggeber mit anderen DJs schließt – etwa nach einer Empfehlung bzw. Vermittlung über die Partner-Agentur (vgl. Ziffer 6) oder direkt mit dem jeweiligen DJ. Für solche Verträge gelten allein die Bedingungen des jeweiligen DJs bzw. der Agentur; der Auftragnehmer ist an diesen Verträgen nicht beteiligt und übernimmt für deren Inhalt und Erfüllung keine Haftung.\n\n2. Angebot und Vertragsschluss\nAngebote sind freibleibend. Der Vertrag kommt mit schriftlicher Bestätigung (auch per E-Mail) zustande. Erst mit der Bestätigung ist der Termin verbindlich reserviert.\n\n3. Preise\nDie Vergütung richtet sich nach Auslastung, Arbeitsstunden und technischem Aufwand der jeweiligen Veranstaltung; eine Unterscheidung nach Anlass (z. B. Hochzeit, Geburtstag, Firmenfeier) findet nicht statt. Alle Posten werden im Angebot ausgewiesen.\n\n4. Ausfall des Auftragnehmers und Ersatz (Plan B)\nFällt der Auftragnehmer aus (z. B. durch Krankheit), verpflichtet er sich, sich im Rahmen seiner Möglichkeiten um einen geeigneten Ersatz-DJ aus seinem Kollegen-Netzwerk zu bemühen und diesen dem Auftraggeber unverzüglich vorzuschlagen.\n\nDer Vorschlag ist für den Auftraggeber unverbindlich: Er kann frei entscheiden, ob er den vorgeschlagenen Ersatz-DJ beauftragt oder vom Vertrag zurücktritt. Bei Rücktritt werden bereits geleistete Zahlungen vollständig erstattet; weitergehende Ansprüche bestehen nur bei Vorsatz oder grober Fahrlässigkeit.\n\nEntscheidet sich der Auftraggeber für den Ersatz-DJ, kommt der Vertrag über dessen Leistung direkt mit dem Ersatz-DJ zustande. Wichtig: Der Ersatz-DJ rechnet zu seinen eigenen Preisen ab – der Endpreis kann daher vom ursprünglich vereinbarten Preis abweichen. Auch der Leistungsumfang, insbesondere die mitgeführte Ton- und Lichttechnik, kann vom Angebot des Auftragnehmers abweichen. Bereits an den Auftragnehmer geleistete Zahlungen werden in diesem Fall erstattet bzw. verrechnet.\n\n5. Stornierung durch den Auftraggeber\nSagt der Auftraggeber die Veranstaltung ab, kann kurzfristig in der Regel kein Ersatzauftrag mehr angenommen werden – insbesondere innerhalb von sechs Wochen vor dem Termin ist eine Neubelegung praktisch ausgeschlossen. Daher gilt folgende pauschale Ausfallvergütung (jeweils bezogen auf die vereinbarte Nettovergütung):\n– Absage bis 6 Monate vor dem Termin: 20 %\n– Absage bis 3 Monate vor dem Termin: 40 %\n– Absage bis 6 Wochen vor dem Termin: 60 %\n– Absage weniger als 6 Wochen vor dem Termin: 80 %\n– Absage weniger als 7 Tage vor dem Termin oder Nichtabnahme: 90 %\nErsparte Aufwendungen (z. B. nicht anfallende Fahrtkosten sowie stornierbare Übernachtungskosten) werden angerechnet und von der Ausfallvergütung abgezogen. Dem Auftraggeber bleibt der Nachweis unbenommen, dass kein oder ein wesentlich geringerer Schaden entstanden ist. Gelingt es dem Auftragnehmer, für den Termin einen gleichwertigen Ersatzauftrag anzunehmen, entfällt die Ausfallvergütung bis auf bereits entstandene Kosten. Maßgeblich für die Staffel ist der Zugang der Absage in Textform.\n\nUmbuchung auf einen Ersatztermin: Einigen sich beide Seiten auf einen Ersatztermin, kann der Auftragnehmer anstelle der Ausfallvergütung eine reduzierte Umbuchungspauschale ansetzen; bereits entstandene Kosten (z. B. nicht stornierbare Auslagen) werden zusätzlich berechnet. Die Umbuchung ist eine reine Kulanzregelung des Auftragnehmers: Ein Anspruch auf einen Ersatztermin oder auf eine reduzierte Pauschale besteht nicht. Ob und zu welchen Konditionen umgebucht wird, entscheidet der Auftragnehmer frei im Einzelfall – insbesondere abhängig von seiner Verfügbarkeit am Wunschtermin, davon, ob der ursprüngliche Termin anderweitig belegt werden kann, und vom Buchungswert des Ersatztermins.\n\n6. DJ-Vermittlung über Partner-Agentur\nIst der Auftragnehmer am gewünschten Termin verhindert oder kommt eine Zusammenarbeit aus anderen Gründen nicht zustande, kann er dem Interessenten auf Wunsch bis zu fünf passende DJs vorschlagen. Diese Empfehlung ist eine reine Vermittlungsleistung des Auftragnehmers und für den Interessenten kostenlos – sie wird ihm nicht in Rechnung gestellt.\n\nDie Vermittlung erfolgt über die Partner-Agentur DJ Bande (Münster). Der Vertrag über die DJ-Leistung kommt ausschließlich zwischen dem Interessenten und dem vermittelten DJ bzw. der Agentur zustande; die Abrechnung der DJ-Leistung erfolgt nicht über den Auftragnehmer. Die Vermittlungsleistung finanziert sich dadurch, dass der Auftragnehmer für eine erfolgreich zustande gekommene Vermittlung eine Aufwandsentschädigung (Provision) von der Agentur bzw. dem vermittelten DJ erhält. Für den Interessenten entstehen dadurch keine zusätzlichen Kosten. Die auf dieser Website genannten Preise und Preisbeispiele gelten ausschließlich für Leistungen des Auftragnehmers selbst; vermittelte DJs kalkulieren ihre Vergütung eigenständig, deren Konditionen können abweichen.\n\n7. Widerrufsrecht\nBei der Buchung von DJ- und Veranstaltungstechnik-Leistungen für einen bestimmten Termin besteht kein Widerrufsrecht. Gemäß § 312g Abs. 2 Nr. 9 BGB ist das Widerrufsrecht ausgeschlossen bei Verträgen zur Erbringung von Dienstleistungen im Zusammenhang mit Freizeitbetätigungen, wenn der Vertrag für die Erbringung einen spezifischen Termin oder Zeitraum vorsieht. Jede Buchung ist daher rechtsverbindlich und verpflichtet zur Abnahme und Bezahlung der Leistung.\n\nSofern eine Buchung im Einzelfall nicht unter § 312g Abs. 2 Nr. 9 BGB fallen sollte, gilt für Verbraucher: Sie haben das Recht, binnen vierzehn Tagen ab Vertragsschluss diesen Vertrag ohne Angabe von Gründen zu widerrufen. Der Widerruf ist zu richten an: Markus Jankowski, Büttmecker Weg 35c, 58675 Hemer (oder per E-Mail an die im Impressum genannte Adresse).\n\n8. Technikvermietung\nMietpreise gelten pro Miettag (24 Stunden); jeder Folgetag wird mit 50 % des Grundpreises berechnet. Der Mieter haftet für Verlust und Beschädigung der Mietsachen ab Übergabe bis zur Rückgabe.\n\n9. Zahlungsbedingungen\nRechnungen sind, sofern nicht anders vereinbart, innerhalb von 14 Tagen ohne Abzug zahlbar. Bei Buchungen kann eine Abschlagszahlung vereinbart werden.\n\n10. Schlussbestimmungen\nEs gilt deutsches Recht. Sollten einzelne Bestimmungen unwirksam sein, bleibt der Vertrag im Übrigen wirksam.\n\nStand: August 2026.",
+      'agb' => agbIntro() . "Allgemeine Geschäftsbedingungen (AGB)\n\n1. Geltungsbereich\nDiese AGB gelten ausschließlich für Verträge über DJ-Leistungen, Technikvermietung und Workshops, die unmittelbar mit Markus Jankowski (DJ Lauschgift), Büttmecker Weg 35c, 58675 Hemer, geschlossen werden.\n\nSie gelten nicht für Verträge, die der Auftraggeber mit anderen DJs schließt – etwa nach einer Empfehlung bzw. Vermittlung über die Partner-Agentur (vgl. Ziffer 6) oder direkt mit dem jeweiligen DJ. Für solche Verträge gelten allein die Bedingungen des jeweiligen DJs bzw. der Agentur; der Auftragnehmer ist an diesen Verträgen nicht beteiligt und übernimmt für deren Inhalt und Erfüllung keine Haftung.\n\n2. Angebot und Vertragsschluss\nAngebote sind freibleibend. Der Vertrag kommt mit schriftlicher Bestätigung (auch per E-Mail) zustande. Erst mit der Bestätigung ist der Termin verbindlich reserviert.\n\n3. Preise\nDie Vergütung richtet sich nach Auslastung, Arbeitsstunden und technischem Aufwand der jeweiligen Veranstaltung; eine Unterscheidung nach Anlass (z. B. Hochzeit, Geburtstag, Firmenfeier) findet nicht statt. Alle Posten werden im Angebot ausgewiesen.\n\n4. Ausfall des Auftragnehmers und Ersatz (Plan B)\nFällt der Auftragnehmer aus (z. B. durch Krankheit), verpflichtet er sich, sich im Rahmen seiner Möglichkeiten um einen geeigneten Ersatz-DJ aus seinem Kollegen-Netzwerk zu bemühen und diesen dem Auftraggeber unverzüglich vorzuschlagen.\n\nDer Vorschlag ist für den Auftraggeber unverbindlich: Er kann frei entscheiden, ob er den vorgeschlagenen Ersatz-DJ beauftragt oder vom Vertrag zurücktritt. Bei Rücktritt werden bereits geleistete Zahlungen vollständig erstattet; weitergehende Ansprüche bestehen nur bei Vorsatz oder grober Fahrlässigkeit.\n\nEntscheidet sich der Auftraggeber für den Ersatz-DJ, kommt der Vertrag über dessen Leistung direkt mit dem Ersatz-DJ zustande. Wichtig: Der Ersatz-DJ rechnet zu seinen eigenen Preisen ab – der Endpreis kann daher vom ursprünglich vereinbarten Preis abweichen. Auch der Leistungsumfang, insbesondere die mitgeführte Ton- und Lichttechnik, kann vom Angebot des Auftragnehmers abweichen. Bereits an den Auftragnehmer geleistete Zahlungen werden in diesem Fall erstattet bzw. verrechnet.\n\n5. Stornierung durch den Auftraggeber\nSagt der Auftraggeber die Veranstaltung ab, kann kurzfristig in der Regel kein Ersatzauftrag mehr angenommen werden – insbesondere innerhalb von sechs Wochen vor dem Termin ist eine Neubelegung praktisch ausgeschlossen. Daher gilt folgende pauschale Ausfallvergütung (jeweils bezogen auf die vereinbarte Nettovergütung):\n– Absage bis 6 Monate vor dem Termin: 20 %\n– Absage bis 3 Monate vor dem Termin: 40 %\n– Absage bis 6 Wochen vor dem Termin: 60 %\n– Absage weniger als 6 Wochen vor dem Termin: 80 %\n– Absage weniger als 7 Tage vor dem Termin oder Nichtabnahme: 90 %\nErsparte Aufwendungen (z. B. nicht anfallende Fahrtkosten sowie stornierbare Übernachtungskosten) werden angerechnet und von der Ausfallvergütung abgezogen. Dem Auftraggeber bleibt der Nachweis unbenommen, dass kein oder ein wesentlich geringerer Schaden entstanden ist. Gelingt es dem Auftragnehmer, für den Termin einen gleichwertigen Ersatzauftrag anzunehmen, entfällt die Ausfallvergütung bis auf bereits entstandene Kosten. Maßgeblich für die Staffel ist der Zugang der Absage in Textform.\n\nUmbuchung auf einen Ersatztermin: Einigen sich beide Seiten auf einen Ersatztermin, kann der Auftragnehmer anstelle der Ausfallvergütung eine reduzierte Umbuchungspauschale ansetzen; bereits entstandene Kosten (z. B. nicht stornierbare Auslagen) werden zusätzlich berechnet. Die Umbuchung ist eine reine Kulanzregelung des Auftragnehmers: Ein Anspruch auf einen Ersatztermin oder auf eine reduzierte Pauschale besteht nicht. Ob und zu welchen Konditionen umgebucht wird, entscheidet der Auftragnehmer frei im Einzelfall – insbesondere abhängig von seiner Verfügbarkeit am Wunschtermin, davon, ob der ursprüngliche Termin anderweitig belegt werden kann, und vom Buchungswert des Ersatztermins.\n\n6. DJ-Vermittlung über Partner-Agentur\nIst der Auftragnehmer am gewünschten Termin verhindert oder kommt eine Zusammenarbeit aus anderen Gründen nicht zustande, kann er dem Interessenten auf Wunsch bis zu fünf passende DJs vorschlagen. Diese Empfehlung ist eine reine Vermittlungsleistung des Auftragnehmers und für den Interessenten kostenlos – sie wird ihm nicht in Rechnung gestellt.\n\nDie Vermittlung erfolgt über die Partner-Agentur DJ Bande (Münster). Der Vertrag über die DJ-Leistung kommt ausschließlich zwischen dem Interessenten und dem vermittelten DJ bzw. der Agentur zustande; die Abrechnung der DJ-Leistung erfolgt nicht über den Auftragnehmer. Die Vermittlungsleistung finanziert sich dadurch, dass der Auftragnehmer für eine erfolgreich zustande gekommene Vermittlung eine Aufwandsentschädigung (Provision) von der Agentur bzw. dem vermittelten DJ erhält. Für den Interessenten entstehen dadurch keine zusätzlichen Kosten. Die auf dieser Website genannten Preise und Preisbeispiele gelten ausschließlich für Leistungen des Auftragnehmers selbst; vermittelte DJs kalkulieren ihre Vergütung eigenständig, deren Konditionen können abweichen.\n\n7. Widerrufsrecht\nBei der Buchung von DJ- und Veranstaltungstechnik-Leistungen sowie Workshops für einen bestimmten Termin besteht kein Widerrufsrecht. Gemäß § 312g Abs. 2 Nr. 9 BGB ist das Widerrufsrecht ausgeschlossen bei Verträgen zur Erbringung von Dienstleistungen im Zusammenhang mit Freizeitbetätigungen, wenn der Vertrag für die Erbringung einen spezifischen Termin oder Zeitraum vorsieht – ein Workshop zu einem festen Termin fällt genauso darunter wie eine DJ-Buchung. Jede Buchung ist daher rechtsverbindlich und verpflichtet zur Abnahme und Bezahlung der Leistung.\n\nSofern eine Buchung im Einzelfall nicht unter § 312g Abs. 2 Nr. 9 BGB fallen sollte, gilt für Verbraucher: Sie haben das Recht, binnen vierzehn Tagen ab Vertragsschluss diesen Vertrag ohne Angabe von Gründen zu widerrufen. Der Widerruf ist zu richten an: Markus Jankowski, Büttmecker Weg 35c, 58675 Hemer (oder per E-Mail an die im Impressum genannte Adresse).\n\n8. Technikvermietung\nMietpreise gelten pro Miettag (24 Stunden); jeder Folgetag wird mit 50 % des Grundpreises berechnet. Der Mieter haftet für Verlust und Beschädigung der Mietsachen ab Übergabe bis zur Rückgabe.\n\n9. Zahlungsbedingungen\nRechnungen sind, sofern nicht anders vereinbart, innerhalb von 14 Tagen ohne Abzug zahlbar. Bei Buchungen kann eine Abschlagszahlung vereinbart werden.\n\n10. Schlussbestimmungen\nEs gilt deutsches Recht. Sollten einzelne Bestimmungen unwirksam sein, bleibt der Vertrag im Übrigen wirksam.\n\nStand: September 2026.",
     ], JSON_UNESCAPED_UNICODE)],
   ] as [$k, $v]) $p->prepare('insert into site_content (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
 
@@ -3587,6 +3594,11 @@ function syncContactFromCompany(PDO $p, array $company): void {
 
 function handleRest(string $t, string $method, array $q, $body, array $prefer): never {
   if (!in_array($t, TABLES)) fail('Unbekannte Tabelle.', 404);
+  /* Lazy-Bereinigung abgelaufener Workshop-Reservierungen, bevor die Liste gelesen wird -
+     das Backoffice soll nie eine laengst abgelaufene Anmeldung noch als 'angemeldet' zeigen. */
+  if ($method === 'GET' && ($t === 'workshop_signups' || $t === 'workshop_events')) {
+    try { wsExpireStale(db()); } catch (Throwable $e) {}
+  }
   $auth = currentUser() !== null;
   $p = db();
 
@@ -4475,12 +4487,16 @@ function legacyMailSend(string $to, string $subject, string $bodyText): array {
   $ok = @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $bodyText, $headers);
   return $ok ? ['ok' => true] : ['ok' => false, 'error' => 'Der Server konnte die Mail nicht annehmen (PHP mail()) – kein E-Mail-Konto eingerichtet.'];
 }
-function sendMailSafe(string $to, string $subject, string $bodyText): bool {
+/* $attachments: optionale Liste [['name'=>...,'mime'=>...,'data'=>Binaerinhalt], ...] -
+   geht nur raus, wenn ein SMTP-Konto eingerichtet ist (smtpSend baut echtes MIME). Der
+   alte mail()-Fallback ohne Konto kennt keine Anhaenge (siehe legacyMailSend) - dort
+   kommt weiterhin nur der Text an, das ist bewusst kein Rueckschritt gegenueber vorher. */
+function sendMailSafe(string $to, string $subject, string $bodyText, array $attachments = []): bool {
   $sys = mailAccount('system');
   if ($sys !== null) {
     $personal = mailAccount('personal');
     $replyTo = $personal['email'] ?? null;
-    $r = smtpSend($sys, $to, $subject, $bodyText, null, [], $replyTo, null, null);
+    $r = smtpSend($sys, $to, $subject, $bodyText, null, $attachments, $replyTo, null, null);
     if ($r['ok']) mailState(['last_ok_at' => now(), 'last_error' => null, 'last_error_at' => null]);
     else mailState(['last_error' => $r['error'], 'last_error_at' => now()]);
     return $r['ok'];
@@ -4538,9 +4554,52 @@ function workshopCustomer(PDO $p, array $s): array {
   return [$cid, $custZip];
 }
 
+/* Reservierungsfrist einer Workshop-Anmeldung: 5 Tage ab der Anmeldung. Kommt in dieser
+   Zeit keine Zahlung rein, ist der Platz weg - genau wie eine bewusste Absage, nur mit
+   eigenem Status 'abgelaufen' (nicht 'storniert'), damit im Backoffice sichtbar bleibt,
+   WARUM der Platz wieder frei ist. Kostenlose Termine (kein Preis hinterlegt) kennen
+   keine Rechnung und damit auch keine Zahlungsfrist - die bleiben angemeldet.
+   Lazy statt Cron: wird bei jedem Lesezugriff aufgerufen, der die Kapazitaet oder die
+   Anmeldungsliste braucht (genau das Muster, nach dem auch ein abgelaufenes Angebot erst
+   beim naechsten Zugriff als 'abgelaufen' erkannt wird, siehe docAcceptKind()). */
+const WORKSHOP_RESERVE_DAYS = 5;
+function wsExpireStale(PDO $p): void {
+  $cutoff = gmdate('Y-m-d\TH:i:s\Z', time() - WORKSHOP_RESERVE_DAYS * 86400);
+  /* Frist zaehlt ab der Rechnung, nicht zwingend ab der urspruenglichen Anmeldung: Wer von
+     der Warteliste nachrueckt, bekommt seine Rechnung erst bei der Beforderung - die 5 Tage
+     sollen ab dann laufen, sonst waere die Reservierung bei einer alten Wartelisten-Anmeldung
+     schon im Moment des Nachrueckens abgelaufen. Ohne Rechnung (z. B. manuell ohne sofortige
+     Rechnung erfasst) zaehlt weiterhin die Anmeldung selbst. */
+  $rows = $p->prepare("select s.*, w.title as w_title, w.event_date as w_date
+      from workshop_signups s join workshop_events w on w.id = s.workshop_id
+      left join documents d on d.id = s.invoice_id
+      where s.status = 'angemeldet' and coalesce(d.created_at, s.created_at) < ? and coalesce(w.price_net, 0) > 0
+        and (s.invoice_id is null or coalesce(d.status, '') != 'bezahlt')");
+  $rows->execute([$cutoff]);
+  foreach ($rows->fetchAll() as $s) {
+    $p->prepare("update workshop_signups set status = 'abgelaufen' where id = ?")->execute([$s['id']]);
+    $wDateDe = deDate((string)$s['w_date']);
+    [$cid] = workshopCustomer($p, $s);
+    $cst = $p->prepare('select first_name, kind from customers where id = ?'); $cst->execute([$cid]);
+    $anrede = anredeFor(($cst->fetch() ?: []) + ['name' => (string)$s['name']]);
+    $subject = 'Deine Reservierung für den Workshop „' . $s['w_title'] . '“ ist abgelaufen';
+    $bodyT = "$anrede,\n\ndeine Reservierung für den Workshop „" . $s['w_title'] . "“ am $wDateDe ist leider abgelaufen, weil die Rechnung nicht bezahlt wurde. Der Platz ist jetzt wieder frei.\n\nMeld dich gern, falls noch Interesse besteht – ich schaue dann, ob noch etwas frei ist.\n\nViele Grüße\n" . ownerFirst();
+    $mailed = trim((string)$s['email']) !== '' && sendMailSafe((string)$s['email'], $subject, $bodyT);
+    $p->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, created_at)
+        values (?,?,?,?,?,?,?,?)')
+      ->execute([uuid(), $cid, $mailed ? 'email' : 'note', 'out',
+        'Workshop-Reservierung abgelaufen: ' . $s['w_title'],
+        'Anmeldung vom ' . date('d.m.Y', strtotime((string)$s['created_at'])) . ' zum Workshop „' . $s['w_title'] . '“ am ' . $wDateDe .
+        ' wurde nach ' . WORKSHOP_RESERVE_DAYS . ' Tagen ohne Zahlungseingang automatisch auf "abgelaufen" gesetzt und der Platz freigegeben.' .
+        ($mailed ? '' : ' Mail an ' . $s['email'] . ' konnte nicht zugestellt werden.'),
+        now(), now()]);
+  }
+}
+
 /* Erstellt (einmalig) die Rechnung zu einer Workshop-Anmeldung und mailt den Portal-Link. */
 function workshopInvoice(PDO $p, string $signupId, bool $quiet = false): array {
-  $st = $p->prepare('select s.*, w.title as w_title, w.event_date as w_date, w.price_net as w_price
+  $st = $p->prepare('select s.*, w.title as w_title, w.event_date as w_date, w.price_net as w_price,
+    w.start_time as w_start, w.location as w_loc, w.info_file as w_info_file, w.info_name as w_info_name
     from workshop_signups s join workshop_events w on w.id = s.workshop_id where s.id = ?');
   $st->execute([$signupId]);
   $s = $st->fetch();
@@ -4583,7 +4642,11 @@ function workshopInvoice(PDO $p, string $signupId, bool $quiet = false): array {
     if ($s['w_date'] && $s['w_date'] > gmdate('Y-m-d') && $s['w_date'] < $due) $due = $s['w_date'];
     /* Deutsches Datumsformat: Auf einer Kundenrechnung hat "2026-10-15" nichts zu suchen. */
     $wDateDe = $s['w_date'] ? date('d.m.Y', strtotime((string)$s['w_date'])) : '';
+    $wZeit = $s['w_start'] ? substr((string)$s['w_start'], 0, 5) . ' Uhr' : '';
     $dTitle = $s['w_title'] . ($wDateDe ? ' am ' . $wDateDe : '');
+    /* Termin und Ort stehen jetzt auf der Rechnung selbst (nicht nur im Titel) - sonst
+       stand da nur "Workshop XY am 12.03.2026", ohne Uhrzeit und ohne Adresse. */
+    $terminZeile = 'Termin: ' . $wDateDe . ($wZeit ? ', ' . $wZeit : '') . ' · Ort: ' . ($s['w_loc'] ?: '–');
     $docId = uuid(); $token = bin2hex(random_bytes(24));
     /* price_mode ausdruecklich mitgeben: ohne den Wert greift der alte Spalten-Standard
        'netto', und die Workshop-Rechnung stuende als einzige netto da, obwohl alle Preise
@@ -4593,11 +4656,12 @@ function workshopInvoice(PDO $p, string $signupId, bool $quiet = false): array {
         values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
       ->execute([$docId, $token, 'rechnung', $number, $cid, 'entwurf', gmdate('Y-m-d'), $due,
         $rate, $small ? 1 : 0, 'brutto',
-        'vielen Dank für deine Anmeldung zum Workshop „' . $s['w_title'] . '“. Mit Zahlungseingang ist dein Platz verbindlich reserviert.',
+        'vielen Dank für deine Anmeldung zum Workshop „' . $s['w_title'] . '“. Mit Zahlungseingang ist dein Platz verbindlich reserviert.' .
+        "\n" . $terminZeile,
         (string)($defs['invoice_outro'] ?? ''), $net, $tax, $gross, now()]);
     $p->prepare('insert into document_items (id, document_id, pos, description, qty, unit, unit_price)
         values (?,?,?,?,?,?,?)')
-      ->execute([uuid(), $docId, 1, 'Workshop: ' . $dTitle . ' – Teilnahme', $seats, $seats > 1 ? 'Plätze' : 'Platz', $price]);
+      ->execute([uuid(), $docId, 1, 'Workshop: ' . $dTitle . ($wZeit ? ', ' . $wZeit : '') . ' – Teilnahme', $seats, $seats > 1 ? 'Plätze' : 'Platz', $price]);
     $p->prepare('update workshop_signups set invoice_id = ? where id = ?')->execute([$docId, $signupId]);
     docAudit($p, $docId, 'erstellt', $number . ' (rechnung, automatisch aus Workshop-Buchung)');
     $p->commit();
@@ -4610,14 +4674,24 @@ function workshopInvoice(PDO $p, string $signupId, bool $quiet = false): array {
   $portal = baseUrl() . '/portal.html?a=' . $token;
   $bodyTxt = "$anrede,\n\n" .
     "danke für deine Anmeldung zum Workshop „" . $s['w_title'] . "“ am " . $wDateDe . "!\n\n" .
+    $terminZeile . "\n\n" .
     "Hier ist deine Rechnung $number (" . number_format($gross, 2, ',', '.') . " €):\n$portal\n" .
     "Login: deine Postleitzahl ($custZip). Dort kannst du die Rechnung ansehen und als PDF speichern.\n\n" .
     "Mit Zahlungseingang ist dein Platz verbindlich reserviert. Zahlbar bis $due per Überweisung – die Bankverbindung steht auf der Rechnung.\n\n" .
+    "Bitte überweise innerhalb von 5 Tagen, sonst geht der Platz an die Warteliste.\n\n" .
+    ($s['w_info_file'] ? "Alle Infos zum Workshop findest du im angehängten Infoblatt.\n\n" : '') .
     "Bis bald im Workshop!\n" . ($comp['owner'] ?? '') . "\n" . ($comp['name'] ?? '') .
     ($comp['phone'] ?? '' ? "\n" . $comp['phone'] : '');
+  /* Infoblatt als Anhang: geht nur mit echtem SMTP-Konto raus (siehe sendMailSafe) - ohne
+     Konto (mail()-Fallback) bleibt es mangels MIME-Unterstuetzung weg, der Rest der Mail
+     kommt trotzdem an. */
+  $attachments = [];
+  if ($s['w_info_file'] && is_file(DATA_DIR . '/wsinfo/' . $s['w_info_file']))
+    $attachments[] = ['name' => (string)($s['w_info_name'] ?: 'infoblatt.pdf'), 'mime' => 'application/pdf',
+      'data' => (string)file_get_contents(DATA_DIR . '/wsinfo/' . $s['w_info_file'])];
   /* $quiet: Der Aufrufer (Nachruecken) schickt seine eigene Mail mit Rechnungslink -
      zwei Mails hintereinander waeren verwirrend. */
-  $mailed = $quiet ? false : sendMailSafe((string)$s['email'], "Rechnung $number – dein Workshop-Platz am " . $wDateDe, $bodyTxt);
+  $mailed = $quiet ? false : sendMailSafe((string)$s['email'], "Rechnung $number – dein Workshop-Platz am " . $wDateDe, $bodyTxt, $attachments);
   /* Die Rechnung ist ausgestellt, sobald sie hier steht: Nummer ist vergeben, der Kunde hat
      "Rechnung ist unterwegs" gelesen. Ein Mailfehler ist ein Zustellproblem, kein Grund,
      sie als Entwurf zu verstecken - als Entwurf fehlte sie im Portal, in "Offene Rechnungen"
@@ -5935,6 +6009,7 @@ function handlePortal(string $path, string $method, $body): never {
   }
   /* Workshops: öffentliche Termine mit freien Plätzen, Anmeldung mit Kapazitätsprüfung */
   if ($path === 'portal/workshops' && $method === 'GET') {
+    try { wsExpireStale($p); } catch (Throwable $e) {}
     $rows = $p->query("select w.*, coalesce((select sum(s.seats) from workshop_signups s
         where s.workshop_id = w.id and s.status = 'angemeldet'), 0) as booked
       from workshop_events w where w.public = 1 and w.event_date >= date('now')
@@ -5949,6 +6024,7 @@ function handlePortal(string $path, string $method, $body): never {
     ], $rows));
   }
   if (preg_match('#^portal/workshops/([a-f0-9-]{30,40})/signup$#', $path, $m) && $method === 'POST') {
+    try { wsExpireStale($p); } catch (Throwable $e) {}
     $st = $p->prepare("select w.*, coalesce((select sum(s.seats) from workshop_signups s
         where s.workshop_id = w.id and s.status = 'angemeldet'), 0) as booked
       from workshop_events w where w.id = ? and w.public = 1");
@@ -5960,6 +6036,9 @@ function handlePortal(string $path, string $method, $body): never {
     if ($name === '' || $email === '') fail('Name und E-Mail erforderlich.');
     if (!filter_var($email, FILTER_VALIDATE_EMAIL))
       fail('Bitte eine gültige E-Mail-Adresse angeben – sonst kommt die Bestätigung nicht an.');
+    /* Server prueft die Einwilligung genauso wie das Formular selbst - ein weggelassenes
+       Attribut oder eine deaktivierte Pruefung im Browser darf nicht reichen. */
+    if (empty($body['consent'])) fail('Bitte AGB und Datenschutzerklärung bestätigen.');
     /* Dublette zuerst prüfen: Sonst bekommt jemand, der schon angemeldet ist, bei einem
        inzwischen vollen Termin fälschlich "ausgebucht" statt des richtigen Hinweises. */
     $dup = $p->prepare("select count(*) from workshop_signups where workshop_id = ? and email = ? and status in ('angemeldet','warteliste')");
@@ -6673,12 +6752,55 @@ try {
     header('Content-Disposition: inline; filename="' . rawurlencode((string)$f['invoice_name']) . '"');
     readfile(DATA_DIR . '/eqfiles/' . $f['invoice_file']); exit;
   }
+  /* Workshop-Infoblatt (optionales PDF am Termin, z. B. Anfahrt/Mitzubringendes) - wird der
+     automatischen Rechnung angehaengt, sobald es hinterlegt ist. Nur PDF, nur angemeldet -
+     das ist Termin-Verwaltung, nicht der allgemeine Medien-Pool (deshalb eigener Upload-Weg,
+     nicht mediaExtOk()/handleUpload(), die nur Bild/Video kennen). */
+  if (preg_match('#^workshop-event/([a-f0-9-]{30,40})/info$#', $path, $m) && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    $chk = $p->prepare('select id, info_file from workshop_events where id = ?'); $chk->execute([$m[1]]);
+    $w = $chk->fetch();
+    if (!$w) fail('Workshop-Termin nicht gefunden.', 404);
+    $raw = file_get_contents('php://input');
+    if (!$raw || strlen($raw) > MAX_UPLOAD) fail('Datei fehlt oder ist zu groß (max. 8 MB).');
+    if (!str_starts_with($raw, '%PDF')) fail('Nur PDF-Dateien erlaubt.');
+    $orig = mb_substr(preg_replace('/[^\w.\-() äöüÄÖÜß]/u', '_', (string)($_GET['name'] ?? 'infoblatt.pdf')), 0, 120);
+    $dir = DATA_DIR . '/wsinfo';
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    $file = uuid() . '.pdf';
+    file_put_contents("$dir/$file", $raw);
+    if ($w['info_file'] && is_file("$dir/" . $w['info_file'])) @unlink("$dir/" . $w['info_file']);
+    $p->prepare('update workshop_events set info_file = ?, info_name = ? where id = ?')
+      ->execute([$file, $orig, $m[1]]);
+    out(['ok' => true, 'name' => $orig], 201);
+  }
+  if (preg_match('#^workshop-event/([a-f0-9-]{30,40})/info$#', $path, $m) && $method === 'DELETE') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    $chk = $p->prepare('select info_file from workshop_events where id = ?'); $chk->execute([$m[1]]);
+    $w = $chk->fetch();
+    if ($w && $w['info_file']) @unlink(DATA_DIR . '/wsinfo/' . $w['info_file']);
+    $p->prepare('update workshop_events set info_file = null, info_name = null where id = ?')->execute([$m[1]]);
+    out(['ok' => true]);
+  }
+  if (preg_match('#^wsinfo/([a-f0-9-]{30,40})$#', $path, $m) && $method === 'GET') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    $st = $p->prepare('select info_file, info_name from workshop_events where id = ?'); $st->execute([$m[1]]);
+    $f = $st->fetch();
+    if (!$f || !$f['info_file'] || !is_file(DATA_DIR . '/wsinfo/' . $f['info_file'])) fail('Datei nicht gefunden.', 404);
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . rawurlencode((string)$f['info_name']) . '"');
+    readfile(DATA_DIR . '/wsinfo/' . $f['info_file']); exit;
+  }
   /* Teilnehmer von Hand erfassen (Backoffice): Anmeldung per Telefon/Mail, die nicht ueber das
      oeffentliche Formular kam. Gleiche Regeln wie dort (Kapazitaet, Dublette, Kunde per E-Mail
      finden oder anlegen), auf Wunsch sofort Rechnung erzeugen und mailen. */
   if (preg_match('#^workshop/([a-f0-9-]{30,40})/signup$#', $path, $m) && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
     $p = db();
+    try { wsExpireStale($p); } catch (Throwable $e) {}
     $st = $p->prepare("select w.*, coalesce((select sum(s.seats) from workshop_signups s
         where s.workshop_id = w.id and s.status = 'angemeldet'), 0) as booked from workshop_events w where w.id = ?");
     $st->execute([$m[1]]);
@@ -6777,6 +6899,7 @@ try {
   if ($path === 'cron/backup' && $method === 'GET') {
     $key = (string)($_GET['key'] ?? '');
     if ($key === '' || !hash_equals(backupKey(), $key)) { usleep(500000); fail('Ungültiger Schlüssel.', 401); }
+    try { wsExpireStale(db()); } catch (Throwable $e) {}
     $r = runBackup();
     $r['digest'] = dailyDigest();
     out($r);

@@ -1582,6 +1582,11 @@ function openWsModal(id){
     '<div><label>Plätze</label><input type="number" id="wCap" value="'+(w.capacity||8)+'"></div>'+
     '<div><label>Ort</label><input id="wLoc" value="'+esc(w.location||(companyAddress()?'Lager, '+companyAddress():''))+'" placeholder="z. B. Lager, Musterweg 1, 12345 Musterstadt"></div></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="wPub" style="width:auto;margin-right:6px" '+(w.public?'checked':'')+'>Auf der Technik-Seite buchbar anzeigen</label>'+
+    (id?('<label style="margin-top:12px">Infoblatt (PDF) <span class="mut sml" style="text-transform:none;letter-spacing:0">– wird der automatischen Rechnung angehängt</span></label>'+
+      '<div style="display:flex;gap:8px;align-items:center">'+
+      (w.info_name?'<a class="mut sml" onclick="openWsInfo(\''+id+'\')">'+esc(w.info_name)+' ansehen ↗</a> <a class="mut sml" style="color:var(--redl)" onclick="removeWsInfo(\''+id+'\')">entfernen</a>':'<span class="mut sml">Noch kein Infoblatt hinterlegt.</span>')+
+      '<input type="file" accept="application/pdf" style="display:none" id="upWsInfo" onchange="uploadWsInfo(this,\''+id+'\')">'+
+      '<button class="btn g sm" onclick="document.getElementById(\'upWsInfo\').click()">'+(w.info_name?'Ersetzen':'Hochladen')+'</button></div>'):'')+
     '<div style="margin-top:14px"><button class="btn" onclick="saveWs(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'workshop_events\',\''+id+'\',reloadWs)">Löschen</button>':'')+'</div>');
 }
@@ -1606,18 +1611,37 @@ function saveWs(id){
   (id?api('workshop_events?id=eq.'+id,{method:'PATCH',body:body}):api('workshop_events',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');reloadWs()}).catch(function(e){toast(e.message,1)});
 }
+/* Reservierungsfrist einer Anmeldung (5 Tage ab Anmeldung, siehe wsExpireStale() im
+   Server) - rein zur Anzeige, damit im Backoffice sichtbar ist, bis wann eine offene
+   Reservierung noch gilt. Nur relevant ohne bezahlte Rechnung. */
+function wsReservedUntilStr(s){
+  /* Frist zaehlt ab der Rechnung (Nachruecken von der Warteliste bekommt seine Rechnung
+     erst bei der Befoerderung) - ohne Rechnung ab der Anmeldung selbst. Gleiche Regel wie
+     im Server (wsExpireStale). */
+  var inv=s.invoice_id?(CACHE.documents||[]).find(function(d){return d.id===s.invoice_id}):null;
+  var base=new Date((inv?inv.created_at:s.created_at));if(isNaN(base))return null;
+  var due=new Date(base.getTime()+5*86400000);
+  return dt(due.toISOString());
+}
 function openWsDetail(id){
   var w=(CACHE.wsEvents||[]).find(function(x){return x.id===id});if(!w)return;
-  var order={angemeldet:0,warteliste:1,storniert:2};
+  var order={angemeldet:0,warteliste:1,abgelaufen:2,storniert:3};
   var sg=(CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===id})
     .sort(function(a,b){return (order[a.status]||0)-(order[b.status]||0)});
   var rows=sg.map(function(s){
-    var badge=s.status==='warteliste'?'<span class="b blue">Warteliste</span>':(s.status==='storniert'?'<span class="b grey">storniert</span>':'<span class="b green">angemeldet</span>');
+    var badge=s.status==='warteliste'?'<span class="b blue">Warteliste</span>'
+      :(s.status==='storniert'?'<span class="b grey">storniert</span>'
+      :(s.status==='abgelaufen'?'<span class="b red">abgelaufen</span>'
+      :'<span class="b green">angemeldet</span>'));
     var qa=[['Musikalisch',s.q_music],['Herausforderung',s.q_challenge],['Ziel',s.q_goal]]
       .filter(function(x){return x[1]}).map(function(x){return '<div><span class="mut">'+x[0]+':</span> '+esc(x[1])+'</div>'}).join('');
     var invDoc=s.invoice_id?(CACHE.documents||[]).find(function(d){return d.id===s.invoice_id}):null;
     if(invDoc)qa+='<div style="margin-top:4px"><span class="mut">Rechnung:</span> <a onclick="closeModal();openDocEditor(\''+invDoc.id+'\')">'+esc(invDoc.number)+'</a> <span class="b '+docBadge(invDoc.status)+'">'+invDoc.status+'</span></div>';
-    return '<tr'+(s.status==='storniert'?' style="opacity:.45"':'')+'><td>'+esc(s.name)+'<br>'+badge+'</td>'+
+    if(s.status==='angemeldet'&&(!invDoc||invDoc.status!=='bezahlt')){
+      var ru=wsReservedUntilStr(s);
+      if(ru)qa+='<div style="margin-top:4px"><span class="mut">Reserviert bis:</span> '+ru+'</div>';
+    }
+    return '<tr'+(s.status==='storniert'||s.status==='abgelaufen'?' style="opacity:.45"':'')+'><td>'+esc(s.name)+'<br>'+badge+'</td>'+
     '<td>'+esc(s.email||'')+(s.phone?'<br><span class="mut">'+esc(s.phone)+'</span>':'')+'</td>'+
     '<td class="num">'+(s.seats||1)+'</td>'+
     '<td style="font-size:11px;line-height:1.6">'+qa+(s.message?'<div><span class="mut">Nachricht:</span> '+esc(s.message)+'</div>':'')+'</td>'+
@@ -1640,7 +1664,9 @@ function openWsDetail(id){
 /* Teilnehmerliste fuer den Workshop-Tag: Name, Plaetze, Status, bezahlt - zum Abhaken. */
 function wsListRows(wid){
   var order={angemeldet:0,warteliste:1,storniert:2};
-  return (CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===wid&&s.status!=='storniert'})
+  /* Abgelaufene Reservierungen genauso wie stornierte weglassen - sie kommen nicht zum
+     Workshop, sollen aber im Teilnehmer-Modal (openWsDetail) sichtbar bleiben. */
+  return (CACHE.wsSignups||[]).filter(function(s){return s.workshop_id===wid&&s.status!=='storniert'&&s.status!=='abgelaufen'})
     .sort(function(a,b){return (order[a.status]||0)-(order[b.status]||0)||String(a.name).localeCompare(String(b.name),'de')})
     .map(function(s){
       var inv=s.invoice_id?(CACHE.documents||[]).find(function(d){return d.id===s.invoice_id}):null;
@@ -6371,6 +6397,34 @@ function openEqInvoice(id){
   fetch(API+'/eqfile/'+id,{headers:{Authorization:'Bearer '+TOKEN}})
     .then(function(r){if(!r.ok)throw new Error('Datei nicht gefunden.');return r.blob()})
     .then(function(bl){window.open(URL.createObjectURL(bl),'_blank')})
+    .catch(function(e){toast(e.message,1)});
+}
+/* Workshop-Infoblatt: gleiches Muster wie der Einkaufsbeleg oben, nur PDF und eigener
+   Ablageort (workshop-event/.../info) - das ist Termin-Verwaltung, kein Medien-Pool. */
+function uploadWsInfo(inp,id){
+  var f=inp.files[0];if(!f)return;
+  fetch(API+'/workshop-event/'+id+'/info?name='+encodeURIComponent(f.name),{
+    method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:f
+  }).then(function(r){
+    if(!r.ok)return r.text().then(function(t){throw new Error(t||('Upload fehlgeschlagen ('+r.status+')'))});
+    return r.json();
+  }).then(function(){
+    toast('Infoblatt hochgeladen ✓');
+    return api('workshop_events?select=*&order=event_date');
+  }).then(function(r){CACHE.wsEvents=r||[];renderWsAdmin();openWsModal(id)})
+  .catch(function(e){toast(e.message,1)});
+}
+function openWsInfo(id){
+  fetch(API+'/wsinfo/'+id,{headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){if(!r.ok)throw new Error('Datei nicht gefunden.');return r.blob()})
+    .then(function(bl){window.open(URL.createObjectURL(bl),'_blank')})
+    .catch(function(e){toast(e.message,1)});
+}
+function removeWsInfo(id){
+  if(!confirm('Infoblatt entfernen? Es wird dann keiner Rechnung mehr angehängt.'))return;
+  fetch(API+'/workshop-event/'+id+'/info',{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){if(!r.ok)throw new Error('Konnte nicht entfernt werden.');return api('workshop_events?select=*&order=event_date')})
+    .then(function(r){CACHE.wsEvents=r||[];renderWsAdmin();openWsModal(id);toast('Infoblatt entfernt ✓')})
     .catch(function(e){toast(e.message,1)});
 }
 /* Fokuspunkt-Widget: Klick aufs Vorschaubild legt fest, welcher Bereich beim Zuschneiden (object-fit:cover)
