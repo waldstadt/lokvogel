@@ -4457,6 +4457,24 @@ function mailState(?array $set = null): array {
    Hosting unzuverlaessige mail()-Fallback aktiv (nicht schlechter als vorher). Signatur
    bleibt kompatibel (gleicher Name, bool-Rueckgabe) - alle bestehenden Aufrufstellen im
    ganzen File funktionieren unveraendert weiter. */
+/* Fallback ohne konfiguriertes E-Mail-Konto: das alte, einfache mail() ueber die in
+   den Firmendaten hinterlegte Absenderadresse - genau der Weg, der vor Paket 19 fuer
+   ALLE Mails galt. Bleibt aktiv, solange kein SMTP-Konto eingerichtet ist, egal ob der
+   Versand automatisch (sendMailSafe) oder manuell aus dem Compose-Fenster (Absage-Mail,
+   Gutschrift, freier Text) ausgeloest wird - sonst waere man nach dem Update schlechter
+   dran als vorher, bis die echten Zugangsdaten eingetragen sind. */
+function legacyMailSend(string $to, string $subject, string $bodyText): array {
+  $comp = json_decode(db()->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+  $from = trim((string)($comp['email'] ?? ''));
+  if ($from === '' || !filter_var($from, FILTER_VALIDATE_EMAIL))
+    return ['ok' => false, 'error' => 'Keine Absenderadresse hinterlegt (Einstellungen → Firmendaten) und kein E-Mail-Konto eingerichtet.'];
+  if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return ['ok' => false, 'error' => 'Ungültige Empfängeradresse.'];
+  $fromName = preg_replace('/[\r\n"]+/', '', (string)($comp['name'] ?? '')) ?: $from;
+  $headers = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$from>\r\n" .
+             "Reply-To: $from\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit";
+  $ok = @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $bodyText, $headers);
+  return $ok ? ['ok' => true] : ['ok' => false, 'error' => 'Der Server konnte die Mail nicht annehmen (PHP mail()) – kein E-Mail-Konto eingerichtet.'];
+}
 function sendMailSafe(string $to, string $subject, string $bodyText): bool {
   $sys = mailAccount('system');
   if ($sys !== null) {
@@ -4467,13 +4485,7 @@ function sendMailSafe(string $to, string $subject, string $bodyText): bool {
     else mailState(['last_error' => $r['error'], 'last_error_at' => now()]);
     return $r['ok'];
   }
-  $comp = json_decode(db()->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
-  $from = trim((string)($comp['email'] ?? ''));
-  if ($from === '' || !filter_var($from, FILTER_VALIDATE_EMAIL) || !filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
-  $fromName = preg_replace('/[\r\n"]+/', '', (string)($comp['name'] ?? '')) ?: $from;
-  $headers = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$from>\r\n" .
-             "Reply-To: $from\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit";
-  return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $bodyText, $headers);
+  return legacyMailSend($to, $subject, $bodyText)['ok'];
 }
 /* Fuer Compose/manuellen Versand aus dem Backoffice: liefert Erfolg + genauen Fehlertext
    statt nur bool. $account 'personal' oder 'system' (Vorgabe fuer Freitext: persoenlich). */
@@ -4481,8 +4493,12 @@ function mailSendManual(string $account, string $to, string $subject, string $bo
     array $attachments = [], ?string $inReplyTo = null, ?string $references = null): array {
   if (!in_array($account, MAIL_ACCOUNT_KEYS, true)) $account = 'personal';
   $acc = mailAccount($account);
-  if ($acc === null) return ['ok' => false, 'error' => 'Für das Konto „' . ($account === 'system' ? 'System' : 'Persönlich') .
-    '" ist noch kein Passwort hinterlegt – bitte zuerst unter Einstellungen → E-Mail-Konten eintragen.'];
+  if ($acc === null) {
+    /* Ohne eingerichtetes Konto wie vor Paket 19 ueber PHP mail() versenden - Anhaenge
+       und Threading-Header gehen dabei mangels MIME-Unterstuetzung des Fallbacks verloren,
+       der Text kommt trotzdem an. */
+    return legacyMailSend($to, $subject, $bodyText);
+  }
   $replyTo = null;
   if ($account === 'system') { $personal = mailAccount('personal'); $replyTo = $personal['email'] ?? null; }
   return smtpSend($acc, $to, $subject, $bodyText, null, $attachments, $replyTo, $inReplyTo, $references);
