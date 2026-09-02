@@ -940,6 +940,9 @@ function openLegal(key){
   document.body.style.overflow='hidden';
 }
 function closeLegal(){document.getElementById('legalBg').style.display='none';document.body.style.overflow=''}
+/* Direktlink auf einen Rechtstext (z. B. index.html#agb aus dem Angebot heraus) */
+(function(){var m=/^#(impressum|datenschutz|agb|widerrufsformular)$/.exec(location.hash||'');if(!m)return;
+  var tries=0;(function w(){if(Object.keys(LEGAL).length||tries++>24)openLegal(m[1]);else setTimeout(w,250)})()})();
 
 
 /* ===== Veranstaltungsberichte =====

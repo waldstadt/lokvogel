@@ -92,7 +92,7 @@ footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
   body>.wrap{display:none!important}
   #printArea{display:block!important;background:#fff;color:#111}
 }
-.chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--mut);margin:14px 0}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--mut);margin:14px 0;text-transform:none;letter-spacing:0;font-weight:400}
 /* Mietvertrag mobil: "Pos" und die Zahlenspalten sollen nicht mitten im Wort umbrechen -
    die Tabelle bekommt dafuer ihren eigenen Scrollbereich. */
 .items th,.items td:first-child,.items .num{white-space:nowrap}
@@ -407,9 +407,12 @@ function renderOffer(){
     (!DOC.has_account?
       '<div class="card" style="padding:14px 24px"><p class="sub" style="margin:0">Noch keinen Zugang zu deinem Kundenkonto? '+
       '<a href="portal.html?register=1">Kundenkonto anlegen</a> – du bekommst dann einen Link zum Passwort setzen per E-Mail. Danach musst du dich nicht mehr mit der Postleitzahl ausweisen und hast alle Unterlagen an einem Ort.</p></div>':'')+
-    '<div class="card"><table><thead><tr><th class="num">#</th><th>Leistung</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead>'+
+    (d.doc_type==='lieferschein'
+      ?'<div class="card"><table><thead><tr><th class="num">#</th><th>Artikel</th><th class="num">Menge</th></tr></thead><tbody>'+lsRowsHtml(items,false)+'</tbody></table>'+
+       '<p class="hint">Übergabeprotokoll – die Preise stehen im Angebot bzw. auf der Rechnung.</p></div>'
+      :'<div class="card"><table><thead><tr><th class="num">#</th><th>Leistung</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead>'+
     '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>'+
-    '<p class="hint">Tipp: Tippt auf eine Position mit dem <b style="color:var(--acc)">i</b> – dort erkläre ich, was genau dahintersteckt.</p></div>'+
+    '<p class="hint">Tipp: Tippt auf eine Position mit dem <b style="color:var(--acc)">i</b> – dort erkläre ich, was genau dahintersteckt.</p></div>')+
     ((DOC.upsells&&DOC.upsells.length&&!decided)?
       '<div class="card"><h3 style="margin-bottom:4px">Noch eine Schippe drauf?</h3>'+
       '<p class="sub">Falls ihr noch überlegt: Diese Extras werden oft dazugebucht. Klickt an, was euch interessiert – ich sage euch, was es für euren Termin kostet.</p>'+
@@ -419,6 +422,7 @@ function renderOffer(){
         '<button class="btn g" onclick="askUpsell(\''+u.id+'\',this)">Interessiert mich</button></div>';
       }).join('')+'</div></div>':'')+
     (d.outro_text?'<div class="card"><p style="white-space:pre-wrap" class="sub">'+esc(d.outro_text)+'</p></div>':'')+
+    agreementsHtml(false)+
     (function(){
       var rv=DOC.reviews||{};if(!rv.google_url)return '';
       return '<div class="card" style="padding:16px 24px;font-size:13px;color:var(--mut)">'+
@@ -625,6 +629,23 @@ function docRowsHtmlPrint(items,f){
     return head+subs+foot;
   }).join('');
 }
+/* Lieferschein: Uebergabeprotokoll ohne Preise - nur Artikel und Mengen (Bildschirm + PDF). */
+function lsRowsHtml(items,print){
+  var td=print?'padding:6px;border-bottom:1px solid #ddd':'';
+  return items.filter(function(it){return it.description&&!Number(it.is_header)}).map(function(it,i){
+    return '<tr><td class="num" style="'+td+'">'+(i+1)+'</td><td style="'+td+'">'+esc(it.description)+(it.note?'<div style="font-size:11px;color:'+(print?'#666':'var(--mut2)')+'">'+esc(it.note)+'</div>':'')+'</td>'+
+      '<td class="num" style="'+td+(print?';text-align:right;white-space:nowrap':'')+'">'+Number(it.qty)+' '+esc(it.unit||'')+'</td></tr>';
+  }).join('');
+}
+/* "Vereinbarungen" (Angebot/AB) bzw. "Zahlungsbedingungen" (Rechnungen), fertig vom Server */
+function agreementsTitle(d){return ['rechnung','abschlag','schluss'].indexOf(d.doc_type)>=0?'Zahlungsbedingungen':'Vereinbarungen'}
+function agreementsHtml(print){
+  var a=DOC.agreements;if(!a||DOC.doc.status==='storniert')return '';
+  var html=esc(a).replace(/(https?:\/\/[^\s<]+)/g,function(u){return '<a href="'+u+'" target="_blank" rel="noopener"'+(print?' style="color:#111"':'')+'>'+u+'</a>'});
+  if(print)return '<div style="margin:16px 0 14px;padding:10px 12px;border:1px solid #ddd;border-left:3px solid #111;border-radius:4px;font-size:10.5px;color:#333;line-height:1.5;page-break-inside:avoid">'+
+    '<div style="font-weight:700;margin-bottom:4px;font-size:11px">'+agreementsTitle(DOC.doc)+'</div><div style="white-space:pre-wrap">'+html+'</div></div>';
+  return '<div class="card"><h3 style="margin-bottom:6px">'+agreementsTitle(DOC.doc)+'</h3><div class="sub" style="white-space:pre-wrap;font-size:13px">'+html+'</div></div>';
+}
 function downloadPdf(){
   var d=DOC.doc,c=DOC.company;
   var brutto=d.price_mode==='brutto'&&!d.is_small_business;
@@ -666,11 +687,14 @@ function downloadPdf(){
   (d.valid_until&&!storniert?'<br>Gültig bis: '+dt(d.valid_until):'')+(d.due_date&&!storniert?'<br>Zahlbar bis: '+dt(d.due_date):'')+'</div></div>'+
   (eventInfoLine(d)?'<div style="border:1px solid #ddd;border-left:3px solid #111;border-radius:4px;padding:7px 10px;margin-bottom:16px;color:#333">'+esc(eventInfoLine(d))+'</div>':'')+
   (d.intro_text?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
-  '<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2">'+
+  (d.doc_type==='lieferschein'
+    ?'<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2"><th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Artikel</th><th style="padding:6px;text-align:right">Menge</th></tr></thead><tbody>'+lsRowsHtml(DOC.items,true)+'</tbody></table>'
+    :'<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2">'+
   '<th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Leistung</th><th style="padding:6px;text-align:right">Menge</th><th style="padding:6px;text-align:right">Gesamt'+(brutto?' brutto':' netto')+'</th></tr></thead>'+
-  '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>'+
-  (d.is_small_business?'<p style="color:#555;margin-bottom:12px">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>':'')+
+  '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>')+
+  (d.is_small_business&&d.doc_type!=='lieferschein'?'<p style="color:#555;margin-bottom:12px">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>':'')+
   (d.outro_text?'<p style="margin-bottom:20px;white-space:pre-wrap">'+esc(d.outro_text)+'</p>':'')+
+  agreementsHtml(true)+
   '<div style="margin-top:36px;padding-top:10px;border-top:1px solid #ccc;font-size:10px;color:#666;display:flex;justify-content:space-between;gap:20px">'+
   '<div>'+esc(c.name||'')+(c.tax_id?'<br>St.-Nr.: '+esc(c.tax_id):'')+'</div>'+
   /* Bankverbindung nicht auf einem stornierten Beleg - da soll niemand mehr ueberweisen. */
@@ -1282,6 +1306,7 @@ function profileCard(){
   var summary=[c.phone,c.street,[c.zip,c.city].filter(Boolean).join(' ')].filter(Boolean).map(esc).join(' · ');
   return '<div class="card" id="profCard"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Mein Profil</h2>'+
     '<p class="sub" style="font-size:13px">Telefon und Anschrift brauche ich für Rechnungen und Mietverträge – und mit deiner Postleitzahl öffnest du meine Angebots-Links.</p>'+
+    (filled?'':'<div class="msg warn" style="margin-top:0"><b>Bitte Anschrift ergänzen</b> – ohne vollständige Adresse (Straße, PLZ, Ort) kann ich dir kein Angebot rausschicken.</div>')+
     (filled?'<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0"><span>'+summary+'</span><a onclick="profToggle()" style="cursor:pointer;font-size:13px">bearbeiten</a></div>':'')+
     '<div id="profEdit"'+(filled?' hidden':'')+' style="margin-top:8px">'+
     '<label for="pfPhone">Telefon</label><input id="pfPhone" value="'+esc(c.phone||'')+'" autocomplete="tel">'+

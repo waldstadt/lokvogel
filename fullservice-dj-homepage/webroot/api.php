@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 92;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 93;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -941,7 +941,89 @@ function upgrade(PDO $p): void {
        dann noch stimmen, wenn die Buchung spaeter geaendert wird. */
     $p->exec('alter table documents add column event_info text');
   } catch (PDOException $e) {}
+  if ($v < 93) {
+    /* v93: (a) "Vereinbarungen" auf Angebot/AB und Zahlungsbedingungen auf Rechnungen als
+       editierbare Vorgaben - vorher stand auf dem Angebot nichts zu Storno-Staffel, Plan B
+       und Zahlungsziel, obwohl der Kunde genau das annimmt. (b) Die Leiste unter "Ueber
+       mich" zerlegte "Hochzeiten, Geburtstage, Firmenfeiern" in drei Chips; nur der
+       unveraenderte Startwert wird ersetzt. (c) Mailvorlage "Absage durch DJ". */
+    try {
+      $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
+      $neu = false;
+      if (trim((string)($defs['agreements_text'] ?? '')) === '') { $defs['agreements_text'] = agreementsDefaultText(); $neu = true; }
+      if (trim((string)($defs['payment_terms_text'] ?? '')) === '') { $defs['payment_terms_text'] = paymentTermsDefaultText(); $neu = true; }
+      if ($neu) $p->prepare("update settings set value = ?, updated_at = ? where key='defaults'")->execute([json_encode($defs, JSON_UNESCAPED_UNICODE), now()]);
+      $row = $p->query("select value from site_content where key='about'")->fetchColumn();
+      $ab = $row ? json_decode((string)$row, true) : null;
+      if (is_array($ab) && ($ab['gear'] ?? null) === ["23 Jahre am Pult","Alle Generationen auf der Tanzfläche","Hochzeiten, Geburtstage, Firmenfeiern","Eigene Ton- und Lichttechnik","Sauerland und ganz NRW"]) {
+        $ab['gear'] = aboutGearSeed();
+        $p->prepare("update site_content set value = ? where key='about'")->execute([json_encode($ab, JSON_UNESCAPED_UNICODE)]);
+      }
+    } catch (Throwable $e) {}
+    seedExtraTemplates($p);
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
+}
+
+/* Regel von Markus: Keine Angebote ohne vollstaendige Adresse (gilt auch fuer die
+   DJ-Vermittlung). Vollstaendig = Strasse mit Hausnummer, 5-stellige PLZ, Ort - dasselbe
+   prueft custAddressComplete() im Backoffice. */
+const ADDRESS_DOC_TYPES = ['angebot', 'bestaetigung', 'abschlag', 'rechnung', 'schluss'];
+function customerAddressComplete(array $c): bool {
+  $street = trim((string)($c['street'] ?? ''));
+  return $street !== '' && preg_match('/\d/', $street) === 1
+    && preg_match('/^\d{5}$/', trim((string)($c['zip'] ?? ''))) === 1
+    && trim((string)($c['city'] ?? '')) !== '';
+}
+function docCustomerAddressOk(PDO $p, ?string $custId): bool {
+  if (!$custId) return false;
+  $st = $p->prepare('select street, zip, city from customers where id = ?');
+  $st->execute([$custId]);
+  $c = $st->fetch();
+  return $c ? customerAddressComplete($c) : false;
+}
+const ADDRESS_INCOMPLETE_MSG = 'Adresse des Kunden unvollständig – bitte Straße mit Hausnummer, PLZ und Ort am Kunden ergänzen, dann geht der Beleg raus.';
+/* Anschrift aus einer Freitext-Zeile ("Musterweg 3, 58675 Hemer") in Strasse/PLZ/Ort
+   zerlegen; null, wenn Hausnummer, 5-stellige PLZ oder Ort fehlen. */
+function parseAddressLine(string $s): ?array {
+  $s = trim(preg_replace('/\s+/u', ' ', $s));
+  if (!preg_match('/^(.*?[^\d\s]\S*\s*\d+\s*[a-zA-Z]?(?:\s*[-\/]\s*\d+[a-zA-Z]?)?)\s*[,;]?\s*(\d{5})\s+(\p{L}[\p{L}\s.\-\/()]*)$/u', $s, $m)) return null;
+  $street = trim($m[1], " ,;"); $city = trim($m[3], " ,;");
+  if ($street === '' || $city === '' || !preg_match('/\p{L}/u', $street)) return null;
+  return ['street' => $street, 'zip' => $m[2], 'city' => $city];
+}
+/* Stichworte unter "Ueber mich" (Startbestand). Jedes Element ist EIN Chip - deshalb
+   keine Kommas innerhalb eines Eintrags. */
+function aboutGearSeed(): array {
+  return ["23 Jahre am Pult","Alle Generationen auf der Tanzfläche","Von der Hochzeit bis zur Firmenfeier","Eigene Ton- und Lichttechnik","Sauerland und ganz NRW"];
+}
+/* Block "Vereinbarungen" unter den Positionen von Angebot und Auftragsbestaetigung:
+   Gueltigkeit, Zahlung, Storno-Staffel (Ziffer 5 der AGB), Plan B und der AGB-Verweis.
+   Editierbar unter Einstellungen -> Belege/Vorgaben; Platzhalter {zahlungsziel}, {agb_link}. */
+function agreementsDefaultText(): string {
+  return "Gültigkeit: Dieses Angebot gilt bis zum oben genannten Datum. Bis dahin halte ich euch den Termin frei – verbindlich reserviert ist er mit eurer Annahme bzw. meiner Auftragsbestätigung.\n\n"
+    . "Zahlung: Rechnungen sind innerhalb von {zahlungsziel} Tagen ohne Abzug zahlbar. Bei Buchungen kann eine Abschlagsrechnung vereinbart werden, der Restbetrag folgt mit der Schlussrechnung nach der Veranstaltung.\n\n"
+    . "Absage durch euch (Ziffer 5 der AGB, jeweils bezogen auf die vereinbarte Nettovergütung):\n"
+    . "– bis 6 Monate vor dem Termin: 20 %\n– bis 3 Monate vor dem Termin: 40 %\n– bis 6 Wochen vor dem Termin: 60 %\n– weniger als 6 Wochen vor dem Termin: 80 %\n– weniger als 7 Tage vor dem Termin oder Nichtabnahme: 90 %\n"
+    . "Ersparte Aufwendungen werden angerechnet. Kann ich den Termin anderweitig gleichwertig belegen, entfällt die Ausfallvergütung bis auf bereits entstandene Kosten.\n\n"
+    . "Ausfall / Plan B: Falle ich aus (z. B. Krankheit), bemühe ich mich um einen passenden Ersatz-DJ aus meinem Kollegen-Netzwerk. Der Vorschlag ist für euch unverbindlich – ihr könnt ihn annehmen oder vom Vertrag zurücktreten, bereits gezahlte Beträge bekommt ihr dann vollständig zurück.\n\n"
+    . "Es gelten meine Allgemeinen Geschäftsbedingungen: {agb_link}";
+}
+/* Rechnungen bekommen nur die Zahlungsbedingungen, keine Storno-Staffel. */
+function paymentTermsDefaultText(): string {
+  return "Zahlungsbedingungen: zahlbar innerhalb von {zahlungsziel} Tagen ab Rechnungsdatum ohne Abzug, bitte unter Angabe der Rechnungsnummer. Es gelten meine Allgemeinen Geschäftsbedingungen: {agb_link}";
+}
+/* Fertiger Vereinbarungs-Text fuer einen Beleg (Portal + Serverseite), null = kein Block.
+   Dieselbe Platzhalter-Logik wie agreementsText() im Backoffice. */
+function agreementsForDoc(PDO $p, array $d): ?string {
+  $type = (string)($d['doc_type'] ?? '');
+  $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
+  if (in_array($type, ['angebot', 'bestaetigung'], true)) $txt = (string)($defs['agreements_text'] ?? agreementsDefaultText());
+  elseif (in_array($type, ['rechnung', 'abschlag', 'schluss'], true)) $txt = (string)($defs['payment_terms_text'] ?? paymentTermsDefaultText());
+  else return null;
+  $txt = trim($txt);
+  if ($txt === '') return null;
+  return strtr($txt, ['{zahlungsziel}' => (string)(int)($defs['payment_days'] ?? 14), '{agb_link}' => baseUrl() . '/index.html#agb']);
 }
 
 /* Anonyme Reichweiten-Statistik (nur Tag/Seite/Referrer-Domain, keine IPs) + Newsletter mit Double-Opt-in */
@@ -1568,6 +1650,7 @@ const TPL_KEYS = [
   'ws_promoted' => 'Nachgerückt – dein Platz ist frei',
   'form_send' => 'Fragebogen zusenden',
   'form_reminder' => 'Erinnerung Fragebogen',
+  'absage_dj' => 'Absage durch DJ',
 ];
 /* Schluessel einmalig ueber den Namen vergeben - fuer Zeilen aus der Zeit vor v87 und
    fuer frisch angelegte Seed-Zeilen. Zeilen mit Schluessel bleiben unangetastet. */
@@ -1655,6 +1738,12 @@ function seedExtraTemplates(PDO $p): void {
        wusste nicht, dass ueberhaupt ein Platz frei geworden ist. */
     [107, 'Nachgerückt – dein Platz ist frei', 'Dein Platz im Workshop „{workshop}“ ist frei!',
       "Hallo {vorname},\n\ngute Nachricht: Für den Workshop „{workshop}“ am {datum} ist ein Platz frei geworden – und der ist jetzt deiner!\n\n{rechnungszeile}\n\nWenn du den Platz doch nicht mehr brauchst, sag mir bitte kurz Bescheid, damit ich ihn weitergeben kann.\n\nBis bald!\n{inhaber}"],
+    /* Markus sagt ein Angebot selbst ab (Termin doppelt, passt nicht, Kapazitaet):
+       ehrlich, kurz, mit Vermittlungs-Angebot, wenn die Partner-Agentur eingerichtet ist.
+       {grund} = Satz zum Grund, {vermittlung} = Absatz mit Bogen-Link (beides fuellt das
+       Backoffice im Absage-Dialog; ohne Agentur bleibt {vermittlung} leer). */
+    [108, 'Absage durch DJ', 'Zu eurem Angebot {nummer} – leider eine Absage',
+      "Hallo {vorname},\n\nich muss euch leider absagen: Das Angebot {nummer} für {termin} kann ich nicht halten. {grund}\n\nDas tut mir ehrlich leid – ich weiß, dass das nicht die Nachricht ist, auf die ihr gewartet habt.\n\n{vermittlung}Wenn ihr Fragen habt oder kurz reden wollt: ruft mich an ({telefon}) oder antwortet einfach auf diese Mail.\n\nAlles Gute für eure Feier!\n{inhaber}"],
     [95, 'Absage: musikalisch nicht mein Ding', 'Zu eurer Anfrage für den {datum}',
       "Hallo {vorname},\n\ndanke für eure Anfrage und dafür, dass ihr so klar geschrieben habt, was ihr musikalisch wollt. Genau deshalb sage ich euch offen: Das ist nicht mein Zuhause. Ich könnte den Abend irgendwie über die Bühne bringen, aber ihr hättet nicht den DJ, den diese Feier verdient – und ich wäre nicht der, der ich sonst bin.\n\nIhr habt euch etwas Bestimmtes vorgestellt, und dafür gibt es Leute, die genau dafür brennen. Wenn ihr wollt, frage ich in meinem Netzwerk nach jemandem, der das wirklich draufhat.\n\nSchreibt mir einfach kurz, ob ich das machen soll.\n\nViele Grüße\n{inhaber}"],
   ];
@@ -2083,6 +2172,10 @@ function resolveDocFollowup(PDO $p, array $doc): void {
 function bookingConflicts(PDO $p, array $booking): array {
   $von = (string)($booking['event_date'] ?? '');
   if ($von === '') return [];
+  /* Reine Technik-Vermietung (kind technik/miete) kollidiert nie: Markus ist da nicht vor
+     Ort, das Material wird ueber den Bestand geprueft. Ein DJ-Gig am selben Tag darf ein
+     Technik-Angebot also nicht stornieren - genau das passierte bisher im Portal. */
+  if (!in_array((string)($booking['kind'] ?? 'dj'), ['dj', 'dj_technik'], true)) return [];
   $bis = (string)($booking['end_date'] ?? '') ?: $von;
   if ($bis < $von) $bis = $von;
   $out = [];
@@ -2978,12 +3071,16 @@ function seed(PDO $p): void {
     ['company', '{"name":"","owner":"","street":"","zip_city":"","phone":"","email":"","website":"","tax_id":"","vat_id":"","iban":"","bic":"","bank":"","small_business":false,"whatsapp":"","agency_name":"","agency_city":"","agency_enabled":false,"hoster_name":""}'],
     ['numbering', '{"angebot":{"prefix":"AN-","next":1},"rechnung":{"prefix":"RE-","next":1},"lieferschein":{"prefix":"LS-","next":1},"year_in_number":true}'],
     ['rental_contract', json_encode(['text' => rentalContractDefault()], JSON_UNESCAPED_UNICODE)],
-    ['defaults', '{"tax_rate":19,"payment_days":14,"quote_valid_days":30,"quote_intro":"vielen Dank für eure Anfrage. Gerne biete ich euch an:","confirm_intro":"schön, dass ihr euch entschieden habt. Hiermit bestätige ich euch den Auftrag verbindlich – der Termin ist ab jetzt für euch reserviert.","invoice_outro":"Bitte überweist den Betrag unter Angabe der Rechnungsnummer auf das unten genannte Konto."}'],
+    ['defaults', json_encode(['tax_rate' => 19, 'payment_days' => 14, 'quote_valid_days' => 30,
+      'quote_intro' => 'vielen Dank für eure Anfrage. Gerne biete ich euch an:',
+      'confirm_intro' => 'schön, dass ihr euch entschieden habt. Hiermit bestätige ich euch den Auftrag verbindlich – der Termin ist ab jetzt für euch reserviert.',
+      'invoice_outro' => 'Bitte überweist den Betrag unter Angabe der Rechnungsnummer auf das unten genannte Konto.',
+      'agreements_text' => agreementsDefaultText(), 'payment_terms_text' => paymentTermsDefaultText()], JSON_UNESCAPED_UNICODE)],
   ] as [$k, $v]) $p->prepare('insert into settings (key,value,updated_at) values (?,?,?)')->execute([$k, $v, now()]);
 
   foreach ([
     ['hero', '{"title":"DJ Lauschgift","headline":"Volle Tanzfläche.\n*Ohne Schnickschnack.*","scrim":{"mode":"gleich","pct":30},"badges":[{"value": "23", "label": "Jahre hinter den Decks"}, {"value": "Plan B", "label": "immer inklusive"}, {"value": "Seeburg", "label": "Premium-Sound"}],"subtitle":"DJ für Hochzeiten, Geburtstage & Firmenfeiern · deutschlandweit","text":"Ich bin Markus – seit 23 Jahren DJ, quer durch Deutschland unterwegs. Keine Show um meine Person, kein Programm von der Stange: Ich lese den Raum und spiele das, was eure Gäste auf die Tanzfläche bringt. Ihr müsst euch um nichts kümmern – dafür bin ich da.","cta":"Unverbindlich anfragen","image":""}'],
-    ['about', '{"title":"Einfach Markus. Und trotzdem kein Standard-DJ.","gear":["23 Jahre am Pult","Alle Generationen auf der Tanzfläche","Hochzeiten, Geburtstage, Firmenfeiern","Eigene Ton- und Lichttechnik","Sauerland und ganz NRW"],"text":"Angefangen hat alles mit zwei Plattenspielern und einem alten Mischpult zum 18. Geburtstag. Ein Jahr lang habe ich in der heimischen Garage geübt, bis ich für bekannte DJs das Warm-up in angesagten Clubs übernehmen durfte. Den eigentlichen Wendepunkt gab es aber bei einer ganz anderen Feier: Als meine Tante mich zu ihrem runden Geburtstag fragte, ob ich auch gemischte Musik auflegen könnte, war ich skeptisch – bis Jung und Alt gemeinsam auf der Tanzfläche standen und weitersangen, als ich den Regler runterzog. Seitdem ist mir in 23 Jahren kein einziger Abend langweilig geworden.\\n\\nWas mich von vielen anderen unterscheidet: Ich bin ein echter Technik- und Menschenfreund. Ich nehme euch und eure Gäste bewusst wahr und setze auf Licht- und Tontechnik, die man sonst eher von deutlich größeren Produktionen kennt – weil auch eine Feier mit 40 Gästen großartige Technik verdient. Mein Sound kommt von Seeburg Acoustic Line, einem der deutschen Top-Hersteller für mobile PA-Systeme – das hört man sofort. Dazu passe ich mich flexibel an jede Location an, ob Scheune, Schloss, Industriehalle oder Gartenparty: Ich kenne mein Equipment in- und auswendig und weiß, wie ich jeden Raum klanglich und optisch in Szene setze.","image":"img/markus_1.jpg"}'],
+    ['about', '{"title":"Einfach Markus. Und trotzdem kein Standard-DJ.","gear":["23 Jahre am Pult","Alle Generationen auf der Tanzfläche","Von der Hochzeit bis zur Firmenfeier","Eigene Ton- und Lichttechnik","Sauerland und ganz NRW"],"text":"Angefangen hat alles mit zwei Plattenspielern und einem alten Mischpult zum 18. Geburtstag. Ein Jahr lang habe ich in der heimischen Garage geübt, bis ich für bekannte DJs das Warm-up in angesagten Clubs übernehmen durfte. Den eigentlichen Wendepunkt gab es aber bei einer ganz anderen Feier: Als meine Tante mich zu ihrem runden Geburtstag fragte, ob ich auch gemischte Musik auflegen könnte, war ich skeptisch – bis Jung und Alt gemeinsam auf der Tanzfläche standen und weitersangen, als ich den Regler runterzog. Seitdem ist mir in 23 Jahren kein einziger Abend langweilig geworden.\\n\\nWas mich von vielen anderen unterscheidet: Ich bin ein echter Technik- und Menschenfreund. Ich nehme euch und eure Gäste bewusst wahr und setze auf Licht- und Tontechnik, die man sonst eher von deutlich größeren Produktionen kennt – weil auch eine Feier mit 40 Gästen großartige Technik verdient. Mein Sound kommt von Seeburg Acoustic Line, einem der deutschen Top-Hersteller für mobile PA-Systeme – das hört man sofort. Dazu passe ich mich flexibel an jede Location an, ob Scheune, Schloss, Industriehalle oder Gartenparty: Ich kenne mein Equipment in- und auswendig und weiß, wie ich jeden Raum klanglich und optisch in Szene setze.","image":"img/markus_1.jpg"}'],
     ['services', '{"title":"Das bekommt ihr","text":"Vom Sektempfang bis zum letzten Song: Musik, Ton für die freie Trauung, dezentes Licht passend zur Location – und ein Plan B für alle Fälle. Ihr feiert, ich kümmere mich um den Rest.","image":""}'],
     ['guarantee', '{"title":"Schon ausgebucht? Ihr steht trotzdem nicht ohne DJ da.","text":"Wenn ich an eurem Termin keine Zeit habe – oder merke, dass ich nicht der richtige DJ für eure Feier bin – wähle ich persönlich bis zu fünf Kollegen aus meinem Partner-Netzwerk aus, die wirklich zu euch passen. Keine anonyme Liste: Ich kenne die Kollegen und ihre Stärken, und ihr bekommt die Vorschläge direkt von mir – auch günstigere Optionen sind dabei, falls euer Budget das erfordert. Und Transparenz gehört dazu: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision (Details in den AGB)."}'],
     ['rental', '{"title":"Technik mieten","text":"Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung."}'],
@@ -3441,6 +3538,9 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
            der Client zaehlte bisher selbst hoch und ueberschrieb dabei Zaehler, die
            inzwischen woanders (anderes Geraet, Workshop-Rechnung) weitergelaufen waren. */
         if ($t === 'documents') assertGutschriftNotZero($row, null);
+        if ($t === 'documents' && !empty($row['share_token']) && in_array((string)($row['doc_type'] ?? ''), ADDRESS_DOC_TYPES, true)
+            && !docCustomerAddressOk($p, (string)($row['customer_id'] ?? '')))
+          fail(ADDRESS_INCOMPLETE_MSG, 422);
         $ownTx = false;
         if ($t === 'documents' && !$merge) {
           if (!$p->inTransaction()) { $p->beginTransaction(); $ownTx = true; }
@@ -3506,6 +3606,13 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         $allowed = ['status','paid_at','sent_at','share_token','version','version_at','version_hash','accepted_version','settled_by'];
         foreach ($before as $b) {
           assertGutschriftNotZero($row, $b);
+          /* Versand ("versendet") und Portal-Freigabe (share_token) nur mit vollstaendiger
+             Kundenadresse - Entwurf speichern bleibt erlaubt. */
+          $wirdVersand = (($row['status'] ?? null) === 'versendet' && ($b['status'] ?? '') !== 'versendet');
+          $wirdFreigabe = !empty($row['share_token']) && (string)$row['share_token'] !== (string)($b['share_token'] ?? '');
+          if (($wirdVersand || $wirdFreigabe) && in_array((string)$b['doc_type'], ADDRESS_DOC_TYPES, true)
+              && !docCustomerAddressOk($p, (string)($row['customer_id'] ?? $b['customer_id'] ?? '')))
+            fail(ADDRESS_INCOMPLETE_MSG, 422);
           if (docLockedRow($b) && array_diff(array_keys($row), $allowed))
             fail('Rechnung ' . $b['number'] . ' ist festgeschrieben (GoBD): Inhalte können nach dem Versand nicht mehr geändert werden. Erstelle eine Korrekturrechnung oder storniere sie.', 409);
           /* Angenommenes Angebot: Inhalte nur sperren, wenn sich wirklich etwas aendert -
@@ -4317,6 +4424,8 @@ function handleDocAction(string $id, string $action, array $body): never {
       'paid_sum' => $paidSum, 'open' => max(0, $rest)]);
   }
   /* resend: automatische Kundenmail noch einmal anstossen. kind = ref_kind der Notiz. */
+  if (in_array((string)$d['doc_type'], ADDRESS_DOC_TYPES, true) && !docCustomerAddressOk($p, (string)$d['customer_id']))
+    fail(ADDRESS_INCOMPLETE_MSG, 422);
   $kind = (string)($body['kind'] ?? ($_GET['kind'] ?? ''));
   if (empty($d['share_token'])) {
     $tok = bin2hex(random_bytes(24));
@@ -5008,6 +5117,8 @@ function handlePortal(string $path, string $method, $body): never {
         return $tok ? baseUrl() . '/portal.html?f=' . $tok : null;
       })(),
       'today' => date('Y-m-d'),
+      /* Vereinbarungen (Angebot/AB) bzw. Zahlungsbedingungen (Rechnungen) - fertig gefuellt */
+      'agreements' => agreementsForDoc($p, $d),
       /* Art der zugehoerigen Buchung (dj / technik / miete ...): Das Portal waehlt danach
          die DJ- oder Technik-Farbpalette der Website. */
       'booking_kind' => (function () use ($p, $d) {
@@ -5195,8 +5306,41 @@ function handlePortal(string $path, string $method, $body): never {
         $leer = $a === '' || (($fl['type'] ?? '') === 'checkbox' && $a !== 'Ja');
         if ($leer) fail('Bitte beantworte noch „' . mb_substr((string)($fl['label'] ?? 'Frage ' . ($i + 1)), 0, 120) . '“ – die Frage brauche ich für die Planung.');
       }
+      /* DJ-Vermittlung: keine Weitergabe ohne vollstaendige Anschrift (Regel von Markus,
+         gilt auch fuer Empfehlungen). Die Anschrift wandert in den Kundendatensatz, wenn
+         dort Strasse/Ort fehlen - Name, E-Mail, Telefon ebenfalls nur, wenn leer. */
+      $adr = null; $byKey = [];
+      if (isBandeForm($f)) {
+        foreach ($fields as $i => $fl) if (!empty($fl['key'])) $byKey[(string)$fl['key']] = trim((string)($answers[$i] ?? ''));
+        if (isset($byKey['address'])) {
+          $adr = parseAddressLine($byKey['address']);
+          if (!$adr) fail('Bitte die vollständige Anschrift mit Straße, Hausnummer, PLZ und Ort angeben – zum Beispiel „Musterweg 3, 58675 Hemer“.');
+        }
+      }
       $p->prepare("update forms set answers=?, status='beantwortet', submitted_at=? where id=?")
         ->execute([json_encode($answers, JSON_UNESCAPED_UNICODE), now(), $f['id']]);
+      if ($f['customer_id'] && $byKey) {
+        try {
+          $cst = $p->prepare('select * from customers where id = ?'); $cst->execute([$f['customer_id']]);
+          if ($c = $cst->fetch()) {
+            $upd = [];
+            if ($adr && (trim((string)$c['street']) === '' || trim((string)$c['city']) === '')) {
+              $upd['street'] = $adr['street']; $upd['zip'] = $adr['zip']; $upd['city'] = $adr['city'];
+            }
+            if (!empty($byKey['email']) && trim((string)$c['email']) === '' && filter_var($byKey['email'], FILTER_VALIDATE_EMAIL)) $upd['email'] = $byKey['email'];
+            if (!empty($byKey['phone']) && trim((string)$c['phone']) === '') $upd['phone'] = mb_substr($byKey['phone'], 0, 60);
+            if (!empty($byKey['name']) && trim((string)$c['first_name']) === '' && trim((string)$c['last_name']) === '' && trim((string)$c['company']) === '') {
+              $teile = preg_split('/\s+/u', $byKey['name'], 2);
+              $upd['first_name'] = $teile[0]; $upd['last_name'] = $teile[1] ?? '';
+            }
+            if ($upd) {
+              $upd['updated_at'] = now();
+              $p->prepare('update customers set ' . implode(',', array_map(fn($k) => "\"$k\"=?", array_keys($upd))) . ' where id = ?')
+                ->execute(array_merge(array_values($upd), [$f['customer_id']]));
+            }
+          }
+        } catch (Throwable $e) {}
+      }
       $sum = '';
       foreach ($fields as $i => $fl) $sum .= ($fl['label'] ?? ('Frage '.($i+1))).":\n".($answers[$i] ?? '–')."\n\n";
       $sum = trim($sum);

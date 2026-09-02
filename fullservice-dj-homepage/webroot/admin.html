@@ -327,6 +327,9 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
 /* Auf dem Handy passen sieben feste Spalten nicht nebeneinander (450px Mindestbreite) -
    dort untereinander, damit der Belegeditor nicht waagerecht scrollt. */
 .it-lbl{display:none}
+/* Lieferschein: keine Preisspalten (Uebergabeprotokoll, nur Mengen) */
+.it-row.pl{grid-template-columns:36px 1fr 70px 100px 28px}
+.it-row.sml.pl{grid-template-columns:30px 1fr 56px 84px 20px}
 /* Hoch/Runter je Position: Drag & Drop gibt es auf dem Handy nicht zuverlaessig. */
 .it-act{display:flex;align-items:center;gap:6px;justify-content:center}
 .it-mv{display:none;gap:2px}
@@ -678,6 +681,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
     </div>
     <div class="card"><h3>Positionen <span class="doc-add" id="docAddBtns"><button class="btn g sm" onclick="openProductPicker()"> + Artikel</button> <button class="btn g sm" onclick="openUpsellPicker()"> + Extra</button> <button class="btn sm" onclick="addItemRow()">+ Position</button> <span id="docBookBtns"></span> <span id="docTplBtns"></span></span></h3>
       <div class="it-row it-head"><div>Pos</div><div>Beschreibung</div><div>Menge</div><div>Einheit</div><div>Einzel brutto</div><div>Gesamt</div><div></div></div>
+      <div id="docPlNote" class="mut sml" style="display:none;margin-bottom:8px">Lieferschein = Übergabeprotokoll ohne Preise: nur Artikel und Mengen. Die Preise kommen erst über „→ Rechnung“ aus dem Gig bzw. dem Katalog.</div>
       <div id="docItems"></div>
       <datalist id="artikelVorschlaege"></datalist>
       <div class="dblk" id="docDiscBlk" style="margin-top:12px"><div class="dblk-h" onclick="docBlkToggle('disc')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>Rabatt / Pauschalpreis <span class="fill" id="docDiscFill"></span></div><div class="dblk-b">
@@ -1117,7 +1121,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           </div>
           <div class="grid2">
             <div><label>Standard-Technik bei DJ-Gigs</label><select id="sDjSet"><option value="">– keine –</option></select>
-              <div class="mut sml" style="margin-top:3px">Wird jedem neuen DJ-Gig automatisch zugeordnet (im Gig änderbar). Sets legst du unter Technik an.</div></div>
+              <div class="mut sml" style="margin-top:3px" id="sDjSetHint">Wird jedem neuen DJ-Gig automatisch zugeordnet (im Gig änderbar). Sets legst du unter Technik an.</div></div>
           </div>
           <div class="grid2">
             <div><label>USt.-Satz Standard (%)</label><input type="number" step="0.1" id="sTaxRate"></div>
@@ -1145,6 +1149,12 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
             <div><label>% ab 2 Wochen (Tag 15+)</label><input type="number" id="sTier2Week"></div>
             <div><label>% ab 1 Monat (Tag 31+)</label><input type="number" id="sTierMonth"></div>
           </div>
+          <label style="margin-top:14px">Vereinbarungen im Angebot</label>
+          <div class="mut sml" style="margin:-2px 0 6px">Steht als Block „Vereinbarungen“ unter den Positionen von Angebot und Auftragsbestätigung (Kundenansicht, Druck, Portal): Gültigkeit, Zahlung, Storno-Staffel, Plan B, AGB. Platzhalter: {zahlungsziel} (Zahlungsziel in Tagen), {agb_link} (Link zu den AGB).</div>
+          <textarea id="sAgree" style="min-height:170px;font-size:11px"></textarea>
+          <label style="margin-top:12px">Zahlungsbedingungen auf Rechnungen</label>
+          <div class="mut sml" style="margin:-2px 0 6px">Kurzer Block unter den Positionen von Rechnung, Abschlag und Schlussrechnung – dieselben Platzhalter.</div>
+          <textarea id="sPayTerms" style="min-height:56px;font-size:11px"></textarea>
           <div style="margin-top:12px"><button class="btn sm" onclick="saveNumbering()">Speichern</button></div>
         </div>
         <div class="card"><h3>Angebots-Vorlagen <span class="mut sml" style="font-weight:400">– Standardangebote zum schnellen Anpassen</span></h3>
@@ -1289,6 +1299,22 @@ function dtt(d){if(!d)return '–';return new Date(d).toLocaleString('de-DE',{da
    jeder Kunde stand damit zigfach in der Antwort. Die Map wird bei Bedarf neu gebaut,
    wenn CACHE.customers ausgetauscht oder ergaenzt wurde. */
 var CUST_MAP=null,CUST_MAP_SRC=null,CUST_MAP_N=-1;
+/* Regel von Markus: Keine Angebote ohne vollstaendige Adresse - Strasse mit Hausnummer,
+   5-stellige PLZ, Ort (Server: customerAddressComplete). */
+var ADDRESS_DOC_TYPES=['angebot','bestaetigung','abschlag','rechnung','schluss'];
+function custAddressComplete(c){
+  if(!c)return false;
+  var st=String(c.street||'').trim();
+  return !!st&&/\d/.test(st)&&/^\d{5}$/.test(String(c.zip||'').trim())&&!!String(c.city||'').trim();
+}
+/* Freitext-Anschrift ("Musterweg 3, 58675 Hemer") pruefen - wie parseAddressLine() im Server */
+function parseAddressText(s){
+  s=String(s||'').replace(/\s+/g,' ').trim();
+  var m=/^(.*?[^\d\s]\S*\s*\d+\s*[a-zA-Z]?(?:\s*[-\/]\s*\d+[a-zA-Z]?)?)\s*[,;]?\s*(\d{5})\s+([^\d].*)$/.exec(s);
+  if(!m)return null;
+  var street=m[1].replace(/[ ,;]+$/,''),city=m[3].replace(/[ ,;]+$/,'');
+  return street&&city?{street:street,zip:m[2],city:city}:null;
+}
 function custOf(x){
   if(!x||!x.customer_id)return null;
   var list=CACHE.customers||[];
@@ -1733,7 +1759,7 @@ function renderDash(){
   var upcomingAll=CACHE.bookings.filter(function(b){return b.event_date>=today&&b.status!=='storniert'}).sort(function(a,b){return a.event_date<b.event_date?-1:1});
   var upcoming=upcomingAll.filter(function(b){return ['gebucht','abgeschlossen'].indexOf(b.status)>=0});
   var unbestaetigt=upcomingAll.length-upcoming.length;
-  var openInv=CACHE.documents.filter(function(d){return istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0});
+  var openInv=CACHE.documents.filter(function(d){return istZahlbeleg(d.doc_type)&&d.doc_type!=='gutschrift'&&['versendet','ueberfaellig'].indexOf(d.status)>=0});
   var openQ=CACHE.documents.filter(function(d){return d.doc_type==='angebot'&&d.status==='versendet'});
   var year=new Date().getFullYear();
   var rev=revenueInYear(String(year));
@@ -1800,7 +1826,7 @@ function renderDash(){
      rausging (Notizen zaehlen nicht als Kontakt). */
   var vor3=new Date(Date.now()-3*86400000).toISOString();
   var silentInq=CACHE.inquiries.filter(function(i){
-    if(['neu','in_bearbeitung'].indexOf(i.status)<0||!i.created_at||i.created_at>vor3)return false;
+    if(['neu','gesehen','in_bearbeitung'].indexOf(i.status)<0||!i.created_at||i.created_at>vor3)return false;
     return !CACHE.comms.some(function(c){return i.customer_id&&c.customer_id===i.customer_id&&c.channel!=='note'&&c.occurred_at>=i.created_at});
   }).sort(function(a,b){return a.created_at<b.created_at?-1:1});
   document.getElementById('dashSilentInq').innerHTML=silentInq.slice(0,8).map(function(i){
@@ -1959,7 +1985,7 @@ function composeFromNote(noteId){
 }
 
 /* ===== Anfragen ===== */
-var INQ_BADGE={neu:'gold',in_bearbeitung:'blue',erledigt:'green',abgesagt:'red',archiviert:'grey'};
+var INQ_BADGE={neu:'gold',gesehen:'blue',in_bearbeitung:'blue',erledigt:'green',abgesagt:'red',archiviert:'grey'};
 function renderInq(){
   /* Die Zahl im Menü zählt nur die neuen Anfragen, die Liste zeigt alle - ohne diese
      Zeile wirkt das wie ein Zählfehler. */
@@ -1979,11 +2005,17 @@ function renderInq(){
       (konf.length?' <span class="b gold" title="'+esc(konf.join(' · '))+'">Termin belegt</span>':'')+'</td>'+
     '<td><span class="b '+(INQ_BADGE[i.status]||'grey')+'">'+i.status.replace('_',' ')+'</span></td>'+
     '<td style="white-space:nowrap"><button class="btn g sm" onclick="viewInq(\''+i.id+'\')">Ansehen</button> '+
-    (i.customer_id?'<a class="sml" onclick="openCustDetail(\''+i.customer_id+'\')">→ Kunde</a>':'<button class="btn sm" onclick="inqToCust(\''+i.id+'\')">Als Kunde anlegen</button>')+'</td></tr>';
+    (i.customer_id?'<button class="btn sm" onclick="openCustDetail(\''+i.customer_id+'\')">Zum Kunden</button>':'<button class="btn sm" onclick="inqToCust(\''+i.id+'\')">Als Kunde anlegen</button>')+'</td></tr>';
   }).join('')||'<tr><td colspan="6" class="mut">Noch keine Anfragen.</td></tr>';
 }
 function viewInq(id){
   var i=CACHE.inquiries.find(function(x){return x.id===id});if(!i)return;
+  /* Web-Anfragen legen Kunde + Gig schon serverseitig an - "Als Kunde anlegen" gibt es
+     dann nicht, und die Anfrage blieb ewig "neu" (rote Zahl im Menue). Oeffnen = gesehen. */
+  if(i.status==='neu'){
+    api('inquiries?id=eq.'+id,{method:'PATCH',body:{status:'gesehen'}})
+      .then(function(){i.status='gesehen';renderInq();renderDash()}).catch(function(){});
+  }
   var konf=dateConflicts(i.event_date,i.customer_id);
   var tage=i.event_date?Math.round((new Date(i.event_date)-new Date(new Date().toISOString().slice(0,10)))/86400000):null;
   var eilig=tage!=null&&tage>=0&&tage<=10;
@@ -2004,7 +2036,7 @@ function viewInq(id){
     replyTplOptions(konf.length?/^Termin belegt/i:null)+
     '</select><button class="btn" style="white-space:nowrap" onclick="composeReply(\''+i.id+'\')">Verfassen</button></div></div>'+
     '<div style="margin-top:14px">'+
-    (i.customer_id?'':'<button class="btn g" onclick="inqToCust(\''+i.id+'\')">Als Kunde anlegen</button>')+
+    (i.customer_id?'<button class="btn" onclick="closeModal();openCustDetail(\''+i.customer_id+'\')">Zum Kunden</button> ':'<button class="btn g" onclick="inqToCust(\''+i.id+'\')">Als Kunde anlegen</button> ')+
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'erledigt\')">Erledigt</button> '+
     (i.status==='abgesagt'?'':'<button class="btn g" onclick="inqAbsagen(\''+i.id+'\')">Absagen</button> ')+
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'archiviert\')">Archivieren</button></div>');
@@ -2457,10 +2489,31 @@ function openBookDetail(id){
       ?'<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b style="color:var(--acc)">Vom Kunden gepflegt'+(b.customer_notes.updated_at?' ('+dt(b.customer_notes.updated_at)+')':'')+':</b>'+
        row('Programmablauf',b.customer_notes.schedule)+row('Musikwünsche',b.customer_notes.music)+row('Vereinbarungen',b.customer_notes.agreements)+'</div>':'');
   renderBe();renderRider();renderPlan();
+  /* Angebot nach Ablauf angenommen: Der Termin steht bewusst noch nicht auf gebucht -
+     hier sieht Markus das auch im Gig und entscheidet, nicht nur im Beleg. */
+  var spaet=['anfrage','angebot'].indexOf(b.status)>=0?(CACHE.documents||[]).filter(function(d){return d.booking_id===id&&d.doc_type==='angebot'&&d.status==='angenommen'}):[];
+  document.getElementById('bdData').innerHTML+=spaet.map(function(d){
+    return '<div class="msg" style="margin-top:10px;border:1px solid var(--yel);color:var(--yel)"><b>Annahme nach Ablauf – bitte prüfen (Angebot '+esc(d.number)+')</b>'+
+      '<div class="sml" style="margin-top:4px;color:var(--txt,inherit)">Der Kunde hat das Angebot nach Ablauf der Gültigkeit angenommen. Der Termin ist noch nicht fest – Verfügbarkeit und Preise prüfen, dann entscheiden.</div>'+
+      '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn g sm" onclick="gigConfirmLate(\''+d.id+'\')">Gig bestätigen</button>'+
+      '<button class="btn g sm" onclick="gigAbsageLate(\''+d.id+'\')">Absagen</button></div></div>';
+  }).join('');
   document.getElementById('bdDocs').innerHTML=renderDocList(function(d){return d.booking_id===id})||
     'Noch keine Dokumente – leg über „+ Neues Dokument" eins an.';
   closeBookMenu();
   showPage('bookd');
+}
+/* Gig bestaetigen / absagen aus dem Gig heraus - dieselben Wege wie im Beleg-Editor
+   (curDoc wird dafuer kurz auf das Angebot gesetzt). */
+function gigConfirmLate(docId){
+  var d=(CACHE.documents||[]).find(function(x){return x.id===docId});if(!d)return;
+  curDoc=d;
+  syncVeranstaltungStatus('angenommen').then(function(){if(curBook)openBookDetail(curBook.id)}).catch(function(e){toast(e.message,1)});
+}
+function gigAbsageLate(docId){
+  var d=(CACHE.documents||[]).find(function(x){return x.id===docId});if(!d)return;
+  openDocEditor(d.id);
+  setTimeout(docAbsagen,400);
 }
 /* ===== "Weitere Aktionen"-Menü in der Buchung (Storno, Mietvertrag, Packliste) ===== */
 function toggleBookMenu(ev){
@@ -2771,7 +2824,7 @@ function openBookModal(b,presetCust){
   openModal(b.id?'Gig bearbeiten':'Neuer Gig',
     '<label>Kunde *</label><select id="bCust">'+custOpts+'</select>'+
     '<div class="grid3"><div><label>Status</label><select id="bStatus"><option>anfrage</option><option>angebot</option><option>gebucht</option><option>abgeschlossen</option><option>storniert</option></select></div>'+
-    '<div><label>Art</label><select id="bKind"><option value="dj">DJ</option><option value="technik">Technikverleih</option><option value="dj_technik">DJ + Technik</option></select></div>'+
+    '<div><label>Art</label><select id="bKind" onchange="bookDateCheck()"><option value="dj">DJ</option><option value="technik">Technikverleih</option><option value="dj_technik">DJ + Technik</option></select></div>'+
     '<div><label>Anlass</label><input id="bType" value="'+esc(b.event_type||'')+'" placeholder="Hochzeit, Geburtstag …"></div></div>'+
     '<label>Titel</label><input id="bTitle" value="'+esc(b.title||'')+'" placeholder="z. B. Hochzeit Lisa & Tom">'+
     '<div class="grid4"><div><label>Datum *</label><input type="date" id="bDate" value="'+(b.event_date||'')+'" onchange="bookDateCheck()" oninput="bookDateCheck()"></div>'+
@@ -2801,8 +2854,11 @@ function bookDateCheck(){
   var el=document.getElementById('bDateCheck');if(!el)return;
   var datum=v('bDate');
   if(!datum){el.innerHTML='';return}
-  var konf=konflikteAm(datum,BOOK_EDIT_ID);
-  el.innerHTML=konf.length
+  var art=v('bKind')||'dj';
+  var konf=konflikteAm(datum,BOOK_EDIT_ID,null,art);
+  el.innerHTML=!kollidiertKind(art)
+    ? '<span class="mut">Technikverleih ohne DJ-Einsatz – kollidiert nicht mit anderen Terminen, die Verfügbarkeit prüft der Bestand.</span>'
+    : konf.length
     ? '<span style="color:var(--yel)">An dem Tag steht schon etwas im Kalender: '+esc(konf.join(' · '))+'</span>'
     : '<span style="color:var(--grn)">Der Tag ist im Kalender noch frei.</span>';
 }
@@ -3457,9 +3513,15 @@ function refreshBookOpts(){
     return '<option value="'+b.id+'">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Gig')+'</option>'}).join('');
 }
 document.getElementById('docCust').addEventListener('change',docCustChanged);
-document.getElementById('docType').addEventListener('change',function(){updateDocTypeUI(this.value)});
+document.getElementById('docType').addEventListener('change',function(){updateDocTypeUI(this.value);renderItems()});
 function updateDocTypeUI(t){
   document.getElementById('docDepWrap').style.display=t==='schluss'?'':'none';
+  /* Lieferschein ist preislos: Summen und Rabatt-Block weg, Positionszeilen ohne Preis */
+  var pl=t==='lieferschein';
+  document.getElementById('docTotals').style.display=pl?'none':'';
+  document.getElementById('docDiscBlk').style.display=pl?'none':'';
+  var plNote=document.getElementById('docPlNote');
+  if(plNote)plNote.style.display=pl?'':'none';
   document.getElementById('docDateLbl2').textContent=istZahlbeleg(t)?'Fällig am':'Gültig bis';
   if(curTpl)return; /* im Vorlagen-Editor gelten Zurueck-Link und Vorlagen-Buttons von setTplMode */
   document.getElementById('docBack').setAttribute('onclick','docBack()');
@@ -3487,12 +3549,16 @@ function renderDocSub(){
       :' · <b style="color:var(--yel)">Erhalten '+euro(paid)+' · Rest '+euro(docOffen(d))+' offen</b>';
     paidTxt+=' <a onclick="showPayments()">Zahlungen ('+zahl.length+')</a>';
   }
-  document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(d.status)+'">'+docStatusLabel(d)+'</span>'+verTxt+paidTxt+
+  var cAdr=custOf(d);
+  var adrHint=(ADDRESS_DOC_TYPES.indexOf(d.doc_type)>=0&&cAdr&&!custAddressComplete(cAdr)&&d.status!=='storniert')
+    ?'<div id="docAddrHint" style="margin-top:6px;color:var(--yel)">Adresse unvollständig – vor dem Versand ergänzen '+
+      '<button class="btn g sm" onclick="docFixAddress()">Adresse ergänzen</button></div>':'';
+  document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(d.status)+'">'+docStatusLabel(d)+'</span>'+verTxt+paidTxt+adrHint+
     (d.accepted_name?' · digital angenommen von <b style="color:var(--wh)">'+esc(d.accepted_name)+'</b>'+
       (d.accept_signature?' <a onclick="showAcceptSig()">Unterschrift ansehen</a>':''):'')+
     (offen?'<div id="docExpiredHint" style="margin-top:6px;color:var(--yel)">Angenommen nach Ablauf – Gig noch nicht bestätigt '+
       '<button class="btn g sm" onclick="confirmGigFromDoc()">Gig bestätigen</button> '+
-      '<button class="btn g sm" onclick="setDocStatus(\'abgelehnt\')">Absagen</button></div>':'')+
+      '<button class="btn g sm" onclick="docAbsagen()">Absagen</button></div>':'')+
     renderDocEvents(d);
 }
 /* Kundenreaktionen aus dem Portal direkt am Beleg - bleiben sichtbar, auch wenn sie im
@@ -3506,6 +3572,10 @@ function renderDocEvents(d){
     return '<div>Kunde: '+(LBL[e.kind]||esc(e.kind))+' am '+dt((e.created_at||'').slice(0,10))+
       (e.message?' – „'+esc(e.message.slice(0,200))+(e.message.length>200?'…':'')+'“':'')+(e.phone?' · '+esc(e.phone):'')+'</div>';
   }).join('')+'</div>';
+}
+function docFixAddress(){
+  var c=custOf(curDoc);if(!c)return;
+  askCustAddress(c).then(function(){toast('Adresse gespeichert ✓');renderDocSub();renderStatusBtns()}).catch(function(){});
 }
 function confirmGigFromDoc(){
   syncVeranstaltungStatus('angenommen').then(renderDocSub).catch(function(e){toast(e.message,1)});
@@ -3650,11 +3720,16 @@ function openAuditModal(){
 function renderStatusBtns(){
   var d=curDoc,btns='';
   if(!d.id){document.getElementById('docStatusBtns').innerHTML='';return}
-  if(['angebot','bestaetigung','rechnung','abschlag','schluss'].indexOf(d.doc_type)>=0&&d.status!=='storniert')
+  if(['angebot','bestaetigung','rechnung','abschlag','schluss','gutschrift'].indexOf(d.doc_type)>=0&&d.status!=='storniert')
     btns+='<button class="btn g sm" onclick="docSendMail()">Per E-Mail senden</button> ';
-  if(d.status==='entwurf')btns+='<button class="btn g sm" onclick="setDocStatus(\'versendet\')">→ Versendet</button>';
+  if(d.status==='entwurf')btns+='<button class="btn g sm" onclick="setDocStatus(\'versendet\')">→ Versendet</button> ';
   if(d.doc_type==='angebot'&&d.status==='versendet')
-    btns+='<button class="btn g sm" onclick="setDocStatus(\'angenommen\')">✓ Angenommen</button> <button class="btn g sm" onclick="setDocStatus(\'abgelehnt\')">✕ Abgelehnt</button>';
+    btns+='<button class="btn g sm" onclick="setDocStatus(\'angenommen\')">✓ Angenommen</button> <button class="btn g sm" onclick="setDocStatus(\'abgelehnt\')" title="Der Kunde hat abgesagt – nur der Status wird gesetzt">Kunde hat abgelehnt</button> ';
+  /* Eigene Absage: Grund, Mail an den Kunden, Termin freigeben - alles in einem Dialog.
+     Der reine Status-Knopf "Kunde hat abgelehnt" bleibt fuer den Fall, dass der Kunde
+     abgesagt hat. */
+  if(d.doc_type==='angebot'&&['entwurf','versendet','angenommen'].indexOf(d.status)>=0)
+    btns+='<button class="btn g sm" onclick="docAbsagen()">Absagen</button> ';
   if(istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
     btns+='<button class="btn g sm" onclick="askPaid()">€ Bezahlt</button> ';
   if(d.doc_type==='angebot'&&d.status==='angenommen')
@@ -3700,7 +3775,7 @@ function exportInvoicesCsv(){
   toast(list.length+'Rechnungen exportiert ✓');
 }
 function isOverdue(d){
-  return istZahlbeleg(d.doc_type)&&d.status==='versendet'
+  return istZahlbeleg(d.doc_type)&&d.doc_type!=='gutschrift'&&d.status==='versendet'
     &&d.due_date&&d.due_date<new Date().toISOString().slice(0,10);
 }
 function composeReminderMail(){
@@ -3759,6 +3834,70 @@ function docAction(id,action,body){
 function docAfterStatus(st){
   curDoc.status=st;renderDocSub();renderStatusBtns();renderItems();applyDocLock();refreshDocs();refreshComms();
   return syncVeranstaltungStatus(st).then(renderDocSub);
+}
+/* ===== Eigene Absage am Angebot =====
+   Bisher gab es nur "Abgelehnt" (setzt den Status, sonst nichts): keine Mail, der Gig blieb
+   auf "anfrage", der Kalender zeigte den Tag belegt. Jetzt: Grund (Pflicht), Absage-Mail
+   an den Kunden (Vorlage "Absage durch DJ", mit Vermittlungs-Angebot bei aktiver Agentur)
+   und Termin freigeben - der Beleg wird storniert (Angebot zurueckgezogen), der Gig
+   auf storniert (Kalender frei), Grund in Timeline und Aenderungsprotokoll. */
+var ABSAGE_GRUENDE=[
+  ['Termin doppelt','An dem Tag bin ich inzwischen anderweitig fest gebucht.'],
+  ['Passt nicht','Ich glaube, ich bin nicht der richtige DJ für diese Feier – und dann sollt ihr jemanden haben, der es ist.'],
+  ['Kapazität','Ich bekomme das rund um euren Termin schlicht nicht mehr unter, ohne dass die Qualität leidet.']];
+function docAbsagen(){
+  var d=curDoc;if(!d||!d.id||d.doc_type!=='angebot')return;
+  var cust=(CACHE.customers||[]).find(function(c){return c.id===d.customer_id})||{};
+  var b=d.booking_id?(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id}):null;
+  var gigFrei=b&&['anfrage','angebot','gebucht'].indexOf(b.status)>=0;
+  openModal('Angebot absagen – '+esc(d.number),
+    '<div class="sml mut" style="margin-bottom:10px">Du sagst dem Kunden ab: Das Angebot wird zurückgezogen (Status storniert), der Grund landet in der Kunden-Timeline und im Änderungsprotokoll.</div>'+
+    '<label>Grund *</label><input id="absGrund" list="absGrundListe" placeholder="Termin doppelt, passt nicht, Kapazität …">'+
+    '<datalist id="absGrundListe">'+ABSAGE_GRUENDE.map(function(g){return '<option value="'+esc(g[0])+'">'}).join('')+'</datalist>'+
+    '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer">'+
+    '<input type="checkbox" id="absMail" style="width:auto"'+(cust.email?' checked':' disabled')+'> Absage-Mail an den Kunden'+(cust.email?' ('+esc(cust.email)+')':' – keine E-Mail-Adresse hinterlegt')+
+    (agencyEnabled()&&cust.email?' – mit Vermittlungs-Angebot über '+esc(agencyName()):'')+'</label>'+
+    '<label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer">'+
+    '<input type="checkbox" id="absFrei" style="width:auto"'+(gigFrei?' checked':' disabled')+'> Termin freigeben'+(b?(gigFrei?' (Gig am '+dt(b.event_date)+' auf storniert, Kalender wieder frei)':' – der Gig ist schon '+esc(b.status)):' – kein Gig verknüpft')+'</label>'+
+    '<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn r" onclick="doDocAbsage()">Absagen</button><button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+  setTimeout(function(){var t=document.getElementById('absGrund');if(t)t.focus()},50);
+}
+function doDocAbsage(){
+  var d=curDoc,grund=v('absGrund');
+  if(grund.length<3){toast('Bitte einen Grund angeben.',1);return}
+  var mail=!!(document.getElementById('absMail')||{}).checked,frei=!!(document.getElementById('absFrei')||{}).checked;
+  var b=d.booking_id?(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id}):null;
+  var cust=(CACHE.customers||[]).find(function(c){return c.id===d.customer_id});
+  var jobs=[docAction(d.id,'storno',{reason:'Absage durch DJ – '+grund})];
+  if(frei&&b)jobs.push(api('bookings?id=eq.'+b.id,{method:'PATCH',body:{status:'storniert'}}));
+  if(d.customer_id)jobs.push(api('communications',{method:'POST',body:{customer_id:d.customer_id,booking_id:d.booking_id||null,channel:'note',direction:'out',
+    subject:'Angebot '+d.number+' abgesagt',content:'Angebot '+d.number+(b&&b.event_date?' für den '+dt(b.event_date):'')+' von meiner Seite abgesagt. Grund: '+grund+(frei&&b?' – Termin im Kalender freigegeben.':''),
+    occurred_at:new Date().toISOString()}}));
+  Promise.all(jobs).then(function(){
+    closeModal();toast('Angebot abgesagt'+(frei&&b?', Termin freigegeben':'')+' ✓');
+    curDoc.status='storniert';renderDocSub();renderStatusBtns();renderItems();applyDocLock();refreshDocs();refreshComms();
+    if(frei&&b)reloadBookings();
+    if(mail&&cust&&cust.email)docAbsageMail(d,cust,b,grund);
+  }).catch(function(e){toast(e.message,1)});
+}
+/* Absage-Mail: Vorlage "Absage durch DJ"; bei aktiver Agentur wird der Vorauswahl-Bogen
+   angelegt (Gig + Beleg als Vorbelegung) und als Vermittlungs-Absatz eingesetzt. */
+function docAbsageMail(d,cust,b,grund){
+  var tpl=tplKey('absage_dj')||{subject:'Zu eurem Angebot {nummer} – leider eine Absage',
+    body:'Hallo {vorname},\n\nich muss euch leider absagen: Das Angebot {nummer} für {termin} kann ich nicht halten. {grund}\n\nDas tut mir ehrlich leid.\n\n{vermittlung}Wenn ihr Fragen habt: ruft mich an ({telefon}) oder antwortet einfach auf diese Mail.\n\nAlles Gute für eure Feier!\n{inhaber}'};
+  var satz=(ABSAGE_GRUENDE.find(function(g){return g[0].toLowerCase()===grund.toLowerCase()})||[null,grund])[1];
+  var i={name:custName(cust),email:cust.email,customer_id:cust.id,booking_id:d.booking_id||null,event_date:(b&&b.event_date)||null,
+    location:(b&&b.venue_name)||'',event_type:(b&&(b.event_type||b.title))||'',_nummer:d.number,_grund:satz,_vermittlung:'',
+    _title:'Absage zu Angebot '+esc(d.number)+' per E-Mail',_doc:true};
+  if(!agencyEnabled()){openCompose(i,tpl,null,null);return}
+  var ft=(CACHE.formTpls||[]).find(function(x){return (x.name||'').indexOf('Vorauswahl')>=0});
+  if(!ft){openCompose(i,tpl,null,null);return}
+  createForm(ft.id,null,cust.id,function(f){
+    var link=portalUrl('f',f.token);
+    api('forms?id=eq.'+f.id,{method:'PATCH',body:{booking_id:d.booking_id||null,doc_id:d.id}}).catch(function(){});
+    i._vermittlung='Was ich euch anbieten kann: Über meine Partner-Agentur '+agencyName()+' kenne ich richtig gute Kollegen – die Agentur hat deutschlandweit geprüfte DJs, der Kollege für eure Feier kommt also aus eurer Gegend. Die Vermittlung ist für euch kostenlos und unverbindlich. Füllt dafür kurz diesen Bogen aus, dann weiß ich, wer zu euch passt:\n'+link+'\n\n';
+    openCompose(i,tpl,link,null);
+  });
 }
 /* Storno: nie ohne Grund, nie auf einer bezahlten Rechnung (dafuer gibt es die Gutschrift). */
 function askStorno(){
@@ -3836,10 +3975,15 @@ function doPaid(){
 function refreshPayments(){return api('payments?select=*&order=paid_at').then(function(r){CACHE.payments=r||[]}).catch(function(){})}
 function setDocStatus(st){
   var wasVersand=st==='versendet';
+  /* Kein Versand ohne vollstaendige Adresse: erst der Dialog, dann weiter */
+  if(wasVersand&&ADDRESS_DOC_TYPES.indexOf(curDoc.doc_type)>=0){
+    var cA=custOf(curDoc);
+    if(cA&&!custAddressComplete(cA)){askCustAddress(cA).then(function(){renderDocSub();setDocStatus(st)}).catch(function(e){toast(e.message,1)});return}
+  }
   if(curDoc.doc_type==='gutschrift'&&wasVersand&&Math.abs(Number(curDoc.total_gross)||0)<0.005){toast('Eine Gutschrift über 0,00 € ergibt keinen Sinn – bitte Positionen prüfen.',1);return}
-  /* Eine Gutschrift wird nicht bezahlt - sie mindert beim Versand sofort den offenen
-     Betrag der Rechnung, ohne eigenen Zahlungsvorgang. */
-  if(curDoc.doc_type==='gutschrift'&&st==='versendet')st='bezahlt';
+  /* Eine Gutschrift mindert ab dem Versand den offenen Betrag der Rechnung (gutschriftSum
+     zaehlt alles ausser storniert) - sie bleibt deshalb ehrlich auf "versendet", bis die
+     Erstattung tatsaechlich geflossen ist (dann "€ Bezahlt"). */
   var patch={status:st};
   if(wasVersand)patch.sent_at=new Date().toISOString();
   if(st==='bezahlt')patch.paid_at=new Date().toISOString();
@@ -3892,7 +4036,26 @@ function subMenge(it){
   return days?Math.round((it.qty/days)*100)/100:it.qty;
 }
 function itemRowHtml(it,i,posLabel,locked,sml){
-  var sum=lineTotal(it);
+  var sum=lineTotal(it),pl=v('docType')==='lieferschein';
+  if(sml&&pl){
+    return '<div class="it-row sml pl">'+
+    '<div style="display:flex;align-items:center;justify-content:center;color:var(--gll);user-select:none">'+posLabel+'</div>'+
+    '<input value="'+esc(it.description)+'" oninput="itSet('+i+',\'description\',this.value)">'+
+    '<input value="'+subMenge(it)+'" disabled>'+
+    '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
+    (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--redl)" title="Stufe löschen">✕</a>')+'</div>';
+  }
+  if(pl){
+    /* Lieferschein = Uebergabeprotokoll: Artikel, Menge, Einheit, Notiz - keine Preise */
+    return '<div class="it-row pl" style="margin-bottom:3px">'+
+    '<div'+(locked?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':'grab')+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked?'':'<span style="opacity:.55">⠿</span>')+posLabel+'</div>'+
+    '<input value="'+esc(it.description)+'" placeholder="Artikel" list="artikelVorschlaege" oninput="itSet('+i+',\'description\',this.value)" onchange="itAutoFill('+i+',this.value)">'+
+    '<span class="it-lbl">Menge</span><input type="number" step="1" value="'+it.qty+'" placeholder="Menge" title="Menge" oninput="itSet('+i+',\'qty\',this.value)">'+
+    '<span class="it-lbl">Einheit</span><select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
+    (locked?'<span></span>':'<span class="it-act">'+itMoveBtns(i)+'<a onclick="itDel('+i+')" style="color:var(--redl)" title="Position löschen">✕</a></span>')+'</div>'+
+    '<div style="padding-left:42px;padding-right:34px;display:flex;gap:6px">'+
+    '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Hinweis (Zustand, Zubehör, Seriennummer) – optional" style="font-size:10px;padding:5px 8px;color:var(--gll)"></div>';
+  }
   if(sml){
     /* Kompakte Unterposition (Rabattstaffel-Stufe): eine einzeilige Zeile ohne Notiz/Rabatt-Feld,
        damit eine Position mit mehreren Miettagen nicht zu viel Platz braucht. */
@@ -4081,6 +4244,10 @@ function saveDoc(){
   if(!custId){toast('Bitte Kunden wählen.',1);return}
   var type=v('docType'),c=docCalc();
   if(type==='gutschrift'&&Math.abs(c.gross)<0.005){toast('Eine Gutschrift über 0,00 € ergibt keinen Sinn – bitte Positionen prüfen.',1);return}
+  /* Lieferschein speichert keine Preise - was in einem alten Beleg noch an Preisen stand,
+     wird beim Speichern genullt (Uebergabeprotokoll, kein Zahlbeleg). */
+  var preislos=type==='lieferschein';
+  if(preislos){c.net=0;c.tax=0;c.gross=0;c.override=null;c.discVal=0;c.disc=0;c.dep=0}
   var body={doc_type:type,customer_id:custId,booking_id:v('docBook')||null,doc_date:v('docDate'),
     /* Bei einem uebernommenen Beleg zaehlt dessen Kennzeichen, sonst die Firmeneinstellung -
        sonst verliert eine Korrektur an einem Altbeleg den Paragraf-19-Hinweis, sobald
@@ -4119,8 +4286,8 @@ function saveDoc(){
       filtered.forEach(function(it,i){if(it.is_header)gidPos[hKey(it)]=i+1});
       var items=filtered.map(function(it,i){
         var pk=pKey(it);
-        return {document_id:d.id,pos:i+1,description:it.description,note:it.note||null,qty:it.qty,unit:it.unit,unit_price:it.unit_price,
-          discount_value:it.discount_value||0,discount_type:it.discount_type||'pct',
+        return {document_id:d.id,pos:i+1,description:it.description,note:it.note||null,qty:it.qty,unit:it.unit,unit_price:preislos?0:it.unit_price,
+          discount_value:preislos?0:(it.discount_value||0),discount_type:it.discount_type||'pct',
           is_header:it.is_header?1:0,group_pos:pk!=null?(gidPos[pk]!=null?gidPos[pk]:null):null}});
       return items.length?api('document_items',{method:'POST',body:items}):null;
     });
@@ -4312,10 +4479,15 @@ function renderEventHint(){
 /* Kalenderprüfung direkt beim Eintippen des Datums: sonst faellt eine Doppelbelegung
    erst auf, wenn das Angebot schon beim Kunden liegt. Die eigene Veranstaltung zaehlt
    dabei natuerlich nicht als Konflikt. */
-function konflikteAm(datum,ausser,eigenerKunde){
+/* Reine Technik-Vermietung kollidiert nie - weder als bestehender Gig noch als der
+   Gig, um den es gerade geht (Markus ist da nicht vor Ort; das Material prueft der
+   Bestand). Dieselbe Regel wie bookingConflicts() im Server. */
+function kollidiertKind(kind){return !kind||kind==='dj'||kind==='dj_technik'}
+function konflikteAm(datum,ausser,eigenerKunde,eigeneArt){
   if(!datum)return [];
+  if(eigeneArt!==undefined&&!kollidiertKind(eigeneArt))return [];
   return (CACHE.bookings||[]).filter(function(b){
-    if(b.id===ausser||b.status==='storniert'||!b.event_date)return false;
+    if(b.id===ausser||b.status==='storniert'||!b.event_date||!kollidiertKind(b.kind))return false;
     /* Die Veranstaltung, um die es hier gerade geht, ist kein Konflikt mit sich selbst -
        auch dann nicht, wenn sie noch nicht verknuepft ist. Erkannt ueber Kunde + Datum. */
     if(eigenerKunde&&b.customer_id===eigenerKunde&&datum>=b.event_date&&datum<=(b.end_date||b.event_date))return false;
@@ -4333,8 +4505,11 @@ function renderDateCheck(datum){
   /* Massgeblich ist, was im Auswahlfeld steht - curDoc.booking_id wird erst beim
      Speichern gesetzt. Zusaetzlich der Kunde des Belegs: seine eigene Feier am selben
      Tag ist kein Konflikt, sonst warnt fast jedes Angebot aus einer Anfrage. */
-  var konf=konflikteAm(datum,v('docBook')||(curDoc&&curDoc.booking_id),v('docCust'));
-  el.innerHTML=konf.length
+  var art=v('evKind')||(function(){var b=(CACHE.bookings||[]).find(function(x){return x.id===(v('docBook')||(curDoc&&curDoc.booking_id))});return b?b.kind:'dj'})();
+  var konf=konflikteAm(datum,v('docBook')||(curDoc&&curDoc.booking_id),v('docCust'),art);
+  el.innerHTML=!kollidiertKind(art)
+    ? '<span class="mut">Technikverleih ohne DJ-Einsatz – kein Terminkonflikt möglich, die Verfügbarkeit prüft der Bestand.</span>'
+    : konf.length
     ? '<span style="color:var(--yel)">Achtung, an dem Tag steht schon etwas im Kalender: '+esc(konf.join(' · '))+'</span>'
     : '<span style="color:var(--grn)">Der Tag ist im Kalender noch frei.</span>';
 }
@@ -4655,13 +4830,23 @@ function docToInvoice(type){
          diese Buchung gebuchten Preise nachladen (beruecksichtigt Partner-Rabatt/
          Miettage), sonst den aktuellen Katalogpreis. */
       var lsBook=src.booking_id?CACHE.bookings.find(function(b){return b.id===src.booking_id}):null;
-      var lsPriced=lsBook?bookEquipList(lsBook):[];
+      var lsPriced=lsBook?bookEquipListIds(lsBook):[];
+      var ohnePreis=[];
       curItems=copyItems(items.map(function(it){
-        var match=lsPriced.find(function(p){return p.name===it.description});
+        if(it.is_header)return Object.assign({},it);
+        var name=lsArtikelName(it.description);
+        /* Zuerst die Technik des Gigs (ueber equipment_id der Position, sonst Artikelname
+           ohne "Technik-Miete: " und "(N Miettage)"), dann der Artikelstamm, dann der Katalog. */
+        var match=lsPriced.find(function(p){return it.equipment_id&&p.equipment_id===it.equipment_id})
+          ||lsPriced.find(function(p){return p.name===name||p.name===it.description});
         var unit=match?(Number(match.price)/(Number(it.qty)||1)):0;
-        if(!unit){var cat=catalogFind(it.description);if(cat)unit=Number(cat.price)||0;}
-        return Object.assign({},it,{unit_price:unit});
+        if(!unit){var eq=(CACHE.equipment||[]).find(function(e){return e.name===name});
+          if(eq)unit=lsBook?rentPrice(eq,lsBook):(Number(eq.day_rate)||0);}
+        if(!unit){var cat=catalogFind(name)||catalogFind(it.description);if(cat)unit=Number(cat.price)||0;}
+        if(!unit)ohnePreis.push(it.description);
+        return Object.assign({},it,{unit_price:Math.round(unit*100)/100});
       }));
+      if(ohnePreis.length)setTimeout(function(){toast('Kein Preis gefunden für: '+ohnePreis.join(', ')+' – bitte in der Rechnung eintragen.',1)},300);
     }else if(type==='gutschrift'){
       /* Positionen mit umgekehrtem Vorzeichen uebernehmen - Markus kuerzt sie danach auf
          das, was tatsaechlich gutgeschrieben wird. Rabatt/Pauschalpreis bewusst NICHT
@@ -4681,6 +4866,18 @@ function docToInvoice(type){
 }
 
 /* ===== Lieferschein & Mietvertrag ===== */
+/* Artikelname einer Lieferschein-/Angebotsposition: ohne Praefix "Technik-Miete: " und
+   ohne Miettage-Zusatz, damit er gegen Gig-Technik, Artikelstamm und Katalog passt. */
+function lsArtikelName(desc){
+  return String(desc||'').replace(/^Technik-Miete:\s*/i,'').replace(/\s*\(\d+\s*Miettage?\)\s*$/i,'').trim();
+}
+/* Wie bookEquipList, zusaetzlich mit equipment_id je Zeile */
+function bookEquipListIds(b){
+  return CACHE.be.filter(function(x){return x.booking_id===b.id}).map(function(x){
+    var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};
+    return {equipment_id:x.equipment_id,name:eq.name||'?',qty:x.qty,price:x.price_override!=null?Number(x.price_override):rentPrice(eq,b)*x.qty,notes:x.notes};
+  });
+}
 function bookEquipList(b){
   return CACHE.be.filter(function(x){return x.booking_id===b.id}).map(function(x){
     var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};
@@ -4757,11 +4954,7 @@ function openDigitalRental(){
   var b=curBook,cust=CACHE.customers.find(function(c){return c.id===b.customer_id});
   if(!cust){toast('Kunde nicht gefunden.',1);return}
   if(!bookEquipList(b).length){toast('Keine Technik zugeordnet – bitte erst Mietsachen zuordnen.',1);return}
-  var ensureZip=cust.zip?Promise.resolve():(function(){
-    var z=prompt('Der Kunde hat noch keine PLZ hinterlegt – sie dient als Login fürs Portal.\nPLZ des Kunden:');
-    if(!z)return Promise.reject(new Error('Ohne PLZ kein Kundenlink.'));
-    return api('customers?id=eq.'+cust.id,{method:'PATCH',body:{zip:z.trim()}}).then(function(){cust.zip=z.trim()});
-  })();
+  var ensureZip=custAddressComplete(cust)?Promise.resolve():askCustAddress(cust);
   ensureZip.then(function(){return api('rental_contracts?booking_id=eq.'+b.id)})
   .then(function(rows){
     if(rows&&rows.length)return rows[0];
@@ -4782,7 +4975,7 @@ function showRentalModal(rc){
     '<div class="mut sml" style="margin-top:4px">Wird dem Kunden im Mietvertrag angezeigt und bei der Rückgabe erstattet. Ohne Eintrag steht im Vertrag keine Zahl – erinnert dich das Dashboard, solange offen.</div>';
   }
   if(rc.status==='unterschrieben'){
-    html+='<div style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px"> <b>Unterschrieben</b>am '+dt(rc.signed_at)+'von '+esc(rc.signed_name)+'</div>'+
+    html+='<div style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px"> <b>Unterschrieben</b> am '+dt(rc.signed_at)+' von '+esc(rc.signed_name)+'</div>'+
     '<img src="'+esc(rc.signature)+'" alt="Unterschrift" style="background:#fff;border-radius:8px;max-width:100%;max-height:110px;display:block;margin-bottom:12px">'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
     (rc.id_front?'<button class="btn g sm" onclick="viewIdFile(\''+rc.id_front+'\')">Ausweis Vorderseite</button>':'')+
@@ -4917,6 +5110,7 @@ function buildDocHtml(){
   var d=curDoc,c=docCalc(),comp=S.company||{};
   var cust=CACHE.customers.find(function(x){return x.id===v('docCust')})||{};
   var type=v('docType');
+  if(type==='lieferschein')return buildLieferscheinHtml(d,cust,comp);
   var small=Number(document.getElementById('docTax').value)===0&&
     (d.is_small_business!=null&&d.is_small_business!=='' ? !!Number(d.is_small_business) : !!comp.small_business);
   var brutto=docModeVal()==='brutto'&&!small;
@@ -4982,10 +5176,57 @@ function buildDocHtml(){
   '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>'+
   (small?'<p style="color:#555;margin-bottom:12px">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>':'')+
   (v('docOutro')?'<p style="margin-bottom:20px;white-space:pre-wrap">'+esc(v('docOutro'))+'</p>':'')+
+  (d.status!=='storniert'?agreementsBlockHtml(type):'')+
   '<div style="margin-top:36px;padding-top:10px;border-top:1px solid #ccc;font-size:10px;color:#666;display:flex;justify-content:space-between;gap:20px">'+
   '<div>'+esc(comp.name||'')+'<br>'+(comp.tax_id?'St.-Nr.: '+esc(comp.tax_id):'')+(comp.vat_id?'<br>USt-IdNr.: '+esc(comp.vat_id):'')+'</div>'+
   '<div>'+(comp.bank?esc(comp.bank)+'<br>':'')+(comp.iban?'IBAN: '+esc(comp.iban)+'<br>':'')+(comp.bic?'BIC: '+esc(comp.bic):'')+(comp.paypal?(comp.bic?'<br>':'')+'PayPal: '+esc(comp.paypal):'')+'</div>'+
   '<div>'+esc(comp.phone||'')+'<br>'+esc(comp.email||'')+'</div></div></div>';
+}
+/* "Vereinbarungen" (Angebot/AB) bzw. "Zahlungsbedingungen" (Rechnungen) unter den
+   Positionen - Text aus Einstellungen -> Belege/Vorgaben, dieselben Platzhalter wie
+   agreementsForDoc() im Server, damit Kundenansicht, Druck und Portal dasselbe zeigen. */
+function agreementsText(type){
+  var defs=S.defaults||{},txt='';
+  if(type==='angebot'||type==='bestaetigung')txt=defs.agreements_text||'';
+  else if(['rechnung','abschlag','schluss'].indexOf(type)>=0)txt=defs.payment_terms_text||'';
+  txt=String(txt).trim();if(!txt)return '';
+  var agb=location.origin+location.pathname.replace(/[^\/]*$/,'index.html#agb');
+  return txt.replace(/\{zahlungsziel\}/g,String(Number(defs.payment_days)||14)).replace(/\{agb_link\}/g,agb);
+}
+function agreementsBlockHtml(type){
+  var a=agreementsText(type);if(!a)return '';
+  var html=esc(a).replace(/(https?:\/\/[^\s<]+)/g,function(u){return '<a href="'+u+'" style="color:#111">'+u+'</a>'});
+  return '<div class="pb-avoid" style="margin:16px 0 14px;padding:10px 12px;border:1px solid #ddd;border-left:3px solid #111;border-radius:4px;font-size:10.5px;color:#333;line-height:1.5">'+
+    '<div style="font-weight:700;margin-bottom:4px;font-size:11px">'+(istZahlbeleg(type)?'Zahlungsbedingungen':'Vereinbarungen')+'</div>'+
+    '<div style="white-space:pre-wrap">'+html+'</div></div>';
+}
+/* Lieferschein in der Kundenansicht: dieselbe Mengen-Tabelle wie beim Druck
+   (printLieferschein), nie Preise oder Summen. */
+function buildLieferscheinHtml(d,cust,comp){
+  var b=(CACHE.bookings||[]).find(function(x){return x.id===(v('docBook')||d.booking_id)})||{};
+  var list=curItems.filter(function(it){return it.description&&!it.is_header});
+  var rows=list.map(function(it,i){
+    return '<tr><td style="padding:8px;border-bottom:1px solid #ddd">'+(i+1)+'</td>'+
+    '<td style="padding:8px;border-bottom:1px solid #ddd">'+esc(it.description)+(it.note?'<div style="font-size:10px;color:#666">'+esc(it.note)+'</div>':'')+'</td>'+
+    '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:right">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
+    '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:center"></td>'+
+    '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:center"></td></tr>';
+  }).join('');
+  var bezug=docBezugHtml(d,'lieferschein','#b00000');
+  return '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-size:12px;line-height:1.55">'+bezug.banner+
+  '<div style="display:flex;justify-content:space-between;margin-bottom:30px"><div>'+
+  '<div style="font-size:20px;font-weight:700">'+esc(comp.name||'')+'</div><div style="color:#555">'+esc(comp.owner||'')+'</div></div>'+
+  '<div style="text-align:right;color:#555">'+esc(comp.street||'')+'<br>'+esc(comp.zip_city||'')+'<br>'+esc(comp.phone||'')+'</div></div>'+
+  '<div style="font-size:17px;font-weight:700;margin-bottom:4px">Lieferschein '+esc(d.number)+'</div>'+
+  '<div style="color:#555;margin-bottom:18px">Datum: '+dt(v('docDate'))+(b.event_date?' · Auftrag: '+esc(b.title||b.event_type||'')+' am '+dt(b.event_date)+(b.venue_name?' · '+esc(b.venue_name):''):'')+'</div>'+
+  '<div style="margin-bottom:20px"><b>Empfänger:</b> '+esc(custName(cust))+(cust.street?', '+esc(cust.street)+', '+esc([cust.zip,cust.city].filter(Boolean).join(' ')):'')+'</div>'+
+  '<table style="width:100%;border-collapse:collapse;margin-bottom:24px"><thead><tr style="background:#f2f2f2">'+
+  '<th style="padding:8px;text-align:left">Pos</th><th style="padding:8px;text-align:left">Artikel</th><th style="padding:8px;text-align:right">Menge</th><th style="padding:8px">Übergeben</th><th style="padding:8px">Zurück</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+  (v('docIntro')?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(v('docIntro'))+'</p>':'')+
+  '<p style="color:#555;font-size:11px;margin-bottom:34px">Der Empfänger bestätigt den Erhalt der aufgeführten Artikel in einwandfreiem, geprüftem Zustand. Für Vermietungen gelten Mietvertrag und AGB.</p>'+
+  '<div style="display:flex;gap:40px;margin-top:30px">'+
+  '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift – Übergabe</div></div>'+
+  '<div style="flex:1"><div style="border-top:1px solid #111;padding-top:4px;font-size:10px;color:#555">Ort, Datum, Unterschrift – Rückgabe</div></div></div></div>';
 }
 /* Storno-Banner und Bezugszeilen fuer den Beleg (Druck + Kundenansicht). */
 function docBezugHtml(d,type,col){
@@ -6818,6 +7059,7 @@ function openTechCheckModal(id){
     (cust?'<div class="sml" style="margin:-6px 0 10px"><a onclick="closeModal();openCustDetail(\''+cust.id+'\')">Zum Kunden →</a></div>':'')+
     '<div class="grid2"><div><label>Datum des Checks</label><input type="date" id="tcDate" value="'+(t.date||new Date().toISOString().slice(0,10))+'"></div>'+
     '<div><label>Anlage / Ort</label><input id="tcWhere" value="'+esc(t.where||'')+'" placeholder="z. B. Saalanlage Vereinsheim Musterstraße"></div></div>'+
+    tcFormSectionHtml(cust)+
     '<div class="sml mut" style="margin:10px 0 2px">– Vom Kunden (aus dem Vorab-Fragebogen übernehmen oder vor Ort erfragen) –</div>'+
     '<label>Wofür wird die Tontechnik genutzt? / Anforderungen</label><textarea id="tcUse" style="min-height:52px">'+esc(t.use||'')+'</textarea>'+edBtn('tcUse')+
     '<label>Aktuelle Probleme</label><textarea id="tcProb" style="min-height:52px">'+esc(t.problems||'')+'</textarea>'+edBtn('tcProb')+
@@ -6846,6 +7088,57 @@ function openTechCheckModal(id){
     '<div class="mut sml" style="margin-top:8px">Tipp: Vorab-Fragen als Fragebogen senden (Fragebögen → „Technik-Check – Vorab-Fragen"), Abrechnung über die Produkte TECH-CHECK / TECH-CHECK-PLUS.</div>');
   TC_PHOTOS=(t.photos||[]).slice();
   tcRenderPhotos();
+}
+/* Vorab-Fragebogen direkt im Check: Bogen senden (Vorlage "Technik-Check …") und, wenn
+   der Kunde ihn beantwortet hat, die Antworten lesen und ins Protokoll uebernehmen. */
+function tcFormTpl(){return (CACHE.formTpls||[]).find(function(t){return /^Technik-Check/i.test(t.name||'')})||null}
+function tcAnsweredForm(cust){
+  var t=tcFormTpl();if(!t||!cust)return null;
+  return (CACHE.forms||[]).filter(function(f){return f.customer_id===cust.id&&f.title===t.name&&f.status==='beantwortet'})
+    .sort(function(a,b){return (b.submitted_at||'')<(a.submitted_at||'')?-1:1})[0]||null;
+}
+function tcFormSectionHtml(cust){
+  var t=tcFormTpl();
+  var html='<div style="border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:10px 14px;margin:6px 0 4px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><b>Vorab-Fragebogen</b>';
+  if(!t)return html+'<span class="sml mut">Keine Bogen-Vorlage „Technik-Check …“ vorhanden (Fragebögen → Vorlagen).</span></div></div>';
+  if(!cust)return html+'<span class="sml mut">Kein Kunde zugeordnet.</span></div></div>';
+  var f=tcAnsweredForm(cust),offen=(CACHE.forms||[]).some(function(x){return x.customer_id===cust.id&&x.title===t.name&&x.status!=='beantwortet'});
+  html+='<button class="btn g sm" onclick="tcSendForm()">Fragebogen senden</button></div>';
+  if(f){
+    html+='<div class="sml mut" style="margin-top:6px">Beantwortet am '+dt((f.submitted_at||'').slice(0,10))+':</div>'+
+      '<div class="sml" style="max-height:180px;overflow-y:auto;margin-top:4px">'+(f.fields||[]).map(function(fl,i){
+        var a=(f.answers||[])[i];if(Array.isArray(a))a=a.join(', ');
+        return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span class="mut">'+esc(fl.label)+'</span><br>'+esc(a==null||a===''?'–':String(a))+'</div>';
+      }).join('')+'</div>'+
+      '<div style="margin-top:8px"><button class="btn sm" onclick="tcApplyForm(\''+f.id+'\')">In Protokoll übernehmen</button> <span class="sml mut">füllt Anforderungen, Probleme, Wünsche und Budget – danach speichern</span></div>';
+  }else html+='<div class="sml mut" style="margin-top:6px">'+(offen?'Bogen ist verschickt, noch keine Antwort.':'Noch kein Bogen an diesen Kunden – per Knopf anlegen und mailen (ohne E-Mail-Adresse wird der Link kopiert).')+'</div>';
+  return html+'</div>';
+}
+function tcSendForm(){
+  var t=tcFormTpl(),cust=(CACHE.customers||[]).find(function(c){return c.id===(curCheck&&curCheck.customer_id)});
+  if(!t||!cust){toast('Keine Vorlage oder kein Kunde.',1);return}
+  createForm(t.id,null,cust.id,function(f){
+    if(cust.email)formSendMail(f.id);
+    else{closeModal();copyFormLink(f.token);}
+  });
+}
+/* Antworten -> Protokollfelder: passende Fragen (Anforderungen, Probleme, Wuensche,
+   Budget) landen in ihrem Feld, alles andere als "Frage: Antwort" in der Ausgangslage. */
+function tcApplyForm(formId){
+  var f=(CACHE.forms||[]).find(function(x){return x.id===formId});if(!f)return;
+  var map=[[/anforderung|können|nutzt ihr|wofür/i,'tcUse'],[/problem/i,'tcProb'],[/wünsch/i,'tcWish'],[/budget/i,'tcBudget']];
+  var rest=[],gesetzt=0;
+  (f.fields||[]).forEach(function(fl,i){
+    var a=(f.answers||[])[i];if(Array.isArray(a))a=a.join(', ');
+    a=(a==null?'':String(a)).trim();if(!a)return;
+    var m=map.find(function(x){return x[0].test(fl.label||'')});
+    var el=m?document.getElementById(m[1]):null;
+    if(el&&!el.dataset.tcFilled){el.value=a;el.dataset.tcFilled='1';gesetzt++}
+    else rest.push((fl.label||'Frage')+': '+a);
+  });
+  if(rest.length){var u=document.getElementById('tcUse');u.value=(u.value?u.value+'\n\n':'')+rest.join('\n');}
+  toast('Antworten übernommen ('+gesetzt+' Felder'+(rest.length?', '+rest.length+' als Text in der Ausgangslage':'')+') – bitte speichern.');
 }
 var TC_PHOTOS=[];
 function tcRenderPhotos(){
@@ -7027,7 +7320,7 @@ function nlAdminSend(test){
     .then(function(r){return r.json()}).then(function(j){
       if(j.error){toast(j.error,1);return}
       toast(test?(j.mailed?'Testmail verschickt ✓':'Testmail fehlgeschlagen – Firmen-E-Mail in den Einstellungen prüfen'):
-        ('Versendet ✓ '+j.sent+'von '+j.total+(j.failed?' – '+j.failed+'fehlgeschlagen':'')),test&&!j.mailed?1:0);
+        ('Versendet ✓ '+j.sent+' von '+j.total+(j.failed?' – '+j.failed+' fehlgeschlagen':'')),test&&!j.mailed?1:0);
     }).catch(function(e){toast(e.message,1)});
 }
 
@@ -7066,9 +7359,11 @@ function printPackliste(){
   document.getElementById('printArea').innerHTML=
   '<div style="max-width:680px;margin:0 auto;padding:36px 20px;font-size:12px;line-height:1.5">'+
   '<div style="font-size:17px;font-weight:700">Packliste – '+esc(b.title||b.event_type||'Gig')+'</div>'+
-  '<div style="color:#555;margin-bottom:6px">'+dt(b.event_date)+(b.start_time?' · Beginn '+b.start_time.slice(0,5)+' Uhr':'')+
+  '<div style="color:#555;margin-bottom:2px">'+dt(b.event_date)+(b.start_time?' · Beginn '+b.start_time.slice(0,5)+' Uhr':'')+
   (r.setup_from?' · Aufbau ab '+r.setup_from.slice(0,5)+' Uhr':'')+
   ((b.venue_name||b.venue_address)?' · '+esc([b.venue_name,b.venue_address].filter(Boolean).join(', ')):'')+'</div>'+
+  /* Kunde + Telefon: vor Ort will man anrufen koennen, ohne erst das Backoffice zu oeffnen */
+  (function(){var c=custOf(b);return c?'<div style="color:#555;margin-bottom:6px">Kunde: '+esc(custName(c))+(c.phone?' · Telefon '+esc(c.phone):'')+'</div>':''})()+
   sec('Technik für diesen Gig',eq)+
   sec('Immer dabei',always)+
   sec('DJ-Standard',dj)+
@@ -7313,12 +7608,18 @@ function renderSet(){
   document.getElementById('sPlanLock').value=d.plan_lock_days!=null?d.plan_lock_days:3;
   document.getElementById('sFollowDays').value=d.followup_days!=null?d.followup_days:7;
   document.getElementById('sFormRemind').value=d.form_reminder_days!=null?d.form_reminder_days:7;
+  document.getElementById('sAgree').value=d.agreements_text||'';
+  document.getElementById('sPayTerms').value=d.payment_terms_text||'';
   var djSet=document.getElementById('sDjSet');
   djSet.innerHTML='<option value="">– keine –</option>'+(CACHE.equipmentSets||[]).map(function(x){
     var n=(CACHE.setItems||[]).filter(function(i){return i.set_id===x.id}).length;
     return '<option value="'+x.id+'">'+esc(x.name)+' ('+n+' Artikel)</option>'}).join('');
   djSet.value=d.dj_default_set||'';
   if(djSet.value!==(d.dj_default_set||''))djSet.value='';   /* Set inzwischen geloescht */
+  /* Ohne Sets ist die Auswahl leer - sagen, wo man eins anlegt, statt ein leeres Menue zu zeigen */
+  var djHint=document.getElementById('sDjSetHint');
+  if(djHint)djHint.innerHTML=(CACHE.equipmentSets||[]).length?'Wird jedem neuen DJ-Gig automatisch zugeordnet (im Gig änderbar). Sets legst du unter Technik an.'
+    :'<span style="color:var(--yel)">Noch kein Set vorhanden – erst unter Technik → Sets ein Set anlegen, dann kannst du es hier auswählen.</span>';
   document.getElementById('sRental').value=(S.rental_contract&&S.rental_contract.text)||'';
   var bk=document.getElementById('bkCronOk');if(bk)bk.checked=!!(S.setup&&S.setup.backup_cron);
 }
@@ -7368,8 +7669,12 @@ function saveNumbering(){
   n.rechnung={prefix:v('sIPre'),next:Number(v('sINext'))||1};
   n.gutschrift={prefix:v('sGPre')||'GS-',next:Number(v('sGNext'))||1};
   n.year_in_number=true;
+  /* Fristen unter 1 Tag ergeben keinen Sinn - bisher wurde eine 0 stillschweigend zu 7 */
+  if(v('sFollowDays')!==''&&!(Number(v('sFollowDays'))>=1)){toast('Nachfassen nach: bitte mindestens 1 Tag eintragen.',1);document.getElementById('sFollowDays').focus();return}
+  if(v('sFormRemind')!==''&&!(Number(v('sFormRemind'))>=1)){toast('Fragebogen-Erinnerung: bitte mindestens 1 Tag eintragen.',1);document.getElementById('sFormRemind').focus();return}
   var d=S.defaults||{};d.payment_days=Number(v('sPayDays'))||14;d.quote_valid_days=Number(v('sValidDays'))||30;
   d.plan_lock_days=Number(v('sPlanLock'))||0;d.followup_days=Number(v('sFollowDays'))||7;d.form_reminder_days=Number(v('sFormRemind'))||7;
+  d.agreements_text=document.getElementById('sAgree').value;d.payment_terms_text=document.getElementById('sPayTerms').value;
   d.tax_rate=Number(v('sTaxRate'))||19;d.partner_discount_pct=Number(v('sPartnerPct'))||20;
   d.tier_week_pct=Number(v('sTierWeek'))||0;d.tier_2week_pct=Number(v('sTier2Week'))||0;d.tier_month_pct=Number(v('sTierMonth'))||0;
   d.travel_rate_km=Number(v('sKmRate'))||0;d.travel_free_km=Number(v('sKmFree'))||0;
@@ -7393,17 +7698,44 @@ function ensureDocShare(){
   if(!curDoc.id)return Promise.reject(new Error('Bitte erst speichern.'));
   var cust=CACHE.customers.find(function(c){return c.id===curDoc.customer_id});
   if(!cust)return Promise.reject(new Error('Kunde nicht gefunden.'));
-  var ensureZip=cust.zip?Promise.resolve():(function(){
-    var z=prompt('Der Kunde hat noch keine PLZ hinterlegt – sie dient als Login fürs Portal.\nPLZ des Kunden:');
-    if(!z)return Promise.reject(new Error('Ohne PLZ kein Kundenlink.'));
-    return api('customers?id=eq.'+cust.id,{method:'PATCH',body:{zip:z.trim()}}).then(function(){cust.zip=z.trim()});
-  })();
+  var ensureZip=custAddressComplete(cust)?Promise.resolve():askCustAddress(cust);
   return ensureZip.then(function(){
     if(curDoc.share_token)return curDoc.share_token;
     var t=hexToken();
     return api('documents?id=eq.'+curDoc.id,{method:'PATCH',body:{share_token:t}}).then(function(){curDoc.share_token=t;
       var d=CACHE.documents.find(function(x){return x.id===curDoc.id});if(d)d.share_token=t;return t});
   }).then(function(t){return {url:portalUrl('a',t),cust:cust}});
+}
+/* Kleiner Dialog "Adresse ergaenzen" statt eines PLZ-Prompts: Das Anfrageformular kennt
+   keine Adresse, die steht aber auf dem Angebot - und die PLZ ist der Portal-Login.
+   PLZ Pflicht, Strasse/Ort optional. Loest mit den gespeicherten Werten auf. */
+function askCustAddress(cust){
+  return new Promise(function(resolve,reject){
+    openModal('Adresse ergänzen – '+esc(custName(cust)),
+      '<div class="sml mut" style="margin-bottom:10px">Kein Angebot ohne vollständige Adresse: Sie steht als Anschrift auf dem Beleg, und die Postleitzahl ist der Login fürs Kundenportal. Straße mit Hausnummer, PLZ und Ort sind Pflicht.</div>'+
+      '<label>Straße und Hausnummer *</label><input id="adrStreet" value="'+esc(cust.street||'')+'" placeholder="z. B. Musterweg 3">'+
+      '<div class="grid2"><div><label>PLZ *</label><input id="adrZip" value="'+esc(cust.zip||'')+'" inputmode="numeric" placeholder="z. B. 58675"></div>'+
+      '<div><label>Ort *</label><input id="adrCity" value="'+esc(cust.city||'')+'" placeholder="z. B. Hemer"></div></div>'+
+      '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="adrOk">Übernehmen</button><button class="btn g" id="adrCancel">Abbrechen</button></div>');
+    var done=false;
+    var ABBRUCH='Ohne vollständige Adresse geht kein Beleg raus.';
+    document.getElementById('adrCancel').onclick=function(){done=true;closeModal();reject(new Error(ABBRUCH))};
+    document.getElementById('adrOk').onclick=function(){
+      var zip=v('adrZip').replace(/\s+/g,''),street=v('adrStreet'),city=v('adrCity');
+      if(!street||!/\d/.test(street)){toast('Bitte Straße mit Hausnummer eingeben.',1);return}
+      if(!/^\d{5}$/.test(zip)){toast('Bitte eine gültige Postleitzahl eingeben (5 Ziffern).',1);return}
+      if(!city){toast('Bitte den Ort eingeben.',1);return}
+      var body={zip:zip,street:street,city:city};
+      api('customers?id=eq.'+cust.id,{method:'PATCH',body:body}).then(function(){
+        cust.zip=zip;cust.street=body.street;cust.city=body.city;done=true;closeModal();resolve();
+      }).catch(function(e){toast(e.message,1)});
+    };
+    /* Dialog anders geschlossen (Escape, Klick daneben): nicht ewig haengen lassen */
+    var bg=document.getElementById('modalBg');
+    var obs=new MutationObserver(function(){if(!bg.classList.contains('v')){obs.disconnect();if(!done)reject(new Error(ABBRUCH))}});
+    obs.observe(bg,{attributes:true,attributeFilter:['class']});
+    setTimeout(function(){var z=document.getElementById('adrZip');if(z)z.focus()},50);
+  });
 }
 function shareDoc(){
   if(istZahlbeleg(curDoc.doc_type)){var bl=docSendBlockers();if(bl.length){showSendBlockers(bl,'share');return}}
@@ -7556,6 +7888,11 @@ function viewFormAnswers(id){
 function formAgencyCopyBtn(f){
   if(!f||f.status!=='beantwortet'||!agencyEnabled())return '';
   var ag=(S.company&&S.company.agency_name)||'die Agentur';
+  /* Keine Weitergabe ohne vollstaendige Adresse: am Kunden oder als Anschrift im Bogen */
+  var c=f.customer_id?(CACHE.customers||[]).find(function(x){return x.id===f.customer_id}):null;
+  var ai=(f.fields||[]).findIndex(function(fl){return fl.key==='address'});
+  var ok=custAddressComplete(c)||(ai>=0&&!!parseAddressText((f.answers||[])[ai]));
+  if(!ok)return '<button class="btn g sm" disabled title="Adresse unvollständig">Für '+esc(ag)+' kopieren</button> <span class="sml" style="color:var(--yel)">Adresse unvollständig – erst am Kunden Straße, PLZ und Ort ergänzen, dann weitergeben.</span> ';
   return '<button class="btn g sm" onclick="copyFormForAgency(\''+f.id+'\')" title="Alle Antworten als Text in die Zwischenablage">Für '+esc(ag)+' kopieren</button> ';
 }
 function formAgencyText(f){
@@ -8387,7 +8724,9 @@ function fillTpl(text,i){
     '{inhaber}':ownerName(),'{firma}':(S.company&&S.company.name)||'','{agentur}':agencyName(),
     '{adresse}':companyAddress(),'{firmenort}':String((S.company||{}).zip_city||'').replace(/^\d{4,5}\s*/,''),
     '{termin}':i._termin||((i.event_date||i._datum)?'der '+dt(i.event_date||i._datum)+(i.location?' – '+i.location:''):'euer Termin'),
-    '{titel}':i._titel||''
+    '{titel}':i._titel||'',
+    /* Absage durch DJ: Satz zum Grund und (bei Agentur) der Vermittlungs-Absatz */
+    '{grund}':i._grund||'','{vermittlung}':i._vermittlung||''
   };
   /* Nur bekannte Platzhalter mit Wert ersetzen - Server-Platzhalter ({nachricht} usw.)
      bleiben stehen und werden dort gefuellt. */
@@ -8397,7 +8736,7 @@ function composeReply(inqId){
   var i=CACHE.inquiries.find(function(x){return x.id===inqId});if(!i)return;
   var tplId=v('replyTpl');
   var t=(CACHE.tpls||[]).find(function(x){return x.id===tplId});if(!t){toast('Bitte Vorlage wählen.',1);return}
-  if(i.status==='neu')api('inquiries?id=eq.'+inqId,{method:'PATCH',body:{status:'in_bearbeitung'}})
+  if(i.status==='neu'||i.status==='gesehen')api('inquiries?id=eq.'+inqId,{method:'PATCH',body:{status:'in_bearbeitung'}})
     .then(function(){i.status='in_bearbeitung';renderInq();renderDash()});
   if((t.body||'').indexOf('{fragebogen}')>=0){
     var ft=(CACHE.formTpls||[]).find(function(x){return x.name.indexOf('Vorauswahl')>=0})||(CACHE.formTpls||[])[0];
@@ -8417,7 +8756,7 @@ function dateConflicts(datum,eigenerKunde){
   if(!datum)return [];
   var out=[];
   (CACHE.bookings||[]).forEach(function(b){
-    if(b.status==='storniert'||!b.event_date)return;
+    if(b.status==='storniert'||!b.event_date||!kollidiertKind(b.kind))return;
     /* Die Veranstaltung, die zu dieser Anfrage selbst gehoert, ist kein Konflikt -
        sonst meldet jede Anfrage sich gegen sich selbst. */
     if(eigenerKunde&&b.customer_id===eigenerKunde&&b.event_date===datum)return;
