@@ -279,6 +279,34 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
 .cal .ev.k-technik{border-left-color:var(--blu);background:rgba(85,136,221,.14)}
 .cal .ev.k-workshop{border-left-color:#3fa89b;background:rgba(63,168,155,.14)}
 .cal .ev.k-privat{border-left-color:#b08fd8;background:rgba(176,143,216,.14)}
+/* Handy: statt abgeschnittener Texte ein Punkt je Eintrag in der Farbe der Kategorie;
+   Tag antippen zeigt die Eintraege im Panel unter dem Gitter. Am Desktop bleiben die
+   Textzeilen, die Punkte sind dort aus. */
+.cal .cd-c{cursor:pointer}
+.cal .cd-c.sel{outline:2px solid var(--wh);outline-offset:-2px}
+.cal .cdots{display:none;flex-wrap:wrap;gap:3px;margin-top:3px;align-items:center}
+.cal .cdots i{width:8px;height:8px;border-radius:50%;background:var(--gl);display:inline-block}
+.cal .cdots i.k-anfrage{background:var(--yel)}
+.cal .cdots i.k-angebot{background:var(--acc)}
+.cal .cdots i.k-fest{background:var(--grn)}
+.cal .cdots i.k-fertig{background:var(--gl)}
+.cal .cdots i.k-technik{background:var(--blu)}
+.cal .cdots i.k-workshop{background:#3fa89b}
+.cal .cdots i.k-privat{background:#b08fd8}
+.cal .cdots b{font-size:9px;color:var(--gll);font-weight:400;line-height:8px}
+.cal-day{margin-top:12px;border:1px solid var(--bdr);border-left:3px solid var(--acc);padding:10px 12px;font-size:12px}
+.cal-day .cdh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-weight:700;color:var(--wh)}
+.cal-day .cdi{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.cal-day .cdi:last-child{border-bottom:0}
+.cal-day .cdi i{width:9px;height:9px;border-radius:50%;flex:none;margin-top:5px;display:inline-block}
+.cal-day .cdi .mut{display:block}
+@media(max-width:560px){
+  .cal{gap:2px}
+  .cal .cd-c{min-height:44px;padding:3px 2px 4px}
+  .cal .cdn{font-size:10px}
+  .cal .ev{display:none}
+  .cal .cdots{display:flex}
+}
 .cal-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:10.5px;color:var(--gll)}
 .cal-legend label{display:flex;align-items:center;gap:5px;margin:0;font-weight:400;text-transform:none;letter-spacing:normal;cursor:pointer;color:var(--gll);font-size:10.5px}
 .cal-legend input{width:auto;margin:0}
@@ -499,6 +527,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
       &nbsp;<button class="btn g" onclick="openBlockModal()">+ Blocken</button>
       &nbsp;<button class="btn" onclick="openBookModal()">+ Neuer Gig</button></div></div>
     <div class="card"><div class="cal" id="calGrid"></div>
+      <div class="cal-day" id="calDay" style="display:none"></div>
       <div class="cal-legend" id="calLayers"></div>
     </div>
     <div class="tbl-wrap card"><table><thead><tr><th>Datum</th><th>Titel / Kunde</th><th>Art</th><th>Location</th><th class="num">Gig-Wert</th><th>Status</th></tr></thead><tbody id="bookRows"></tbody></table></div>
@@ -641,7 +670,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <option value="lieferschein">Lieferschein</option><option value="gutschrift">Gutschrift</option></select></div>
         <div><label>USt. %</label><input type="number" id="docTax" step="0.1" value="19"></div>
         <div><label>Preisanzeige</label><label style="display:flex;align-items:center;gap:8px;margin-top:9px;font-weight:400;text-transform:none;letter-spacing:normal;cursor:pointer"><input type="checkbox" id="docNetto" style="width:auto" onchange="renderTotals()">Netto anzeigen (für Geschäftskunden)</label></div>
-        <div id="docDepWrap" style="display:none"><label>Verrechnete Abschläge (brutto €)</label><input type="number" id="docDep" step="0.01" value="0"></div>
+        <div id="docDepWrap" style="display:none"><label>Erhaltene Zahlungen, die hier verrechnet werden (brutto €)</label><input type="number" id="docDep" step="0.01" value="0"></div>
       </div>
       <label>Einleitungstext</label><textarea id="docIntro" style="min-height:46px"></textarea>
       <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('docIntro')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
@@ -1254,6 +1283,19 @@ function jsq(s){return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'
 function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
 function dt(d){if(!d)return '–';return new Date(d).toLocaleDateString('de-DE')}
 function dtt(d){if(!d)return '–';return new Date(d).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})}
+/* Kunde zu einem Datensatz (Gig, Beleg, Notiz ...) ueber customer_id nachschlagen. Frueher
+   kamen Belege und Gigs mit eingebettetem Kundendatensatz vom Server (customers(*)) -
+   jeder Kunde stand damit zigfach in der Antwort. Die Map wird bei Bedarf neu gebaut,
+   wenn CACHE.customers ausgetauscht oder ergaenzt wurde. */
+var CUST_MAP=null,CUST_MAP_SRC=null,CUST_MAP_N=-1;
+function custOf(x){
+  if(!x||!x.customer_id)return null;
+  var list=CACHE.customers||[];
+  if(CUST_MAP_SRC!==list||CUST_MAP_N!==list.length){
+    CUST_MAP=new Map();list.forEach(function(c){CUST_MAP.set(c.id,c)});CUST_MAP_SRC=list;CUST_MAP_N=list.length;
+  }
+  return CUST_MAP.get(x.customer_id)||null;
+}
 function custName(c){
   if(!c)return '–';
   var base=c.company?c.company+(c.last_name?' ('+(c.first_name||'')+' '+c.last_name+')':''):((c.first_name||'')+' '+(c.last_name||'')).trim()||c.email||'?';
@@ -1316,6 +1358,7 @@ function showPage(id){
   document.getElementById('pg-'+id).classList.add('a');
   var navId=SUBPAGE_PARENT[id]||id;
   document.querySelectorAll('#nav a').forEach(function(a){a.classList.toggle('a',a.dataset.pg===navId)});
+  if(REST_PAGES[id])ensureRest();
   if(id==='stats')loadWebStats();
   if(id==='einsatz')renderEinsatz();
   if(id==='workshops')loadNewsletter();
@@ -1338,28 +1381,30 @@ function docIsDirty(){
   window.addEventListener('beforeunload',function(e){if(docIsDirty()){e.preventDefault();e.returnValue=''}});
 })();
 
-/* ===== Daten laden ===== */
+/* ===== Daten laden =====
+   Kern zuerst: alles, was Dashboard, Kunde, Gig, Beleg und Kalender brauchen. Der Rest
+   (Website-Inhalte, Pakete, FAQ, Zusatzangebote, Bewertungen, Partner, Aktionsseiten,
+   Module, Berichte) kommt erst beim ersten Wechsel auf eine Seite, die ihn braucht
+   (ensureRest) - vorher lud jeder Login 32 Tabellen, bevor das Dashboard stand. Belege
+   und Gigs kommen ohne eingebetteten Kunden; der wird ueber custOf() nachgeschlagen. */
+CACHE.content={};CACHE.packages=[];CACHE.faq=[];CACHE.upsells=[];CACHE.reviews=[];CACHE.partners=[];
+CACHE.campaigns=[];CACHE.module=[];CACHE.reports=[];CACHE.payments=[];
+var REST_PROMISE=null,REST_LOADED=false;
 function loadAll(){
-  Promise.all([
+  return Promise.all([
     api('settings?select=*'),
     api('customers?select=*&order=created_at.desc'),
     api('inquiries?select=*&order=created_at.desc'),
-    api('bookings?select=*,customers(*)&order=event_date.desc'),
-    api('documents?select=*,customers(*)&order=created_at.desc'),
+    api('bookings?select=*&order=event_date.desc'),
+    api('documents?select=*&order=created_at.desc'),
     api('equipment?select=*&order=sort'),
     api('booking_equipment?select=*'),
-    api('site_content?select=*'),
-    api('packages?select=*&order=sort'),
-    api('faq?select=*&order=sort'),
     api('communications?select=*&order=occurred_at.desc'),
     api('email_templates?select=*&order=sort'),
     api('doc_events?select=*&order=created_at.desc'),
     api('forms?select=*&order=created_at.desc'),
     api('form_templates?select=*&order=sort'),
-    api('upsells?select=*&order=sort'),
-    api('reviews?select=*&order=sort'),
     api('products?select=*&order=sort'),
-    api('partners?select=*&order=created_at.desc'),
     api('workshop_events?select=*&order=event_date'),
     api('workshop_signups?select=*&order=created_at.desc'),
     api('equipment_sets?select=*&order=sort'),
@@ -1368,28 +1413,55 @@ function loadAll(){
     api('quote_templates?select=*&order=sort'),
     api('event_plan_changes?select=*&order=created_at.desc'),
     api('rental_contracts?select=*'),
-    api('campaign_pages?select=*&order=sort'),
-    api('blocks?select=*&order=anchor,sort'),
-    api('event_reports?select=*&order=sort'),
     api('locations?select=*&order=sort'),
-    api('tech_checks?select=*&order=created_at.desc')
+    api('tech_checks?select=*&order=created_at.desc'),
+    api('payments?select=*&order=paid_at')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
     CACHE.documents=r[4]||[];CACHE.equipment=r[5]||[];CACHE.be=r[6]||[];
-    CACHE.content={};(r[7]||[]).forEach(function(x){CACHE.content[x.key]=x.value});
-    CACHE.packages=r[8]||[];CACHE.faq=r[9]||[];CACHE.comms=r[10]||[];CACHE.tpls=r[11]||[];
-    CACHE.docEvents=r[12]||[];CACHE.forms=r[13]||[];CACHE.formTpls=r[14]||[];CACHE.upsells=r[15]||[];
-    CACHE.reviews=r[16]||[];CACHE.products=r[17]||[];CACHE.partners=r[18]||[];
-    CACHE.wsEvents=r[19]||[];CACHE.wsSignups=r[20]||[];
-    CACHE.equipmentSets=r[21]||[];CACHE.setItems=r[22]||[];CACHE.blocks=r[23]||[];
-    CACHE.quoteTpls=r[24]||[];CACHE.planChanges=r[25]||[];CACHE.rentalContracts=r[26]||[];
-    CACHE.campaigns=r[27]||[];CACHE.module=r[28]||[];CACHE.reports=r[29]||[];CACHE.locations=r[30]||[];
-    CACHE.techChecks=r[31]||[];
+    CACHE.comms=r[7]||[];CACHE.tpls=r[8]||[];
+    CACHE.docEvents=r[9]||[];CACHE.forms=r[10]||[];CACHE.formTpls=r[11]||[];
+    CACHE.products=r[12]||[];
+    CACHE.wsEvents=r[13]||[];CACHE.wsSignups=r[14]||[];
+    CACHE.equipmentSets=r[15]||[];CACHE.setItems=r[16]||[];CACHE.blocks=r[17]||[];
+    CACHE.quoteTpls=r[18]||[];CACHE.planChanges=r[19]||[];CACHE.rentalContracts=r[20]||[];
+    CACHE.locations=r[21]||[];CACHE.techChecks=r[22]||[];CACHE.payments=r[23]||[];
     applyBrand();
     renderAll();
     renderOrtDatalist2();
+    /* Vollstaendiges Neuladen (z. B. nach Kunden-Aenderung): war der Rest schon da, auch ihn nachziehen. */
+    if(REST_LOADED){REST_PROMISE=null;ensureRest()}
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
+}
+/* Seiten, die Rest-Daten brauchen - beim ersten Aufruf nachladen (Promise-Cache). */
+var REST_PAGES={cms:1,set:1,partners:1,camp:1,media:1,prod:1,dash:1};
+function ensureRest(){
+  if(REST_PROMISE)return REST_PROMISE;
+  REST_PROMISE=Promise.all([
+    api('site_content?select=*'),
+    api('packages?select=*&order=sort'),
+    api('faq?select=*&order=sort'),
+    api('upsells?select=*&order=sort'),
+    api('reviews?select=*&order=sort'),
+    api('partners?select=*&order=created_at.desc'),
+    api('campaign_pages?select=*&order=sort'),
+    api('blocks?select=*&order=anchor,sort'),
+    api('event_reports?select=*&order=sort')
+  ]).then(function(r){
+    CACHE.content={};(r[0]||[]).forEach(function(x){CACHE.content[x.key]=x.value});
+    CACHE.packages=r[1]||[];CACHE.faq=r[2]||[];CACHE.upsells=r[3]||[];CACHE.reviews=r[4]||[];
+    CACHE.partners=r[5]||[];CACHE.campaigns=r[6]||[];CACHE.module=r[7]||[];CACHE.reports=r[8]||[];
+    REST_LOADED=true;
+    renderRest();
+  }).catch(function(e){REST_PROMISE=null;toast('Nachladen fehlgeschlagen: '+e.message,1)});
+  return REST_PROMISE;
+}
+function renderRest(){
+  renderCms();renderUpsells();renderPartners();renderCampaigns();renderModulAdmin();renderReportAdmin();
+  /* Dashboard-Hinweise (Rechtstexte, Platzhalter, Setup-Checkliste) haengen an site_content */
+  renderDash();
+  initSort();
 }
 /* Markenname aus den Einstellungen (Website-Domain, sonst Firmenname) im Kopf & Titel */
 function applyBrand(){
@@ -1402,9 +1474,10 @@ function applyBrand(){
 }
 function renderAll(){
   renderDash();renderInq();renderCustList();renderBook();renderDocsPage();
-  renderEq();renderSetsAdmin();renderCms();renderSet();initStats();renderTpls();renderForms();renderUpsells();
-  renderProducts();renderPartners();renderWsAdmin();renderCampaigns();renderModulAdmin();renderReportAdmin();
+  renderEq();renderSetsAdmin();renderSet();initStats();renderTpls();renderForms();
+  renderProducts();renderWsAdmin();
   renderTplSettings();renderTechChecks();renderEinsatz();
+  if(REST_LOADED)renderRest();
   initSort();
 }
 /* ===== Workshop-Termine & Anmeldungen ===== */
@@ -1636,6 +1709,9 @@ function reloadWs(){
 
 /* ===== Dashboard ===== */
 function renderDash(){
+  /* Rechtstexte-, Platzhalter- und Setup-Hinweise brauchen site_content - im Hintergrund
+     nachladen, das Dashboard steht schon; renderRest() zeichnet die Hinweise dann nach. */
+  if(!REST_PROMISE)ensureRest();
   var today=new Date().toISOString().slice(0,10);
   document.getElementById('dashDate').textContent=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   /* Anfragen mit sehr nahem Termin (<=10 Tage) im Dashboard hervorheben, damit sie zwischen
@@ -1659,8 +1735,7 @@ function renderDash(){
   var openInv=CACHE.documents.filter(function(d){return istZahlbeleg(d.doc_type)&&['versendet','ueberfaellig'].indexOf(d.status)>=0});
   var openQ=CACHE.documents.filter(function(d){return d.doc_type==='angebot'&&d.status==='versendet'});
   var year=new Date().getFullYear();
-  var rev=CACHE.documents.filter(function(d){return istZahlbeleg(d.doc_type)&&d.status==='bezahlt'&&d.paid_at&&d.paid_at.slice(0,4)==String(year)})
-    .reduce(function(s,d){return s+Number(d.total_gross)-Number(d.deposit_deducted||0)},0);
+  var rev=revenueInYear(String(year));
   document.getElementById('dashTiles').innerHTML=
     tile(newInq.length,'Neue Anfragen',"showPage('inq')")+tile(upcoming.length,'Kommende Gigs',"showPage('book')")+
     (unbestaetigt?tile(unbestaetigt,'dazu unbestätigte Anfragen',"showPage('book')"):'')+
@@ -1672,7 +1747,7 @@ function renderDash(){
   var offeneInq=CACHE.inquiries.filter(function(i){return i.status==='neu'}).length;
   badge.style.display=offeneInq?'':'none';badge.textContent=offeneInq;
   document.getElementById('dashNext').innerHTML=(upcoming.slice(0,6).map(function(b){
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Gig')+'</a> <span class="mut">'+esc(custName(b.customers))+'</span></div>';
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Gig')+'</a> <span class="mut">'+esc(custName(custOf(b)))+'</span></div>';
   }).join('')||'Keine festen Gigs in Sicht.')+
     (unbestaetigt?'<div class="mut sml" style="margin-top:8px">Dazu '+unbestaetigt+' unbestätigte Anfrage'+(unbestaetigt===1?'':'n')+'/Angebote – <a onclick="showPage(\'book\')">im Kalender ansehen</a></div>':'');
   var fups=CACHE.comms.filter(function(c){return c.followup_at&&!c.followup_done&&c.followup_at<=today});
@@ -1715,7 +1790,7 @@ function renderDash(){
   document.getElementById('dashNoReply').innerHTML=silent.slice(0,8).map(function(x){
     var d=x.d;
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)'+(x.hot?';color:'+(x.abgelaufen?'var(--redl)':'var(--yel)'):'')+'">'+
-      '<a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> <span class="'+(x.hot?'':'mut')+'">· '+esc(custName(d.customers))+
+      '<a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> <span class="'+(x.hot?'':'mut')+'">· '+esc(custName(custOf(d)))+
       ' · versendet vor '+x.days+' Tag'+(x.days===1?'':'en')+(d.valid_until?' · gültig bis '+dt(d.valid_until)+(x.abgelaufen?' (abgelaufen!)':''):'')+'</span> '+
       '<span style="white-space:nowrap;float:right"><button class="btn g sm" onclick="docFollowupMail(\''+d.id+'\')">Nachfassen per E-Mail</button> '+
       '<button class="btn g sm" onclick="openDocEditor(\''+d.id+'\')">Öffnen</button></span><div style="clear:both"></div></div>';
@@ -1738,14 +1813,14 @@ function renderDash(){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+(i.urgent?'<span class="b red" style="margin-right:6px">bald</span>':'')+'<a onclick="'+onclick+'">'+esc(i.label||'?')+'</a> <span class="mut">'+esc(i.sub||'')+'</span></div>';
   }).join('')||'Keine neuen Anfragen.';
   document.getElementById('dashOpenInv').innerHTML=openInv.slice(0,6).map(function(d){
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> <span class="mut">'+esc(custName(d.customers))+' · '+euro(d.total_gross)+(d.due_date?' · fällig '+dt(d.due_date):'')+'</span></div>';
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> <span class="mut">'+esc(custName(custOf(d)))+' · '+euro(d.total_gross)+(d.due_date?' · fällig '+dt(d.due_date):'')+'</span></div>';
   }).join('')||'Alles bezahlt.';
   var EV_LBL={accept:'Angenommen',decline:'Abgelehnt',comment:'Kommentar',callback:'Rückruf-Wunsch',bande:'Vermittlungs-Opt-in',konflikt:'Annahme bei belegtem Termin'};
   var unseen=(CACHE.docEvents||[]).filter(function(e){return !e.seen});
   document.getElementById('dashPortal').innerHTML=unseen.slice(0,8).map(function(e){
     var d=CACHE.documents.find(function(x){return x.id===e.document_id});
-    var custEmail=d&&d.customers?d.customers.email:'';
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openEventDoc(\''+e.id+'\',\''+e.document_id+'\')">'+(EV_LBL[e.kind]||e.kind)+'</a> <span class="mut">'+(d?esc(d.number)+' · '+esc(custName(d.customers)):'')+' · '+dtt(e.created_at)+'</span>'+
+    var custEmail=d&&custOf(d)?custOf(d).email:'';
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openEventDoc(\''+e.id+'\',\''+e.document_id+'\')">'+(EV_LBL[e.kind]||e.kind)+'</a> <span class="mut">'+(d?esc(d.number)+' · '+esc(custName(custOf(d))):'')+' · '+dtt(e.created_at)+'</span>'+
       ((e.kind==='comment'||e.kind==='callback')&&custEmail?' <a href="mailto:'+encodeURIComponent(custEmail)+'?subject='+encodeURIComponent('Re: '+(d?d.number:'')+' – '+(EV_LBL[e.kind]||e.kind))+'" class="sml">Antworten</a>':'')+
       (e.message?'<div class="mut sml" style="white-space:pre-wrap">„'+esc(e.message.slice(0,140))+'“</div>':'')+
       (e.phone?'<div class="mut sml"> '+esc(e.phone)+'</div>':'')+'</div>';
@@ -1753,7 +1828,7 @@ function renderDash(){
   var openPlan=(CACHE.planChanges||[]).filter(function(c){return c.status==='offen'});
   document.getElementById('dashPlan').innerHTML=openPlan.slice(0,8).map(function(c){
     var bk=CACHE.bookings.find(function(x){return x.id===c.booking_id});
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+c.booking_id+'\')">'+esc(c.field_label||c.field_path)+'</a> <span class="mut">'+(bk?esc(custName(bk.customers))+' · '+dt(bk.event_date):'')+'</span>'+
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+c.booking_id+'\')">'+esc(c.field_label||c.field_path)+'</a> <span class="mut">'+(bk?esc(custName(custOf(bk)))+' · '+dt(bk.event_date):'')+'</span>'+
       '<div class="mut sml" style="overflow-wrap:anywhere">„'+esc(planChangeValueText(c.field_path,c.old_value).slice(0,140))+'" → „'+esc(planChangeValueText(c.field_path,c.new_value).slice(0,140))+'"</div></div>';
   }).join('')||'Keine offenen Vorschläge.';
   var answered=(CACHE.forms||[]).filter(function(f){return f.status==='beantwortet'});
@@ -1765,7 +1840,7 @@ function renderDash(){
     return b.event_date<today&&!b.review_requested&&['gebucht','abgeschlossen'].indexOf(b.status)>=0;
   }).sort(function(a,b){return a.event_date<b.event_date?1:-1});
   document.getElementById('dashReviews').innerHTML=pastNoRev.slice(0,6).map(function(b){
-    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(b.title||b.event_type||'Gig')+' <span class="mut">'+dt(b.event_date)+' · '+esc(custName(b.customers))+'</span> '+
+    return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(b.title||b.event_type||'Gig')+' <span class="mut">'+dt(b.event_date)+' · '+esc(custName(custOf(b)))+'</span> '+
     '<button class="btn sm" style="float:right" onclick="composeReviewMail(\''+b.id+'\')">Danke &amp; Bewertung</button></div>';
   }).join('')||'Alle vergangenen Feiern sind angeschrieben.';
   document.getElementById('dashMissing').innerHTML=computeMissingInfo().map(function(m){
@@ -1836,7 +1911,7 @@ function computeMissingInfo(){
   if(!legal.reviewed)issues.push({text:'Rechtstexte (Impressum/Datenschutz/AGB) sind noch nicht als geprüft markiert',go:'cms-legal'});
   (CACHE.rentalContracts||[]).filter(function(rc){return rc.status!=='unterschrieben'&&!rc.deposit_amount}).forEach(function(rc){
     var bk=CACHE.bookings.find(function(b){return b.id===rc.booking_id});
-    issues.push({text:'Kaution für Mietvertrag'+(bk?(' · '+esc(custName(bk.customers))+' · '+dt(bk.event_date)):'')+' noch nicht festgelegt',
+    issues.push({text:'Kaution für Mietvertrag'+(bk?(' · '+esc(custName(custOf(bk)))+' · '+dt(bk.event_date)):'')+' noch nicht festgelegt',
       pg:null,onclick:bk?('openBookDetail(\''+bk.id+'\')'):null});
   });
   return issues;
@@ -2186,7 +2261,7 @@ function renderBook(){
   var rows=CACHE.bookings.slice().sort(function(a,b){return a.event_date<b.event_date?1:-1});
   document.getElementById('bookRows').innerHTML=applySort(rows,'bookings').map(function(b){
     return '<tr class="click" onclick="openBookDetail(\''+b.id+'\')"><td>'+dt(b.event_date)+(b.end_date?' – '+dt(b.end_date):'')+'</td>'+
-    '<td><b>'+esc(b.title||b.event_type||'Gig')+'</b><br><span class="mut sml">'+esc(custName(b.customers))+'</span></td>'+
+    '<td><b>'+esc(b.title||b.event_type||'Gig')+'</b><br><span class="mut sml">'+esc(custName(custOf(b)))+'</span></td>'+
     '<td>'+({dj:'DJ',technik:'Technik',dj_technik:'DJ + Technik'}[b.kind]||b.kind)+'</td>'+
     '<td>'+esc(b.venue_name||'–')+'</td><td class="num">'+(bookingValue(b)?euro(bookingValue(b)):'–')+'</td>'+
     '<td><span class="b '+bookBadge(b.status)+'">'+b.status+'</span></td></tr>';
@@ -2200,7 +2275,7 @@ function calShift(n){calBase.setDate(1);calBase.setMonth(calBase.getMonth()+n);r
    laeuft als eigener Kalender, weil Markus sie auch im Handy getrennt abonniert. */
 var CAL_LAYERS=[
   {key:'anfrage', label:'Anfragen'},
-  {key:'angebot', label:'Angebote offen'},
+  {key:'angebot', label:'Angeboten (Angebot offen)'},
   {key:'fest',    label:'Fest gebucht'},
   {key:'fertig',  label:'Abgeschlossen'},
   {key:'technik', label:'Technikvermietung'},
@@ -2214,18 +2289,39 @@ function calLayerToggle(key,on){
   try{localStorage.setItem('cal_'+key,on?'1':'0')}catch(e){}
   renderCal();
 }
+/* Gigs, zu denen ein Angebot beim Kunden liegt (versendet, noch ohne Antwort). Der Gig
+   selbst bleibt dabei auf "anfrage", wenn das Angebot aus einer bestehenden Anfrage
+   entstand - im Kalender soll er trotzdem als "angeboten" erscheinen. */
+function calOfferedBookings(){
+  var m={};
+  (CACHE.documents||[]).forEach(function(d){
+    if(d.doc_type==='angebot'&&d.status==='versendet'&&d.booking_id)m[d.booking_id]=d;
+  });
+  return m;
+}
+var CAL_OFFERED={};
 function calLayerOf(b){
   if(b.kind==='technik')return 'technik';
-  if(b.status==='anfrage')return 'anfrage';
+  if(b.status==='anfrage')return CAL_OFFERED[b.id]?'angebot':'anfrage';
   if(b.status==='angebot')return 'angebot';
   if(b.status==='abgeschlossen')return 'fertig';
   return 'fest';
+}
+/* Offene Angebote mit Termin, die an keinem Gig haengen (per Schnittstelle angelegt oder
+   Gig geloescht): tauchten bisher gar nicht im Kalender auf. */
+function calOfferDocs(ds){
+  var bookIds={};(CACHE.bookings||[]).forEach(function(b){bookIds[b.id]=1});
+  return (CACHE.documents||[]).filter(function(d){
+    if(d.doc_type!=='angebot'||d.status!=='versendet')return false;
+    if(d.booking_id&&bookIds[d.booking_id])return false;
+    var e=evOf(d);return !!(e&&e.date&&String(e.date).slice(0,10)===ds);
+  });
 }
 /* Im Eintrag steht, was Markus wissen muss: Art der Veranstaltung und Kundenname.
    Der Status steckt in der Farbe. */
 function calLabel(b){
   var art=b.event_type||b.title||'Gig';
-  var kunde=custName(b.customers)||'';
+  var kunde=custName(custOf(b))||'';
   return kunde?art+' \u00b7 '+kunde:art;
 }
 function renderCalLayers(){
@@ -2235,8 +2331,39 @@ function renderCalLayers(){
       ' onchange="calLayerToggle(\''+l.key+'\',this.checked)"><i></i>'+l.label+'</label>';
   }).join('');
 }
+/* Alle Eintraege eines Tages, je mit Kategorie (Farbe), Text und Sprungziel - Grundlage
+   fuer die Textzeilen (Desktop), die Punkte (Handy) und das Tagespanel. */
+function calDayItems(ds){
+  var out=[];
+  CACHE.bookings.forEach(function(b){
+    if(b.status==='storniert')return;
+    var k=calLayerOf(b);if(!calLayerOn(k))return;
+    var end=b.end_date||b.event_date;
+    if(!(b.event_date<=ds&&end>=ds))return;
+    var offer=CAL_OFFERED[b.id];
+    out.push({k:k,label:calLabel(b),title:b.title||b.event_type||'Gig',who:custName(custOf(b)),
+      status:k==='angebot'&&offer?'Angebot '+offer.number+' offen':b.status,
+      open:"openBookDetail('"+b.id+"')",link:'Gig öffnen'});
+  });
+  if(calLayerOn('angebot'))calOfferDocs(ds).forEach(function(d){
+    var e=evOf(d)||{};
+    out.push({k:'angebot',label:(e.occasion||'Angebot')+' \u00b7 '+custName(custOf(d)),title:e.occasion||'Angebot '+d.number,who:custName(custOf(d)),
+      status:'Angebot '+d.number+' offen',open:"openDocEditor('"+d.id+"')",link:'Beleg öffnen'});
+  });
+  if(calLayerOn('workshop'))(CACHE.wsEvents||[]).forEach(function(w){
+    if(w.event_date!==ds||w.public===false)return;
+    out.push({k:'workshop',label:w.title||'Workshop',title:w.title||'Workshop',who:(w.location||''),status:'Workshop',open:"openWsModal('"+w.id+"')",link:'Workshop öffnen'});
+  });
+  if(calLayerOn('privat'))(CACHE.blocks||[]).forEach(function(x){
+    var end=x.end_date||x.start_date;if(!(x.start_date<=ds&&end>=ds))return;
+    out.push({k:'privat',label:x.title,title:x.title,who:x.note||'',status:'geblockt',open:"openBlockModal('"+x.id+"')",link:'Blocker öffnen'});
+  });
+  return out;
+}
+var CAL_SEL=null;
 function renderCal(){
   renderCalLayers();
+  CAL_OFFERED=calOfferedBookings();
   var y=calBase.getFullYear(),m=calBase.getMonth();
   document.getElementById('calTitle').textContent=calBase.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
   var first=new Date(y,m,1),start=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate();
@@ -2245,23 +2372,35 @@ function renderCal(){
   for(var i=0;i<start;i++)html+='<div class="cd-c out"></div>';
   for(var d=1;d<=days;d++){
     var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    var evs=CACHE.bookings.filter(function(b){
-      if(b.status==='storniert')return false;
-      if(!calLayerOn(calLayerOf(b)))return false;
-      var end=b.end_date||b.event_date;
-      return b.event_date<=ds&&end>=ds;
-    });
-    var ws=calLayerOn('workshop')?(CACHE.wsEvents||[]).filter(function(w){return w.event_date===ds&&w.public!==false}):[];
-    var bl=calLayerOn('privat')?(CACHE.blocks||[]).filter(function(x){var end=x.end_date||x.start_date;return x.start_date<=ds&&end>=ds}):[];
-    html+='<div class="cd-c'+(ds===today?' today':'')+'"><div class="cdn">'+d+'</div>'+
-      evs.map(function(b){
-        return '<span class="ev k-'+calLayerOf(b)+'" title="'+esc(calLabel(b)+' \u2013 '+b.status)+'" onclick="openBookDetail(\''+b.id+'\')">'+esc(calLabel(b))+'</span>'}).join('')+
-      ws.map(function(w){return '<span class="ev k-workshop" onclick="openWsModal(\''+w.id+'\')">'+esc(w.title||'Workshop')+'</span>'}).join('')+
-      bl.map(function(x){return '<span class="ev k-privat" onclick="openBlockModal(\''+x.id+'\')">'+esc(x.title)+'</span>'}).join('')+
+    var items=calDayItems(ds);
+    html+='<div class="cd-c'+(ds===today?' today':'')+(ds===CAL_SEL?' sel':'')+'" onclick="calPickDay(\''+ds+'\')"><div class="cdn">'+d+'</div>'+
+      items.map(function(it){
+        return '<span class="ev k-'+it.k+'" title="'+esc(it.label+' \u2013 '+it.status)+'" onclick="event.stopPropagation();'+it.open+'">'+esc(it.label)+'</span>'}).join('')+
+      (items.length?'<div class="cdots">'+items.slice(0,4).map(function(it){return '<i class="k-'+it.k+'"></i>'}).join('')+(items.length>4?'<b>+'+(items.length-4)+'</b>':'')+'</div>':'')+
       '</div>';
   }
   document.getElementById('calGrid').innerHTML=html;
+  renderCalDay();
 }
+/* Tag antippen: Panel unter dem Gitter mit den Eintraegen des Tages. Nochmal antippen schliesst. */
+function calPickDay(ds){
+  CAL_SEL=CAL_SEL===ds?null:ds;
+  document.querySelectorAll('#calGrid .cd-c').forEach(function(c){c.classList.toggle('sel',!!CAL_SEL&&c.getAttribute('onclick')==="calPickDay('"+CAL_SEL+"')")});
+  renderCalDay();
+}
+function renderCalDay(){
+  var el=document.getElementById('calDay');if(!el)return;
+  if(!CAL_SEL){el.style.display='none';el.innerHTML='';return}
+  var items=calDayItems(CAL_SEL);
+  var LBL={};CAL_LAYERS.forEach(function(l){LBL[l.key]=l.label});
+  el.style.display='';
+  el.innerHTML='<div class="cdh"><span>'+dt(CAL_SEL)+(items.length?'':' – frei')+'</span><button class="btn g sm" onclick="calPickDay(\''+CAL_SEL+'\')">Schließen</button></div>'+
+    (items.length?items.map(function(it){
+      return '<div class="cdi"><i class="k-'+it.k+'" style="background:'+calDotColor(it.k)+'"></i><div style="flex:1;min-width:0"><b>'+esc(it.title)+'</b>'+(it.who?' · '+esc(it.who):'')+
+        '<span class="mut sml">'+esc(LBL[it.k]||it.k)+' · '+esc(it.status)+'</span></div><a onclick="'+it.open+'">'+it.link+'</a></div>';
+    }).join(''):'<span class="mut sml">Nichts eingetragen – dieser Tag ist noch frei.</span>');
+}
+function calDotColor(k){return {anfrage:'var(--yel)',angebot:'var(--acc)',fest:'var(--grn)',fertig:'var(--gl)',technik:'var(--blu)',workshop:'#3fa89b',privat:'#b08fd8'}[k]||'var(--gl)'}
 /* ===== Blocker: Tage/Zeitraeume ohne Kunde belegen (Urlaub, privat, ...) ===== */
 function openBlockModal(id){
   var b=id?(CACHE.blocks||[]).find(function(x){return x.id===id}):{};b=b||{};
@@ -2295,7 +2434,7 @@ function openBookDetail(id){
   curBook=CACHE.bookings.find(function(b){return b.id===id});if(!curBook)return;
   var b=curBook;
   document.getElementById('bdCrumb').innerHTML='<a onclick="showPage(\'book\')">Gigs</a> · '+
-    '<a onclick="openCustDetail(\''+b.customer_id+'\')">'+esc(custName(b.customers))+'</a> › Gig vom '+dt(b.event_date);
+    '<a onclick="openCustDetail(\''+b.customer_id+'\')">'+esc(custName(custOf(b)))+'</a> › Gig vom '+dt(b.event_date);
   document.getElementById('bdTitle').textContent=b.title||b.event_type||'Gig';
   document.getElementById('bdSub').innerHTML=dt(b.event_date)+(b.end_date?' – '+dt(b.end_date):'')+' · <span class="b '+bookBadge(b.status)+'">'+b.status+'</span>';
   document.getElementById('bdData').innerHTML=
@@ -2775,7 +2914,7 @@ function riderOvernight(r){
   return 'eingeplant (ab '+th+(overnightThresholdType()==='zeit'?' Min. Fahrzeit':' km')+(overnightPrice()?', '+euro(overnightPrice()):'')+')';
 }
 function printRider(){
-  var b=curBook,r=riderOf(b),comp=S.company||{},cust=b.customers||CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
+  var b=curBook,r=riderOf(b),comp=S.company||{},cust=custOf(b)||{};
   var tech=CACHE.be.filter(function(x){return x.booking_id===b.id}).map(function(x){
     var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};
     return x.qty+'× '+(eq.name||'?');
@@ -2942,7 +3081,7 @@ function rejectPlanChange(id){
    greift dann ganz normal die "leer -> direkt uebernehmen"-Regel des Planers. Ein bereits
    gesetztes Planer-Feld wird dabei NIE ueberschrieben. */
 function planInvoiceDefaults(b,inv){
-  var cust=b.customers||CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
+  var cust=custOf(b)||{};
   return{
     company:inv.company||cust.company||'',
     name:inv.name||((cust.first_name||'')+' '+(cust.last_name||'')).trim(),
@@ -3052,7 +3191,7 @@ function savePlan(){
 /* Weicht die im Planer gespeicherte Rechnungsadresse vom Kundendatensatz ab (oder ist dort
    noch leer), einmal kurz nachfragen statt die Kunden-Stammdaten still zu ueberschreiben. */
 function offerPlanToCustomerSync(b,inv){
-  var cust=b.customers||CACHE.customers.find(function(c){return c.id===b.customer_id});
+  var cust=custOf(b);
   if(!cust||!inv)return;
   var zipParts=(inv.zip_city||'').trim().split(/\s+/);
   var zip=/^\d+$/.test(zipParts[0]||'')?zipParts.shift():null;
@@ -3069,7 +3208,7 @@ function offerPlanToCustomerSync(b,inv){
   }).catch(function(e){toast(e.message,1)});
 }
 function printEventPlan(){
-  var b=curBook,pl=planOf(b),ip=planInternalOf(b),bas=pl.basics||{},inv=pl.invoice||{},mus=pl.music||{},cust=b.customers||CACHE.customers.find(function(c){return c.id===b.customer_id})||{};
+  var b=curBook,pl=planOf(b),ip=planInternalOf(b),bas=pl.basics||{},inv=pl.invoice||{},mus=pl.music||{},cust=custOf(b)||{};
   var pr=function(l,val){return val?'<tr><td style="padding:6px 10px 6px 0;color:#777;white-space:nowrap;vertical-align:top">'+l+'</td><td style="padding:6px 0">'+esc(String(val))+'</td></tr>':''};
   var tech=CACHE.be.filter(function(x){return x.booking_id===b.id}).map(function(x){
     var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};return x.qty+'× '+(eq.name||'?');
@@ -3109,13 +3248,46 @@ function gutschriftSum(d){
   return (CACHE.documents||[]).filter(function(g){return g.doc_type==='gutschrift'&&g.status!=='storniert'&&g.parent_id===d.id})
     .reduce(function(s,g){return s+Number(g.total_gross);},0);
 }
+/* Erhaltene Zahlungen zu einem Beleg (Tabelle payments) - jede Zahlung, voll oder
+   teilweise, ist dort ein Datensatz. */
+function docPayments(d){return (CACHE.payments||[]).filter(function(z){return z.document_id===d.id})}
+function r2(x){return Math.round(Number(x)*100)/100}
+function docPaidSum(d){return r2(docPayments(d).reduce(function(s,z){return s+Number(z.amount||0)},0))}
+/* Offen = brutto - dort verrechnete Zahlungen (Schlussrechnung) + Gutschriften - erhalten.
+   Bei bezahlten Belegen ist nichts mehr offen, auch wenn die Zahlungssumme (Altbestand
+   ohne Zahlungsdatensatz) nicht aufgeht. */
+function docOffen(d){
+  if(d.status==='bezahlt'||d.status==='storniert')return 0;
+  return r2(Number(d.total_gross)-Number(d.deposit_deducted||0)+gutschriftSum(d)-docPaidSum(d));
+}
+/* Umsatz = Zahlungseingaenge nach Zahldatum. Belege ohne Zahlungsdatensatz (Altbestand,
+   Gutschriften) zaehlen wie bisher mit ihrem Betrag abzueglich verrechneter Zahlungen
+   nach paid_at - so kommt eine Feier mit Teilzahlung und Schlussrechnung genau einmal vor. */
+function revenueInYear(year){
+  var sum=0;
+  (CACHE.payments||[]).forEach(function(z){
+    var d=(CACHE.documents||[]).find(function(x){return x.id===z.document_id});
+    if(d&&istZahlbeleg(d.doc_type)&&d.status!=='storniert'&&String(z.paid_at||z.created_at||'').slice(0,4)===year)sum+=Number(z.amount||0);
+  });
+  (CACHE.documents||[]).forEach(function(d){
+    if(!istZahlbeleg(d.doc_type)||d.status!=='bezahlt'||!d.paid_at||d.paid_at.slice(0,4)!==year)return;
+    if(docPayments(d).length)return;
+    sum+=Number(d.total_gross)-Number(d.deposit_deducted||0);
+  });
+  return r2(sum);
+}
 function docOffenText(d){
-  var gs=gutschriftSum(d);
-  var offen=Number(d.total_gross)-Number(d.deposit_deducted||0)+gs;
-  return euro(offen)+(istZahlbeleg(d.doc_type)&&Number(d.deposit_deducted)
-    ? ' <span class="mut">(von '+euro(d.total_gross)+', Abschlag abgezogen)</span>':'')+
+  var gs=gutschriftSum(d),paid=docPaidSum(d);
+  var offen=docOffen(d);
+  if(d.status!=='bezahlt'&&d.status!=='storniert'&&paid>0&&istZahlbeleg(d.doc_type))
+    return '<span style="color:var(--yel)">erhalten '+euro(paid)+' · Rest '+euro(offen)+' offen</span>';
+  return euro(d.status==='bezahlt'?Number(d.total_gross)-Number(d.deposit_deducted||0)+gs:offen)+(istZahlbeleg(d.doc_type)&&Number(d.deposit_deducted)
+    ? ' <span class="mut">(von '+euro(d.total_gross)+', erhaltene Zahlungen abgezogen)</span>':'')+
     (gs?' <span class="mut">(Gutschrift '+euro(gs)+' abgezogen)</span>':'');
 }
+/* Statustext: "abgelöst" statt "bezahlt", wenn eine Schlussrechnung den Beleg abgeloest
+   hat (die Zahlungen darauf sind dort verrechnet). */
+function docStatusLabel(d){return d.status==='bezahlt'&&d.settled_by?'abgelöst':d.status}
 /* Namen zerlegen wie der Server (splitPersonName in api.php): "Familie Kettner" bleibt
    ganz, sonst wuerde die Anrede "Hallo Familie," lauten. Dasselbe gilt fuer "Herr" und
    "Frau" sowie fuer Paare ("Lena und Tobias Vogt"). */
@@ -3146,7 +3318,7 @@ function renderDocList(filterFn){
        einziger, undurchsichtiger Topf. */
     var buchung=d.booking_id?(CACHE.bookings||[]).find(function(b){return b.id===d.booking_id}):null;
     var termin=buchung?' · Termin '+dt(buchung.event_date):'';
-    return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+dt(d.doc_date)+termin+' · '+docOffenText(d)+' <span class="b '+docBadge(d.status)+'">'+d.status+'</span></div>';
+    return '<div style="padding:4px 0"><a onclick="openDocEditor(\''+d.id+'\')">'+esc(d.number)+'</a> · '+docTypeName(d.doc_type)+' · '+dt(d.doc_date)+termin+' · '+docOffenText(d)+' <span class="b '+docBadge(d.status)+'">'+docStatusLabel(d)+'</span></div>';
   }).join('');
 }
 /* Welcher Gig zum Dokument gehoert, stand bisher nur in der Kundenakte - in der zentralen
@@ -3160,20 +3332,27 @@ function renderDocsPage(){
   var list=CACHE.documents.filter(function(d){
     if(t&&d.doc_type!==t)return false;
     if(st&&d.status!==st)return false;
-    if(q&&(custName(d.customers)||'').toLowerCase().indexOf(q)<0)return false;
+    if(q&&(custName(custOf(d))||'').toLowerCase().indexOf(q)<0)return false;
     return true;
   });
   document.getElementById('docsRows').innerHTML=applySort(list,'docs').map(function(d){
     return '<tr class="click" onclick="openDocEditor(\''+d.id+'\')"><td><b>'+esc(d.number)+'</b></td><td>'+docTypeName(d.doc_type)+'</td><td>'+dt(d.doc_date)+'</td>'+
-    '<td>'+esc(custName(d.customers))+'</td><td>'+docGigText(d)+'</td><td class="num">'+euro(Number(d.total_gross)-Number(d.deposit_deducted||0))+'</td>'+
+    '<td>'+esc(custName(custOf(d)))+'</td><td>'+docGigText(d)+'</td><td class="num">'+docListBetrag(d)+'</td>'+
     '<td>'+dt(istZahlbeleg(d.doc_type)?d.due_date:d.valid_until)+'</td>'+
-    '<td>'+(isOverdue(d)?'<span class="b red">überfällig</span>':'<span class="b '+docBadge(d.status)+'">'+d.status+'</span>')+'</td></tr>';
+    '<td>'+(isOverdue(d)?'<span class="b red">überfällig</span>':'<span class="b '+docBadge(d.status)+'">'+docStatusLabel(d)+'</span>')+'</td></tr>';
   }).join('')||'<tr><td colspan="8" class="mut">Keine Dokumente gefunden.</td></tr>';
   var od=CACHE.documents.filter(isOverdue);
   var el=document.getElementById('docsOverdue');
   if(el)el.innerHTML=od.length?(' <b>'+od.length+'</b> überfällige Rechnung'+(od.length>1?'en':'')+' – insgesamt '+
-    euro(od.reduce(function(s,d){return s+Number(d.total_gross)-Number(d.deposit_deducted||0)},0))+
+    euro(od.reduce(function(s,d){return s+docOffen(d)},0))+
     '. Öffne die Rechnung und nutze „Zahlungserinnerung".'):'';
+}
+/* Betragsspalte der Liste: bei Teilzahlung der Rest mit Hinweis, sonst der Belegbetrag. */
+function docListBetrag(d){
+  var paid=docPaidSum(d);
+  if(istZahlbeleg(d.doc_type)&&paid>0&&['versendet','ueberfaellig'].indexOf(d.status)>=0)
+    return euro(docOffen(d))+'<br><span class="mut sml">Rest · erhalten '+euro(paid)+'</span>';
+  return euro(Number(d.total_gross)-Number(d.deposit_deducted||0));
 }
 
 var curDoc=null,curItems=[],DOC_RETURN='docs';
@@ -3288,7 +3467,15 @@ function renderDocSub(){
   var verTxt=ver>1?' · <b style="color:var(--wh)">Version '+ver+'</b>'+(d.version_at?' – geändert am '+dt(d.version_at.slice(0,10)):''):'';
   if(d.accepted_version&&Number(d.accepted_version)!==ver)
     verTxt+=' <span style="color:var(--yel)">(angenommen: Version '+d.accepted_version+' – der Kunde hat nicht diesen Stand angenommen)</span>';
-  document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(d.status)+'">'+d.status+'</span>'+verTxt+
+  /* Teilzahlungen: was schon da ist und was noch fehlt, direkt im Kopf */
+  var zahl=docPayments(d),paidTxt='';
+  if(zahl.length&&istZahlbeleg(d.doc_type)){
+    var paid=docPaidSum(d);
+    paidTxt=d.status==='bezahlt'?' · <span style="color:var(--grn)">bezahlt'+(d.settled_by?' (abgelöst durch Schlussrechnung, erhalten '+euro(paid)+')':' – erhalten '+euro(paid))+'</span>'
+      :' · <b style="color:var(--yel)">Erhalten '+euro(paid)+' · Rest '+euro(docOffen(d))+' offen</b>';
+    paidTxt+=' <a onclick="showPayments()">Zahlungen ('+zahl.length+')</a>';
+  }
+  document.getElementById('docSub').innerHTML='Status: <span class="b '+docBadge(d.status)+'">'+docStatusLabel(d)+'</span>'+verTxt+paidTxt+
     (d.accepted_name?' · digital angenommen von <b style="color:var(--wh)">'+esc(d.accepted_name)+'</b>'+
       (d.accept_signature?' <a onclick="showAcceptSig()">Unterschrift ansehen</a>':''):'')+
     (offen?'<div id="docExpiredHint" style="margin-top:6px;color:var(--yel)">Angenommen nach Ablauf – Gig noch nicht bestätigt '+
@@ -3463,8 +3650,12 @@ function renderStatusBtns(){
       '<button class="btn g sm" onclick="docToInvoice(\'abschlag\')">→ Abschlag</button> <button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button>';
   if(d.doc_type==='bestaetigung'&&d.status!=='storniert')
     btns+='<button class="btn g sm" onclick="docToInvoice(\'abschlag\')">→ Abschlag</button> <button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button>';
-  if(d.doc_type==='abschlag'&&d.status==='bezahlt')
-    btns+='<button class="btn g sm" onclick="docToInvoice(\'schluss\')">→ Schlussrechnung</button>';
+  /* Schlussrechnung: nach bezahltem Abschlag wie bisher - und bei jeder Rechnung/jedem
+     Abschlag mit Teilzahlungen, denn Teilzahlungen werden immer von der Schlussrechnung
+     abgezogen (Regel von Markus). */
+  if((d.doc_type==='abschlag'&&d.status==='bezahlt'&&!d.settled_by)
+    ||(['rechnung','abschlag'].indexOf(d.doc_type)>=0&&['versendet','ueberfaellig'].indexOf(d.status)>=0&&docPaidSum(d)>0))
+    btns+='<button class="btn g sm" onclick="docToInvoice(\'schluss\')">→ Schlussrechnung</button> ';
   if(d.doc_type==='lieferschein')
     btns+='<button class="btn g sm" onclick="docToInvoice(\'rechnung\')">→ Rechnung</button>';
   if((d.doc_type==='rechnung'||d.doc_type==='schluss')&&['versendet','ueberfaellig','bezahlt'].indexOf(d.status)>=0)
@@ -3484,10 +3675,13 @@ function exportInvoicesCsv(){
   }).sort(function(a,b){return (a.number||'').localeCompare(b.number||'')});
   if(!list.length){toast('Keine Rechnungen im Jahr '+year+'.',1);return}
   var num=function(n){return String(Number(n)||0).replace('.',',')};
-  var rows=[['Nummer','Typ','Datum','Kunde','Netto','USt','Brutto','Status','Bezahlt am'].join(';')];
+  var rows=[['Nummer','Typ','Datum','Kunde','Netto','USt','Brutto','Verrechnet','Erhalten','Offen','Status','Bezahlt am','Zahlungen'].join(';')];
   list.forEach(function(d){
-    rows.push([d.number,docTypeName(d.doc_type),d.doc_date||'',(custName(d.customers)||'').replace(/;/g,','),
-      num(d.total_net),num(d.total_tax),num(d.total_gross),d.status,(d.paid_at||'').slice(0,10)].join(';'));
+    /* Zahlungen einzeln mit Datum in der letzten Spalte, damit der Steuerberater
+       Teilzahlungen dem richtigen Monat zuordnen kann. */
+    var zl=docPayments(d).map(function(z){return (z.paid_at||'').slice(0,10)+' '+num(z.amount)}).join(' | ');
+    rows.push([d.number,docTypeName(d.doc_type),d.doc_date||'',(custName(custOf(d))||'').replace(/;/g,','),
+      num(d.total_net),num(d.total_tax),num(d.total_gross),num(d.deposit_deducted),num(docPaidSum(d)),num(docOffen(d)),docStatusLabel(d),(d.paid_at||'').slice(0,10),zl].join(';'));
   });
   var blob=new Blob(['﻿'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rechnungen-'+year.trim()+'.csv';a.click();
@@ -3588,12 +3782,20 @@ function askPaid(){
     '<div><label>Betrag (€, optional)</label><input type="number" step="0.01" id="paidAmount" oninput="renderPaidRest()" placeholder="'+esc(String(d.total_gross!=null?d.total_gross:''))+'"></div></div>'+
     '<label>Notiz (optional)</label><input id="paidNote" placeholder="z. B. Überweisung, PayPal, bar">'+
     '<div class="sml" id="paidRest" style="margin-top:8px"></div>'+
-    '<div class="sml mut" style="margin-top:6px">Das Zahldatum zählt für Umsatz und Export – lieber das Datum vom Kontoauszug als „heute“. Liegt der Betrag unter dem Rechnungsbetrag, bleibt die Rechnung offen und die Teilzahlung landet als Notiz in der Timeline.</div>'+
+    '<div class="sml mut" style="margin-top:6px">Das Zahldatum zählt für Umsatz und Export – lieber das Datum vom Kontoauszug als „heute“. Liegt der Betrag unter dem offenen Betrag, bleibt die Rechnung offen; der Rest wird später mit der Schlussrechnung abgerechnet.</div>'+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="paidBtn" onclick="doPaid()">Als bezahlt markieren</button><button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
   renderPaidRest();
 }
-/* Offener Betrag der Rechnung (brutto abzueglich verrechneter Abschlaege) */
-function paidOpenAmount(d){return Math.round((Number(d.total_gross)-Number(d.deposit_deducted||0))*100)/100}
+/* Offener Betrag der Rechnung (brutto abzueglich verrechneter und erhaltener Zahlungen) */
+function paidOpenAmount(d){return docOffen(d)}
+function showPayments(){
+  var d=curDoc;if(!d)return;
+  var zl=docPayments(d).slice().sort(function(a,b){return (a.paid_at||'')<(b.paid_at||'')?-1:1});
+  openModal('Zahlungen zu '+esc(d.number),
+    (zl.length?'<table><thead><tr><th>Datum</th><th class="num">Betrag</th><th>Notiz</th></tr></thead><tbody>'+zl.map(function(z){
+      return '<tr><td>'+dt(z.paid_at)+'</td><td class="num">'+euro(z.amount)+'</td><td>'+esc([z.method,z.note].filter(Boolean).join(' – '))+'</td></tr>'}).join('')+
+      '</tbody></table><div style="margin-top:8px">Erhalten: <b>'+euro(docPaidSum(d))+'</b>'+(d.status!=='bezahlt'?' · Rest '+euro(docOffen(d))+' offen':'')+'</div>':'<span class="mut sml">Noch keine Zahlung.</span>'));
+}
 function renderPaidRest(){
   var el=document.getElementById('paidRest'),btn=document.getElementById('paidBtn');if(!el||!curDoc)return;
   var soll=paidOpenAmount(curDoc),raw=v('paidAmount'),amt=raw===''?null:Number(raw);
@@ -3604,23 +3806,25 @@ function renderPaidRest(){
 }
 function doPaid(){
   var date=v('paidDate');if(!date){toast('Bitte ein Zahldatum angeben.',1);return}
-  var d=curDoc,soll=paidOpenAmount(d),raw=v('paidAmount'),amt=raw===''?null:Number(raw);
-  if(amt!=null&&!isNaN(amt)&&amt<soll-0.005){
-    /* Teilzahlung: Status bleibt, nur eine Notiz in der Kunden-Timeline mit dem Rest. */
-    var rest=Math.round((soll-amt)*100)/100,note=v('paidNote');
-    api('communications',{method:'POST',body:{customer_id:d.customer_id,booking_id:d.booking_id||null,channel:'note',direction:'in',
-      subject:'Teilzahlung zu '+d.number,content:'Teilzahlung '+euro(amt)+' am '+dt(date)+' – Rest '+euro(rest)+' offen'+(note?'\n'+note:''),
-      occurred_at:date+'T12:00:00Z'}})
-      .then(function(){closeModal();toast('Teilzahlung notiert – Rest '+euro(rest)+' offen, Rechnung bleibt offen.');refreshComms()})
-      .catch(function(e){toast(e.message,1)});
-    return;
-  }
+  var d=curDoc,raw=v('paidAmount'),amt=raw===''?null:Number(raw);
+  if(amt!=null&&(isNaN(amt)||amt<=0)){toast('Bitte einen Betrag über 0 € angeben.',1);return}
+  /* Jede Zahlung legt der Server als Datensatz an; ob der Beleg damit bezahlt ist,
+     entscheidet er anhand der Summe. */
   docAction(d.id,'paid',{paid_at:date,amount:raw,note:v('paidNote')})
-    .then(function(j){closeModal();curDoc.paid_at=j.paid_at;toast('Bezahlt ✓');return docAfterStatus('bezahlt')})
+    .then(function(j){
+      closeModal();
+      return refreshPayments().then(function(){
+        if(j.status==='bezahlt'){curDoc.paid_at=j.paid_at;toast('Bezahlt ✓');return docAfterStatus('bezahlt')}
+        toast('Teilzahlung gebucht – erhalten '+euro(j.paid_sum)+', Rest '+euro(j.open)+' offen.');
+        renderDocSub();renderStatusBtns();refreshDocs();refreshComms();
+      });
+    })
     .catch(function(e){toast(e.message,1)});
 }
+function refreshPayments(){return api('payments?select=*&order=paid_at').then(function(r){CACHE.payments=r||[]}).catch(function(){})}
 function setDocStatus(st){
   var wasVersand=st==='versendet';
+  if(curDoc.doc_type==='gutschrift'&&wasVersand&&Math.abs(Number(curDoc.total_gross)||0)<0.005){toast('Eine Gutschrift über 0,00 € ergibt keinen Sinn – bitte Positionen prüfen.',1);return}
   /* Eine Gutschrift wird nicht bezahlt - sie mindert beim Versand sofort den offenen
      Betrag der Rechnung, ohne eigenen Zahlungsvorgang. */
   if(curDoc.doc_type==='gutschrift'&&st==='versendet')st='bezahlt';
@@ -3634,7 +3838,7 @@ function setDocStatus(st){
     return syncVeranstaltungStatus(st).then(renderDocSub);
   }).catch(function(e){toast(e.message,1)});
 }
-function refreshDocs(){api('documents?select=*,customers(*)&order=created_at.desc').then(function(r){CACHE.documents=r||[];renderDocsPage();renderDash()})}
+function refreshDocs(){api('documents?select=*&order=created_at.desc').then(function(r){CACHE.documents=r||[];renderDocsPage();renderDash()})}
 
 var UNIT_OPTIONS=['Stk.','Set','Tag','Tage','Std.','Kilometer','Liter','pausch.'];
 function unitOptionsHtml(cur){
@@ -3846,7 +4050,7 @@ function renderTotals(){
   }
   html+=docModeVal()==='brutto'?'<br><span class="mut sml">Kundenansicht: Preise werden brutto (inkl. USt.) angezeigt – Standard für Privatkunden</span>':
     '<br><span class="mut sml">Kundenansicht: Preise werden netto + USt. ausgewiesen – für Geschäftskunden</span>';
-  if(t==='schluss'&&c.dep)html+='<br>abzgl. Abschläge: −'+euro(c.dep)+' &nbsp;·&nbsp; <b style="color:var(--wh)">Restbetrag: '+euro(c.gross-c.dep)+'</b>';
+  if(t==='schluss'&&c.dep)html+='<br>abzüglich erhaltener Zahlungen: −'+euro(c.dep)+' &nbsp;·&nbsp; <b style="color:var(--wh)">Restbetrag: '+euro(c.gross-c.dep)+'</b>';
   document.getElementById('docTotals').innerHTML=html;
 }
 function docModeVal(){var el=document.getElementById('docNetto');return el&&el.checked?'netto':'brutto'}
@@ -3864,6 +4068,7 @@ function saveDoc(){
   var custId=v('docCust');
   if(!custId){toast('Bitte Kunden wählen.',1);return}
   var type=v('docType'),c=docCalc();
+  if(type==='gutschrift'&&Math.abs(c.gross)<0.005){toast('Eine Gutschrift über 0,00 € ergibt keinen Sinn – bitte Positionen prüfen.',1);return}
   var body={doc_type:type,customer_id:custId,booking_id:v('docBook')||null,doc_date:v('docDate'),
     /* Bei einem uebernommenen Beleg zaehlt dessen Kennzeichen, sonst die Firmeneinstellung -
        sonst verliert eine Korrektur an einem Altbeleg den Paragraf-19-Hinweis, sobald
@@ -3963,7 +4168,7 @@ function syncVeranstaltung(){
   });
 }
 function reloadBookings(){
-  return api('bookings?select=*,customers(*)&order=event_date.desc').then(function(r){
+  return api('bookings?select=*&order=event_date.desc').then(function(r){
     CACHE.bookings=r||[];renderBook();});
 }
 /* Angenommen heisst fest im Kalender, abgelehnt heisst wieder frei - aber nur, solange
@@ -4341,6 +4546,30 @@ function findAngebot(doc){
   }
   return null;
 }
+/* Was eine Schlussrechnung aus src verrechnet - Spiegelbild von docChainReceived() in
+   api.php (dort beim Versand fuer das Abloesen der Belege): Herkunftskette von src
+   aufwaerts, Geschwister daran, alle Belege derselben Buchung. Abschlaege mit dem
+   Erhaltenen (bezahlt ohne Zahlungsdatensatz = Altbestand, dann brutto), Rechnungen
+   nur, solange sie noch offen sind. */
+function docChainReceived(src){
+  var anc={};anc[src.id]=true;
+  var cur=src,tiefe=0;
+  while(cur&&cur.parent_id&&tiefe++<8&&!anc[cur.parent_id]){
+    anc[cur.parent_id]=true;
+    cur=(CACHE.documents||[]).find(function(d){return d.id===cur.parent_id});
+  }
+  var out=[];
+  (CACHE.documents||[]).forEach(function(d){
+    if(['rechnung','abschlag','schluss'].indexOf(d.doc_type)<0)return;
+    if(['storniert','entwurf'].indexOf(d.status)>=0||d.settled_by)return;
+    if(!(anc[d.id]||(d.parent_id&&anc[d.parent_id])||(src.booking_id&&d.booking_id===src.booking_id)))return;
+    var paid=docPaidSum(d),recv=0;
+    if(d.doc_type==='abschlag')recv=(d.status==='bezahlt'&&paid<=0)?Number(d.total_gross):paid;
+    else if(['versendet','ueberfaellig'].indexOf(d.status)>=0)recv=paid;
+    if(recv>0.005)out.push({doc:d,received:r2(recv)});
+  });
+  return out;
+}
 function docToInvoice(type){
   var src=curDoc,items=curItems.slice();
   /* Der verbindliche Endbetrag des Angebots: Pauschalpreis schlägt die Summe, sonst
@@ -4396,15 +4625,12 @@ function docToInvoice(type){
         document.getElementById('docDiscVal').value=doc.discount_value||0;
         if(doc.discount_type)document.getElementById('docDiscType').value=doc.discount_type;
         document.getElementById('docTotalOverride').value=doc.total_override||'';
-        /* Alle bezahlten Abschläge zu diesem Vorgang abziehen - erkannt über Buchung
-           oder über die Herkunft (parent_id), sonst bliebe der Abzug bei 0. */
-        var paidDeps=CACHE.documents.filter(function(d){
-          if(d.doc_type!=='abschlag'||d.status!=='bezahlt')return false;
-          if(d.id===src.id)return true;
-          if(src.booking_id&&d.booking_id===src.booking_id)return true;
-          return d.parent_id&&d.parent_id===basisDoc.id;
-        });
-        document.getElementById('docDep').value=paidDeps.reduce(function(s,d){return s+Number(d.total_gross)},0)||0;
+        /* ALLE erhaltenen Zahlungen der Kette abziehen: bezahlte Abschläge und
+           Teilzahlungen auf Rechnungen/Abschlägen derselben Buchung bzw. Herkunftskette
+           (Regel von Markus: Teilzahlungen werden immer von der Schlussrechnung abgezogen). */
+        var recv=docChainReceived(src);
+        document.getElementById('docDep').value=r2(recv.reduce(function(s,e){return s+e.received},0))||0;
+        if(recv.length)toast('Verrechnet: '+recv.map(function(e){return e.doc.number+' '+euro(e.received)}).join(', '));
         renderItems();
       };
       if(basis)fertig(basis,basisDoc);
@@ -4718,7 +4944,7 @@ function buildDocHtml(){
     totals+='<tr><td colspan="4" style="text-align:right;padding:6px;font-weight:700">Gesamt</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(dGross)+'</td></tr>';
   }
   if(type==='schluss'&&c.dep){
-    totals+='<tr><td colspan="4" style="text-align:right;padding:6px">abzgl. erhaltener Abschläge</td><td style="text-align:right;padding:6px">−'+euro(r2(c.dep))+'</td></tr>'+
+    totals+='<tr><td colspan="4" style="text-align:right;padding:6px">abzüglich erhaltener Zahlungen</td><td style="text-align:right;padding:6px">−'+euro(r2(c.dep))+'</td></tr>'+
     '<tr><td colspan="4" style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">Verbleibender Restbetrag</td><td style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">'+euro(r2(dGross-r2(c.dep)))+'</td></tr>';
   }
   /* Storno/Korrektur unuebersehbar auf dem Beleg: "STORNIERT am ..." plus die Belege,
@@ -4783,19 +5009,24 @@ function initStats(){
 function renderStats(){
   var year=document.getElementById('statYear').value;
   var paid=CACHE.documents.filter(function(d){return d.doc_type!=='angebot'&&d.status==='bezahlt'&&d.paid_at&&d.paid_at.slice(0,4)===String(year)});
-  var rev=paid.reduce(function(s,d){return s+Number(d.total_gross)-Number(d.deposit_deducted||0)},0);
+  var rev=revenueInYear(String(year));
   var books=CACHE.bookings.filter(function(b){return b.event_date.slice(0,4)===String(year)&&b.status!=='storniert'});
   var quotes=CACHE.documents.filter(function(d){return d.doc_type==='angebot'&&d.doc_date&&d.doc_date.slice(0,4)===String(year)});
   var qSent=quotes.filter(function(d){return ['versendet','angenommen','abgelehnt'].indexOf(d.status)>=0});
   var qAcc=quotes.filter(function(d){return d.status==='angenommen'});
   var avg=paid.length?rev/paid.length:0;
   document.getElementById('statTiles').innerHTML=
-    tile(euro(rev),'Umsatz brutto',null,'Bezahlte Rechnungen nach Zahldatum im Jahr '+esc(year)+', abzüglich verrechneter Abschläge')+
+    tile(euro(rev),'Umsatz brutto',null,'Zahlungseingänge nach Zahldatum im Jahr '+esc(year)+' (Teilzahlungen einzeln, verrechnete Zahlungen nicht doppelt)')+
     tile(books.length,'Gigs',null,'Veranstaltungen mit Termin im Jahr '+esc(year)+' (ohne stornierte, inkl. Anfragen und Angebote)')+
     tile(qSent.length?Math.round(qAcc.length/qSent.length*100)+' %':'–','Angebots-Annahme',null,'Angenommene von allen entschiedenen bzw. versendeten Angeboten mit Belegdatum '+esc(year))+
     tile(euro(avg),'Ø Rechnungswert',null,'Umsatz geteilt durch die Zahl der bezahlten Rechnungen');
   var months=Array(12).fill(0);
-  paid.forEach(function(d){months[new Date(d.paid_at).getMonth()]+=Number(d.total_gross)-Number(d.deposit_deducted||0)});
+  /* Monatsverteilung wie der Jahresumsatz: Zahlungen nach Zahldatum, Altbestand nach paid_at */
+  (CACHE.payments||[]).forEach(function(z){
+    var d=(CACHE.documents||[]).find(function(x){return x.id===z.document_id});
+    if(d&&istZahlbeleg(d.doc_type)&&d.status!=='storniert'&&String(z.paid_at||'').slice(0,4)===String(year))months[new Date(z.paid_at).getMonth()]+=Number(z.amount||0);
+  });
+  paid.forEach(function(d){if(!docPayments(d).length)months[new Date(d.paid_at).getMonth()]+=Number(d.total_gross)-Number(d.deposit_deducted||0)});
   var max=Math.max.apply(null,months.concat([1]));
   var MN=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
   document.getElementById('statMonths').innerHTML='<div style="display:flex;align-items:flex-end;gap:6px;height:140px">'+
@@ -4880,9 +5111,9 @@ var SORTDEFS={
     {get:function(d){return d.number},type:'text'},
     {get:function(d){return d.doc_type},type:'text'},
     {get:function(d){return d.doc_date},type:'date'},
-    {get:function(d){return custName(d.customers)},type:'text'},
+    {get:function(d){return custName(custOf(d))},type:'text'},
     {get:function(d){var b=d.booking_id?(CACHE.bookings||[]).find(function(x){return x.id===d.booking_id}):null;return b?b.event_date:''},type:'date'},
-    {get:function(d){return Number(d.total_gross)-Number(d.deposit_deducted||0)},type:'num'},
+    {get:function(d){return istZahlbeleg(d.doc_type)&&docPaidSum(d)>0&&['versendet','ueberfaellig'].indexOf(d.status)>=0?docOffen(d):Number(d.total_gross)-Number(d.deposit_deducted||0)},type:'num'},
     {get:function(d){return istZahlbeleg(d.doc_type)?d.due_date:d.valid_until},type:'date'},
     {get:function(d){return d.status},type:'text'}]},
   products:{rowsId:'prodRows',render:function(){renderProducts()},cols:[
@@ -4993,7 +5224,7 @@ function epMonthMap(y,m){
 function epGigLabel(b){return (b.title||b.event_type||'Gig')}
 function epGigLine(g,withQty){
   var b=g.b;
-  return (withQty?'×'+g.qty+' – ':'')+'<a onclick="openBookDetail(\''+b.id+'\')">'+esc(epGigLabel(b))+'</a> <span class="mut">('+esc(custName(b.customers))+(b.venue_name?', '+esc(b.venue_name):'')+
+  return (withQty?'×'+g.qty+' – ':'')+'<a onclick="openBookDetail(\''+b.id+'\')">'+esc(epGigLabel(b))+'</a> <span class="mut">('+esc(custName(custOf(b)))+(b.venue_name?', '+esc(b.venue_name):'')+
     ', '+dt(b.event_date)+(b.open_ended?' – offen':b.end_date&&b.end_date!==b.event_date?' – '+dt(b.end_date):'')+')</span>';
 }
 function renderEinsatz(){
@@ -7404,7 +7635,7 @@ function reloadForms(){
 /* Die eine Platzhalterliste: Seitenkopf, Vorlagen-Editor und fillTpl() lesen alle hier.
    Server-Automatiken (tplMap() und die Mail-Funktionen in api.php) fuellen dieselben Namen. */
 var TPL_PLACEHOLDERS=[
-  ['{vorname}','Vorname des Kunden (bei Firmen „zusammen“)'],
+  ['{vorname}','Vorname des Kunden bzw. Ansprechpartners (ohne Vornamen „zusammen“)'],
   ['{name}','Voller Name bzw. Firma des Kunden'],
   ['{datum}','Termin der Veranstaltung (TT.MM.JJJJ)'],
   ['{termin}','Termin mit Location, z. B. „der 15.05.2027 – Gut Kump“'],
@@ -8074,12 +8305,12 @@ function insertUpsell(id){
 }
 
 /* Antwort aus Anfrage verfassen */
-/* Anrede-Vorname wie anredeVorname() in api.php: Firma/Verein -> "zusammen", sonst der
-   Vorname am Kunden. Vorher wurde das erste Wort aus custName() genommen - bei einer
-   Firma stand dann "Hallo O'Brien & Söhne GmbH (Pat," in der Mail. */
+/* Anrede-Vorname wie anredeVorname() in api.php: Ist ein Ansprechpartner-Vorname
+   hinterlegt, "Hallo Pat" - auch bei Firma und Verein. Ohne Vornamen "zusammen".
+   Nie das erste Wort aus custName(): bei einer Firma stand sonst
+   "Hallo O'Brien & Söhne GmbH (Pat," in der Mail. */
 function anredeVorname(c){
   if(!c)return 'zusammen';
-  if(c.kind==='firma'||c.kind==='verein')return 'zusammen';
   var vn=String(c.first_name||'').trim();
   return vn||'zusammen';
 }
@@ -8140,7 +8371,7 @@ function dateConflicts(datum,eigenerKunde){
     if(eigenerKunde&&b.customer_id===eigenerKunde&&b.event_date===datum)return;
     var bis=b.end_date||b.event_date;
     if(datum>=b.event_date&&datum<=bis)
-      out.push((b.title||b.event_type||'Gig')+(b.customers?' · '+custName(b.customers):''));
+      out.push((b.title||b.event_type||'Gig')+(custOf(b)?' · '+custName(custOf(b)):''));
   });
   (CACHE.blocks||[]).forEach(function(c){
     var bis=c.end_date||c.start_date;

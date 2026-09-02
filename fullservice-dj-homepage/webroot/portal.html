@@ -349,6 +349,11 @@ function renderOffer(){
     if(!d.is_small_business)totals+='<tr class="totals"><td colspan="3" class="num">USt. '+Number(d.tax_rate)+' %</td><td class="num">'+euro(d.total_tax)+'</td></tr>';
     totals+='<tr class="totals"><td colspan="3" class="num"><b>Gesamt</b></td><td class="num grand">'+euro(d.total_gross)+'</td></tr>';
   }
+  /* Schlussrechnung: erhaltene Zahlungen (Abschlaege, Teilzahlungen) sind verrechnet -
+     ohne diese Zeilen stand beim Kunden die volle Auftragssumme. */
+  if(Number(d.deposit_deducted)>0)
+    totals+='<tr class="totals"><td colspan="3" class="num">abzüglich erhaltener Zahlungen</td><td class="num">−'+euro(d.deposit_deducted)+'</td></tr>'+
+      '<tr class="totals"><td colspan="3" class="num"><b>Verbleibender Restbetrag</b></td><td class="num grand">'+euro(Number(d.total_gross)-Number(d.deposit_deducted))+'</td></tr>';
   /* Nur ein Angebot wird angenommen oder abgelehnt. Bei einer Rechnung gehört dorthin
      kein "unverbindlich"-Text und kein Unterschriftsfeld, sondern nur der Nachrichtenweg. */
   var istAngebot=d.doc_type==='angebot';
@@ -390,7 +395,10 @@ function renderOffer(){
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
     '<div><h1>Hallo '+esc(DOC.customer)+'!</h1>'+
     (custAddressLine()?'<p class="sub">'+custAddressLine()+'</p>':'')+
-    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until&&!storniert?' · gültig bis '+dt(d.valid_until):'')+(d.status==='bezahlt'&&d.doc_type!=='gutschrift'?' · bezahlt'+(d.paid_at?' am '+dt(d.paid_at.slice(0,10)):''):(d.due_date&&!storniert&&d.doc_type!=='gutschrift'?' · zahlbar bis '+dt(d.due_date):''))+(rentalPeriodLabel(d.rental_from,d.rental_to)?' · '+rentalPeriodLabel(d.rental_from,d.rental_to):'')+'</p></div>'+
+    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until&&!storniert?' · gültig bis '+dt(d.valid_until):'')+(d.status==='bezahlt'&&d.doc_type!=='gutschrift'?(d.settled_by?' · verrechnet in der Schlussrechnung'+(DOC.settled_by_number?' '+esc(DOC.settled_by_number):''):' · bezahlt'+(d.paid_at?' am '+dt(d.paid_at.slice(0,10)):'')):(d.due_date&&!storniert&&d.doc_type!=='gutschrift'?' · zahlbar bis '+dt(d.due_date):''))+(rentalPeriodLabel(d.rental_from,d.rental_to)?' · '+rentalPeriodLabel(d.rental_from,d.rental_to):'')+'</p>'+
+    /* Teilzahlung: der Kunde soll den Rest sehen, nicht noch einmal den vollen Betrag */
+    (Number(DOC.paid_sum)>0&&d.status!=='bezahlt'&&!storniert&&['rechnung','abschlag','schluss'].indexOf(d.doc_type)>=0
+      ?'<p class="sub" style="margin-top:6px"><b>Erhalten '+euro(DOC.paid_sum)+' · Rest '+euro(DOC.open_amount)+' offen</b> – danke für die Anzahlung.</p>':'')+'</div>'+
     '<button class="btn g" onclick="downloadPdf()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Als PDF speichern</button></div>'+
     (eventInfoRows(d)?'<div class="sub" style="margin-top:12px;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:9px 12px">'+eventInfoRows(d)+'</div>':'')+
     (statusLine?'<div style="margin-top:12px">'+statusLine+'</div>':'')+
@@ -623,6 +631,12 @@ function downloadPdf(){
     if(!d.is_small_business)totals+='<tr><td colspan="3" style="text-align:right;padding:6px">USt. '+Number(d.tax_rate)+' %</td><td style="text-align:right;padding:6px">'+euro(d.total_tax)+'</td></tr>';
     totals+='<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700">Gesamt</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(d.total_gross)+'</td></tr>';
   }
+  if(Number(d.deposit_deducted)>0)
+    totals+='<tr><td colspan="3" style="text-align:right;padding:6px">abzüglich erhaltener Zahlungen</td><td style="text-align:right;padding:6px">−'+euro(d.deposit_deducted)+'</td></tr>'+
+      '<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">Verbleibender Restbetrag</td><td style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">'+euro(Number(d.total_gross)-Number(d.deposit_deducted))+'</td></tr>';
+  if(Number(DOC.paid_sum)>0&&d.status!=='bezahlt'&&['rechnung','abschlag','schluss'].indexOf(d.doc_type)>=0)
+    totals+='<tr><td colspan="3" style="text-align:right;padding:6px">davon bereits erhalten</td><td style="text-align:right;padding:6px">'+euro(DOC.paid_sum)+'</td></tr>'+
+      '<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700">Noch offen</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(DOC.open_amount)+'</td></tr>';
   var bz=DOC.bezug||{},storniert=d.status==='storniert';
   var banner=storniert?'<div style="border:2px solid #b00000;color:#b00000;padding:8px 12px;margin-bottom:18px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:13px">Storniert'+(d.storno_at?' am '+dt(d.storno_at.slice(0,10)):'')+
     ((bz.korrigiert_durch||[]).length?'<div style="font-weight:400;letter-spacing:0;text-transform:none;font-size:11px;margin-top:2px">Korrigiert durch '+bz.korrigiert_durch.map(function(x){return (TYPE_NAME[x.doc_type]||'Beleg')+' '+esc(x.number)}).join(', ')+'</div>':'')+'</div>':'';
@@ -1179,7 +1193,8 @@ function renderAccount(){
        zu welcher Veranstaltung ein Beleg gehoert. */
     var termin=d.event_date?' · Termin '+dt(d.event_date):'';
     return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-soft);flex-wrap:wrap">'+
-    '<div><b>'+(TYPE_LABEL[d.doc_type]||d.doc_type)+' '+esc(d.number)+'</b> <span style="color:var(--mut);font-size:13px">· '+dt(d.doc_date)+termin+' · '+d.status+'</span></div>'+
+    '<div><b>'+(TYPE_LABEL[d.doc_type]||d.doc_type)+' '+esc(d.number)+'</b> <span style="color:var(--mut);font-size:13px">· '+dt(d.doc_date)+termin+' · '+d.status+
+      (Number(d.paid_sum)>0&&d.status!=='bezahlt'&&d.open_amount!=null?' · erhalten '+euro(d.paid_sum)+' · Rest '+euro(d.open_amount)+' offen':'')+'</span></div>'+
     '<a href="?a='+d.token+'">Ansehen / PDF →</a></div>';
   }).join('')||(me.bookings.length||(me.rentals||[]).length
     ?'<p class="sub">Noch keine Unterlagen.</p>'

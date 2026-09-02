@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 88;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 89;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -199,7 +199,7 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks','payments'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -257,6 +257,7 @@ function docIndexDdl(): array {
     'create index if not exists idx_bookings_customer on bookings(customer_id)',
     'create index if not exists idx_bookings_event_date on bookings(event_date)',
     'create index if not exists idx_forms_customer on forms(customer_id)',
+    'create index if not exists idx_payments_doc on payments(document_id)',
   ];
 }
 
@@ -301,6 +302,20 @@ function upgrade(PDO $p): void {
      beiden Sonderfaelle bei der Annahme (Termin inzwischen belegt / Angebot abgelaufen),
      v83 "Nachfassen zum Angebot" fuer Kunden, die sich nach dem Angebot nicht melden,
      v85 die Eingangsbestaetigungen fuer Absage, Frage und Rueckrufwunsch im Portal. */
+  if ($v < 89) {
+    /* v89: Zahlungen als eigene Tabelle. Eine Teilzahlung war bisher nur eine Notiz in
+       der Timeline - der Beleg blieb mit dem vollen Betrag offen, das Dashboard zaehlte
+       ihn voll, und die Schlussrechnung konnte nur bezahlte Abschlaege abziehen. Jetzt
+       ist jede Zahlung ein Datensatz; offen = brutto - verrechnete Zahlungen - erhalten. */
+    try { $p->exec(paymentsDdl()); } catch (PDOException $e) {}
+    /* settled_by: Beleg wurde durch eine Schlussrechnung abgeloest (Zahlungen darauf
+       sind dort verrechnet), damit er nirgends mehr als offen zaehlt. */
+    try { $p->exec('alter table documents add column settled_by text'); } catch (PDOException $e) {}
+    /* Versionen zaehlen erst ab dem ersten Versand: ein nie versendetes Angebot hat keine
+       Version (siehe docVersionTouch). Altbestand bereinigen, der durch die fruehere Logik
+       schon "Version 2" trug, ohne je beim Kunden gewesen zu sein. */
+    try { $p->exec("update documents set version = 1, version_at = null, version_hash = null where sent_at is null and status = 'entwurf'"); } catch (PDOException $e) {}
+  }
   if ($v < 88) {
     /* v88: Indizes auf den Spalten, ueber die das Backoffice und das Portal staendig
        filtern (Positionen je Beleg, Technik je Gig, Belege je Kunde/Status/Token ...).
@@ -1099,6 +1114,90 @@ function docAuditDdl(): string {
     user_email text, action text, detail text, created_at text)";
 }
 
+/* ---------- Zahlungen ----------
+   Jede Zahlung (voll oder teilweise) ist ein Datensatz; der Beleg gilt als bezahlt,
+   sobald die Summe den offenen Betrag erreicht. Offen = brutto - verrechnete Zahlungen
+   (deposit_deducted, Schlussrechnung) + Gutschriften darauf - erhaltene Zahlungen. */
+function paymentsDdl(): string {
+  return 'create table if not exists payments (id text primary key,
+    document_id text not null references documents(id) on delete cascade,
+    amount real not null default 0, paid_at text, method text, note text, created_at text)';
+}
+function docPaidSum(PDO $p, string $docId): float {
+  try {
+    $st = $p->prepare('select coalesce(sum(amount),0) from payments where document_id = ?');
+    $st->execute([$docId]);
+    return round((float)$st->fetchColumn(), 2);
+  } catch (PDOException $e) { return 0.0; }
+}
+function docGutschriftSum(PDO $p, string $docId): float {
+  $st = $p->prepare("select coalesce(sum(total_gross),0) from documents where doc_type = 'gutschrift' and parent_id = ? and status != 'storniert'");
+  $st->execute([$docId]);
+  return round((float)$st->fetchColumn(), 2);
+}
+function docOpenAmount(PDO $p, array $d): float {
+  return round((float)$d['total_gross'] - (float)($d['deposit_deducted'] ?? 0) + docGutschriftSum($p, (string)$d['id']) - docPaidSum($p, (string)$d['id']), 2);
+}
+/* Belege, deren Zahlungen eine Schlussrechnung verrechnet: die Herkunftskette der
+   Schlussrechnung (parent_id aufwaerts), Geschwister an dieser Kette und alle Belege
+   derselben Buchung. Abschlaege zaehlen mit dem Erhaltenen (bezahlt ohne Zahlungs-
+   datensatz = Altbestand, dann mit dem Bruttobetrag), Rechnungen nur, solange sie noch
+   offen sind - eine laengst bezahlte Technik-Rechnung derselben Feier gehoert nicht in
+   den Abzug. Spiegelbild von docChainReceived() in admin.html. */
+function docChainReceived(PDO $p, array $schluss): array {
+  $anc = [];
+  $cur = $schluss; $tiefe = 0;
+  while (!empty($cur['parent_id']) && $tiefe++ < 8 && !isset($anc[$cur['parent_id']])) {
+    $anc[$cur['parent_id']] = true;
+    $st = $p->prepare('select id, parent_id from documents where id = ?'); $st->execute([$cur['parent_id']]);
+    $cur = $st->fetch() ?: [];
+  }
+  $ids = array_keys($anc);
+  $rows = [];
+  if ($ids) {
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $st = $p->prepare("select * from documents where id in ($in) or parent_id in ($in)");
+    $st->execute(array_merge($ids, $ids));
+    $rows = $st->fetchAll();
+  }
+  if (!empty($schluss['booking_id'])) {
+    $st = $p->prepare('select * from documents where booking_id = ?'); $st->execute([$schluss['booking_id']]);
+    foreach ($st->fetchAll() as $r) $rows[] = $r;
+  }
+  $out = []; $seen = [];
+  foreach ($rows as $d) {
+    if (isset($seen[$d['id']]) || $d['id'] === ($schluss['id'] ?? null)) continue;
+    $seen[$d['id']] = true;
+    if (!in_array($d['doc_type'], ['rechnung', 'abschlag', 'schluss'], true)) continue;
+    if (in_array($d['status'], ['storniert', 'entwurf'], true) || !empty($d['settled_by'])) continue;
+    $paid = docPaidSum($p, (string)$d['id']);
+    $recv = 0.0;
+    if ($d['doc_type'] === 'abschlag') $recv = ($d['status'] === 'bezahlt' && $paid <= 0) ? (float)$d['total_gross'] : $paid;
+    elseif (in_array($d['status'], ['versendet', 'ueberfaellig'], true)) $recv = $paid;
+    if ($recv > 0.005) $out[] = ['doc' => $d, 'received' => round($recv, 2)];
+  }
+  return $out;
+}
+/* Beim Versand einer Schlussrechnung: die Belege, deren Zahlungen sie verrechnet, gelten
+   als abgeloest. Sie bekommen status 'bezahlt' (plus settled_by) - nicht nur ein Feld,
+   weil jede Offen-/Ueberfaellig-Auswertung (Dashboard, Tagesmeldung, Mahnung, Portal)
+   ueber den Status filtert und ein vergessener Filter sofort einen Phantom-Betrag zeigt.
+   Der Umsatz zaehlt ueber die Zahlungen, nicht ueber den Belegbetrag - ein abgeloester
+   Beleg bringt also nur das ein, was wirklich eingegangen ist. */
+function settleDocsBySchluss(PDO $p, array $schluss): void {
+  if (($schluss['doc_type'] ?? '') !== 'schluss') return;
+  foreach (docChainReceived($p, $schluss) as $e) {
+    $d = $e['doc'];
+    $p->prepare("update documents set status = 'bezahlt', paid_at = coalesce(paid_at, ?), settled_by = ?, updated_at = ? where id = ?")
+      ->execute([now(), $schluss['id'], now(), $d['id']]);
+    docAudit($p, $d['id'], 'abgelöst', $d['number'] . ' – abgelöst durch Schlussrechnung ' . $schluss['number'] . ' (erhalten ' . number_format($e['received'], 2, ',', '.') . ' € dort verrechnet)');
+    if (!empty($d['customer_id']))
+      $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, created_at) values (?,?,?,?,?,?,?,?,?)')
+        ->execute([uuid(), $d['customer_id'], $d['booking_id'] ?: null, 'note', 'out', 'Abgelöst: ' . $d['number'],
+          'Abgelöst durch Schlussrechnung ' . $schluss['number'] . ' – die erhaltenen ' . number_format($e['received'], 2, ',', '.') . ' € sind dort verrechnet.', now(), now()]);
+  }
+}
+
 /* Änderungsprotokoll für Dokumente (GoBD) */
 function docAudit(PDO $p, ?string $docId, string $action, string $detail = ''): void {
   $u = currentUser();
@@ -1195,6 +1294,10 @@ function docVersionTouch(PDO $p, ?string $docId): void {
     $d = $st->fetch();
     if (!$d || !in_array($d['doc_type'], ['angebot', 'bestaetigung'], true) || $d['status'] === 'entwurf') return;
     $hash = docContentHash($p, $docId);
+    /* Versionen zaehlen erst ab dem ersten Versand (Seal). Ohne Fingerabdruck war der
+       Beleg nie beim Kunden - dann nur den Stand merken, kein Versionssprung. Sonst
+       stand an einem per Schnittstelle befuellten, nie versendeten Angebot "Version 2". */
+    if ((string)$d['version_hash'] === '') { docVersionSeal($p, $docId); return; }
     if ($hash === (string)$d['version_hash']) return;
     $recent = !empty($d['version_at']) && (time() - strtotime((string)$d['version_at'])) < 90;
     if ($recent)
@@ -1206,9 +1309,10 @@ function docVersionTouch(PDO $p, ?string $docId): void {
     }
   } catch (Throwable $e) {}
 }
-/* Beim Versand den Fingerabdruck des versendeten Stands merken (ohne Versionssprung). */
+/* Beim Versand den Fingerabdruck des versendeten Stands merken (ohne Versionssprung).
+   Der erste Versand ist Version 1; Aenderungen davor zaehlen nicht. */
 function docVersionSeal(PDO $p, string $docId): void {
-  try { $p->prepare('update documents set version_hash = ? where id = ?')->execute([docContentHash($p, $docId), $docId]); }
+  try { $p->prepare('update documents set version_hash = ?, version = coalesce(nullif(version, 0), 1) where id = ?')->execute([docContentHash($p, $docId), $docId]); }
   catch (Throwable $e) {}
 }
 /* Bei der Annahme festhalten, welche Version der Kunde angenommen hat. */
@@ -1629,15 +1733,16 @@ function splitPersonName(string $name): array {
   return [$words[0], implode(' ', array_slice($words, 1))];
 }
 
-/* Anrede fuer Kundenmails an einer Stelle: Firmen, Vereine und Kunden ohne Vornamen
-   bekommen "Hallo zusammen" - "Hallo Schützenverein," las sich wie ein Serienbrief.
-   anredeVorname() liefert nur das Wort nach "Hallo" (fuer den Platzhalter {vorname}
-   in den Vorlagen), anredeFor() die ganze Anredezeile. Faellt ein Datensatz ohne
-   first_name an (Anfrage, Workshop-Anmeldung), zaehlt das erste Wort aus 'name'. */
+/* Anrede fuer Kundenmails an einer Stelle: Ist ein Ansprechpartner-Vorname hinterlegt,
+   "Hallo Pat" - auch bei Firmen und Vereinen, denn dort schreibt man mit einem
+   Menschen, nicht mit der Firma. Ohne Vornamen "Hallo zusammen" ("Hallo Schützenverein,"
+   las sich wie ein Serienbrief). anredeVorname() liefert nur das Wort nach "Hallo"
+   (Platzhalter {vorname}), anredeFor() die ganze Anredezeile. Faellt ein Datensatz
+   ohne first_name an (Anfrage, Workshop-Anmeldung), zaehlt das erste Wort aus 'name'.
+   Gleiche Regel wie anredeVorname() in admin.html. */
 function anredeVorname(array $c): string {
-  if (($c['kind'] ?? '') === 'firma') return 'zusammen';
   $vn = trim((string)($c['first_name'] ?? ''));
-  if ($vn === '' && trim((string)($c['name'] ?? '')) !== '')
+  if ($vn === '' && ($c['kind'] ?? '') !== 'firma' && trim((string)($c['name'] ?? '')) !== '')
     $vn = preg_split('/\s+/', trim((string)$c['name']), 2)[0] ?? '';
   return $vn !== '' ? $vn : 'zusammen';
 }
@@ -2615,6 +2720,7 @@ create table documents (id text primary key, share_token text, doc_type text not
   deposit_deducted real default 0, total_override real, sent_at text, paid_at text,
   accepted_name text, accept_signature text, event_info text,
   version integer default 1, version_at text, version_hash text, accepted_version integer,
+  settled_by text,
   created_at text, updated_at text);
 create table tech_checks (id text primary key,
   customer_id text not null references customers(id) on delete cascade,
@@ -2662,6 +2768,7 @@ SQL);
     values (?,?,?,?,?,?,?,?,?,?,?)')
     ->execute([uuid(), 'start', 'galerie', 0, 'instagram', 'Frisch aus Instagram', '', '[]', '4', 0, now()]);
   foreach (workshopsDdl() as $sql) $p->exec($sql);
+  $p->exec(paymentsDdl());
   foreach (docIndexDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
   foreach (portalAccountDdl() as $sql) $p->exec($sql);
@@ -3170,6 +3277,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         /* Belegnummer serverseitig in einer Transaktion vergeben (siehe allocDocNumber) -
            der Client zaehlte bisher selbst hoch und ueberschrieb dabei Zaehler, die
            inzwischen woanders (anderes Geraet, Workshop-Rechnung) weitergelaufen waren. */
+        if ($t === 'documents') assertGutschriftNotZero($row, null);
         $ownTx = false;
         if ($t === 'documents' && !$merge) {
           if (!$p->inTransaction()) { $p->beginTransaction(); $ownTx = true; }
@@ -3197,7 +3305,11 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
           fail('Konflikt: ' . $e->getMessage(), 409);
         }
         if ($bookingNeu) applyDefaultSet($p, (string)$row['id'], (string)($row['kind'] ?? 'dj'));
-        if ($t === 'documents') docAudit($p, $row['id'] ?? null, 'erstellt', ($row['number'] ?? '') . ' (' . ($row['doc_type'] ?? '') . ')');
+        if ($t === 'documents') {
+          docAudit($p, $row['id'] ?? null, 'erstellt', ($row['number'] ?? '') . ' (' . ($row['doc_type'] ?? '') . ')');
+          /* Direkt als versendet angelegt (Schnittstelle, Seed): Stand als Version 1 merken. */
+          if (($row['status'] ?? 'entwurf') !== 'entwurf' && !empty($row['id'])) docVersionSeal($p, (string)$row['id']);
+        }
         /* Nur protokollieren, wenn der Beleg schon versendet ist - sonst wuerde jede
            normale Ersterfassung eines Angebots das Protokoll mit "Position hinzugefuegt"
            je Zeile zumuellen. Genau der gemeinte Fall ist die nachtraegliche Korrektur
@@ -3228,8 +3340,9 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       if ($t === 'documents') {
         $chk = $p->prepare("select * from documents$wsql"); $chk->execute($args);
         $before = $chk->fetchAll();
-        $allowed = ['status','paid_at','sent_at','share_token','version','version_at','version_hash','accepted_version'];
+        $allowed = ['status','paid_at','sent_at','share_token','version','version_at','version_hash','accepted_version','settled_by'];
         foreach ($before as $b) {
+          assertGutschriftNotZero($row, $b);
           if (docLockedRow($b) && array_diff(array_keys($row), $allowed))
             fail('Rechnung ' . $b['number'] . ' ist festgeschrieben (GoBD): Inhalte können nach dem Versand nicht mehr geändert werden. Erstelle eine Korrekturrechnung oder storniere sie.', 409);
           /* Angenommenes Angebot: Inhalte nur sperren, wenn sich wirklich etwas aendert -
@@ -3264,6 +3377,9 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
           if (array_intersect(array_keys($row), DOC_VERSION_FIELDS)) docVersionTouch($p, $b['id']);
           /* Versand: Stand des Belegs merken; Annahme: angenommene Version festhalten. */
           if (($row['status'] ?? null) === 'versendet' && ($b['status'] ?? '') === 'entwurf') docVersionSeal($p, $b['id']);
+          /* Schlussrechnung geht raus: die Belege, deren Zahlungen sie verrechnet, abloesen. */
+          if (($row['status'] ?? null) === 'versendet' && ($b['status'] ?? '') === 'entwurf' && ($b['doc_type'] ?? '') === 'schluss')
+            try { settleDocsBySchluss($p, $b); } catch (Throwable $e) {}
           if (($row['status'] ?? null) === 'angenommen' && ($b['status'] ?? '') !== 'angenommen') docMarkAccepted($p, $b['id']);
         }
         /* Angebots-Annahme direkt im Backoffice (Status-Buttons) loest denselben
@@ -3973,6 +4089,17 @@ function portalReactionMail(PDO $p, array $d, string $kind, string $msg, string 
    Fehlklick war nicht rueckholbar. Jetzt: Storno nur mit Grund und nie auf einer
    bezahlten Rechnung (dafuer gibt es die Gutschrift), Zahlung mit Zahldatum, und die
    automatischen Kundenmails lassen sich nach einem Mailfehler erneut anstossen. */
+/* Eine Gutschrift ueber 0 Euro ergibt keinen Sinn - Sicherheitsnetz hinter der
+   Client-Pruefung im Editor. $b = bisherige Zeile (PATCH), null beim Anlegen. */
+function assertGutschriftNotZero(array $row, ?array $b): void {
+  $type = (string)($row['doc_type'] ?? ($b['doc_type'] ?? ''));
+  if ($type !== 'gutschrift') return;
+  $gross = array_key_exists('total_gross', $row) ? (float)$row['total_gross'] : (float)($b['total_gross'] ?? 0);
+  $relevant = array_key_exists('total_gross', $row) || $b === null
+    || in_array((string)($row['status'] ?? ''), ['versendet', 'bezahlt'], true);
+  if ($relevant && abs($gross) < 0.005)
+    fail('Eine Gutschrift über 0,00 € ergibt keinen Sinn – bitte Positionen prüfen.', 422);
+}
 function handleDocAction(string $id, string $action, array $body): never {
   $p = db();
   $st = $p->prepare('select d.*, c.email as c_email, c.first_name as c_first_name, c.last_name as c_last_name,
@@ -3998,16 +4125,33 @@ function handleDocAction(string $id, string $action, array $body): never {
       fail('Dieser Beleg lässt sich in seinem Status nicht als bezahlt markieren.', 409);
     $date = (string)($body['paid_at'] ?? '');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) fail('Bitte ein Zahldatum angeben (YYYY-MM-DD).');
-    $amount = isset($body['amount']) && $body['amount'] !== '' ? (float)$body['amount'] : null;
     $note = trim((string)($body['note'] ?? ''));
-    $p->prepare("update documents set status='bezahlt', paid_at=?, updated_at=? where id=?")->execute([$date . 'T12:00:00Z', now(), $id]);
-    docAudit($p, $id, 'bezahlt', $d['number'] . ' – Zahlung am ' . date('d.m.Y', strtotime($date)) .
-      ($amount !== null ? ' über ' . number_format($amount, 2, ',', '.') . ' €' : '') . ($note !== '' ? ' – ' . $note : ''));
-    if (!empty($d['customer_id']) && ($note !== '' || ($amount !== null && abs($amount - (float)$d['total_gross']) > 0.005)))
+    $method = trim((string)($body['method'] ?? ''));
+    /* Jede Zahlung ist ein Datensatz. Ohne Betrag gilt der offene Rest als eingegangen.
+       Erreicht die Summe den offenen Betrag, ist der Beleg bezahlt - sonst bleibt der
+       Status, und ueberall steht "Erhalten X · Rest Y offen". */
+    $offenVorher = docOpenAmount($p, $d);
+    $amount = isset($body['amount']) && $body['amount'] !== '' ? round((float)$body['amount'], 2) : $offenVorher;
+    if ($amount <= 0 && $d['doc_type'] !== 'gutschrift') fail('Bitte einen Betrag über 0 € angeben.', 422);
+    $p->prepare('insert into payments (id, document_id, amount, paid_at, method, note, created_at) values (?,?,?,?,?,?,?)')
+      ->execute([uuid(), $id, $amount, $date, $method !== '' ? $method : null, $note !== '' ? $note : null, now()]);
+    $paidSum = docPaidSum($p, $id);
+    $rest = round($offenVorher - $amount, 2);
+    $voll = $rest <= 0.005 || $d['doc_type'] === 'gutschrift';
+    $betrag = number_format($amount, 2, ',', '.') . ' €';
+    if ($voll) {
+      $p->prepare("update documents set status='bezahlt', paid_at=?, updated_at=? where id=?")->execute([$date . 'T12:00:00Z', now(), $id]);
+      docAudit($p, $id, 'bezahlt', $d['number'] . ' – Zahlung am ' . date('d.m.Y', strtotime($date)) . ' über ' . $betrag . ($note !== '' ? ' – ' . $note : ''));
+    } else {
+      docAudit($p, $id, 'Teilzahlung', $d['number'] . ' – ' . $betrag . ' am ' . date('d.m.Y', strtotime($date)) . ', Rest ' . number_format($rest, 2, ',', '.') . ' € offen' . ($note !== '' ? ' – ' . $note : ''));
+    }
+    if (!empty($d['customer_id']) && (!$voll || $note !== '' || $method !== '' || abs($amount - (float)$d['total_gross']) > 0.005))
       $p->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, created_at) values (?,?,?,?,?,?,?,?,?)')
-        ->execute([uuid(), $d['customer_id'], $d['booking_id'] ?: null, 'note', 'in', 'Zahlung zu ' . $d['number'],
-          'Zahlung am ' . date('d.m.Y', strtotime($date)) . ($amount !== null ? ' über ' . number_format($amount, 2, ',', '.') . ' €' : '') . ($note !== '' ? "\n" . $note : ''), now(), now()]);
-    out(['ok' => true, 'status' => 'bezahlt', 'paid_at' => $date . 'T12:00:00Z']);
+        ->execute([uuid(), $d['customer_id'], $d['booking_id'] ?: null, 'note', 'in', ($voll ? 'Zahlung zu ' : 'Teilzahlung zu ') . $d['number'],
+          ($voll ? 'Zahlung' : 'Teilzahlung') . ' am ' . date('d.m.Y', strtotime($date)) . ' über ' . $betrag . ($voll ? '' : ' – Rest ' . number_format($rest, 2, ',', '.') . ' € offen') .
+          ($method !== '' ? ' (' . $method . ')' : '') . ($note !== '' ? "\n" . $note : ''), $date . 'T12:00:00Z', now()]);
+    out(['ok' => true, 'status' => $voll ? 'bezahlt' : $d['status'], 'paid_at' => $voll ? $date . 'T12:00:00Z' : ($d['paid_at'] ?? null),
+      'paid_sum' => $paidSum, 'open' => max(0, $rest)]);
   }
   /* resend: automatische Kundenmail noch einmal anstossen. kind = ref_kind der Notiz. */
   $kind = (string)($body['kind'] ?? ($_GET['kind'] ?? ''));
@@ -4154,8 +4298,9 @@ function dailyDigest(): array {
   foreach ($iq as $i)
     $parts[] = 'Anfrage wartet seit ' . max(1, (int)floor((time() - strtotime((string)$i['created_at'])) / 86400)) .
       ' Tag(en) auf Antwort: ' . $i['name'] . ($i['event_type'] ? ' (' . $i['event_type'] . ')' : '');
-  $od = $p->query("select count(*) c, coalesce(sum(total_gross - coalesce(deposit_deducted,0)),0) s from documents
-    where doc_type not in ('angebot','bestaetigung','lieferschein') and status = 'versendet' and due_date < '$today'")->fetch();
+  $od = $p->query("select count(*) c, coalesce(sum(d.total_gross - coalesce(d.deposit_deducted,0)
+      - coalesce((select sum(z.amount) from payments z where z.document_id = d.id),0)),0) s from documents d
+    where d.doc_type not in ('angebot','bestaetigung','lieferschein') and d.status = 'versendet' and d.due_date < '$today'")->fetch();
   if ((int)$od['c']) $parts[] = $od['c'] . ' überfällige Rechnung(en), zusammen ' . number_format((float)$od['s'], 2, ',', '.') . ' € – Zahlungserinnerung im Backoffice.';
   $wt = $p->query("select c.first_name, c.last_name, c.company, max(d.paid_at) lastpaid from document_items i
     join documents d on d.id = i.document_id join customers c on c.id = d.customer_id
@@ -4447,7 +4592,7 @@ function handlePortal(string $path, string $method, $body): never {
       $bd = $p->prepare('select id, event_date from bookings where customer_id = ?');
       $bd->execute([$me['id']]);
       $bookingDates = array_column($bd->fetchAll(), 'event_date', 'id');
-      $dq = $p->prepare("select id, share_token, doc_type, number, status, doc_date, total_gross, booking_id
+      $dq = $p->prepare("select id, share_token, doc_type, number, status, doc_date, total_gross, booking_id, deposit_deducted
         from documents where customer_id = ? and status != 'entwurf' order by doc_date desc, created_at desc");
       $dq->execute([$me['id']]);
       $docs = [];
@@ -4456,8 +4601,11 @@ function handlePortal(string $path, string $method, $body): never {
           $d['share_token'] = bin2hex(random_bytes(24));
           $p->prepare('update documents set share_token = ? where id = ?')->execute([$d['share_token'], $d['id']]);
         }
+        /* Teilzahlungen: "Erhalten X · Rest Y offen" auch in der Uebersicht */
+        $paidSum = docPaidSum($p, (string)$d['id']);
         $docs[] = ['number' => $d['number'], 'doc_type' => $d['doc_type'], 'status' => $d['status'],
           'doc_date' => $d['doc_date'], 'total_gross' => $d['total_gross'], 'token' => $d['share_token'],
+          'paid_sum' => $paidSum, 'open_amount' => $paidSum > 0 ? max(0, docOpenAmount($p, $d)) : null,
           'event_date' => $d['booking_id'] ? ($bookingDates[$d['booking_id']] ?? null) : null];
       }
       $rc = $p->prepare("select r.token, r.status, r.signed_at, b.event_date from rental_contracts r
@@ -4663,7 +4811,15 @@ function handlePortal(string $path, string $method, $body): never {
         'price_mode','discount_value','discount_type','event_info','rental_from','rental_to',
         /* Versionsstand: Der Kunde soll sehen, wenn sich das Angebot seit seinem letzten
            Besuch geaendert hat (bisher stillschweigend derselbe Link, neuer Inhalt). */
-        'version','version_at','accepted_version','parent_id','storno_at','paid_at'])),
+        'version','version_at','accepted_version','parent_id','storno_at','paid_at','settled_by'])),
+      /* Erhaltene Zahlungen und Rest, damit der Kunde bei Teilzahlung nicht den vollen Betrag sieht */
+      'paid_sum' => docPaidSum($p, (string)$d['id']),
+      'open_amount' => max(0, docOpenAmount($p, $d)),
+      'settled_by_number' => (function () use ($p, $d) {
+        if (empty($d['settled_by'])) return null;
+        $st = $p->prepare('select number from documents where id = ?'); $st->execute([$d['settled_by']]);
+        return $st->fetchColumn() ?: null;
+      })(),
       /* Storno und Gutschrift muessen auch beim Kunden unmissverstaendlich sein: "STORNIERT
          am ...", "Korrigiert durch ..." bzw. "zu Rechnung ... vom ...". */
       'bezug' => docBezug($p, $d),
