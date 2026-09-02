@@ -5422,12 +5422,40 @@ function processImage(string $raw, int $maxDim = 2000, int $quality = 85): strin
 }
 /* Schützt uploads/ als Defense-in-Depth: keine Skript-Ausführung, egal was hochgeladen wurde
    (Apache-Produktion; php -S ignoriert .htaccess). */
+/* Kein php_flag mehr: Bei PHP als FastCGI/FPM (All-Inkl) kennt Apache die Direktive
+   nicht und beantwortet JEDE Datei unter uploads/ mit "500 Internal Server Error" -
+   die Bilder waren dann auf der Website und im Medien-Pool weg. RemoveHandler plus
+   FilesMatch reichen als Schutz. Eine alte .htaccess mit php_flag wird ersetzt. */
+const UPLOAD_HTACCESS = "RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phar .cgi .pl\n" .
+  "<FilesMatch \"\\.(php|phtml|php3|php4|php5|php7|phar|cgi|pl|py|svg|htm|html)\$\">\n  Require all denied\n</FilesMatch>\n";
 function ensureUploadDir(string $dir): void {
-  if (!is_dir($dir)) mkdir($dir, 0755, true);
+  if (!is_dir($dir)) @mkdir($dir, 0755, true);
   $ht = UPLOAD_DIR . '/.htaccess';
-  if (!file_exists($ht)) file_put_contents($ht,
-    "php_flag engine off\nRemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phar .cgi .pl\n" .
-    "<FilesMatch \"\\.(php|phtml|php3|php4|php5|php7|phar|cgi|pl|py|svg|htm|html)\$\">\n  Require all denied\n</FilesMatch>\n");
+  $alt = file_exists($ht) ? (string)@file_get_contents($ht) : null;
+  if ($alt === null || stripos($alt, 'php_flag') !== false || stripos($alt, 'php_value') !== false)
+    @file_put_contents($ht, UPLOAD_HTACCESS);
+}
+/* Medien-Dateien eines Ordners lesen - ohne glob(): Das uebersieht Grossschreibung
+   (IMG_1234.JPG per FTP) und faellt auf manchen Hostings still auf eine leere Liste
+   zurueck. scandir plus Endungspruefung ist an keiner Stelle davon abhaengig. */
+function mediaDateien(string $dir): array {
+  if (!is_dir($dir)) return [];
+  $out = [];
+  foreach (@scandir($dir) ?: [] as $n) {
+    if ($n === '' || $n[0] === '.') continue;
+    $f = $dir . '/' . $n;
+    if (is_file($f) && preg_match('/\.(jpe?g|png|webp|gif|avif|mp4|webm)$/i', $n)) $out[] = $f;
+  }
+  return $out;
+}
+function mediaOrdner(): array {
+  $out = [];
+  foreach (@scandir(UPLOAD_DIR) ?: [] as $n) {
+    if ($n === '' || $n[0] === '.' || $n === MEDIA_ARCHIV) continue;
+    if (is_dir(UPLOAD_DIR . '/' . $n)) $out[] = $n;
+  }
+  sort($out);
+  return $out;
 }
 /* ===== Medien-Pool: Ordner, Umbenennen, Archiv =====
    Ordner sind echte Unterordner von uploads/. Beim Verschieben und Umbenennen wandern
@@ -5436,7 +5464,7 @@ function ensureUploadDir(string $dir): void {
    genau das ist der Sinn ("weg, aber zurueckholbar"), und davor wird gewarnt. */
 const MEDIA_ARCHIV = '_archiv';
 function mediaExtOk(string $name): bool {
-  return (bool)preg_match('/\.(jpe?g|png|webp|gif|mp4|webm)$/i', $name);
+  return (bool)preg_match('/\.(jpe?g|png|webp|gif|avif|mp4|webm)$/i', $name);
 }
 /* Dateiname ohne jeden Pfadanteil - alles andere waere ein Loesch- und
    Ueberschreibwerkzeug fuer den ganzen Server. */
@@ -5628,7 +5656,7 @@ try {
     $files = [];
     $scan = function (string $dir, string $folder) use (&$files) {
       if (!is_dir($dir)) return;
-      foreach (glob($dir . '/*.{jpg,jpeg,png,webp,gif,mp4,webm}', GLOB_BRACE) ?: [] as $f)
+      foreach (mediaDateien($dir) as $f)
         if (is_file($f)) {
           $ext = strtolower(pathinfo($f, PATHINFO_EXTENSION));
           $files[] = ['name' => basename($f), 'url' => mediaUrl($folder, basename($f)),
@@ -5644,24 +5672,15 @@ try {
       unset($f);
     } else {
       $scan(UPLOAD_DIR, '');
-      foreach (glob(UPLOAD_DIR . '/*', GLOB_ONLYDIR) ?: [] as $d) {
-        $b = basename($d);
-        if ($b === MEDIA_ARCHIV) continue;
-        $scan($d, $b);
-      }
+      foreach (mediaOrdner() as $b) $scan(UPLOAD_DIR . '/' . $b, $b);
     }
     usort($files, fn($a, $b) => $b['mtime'] <=> $a['mtime']);
     /* Ordnerliste immer mitliefern, auch die leeren - sonst verschwindet ein frisch
        angelegter Ordner sofort wieder aus der Auswahl. */
-    $ordner = [];
-    foreach (glob(UPLOAD_DIR . '/*', GLOB_ONLYDIR) ?: [] as $d) {
-      $b = basename($d);
-      if ($b === MEDIA_ARCHIV) continue;
-      $ordner[] = $b;
-    }
-    sort($ordner);
-    $arch = glob(UPLOAD_DIR . '/' . MEDIA_ARCHIV . '/*.{jpg,jpeg,png,webp,gif,mp4,webm}', GLOB_BRACE) ?: [];
-    out(['files' => $files, 'folders' => $ordner, 'archiv_anzahl' => count($arch)]);
+    $ordner = mediaOrdner();
+    $arch = mediaDateien(UPLOAD_DIR . '/' . MEDIA_ARCHIV);
+    out(['files' => $files, 'folders' => $ordner, 'archiv_anzahl' => count($arch),
+      'dir_ok' => is_dir(UPLOAD_DIR) && is_readable(UPLOAD_DIR)]);
   }
   if ($path === 'media/folder' && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
