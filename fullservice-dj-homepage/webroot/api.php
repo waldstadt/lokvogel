@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 91;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 92;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -323,6 +323,23 @@ function upgrade(PDO $p): void {
     foreach (['alter table forms add column booking_id text', 'alter table forms add column doc_id text'] as $sql)
       try { $p->exec($sql); } catch (PDOException $e) {}
     upgradeBandeForm($p);
+  }
+  if ($v < 92) {
+    /* v92: "Partner-Agentur DJ Bande (Münster)" las sich, als kaeme der vermittelte DJ
+       automatisch aus Muenster. Ein Satz stellt klar: Sitz in Muenster, DJs deutschlandweit.
+       Nur ergaenzen, wo der Agentur-Satz noch steht und der Zusatz fehlt. */
+    try {
+      $satz = " Die Agentur hat deutschlandweit geprüfte, richtig gute DJs – der Kollege für eure Feier kommt also aus eurer Gegend, nicht automatisch vom Sitz der Agentur.";
+      foreach ($p->query("select id, body from email_templates where body like '%Partner-Agentur {agentur}%' and body not like '%deutschlandweit%'")->fetchAll() as $t) {
+        $b = preg_replace('/(Partner-Agentur \{agentur\}[^.\n]*\.)/u', '$1' . $satz, (string)$t['body'], 1);
+        if ($b !== null && $b !== $t['body']) $p->prepare('update email_templates set body = ? where id = ?')->execute([$b, $t['id']]);
+      }
+      $satzB = "Die {agentur_name} sitzt in {agentur_ort}, ihre DJs sind aber deutschlandweit unterwegs – geprüfte Kollegen, die ich passend zu eurer Feier und eurer Gegend auswähle.";
+      foreach ($p->query("select id, intro from form_templates where intro like '%Partner-Agentur {agentur}%' and intro not like '%deutschlandweit%'")->fetchAll() as $t) {
+        $b = preg_replace('/(Partner-Agentur \{agentur\}[^.\n]*\.)/u', '$1 ' . $satzB, (string)$t['intro'], 1);
+        if ($b !== null && $b !== $t['intro']) $p->prepare('update form_templates set intro = ? where id = ?')->execute([$b, $t['id']]);
+      }
+    } catch (Throwable $e) {}
   }
   if ($v < 90) {
     /* v90: Die Leiste unter "Ueber mich" beschreibt Markus, nicht sein Lager. Die
@@ -946,7 +963,7 @@ function bandeMailBody(): string {
 
 danke für eure Anfrage! Die weniger gute Nachricht zuerst: An eurem Termin am {datum} bin ich leider schon fest gebucht.
 
-Aber ich lasse euch nicht allein suchen. Wenn ihr mögt, empfehle ich euch drei bis fünf Kollegen, die an eurem Termin noch frei sind und richtig gute Arbeit machen – handverlesen, passend zu eurer Feier und komplett kostenlos. Die Vermittlung läuft über meine Partner-Agentur {agentur}, bei der ich selbst als DJ im Einsatz bin – ich kenne die Kollegen von echten Veranstaltungen, nicht vom Papier.
+Aber ich lasse euch nicht allein suchen. Wenn ihr mögt, empfehle ich euch drei bis fünf Kollegen, die an eurem Termin noch frei sind und richtig gute Arbeit machen – handverlesen, passend zu eurer Feier und komplett kostenlos. Die Vermittlung läuft über meine Partner-Agentur {agentur}, bei der ich selbst als DJ im Einsatz bin – ich kenne die Kollegen von echten Veranstaltungen, nicht vom Papier. Die Agentur hat deutschlandweit geprüfte, richtig gute DJs – der Kollege für eure Feier kommt also aus eurer Gegend, nicht automatisch vom Sitz der Agentur.
 
 Damit meine Vorauswahl passt, füllt kurz diesen Bogen aus (keine 5 Minuten – er fragt auch eure Anschrift und euer Einverständnis zur Weitergabe ab):
 {fragebogen}
@@ -1431,7 +1448,7 @@ function isBandeForm(array $f): bool { return stripos((string)($f['title'] ?? ''
 /* Vorauswahl-Bogen: Intro und Felder der Seed-Vorlage - eine Quelle fuer seedFormTemplates()
    und den Upgrade-Schritt. Platzhalter werden beim Anlegen des Bogens gefuellt. */
 function bandeFormIntro(): string {
-  return "Ihr wollt, dass ich euch DJs raussuche – gern. So läuft das: Eure Anfrage geht an meine Partner-Agentur {agentur}, bei der ich selbst als DJ unterwegs bin. Dort wähle ich persönlich bis zu fünf Kollegen vor, die zu eurer Feier passen. Alles Weitere – Infogespräch, Preis, Vertrag – läuft danach direkt über die {agentur_name} bzw. den DJ, nicht mehr über mich. Ihr bucht hier also noch nichts, ihr sagt mir nur, wonach ich suchen soll. Dauert keine 5 Minuten.";
+  return "Ihr wollt, dass ich euch DJs raussuche – gern. So läuft das: Eure Anfrage geht an meine Partner-Agentur {agentur}, bei der ich selbst als DJ unterwegs bin. Die {agentur_name} sitzt in {agentur_ort}, ihre DJs sind aber deutschlandweit unterwegs – geprüfte Kollegen, die ich passend zu eurer Feier und eurer Gegend auswähle. Dort wähle ich persönlich bis zu fünf Kollegen vor, die zu eurer Feier passen. Alles Weitere – Infogespräch, Preis, Vertrag – läuft danach direkt über die {agentur_name} bzw. den DJ, nicht mehr über mich. Ihr bucht hier also noch nichts, ihr sagt mir nur, wonach ich suchen soll. Dauert keine 5 Minuten.";
 }
 function bandeFormFields(): array {
   return [
@@ -1594,7 +1611,7 @@ function seedExtraTemplates(PDO $p): void {
        fest gebucht worden - dann kann Markus nicht liefern, will den Kunden aber nicht
        ohne Alternative stehen lassen. */
     [97, 'Termin nicht mehr verfügbar – DJ-Vermittlung', 'Euer Termin am {datum} – leider inzwischen vergeben',
-      "Hallo {vorname},\n\nihr wolltet gerade das Angebot {nummer} annehmen – und genau das tut mir jetzt richtig leid: euer Termin am {datum} ist bei mir in der Zwischenzeit fest gebucht worden. Das Angebot kann ich deshalb nicht mehr erfüllen, so ehrlich muss ich sein.\n\nWas ich euch aber anbieten kann: Ich kenne über meine Partner-Agentur {agentur} richtig gute Kollegen und suche euch gern persönlich einen passenden DJ raus – kostenlos, ihr müsst nur kurz zustimmen. Das geht direkt hier:\n{link}\n\nWenn ihr lieber erst sprechen wollt: ruft mich einfach an ({telefon}) oder antwortet auf diese Mail.\n\nViele Grüße\n{inhaber}"],
+      "Hallo {vorname},\n\nihr wolltet gerade das Angebot {nummer} annehmen – und genau das tut mir jetzt richtig leid: euer Termin am {datum} ist bei mir in der Zwischenzeit fest gebucht worden. Das Angebot kann ich deshalb nicht mehr erfüllen, so ehrlich muss ich sein.\n\nWas ich euch aber anbieten kann: Ich kenne über meine Partner-Agentur {agentur} richtig gute Kollegen und suche euch gern persönlich einen passenden DJ raus – kostenlos, ihr müsst nur kurz zustimmen. Die Agentur hat deutschlandweit geprüfte, richtig gute DJs – der Kollege für eure Feier kommt also aus eurer Gegend, nicht automatisch vom Sitz der Agentur. Das geht direkt hier:\n{link}\n\nWenn ihr lieber erst sprechen wollt: ruft mich einfach an ({telefon}) oder antwortet auf diese Mail.\n\nViele Grüße\n{inhaber}"],
     /* Der Kunde nimmt nach Ablauf der Gueltigkeit an: Annahme wird festgehalten, aber
        der Termin ist noch nicht fest - Markus prueft erst Verfuegbarkeit und Preis. */
     [98, 'Angebot angenommen – abgelaufen, wird geprüft', 'Angebot {nummer} angenommen – ich prüfe das kurz',
@@ -4158,7 +4175,7 @@ function acceptConfirmationMail(PDO $p, array $d, string $fall = 'ok'): bool {
       'ok' => ['accept_ok', 'Angebot {nummer} angenommen – danke!',
         "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen, damit ist {termin} fest bei mir reserviert.\n\nWie es weitergeht: Ihr bekommt von mir noch die Auftragsbestätigung und ggf. eine Abschlagsrechnung.\n\nEuer Angebot findet ihr jederzeit hier – Login ist eure Postleitzahl:\n{link}\n\nBei Fragen: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\n{inhaber}"],
       'konflikt' => ['accept_konflikt', 'Euer Termin am {datum} – leider inzwischen vergeben',
-        "Hallo {vorname},\n\nihr wolltet gerade das Angebot {nummer} annehmen – und genau das tut mir jetzt richtig leid: euer Termin am {datum} ist bei mir in der Zwischenzeit fest gebucht worden. Das Angebot kann ich deshalb nicht mehr erfüllen.\n\nWas ich euch anbieten kann: Über meine Partner-Agentur {agentur} suche ich euch gern persönlich einen passenden DJ raus – kostenlos, ihr müsst nur kurz zustimmen. Das geht direkt hier:\n{link}\n\nOder ruft mich einfach an ({telefon}).\n\nViele Grüße\n{inhaber}"],
+        "Hallo {vorname},\n\nihr wolltet gerade das Angebot {nummer} annehmen – und genau das tut mir jetzt richtig leid: euer Termin am {datum} ist bei mir in der Zwischenzeit fest gebucht worden. Das Angebot kann ich deshalb nicht mehr erfüllen.\n\nWas ich euch anbieten kann: Über meine Partner-Agentur {agentur} suche ich euch gern persönlich einen passenden DJ raus – kostenlos, ihr müsst nur kurz zustimmen. Die Agentur hat deutschlandweit geprüfte, richtig gute DJs – der Kollege für eure Feier kommt also aus eurer Gegend, nicht automatisch vom Sitz der Agentur. Das geht direkt hier:\n{link}\n\nOder ruft mich einfach an ({telefon}).\n\nViele Grüße\n{inhaber}"],
       'abgelaufen' => ['accept_abgelaufen', 'Angebot {nummer} angenommen – ich prüfe das kurz',
         "Hallo {vorname},\n\ndanke für euer Vertrauen – ihr habt das Angebot {nummer} angenommen. Das Angebot war allerdings schon abgelaufen (gültig bis {gueltig}). Ich prüfe deshalb kurz, ob {termin} noch frei ist und die Preise noch passen, und melde mich schnell bei euch. Bis dahin ist der Termin noch nicht fest zugesagt.\n\nEuer Angebot: {link}\n\nFragen? Einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nViele Grüße\n{inhaber}"],
     ];

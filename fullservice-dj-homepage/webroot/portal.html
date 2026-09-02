@@ -471,7 +471,7 @@ function bandeOptHtml(){
      keine Vermittlung - dann erscheint der Haken gar nicht erst. */
   if(!agencyOn())return '';
   var c=coOf(),ag=c.agency_name+(c.agency_city?', '+c.agency_city:'');
-  return '<label class="chk"><input type="checkbox" id="bandeOpt"><span><b style="color:var(--txt)">Trotzdem einen richtig guten DJ finden – kostenlos.</b> Ich wähle persönlich bis zu fünf passende Kollegen aus meinem Partner-Netzwerk aus, die zu eurer Feier und eurem Budget passen – die Vorschläge bekommt ihr direkt von mir. Mit dem Haken willigt ihr ein, dass ich eure Eckdaten dafür an meine Partner-Agentur ('+esc(ag)+') weitergebe.</span></label>';
+  return '<label class="chk"><input type="checkbox" id="bandeOpt"><span><b style="color:var(--txt)">Trotzdem einen richtig guten DJ finden – kostenlos.</b> Ich wähle persönlich bis zu fünf passende Kollegen aus meinem Partner-Netzwerk aus, die zu eurer Feier und eurem Budget passen – die Vorschläge bekommt ihr direkt von mir. Die Agentur hat deutschlandweit geprüfte DJs – der Kollege für eure Feier kommt aus eurer Gegend, nicht automatisch vom Sitz der Agentur. Mit dem Haken willigt ihr ein, dass ich eure Eckdaten dafür an meine Partner-Agentur ('+esc(ag)+') weitergebe.</span></label>';
 }
 /* Der Kunde wollte annehmen, aber der Termin ist seit dem Angebot anderweitig fest
    geworden - ehrlich sagen und gleich die Vermittlung anbieten, statt nur "storniert". */
