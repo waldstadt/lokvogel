@@ -45,6 +45,7 @@ button{font-family:inherit}
 
 /* Form-Elemente */
 label{display:block;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gl);margin:10px 0 3px}
+input[type=search]{-webkit-appearance:none;appearance:none}
 input,textarea,select{width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bdr);color:var(--wh);font:inherit;font-size:12px;outline:0}
 input:focus,textarea:focus,select:focus{border-color:var(--acc)}
 textarea{min-height:70px;resize:vertical}
@@ -411,7 +412,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
   <div class="pg" id="pg-cust">
     <div class="phead"><div><div class="pt">Kunden &amp; Leads</div><div class="ps">CRM</div></div>
       <button class="btn" onclick="openCustModal()">+ Neuer Kunde</button></div>
-    <input type="text" id="custSearch" placeholder="Suchen (Name, Ort, E-Mail, Telefon, Tag) …" oninput="renderCustList()" style="margin-bottom:12px">
+    <input type="search" autocomplete="off" data-lpignore="true" id="custSearch" placeholder="Suchen (Name, Ort, E-Mail, Telefon, Tag) …" oninput="renderCustList()" style="margin-bottom:12px">
     <div class="tbl-wrap card"><table><thead><tr><th>Name</th><th>Kontakt</th><th>Ort</th><th>Quelle</th><th>Status</th></tr></thead><tbody id="custRows"></tbody></table></div>
   </div>
 
@@ -503,7 +504,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
   <div class="pg" id="pg-prod">
     <div class="phead"><div><div class="pt">Produktkatalog</div><div class="ps">Artikel mit Nummern &amp; Kategorien – per „+ Artikel“ blitzschnell ins Angebot. Pakete bündeln mehrere Artikel zu einer Position.</div></div>
       <button class="btn" onclick="openProdModal()">+ Neuer Artikel</button></div>
-    <input type="text" id="prodSearch" placeholder="Suchen (Nummer, Name, Kategorie) …" oninput="renderProducts()" style="margin-bottom:12px">
+    <input type="search" autocomplete="off" data-lpignore="true" id="prodSearch" placeholder="Suchen (Nummer, Name, Kategorie) …" oninput="renderProducts()" style="margin-bottom:12px">
     <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Name</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis brutto</th><th>Typ</th><th>Status</th></tr></thead><tbody id="prodRows"></tbody></table></div>
   </div>
 
@@ -526,7 +527,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <option value="angenommen">Angenommen</option><option value="abgelehnt">Abgelehnt</option>
           <option value="bezahlt">Bezahlt</option><option value="ueberfaellig">Überfällig</option>
           <option value="storniert">Storniert</option></select></div>
-        <div><label>Kunde</label><input type="text" id="docsFCust" placeholder="Name suchen …" oninput="renderDocsPage()"></div>
+        <div><label>Kunde</label><input type="search" autocomplete="off" data-lpignore="true" id="docsFCust" placeholder="Name suchen …" oninput="renderDocsPage()"></div>
       </div>
     </div>
     <div id="docsOverdue" class="sml" style="color:var(--redl);margin-bottom:10px"></div>
@@ -652,7 +653,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
       <span id="eqBatchCount" class="mut sml"></span>
       <button class="btn" onclick="eqBatchSave()">Änderungen speichern</button>
     </div>
-    <input type="text" id="eqSearch" placeholder="Suchen (Name, Kategorie) …" oninput="renderEq()" style="margin-bottom:12px">
+    <input type="search" autocomplete="off" data-lpignore="true" id="eqSearch" placeholder="Suchen (Name, Kategorie) …" oninput="renderEq()" style="margin-bottom:12px">
     <div class="tbl-wrap card" id="eqViewWrap"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Nächstes Mal im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
     <div class="tbl-wrap card" id="eqBatchWrap" hidden><table class="batch"><thead><tr><th class="chk"><input type="checkbox" id="eqBatchAll" onclick="eqBatchToggleAll(this.checked)"></th><th>Name</th><th>Kategorie</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th class="num">Bestand</th><th>Status</th><th class="chk">Auf Anfrage</th><th class="chk">Sichtbar</th></tr></thead><tbody id="eqBatchRows"></tbody></table></div>
     <div class="card"><h3>Sets <span class="mut sml" style="font-weight:400">– mehrere Artikel als ein buchbares Paket (z. B. Lautsprecher + Kabel + Endstufe)</span> <button class="btn sm" style="float:right" onclick="openSetModal()">+ Set</button></h3>
@@ -667,7 +668,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
     <div class="card">
       <div class="ep-ctl">
         <select id="epCat" onchange="renderEinsatz()"><option value="">Alle Kategorien</option></select>
-        <input type="text" id="epSearch" placeholder="Artikel suchen …" oninput="epHighlight=null;renderEinsatz()" style="min-width:180px">
+        <input type="search" autocomplete="off" data-lpignore="true" id="epSearch" placeholder="Artikel suchen …" oninput="epHighlight=null;renderEinsatz()" style="min-width:180px">
         <label><input type="checkbox" id="epOnlyUsed" onchange="renderEinsatz()">nur Artikel mit Einsatz</label>
         <span class="mut sml" id="epCount"></span>
         <span style="flex:1"></span>
@@ -7487,7 +7488,7 @@ function openProductPicker(){
   cats.sort(byNameDe);
   openModal('Artikel einfügen',
     '<div style="display:flex;gap:8px;margin-bottom:10px">'+
-    '<input type="text" id="ppSearch" placeholder="Suchen (auch im Technikkatalog) …" oninput="renderPicker()" style="flex:2">'+
+    '<input type="search" autocomplete="off" data-lpignore="true" id="ppSearch" placeholder="Suchen (auch im Technikkatalog) …" oninput="renderPicker()" style="flex:2">'+
     '<select id="ppCat" onchange="renderPicker()" style="flex:1"><option value="">Alle Kategorien</option>'+
     cats.map(function(c){return '<option value="'+esc(c)+'">'+esc(c)+'</option>'}).join('')+'</select></div>'+
     '<div id="ppList" style="max-height:380px;overflow-y:auto"></div>'+
@@ -8278,7 +8279,14 @@ function mpSetzen(feld,wert){
   if(feld==='archiv'){MP_ARCHIV=!!wert;MP_SEL={};loadMediaPage();return}
   MP_SEL={};renderMediaPage();
 }
-function mpSuche(el){MP_SUCHE=el.value;MP_SEITE=48;renderMediaPage()}
+/* Chrome fuellte das Feld ungefragt mit der Login-E-Mail (Autofill), der Pool war
+   dann scheinbar leer. type=search plus autocomplete=off verhindert das; sicherheits-
+   halber wird ein Wert mit @ ohne passenden Dateinamen ignoriert. */
+function mpSuche(el){
+  var v=el.value||'';
+  if(v.indexOf('@')>=0&&!MEDIA_PG_LIST.some(function(m){return m.name.toLowerCase().indexOf(v.toLowerCase())>=0})){el.value='';v=''}
+  MP_SUCHE=v;MP_SEITE=48;renderMediaPage();
+}
 function mpArten(){
   var vorhanden={};
   MEDIA_PG_LIST.forEach(function(m){if(m.ext)vorhanden[m.ext]=true});
@@ -8299,7 +8307,7 @@ function renderMediaBar(){
       : '<select style="width:auto;min-width:170px" onchange="mpSetzen(\'ordner\',this.value)">'+ordnerOpts+'</select>'+
         (MP_ORDNER&&MP_ORDNER!=='__alle__'?'<button class="btn g sm" onclick="mpOrdnerLoeschen()">Ordner l\u00f6schen</button>':''))+
     '<select style="width:auto;min-width:140px" onchange="mpSetzen(\'art\',this.value)">'+artOpts+'</select>'+
-    '<input type="text" placeholder="Nach Dateiname suchen \u2026" value="'+esc(MP_SUCHE)+'" oninput="mpSuche(this)" style="width:auto;flex:1;min-width:180px">'+
+    '<input type="search" autocomplete="off" data-lpignore="true" placeholder="Nach Dateiname suchen \u2026" value="'+esc(MP_SUCHE)+'" oninput="mpSuche(this)" style="width:auto;flex:1;min-width:180px">'+
     '<button class="btn g sm" onclick="mpAlle()">Alle ausw\u00e4hlen</button>'+
     '<button class="btn g sm" onclick="mpAnsichtSetzen(\''+(mpAnsicht()==='liste'?'kacheln':'liste')+'\')">'+
       (mpAnsicht()==='liste'?'Kacheln':'Liste')+'</button>'+
