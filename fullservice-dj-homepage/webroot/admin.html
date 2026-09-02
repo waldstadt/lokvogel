@@ -83,6 +83,14 @@ textarea{min-height:70px;resize:vertical}
   .btn.sm{padding:7px 12px;font-size:11px}
   .modal-bg{padding:52px 8px 16px}
   .modal{padding:16px}
+  /* Fixe Kopfleiste: Sprungziele (Anker, focus) sonst unter der Leiste versteckt */
+  html{scroll-padding-top:60px}
+  /* Tippziele mind. 40 px hoch: Padding plus negativer Rand vergroessert die Flaeche,
+     ohne das Layout zu verschieben. */
+  a[onclick]{display:inline-block;padding:10px 0;margin:-10px 0;line-height:20px}
+  td a[onclick],#docItems a[onclick],.it-act a{padding:10px 8px;margin:-10px -8px}
+  td input[type=checkbox],.cal-legend input[type=checkbox]{width:22px;height:22px;margin:9px;padding:0;cursor:pointer}
+  .cal-legend label{min-height:40px;display:inline-flex;align-items:center}
 }
 /* Kundeninhalte (Planer, Notizen, Nachrichten) können sehr lange Wörter enthalten -
    ohne Umbruchregel zieht ein einziger Wert die ganze Oberfläche in die Breite. */
@@ -169,7 +177,10 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .msg{border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--gll)}
 .msg.err{border-color:var(--redl);color:var(--redl)}
 .msg.ok{border-color:var(--grn);color:#8cc98c}
-.hint{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid var(--gll);border-radius:50%;font-size:10px;line-height:1;color:var(--gll);cursor:help;margin:0 6px 0 2px;vertical-align:middle}
+.hint{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid var(--gll);border-radius:50%;font-size:10px;line-height:1;color:var(--gll);cursor:help;margin:0 6px 0 4px;vertical-align:middle}
+/* Status- und Aktionsknoepfe im Beleg-Editor mit festem Abstand - der Zwischenraum hing
+   sonst an einem Leerzeichen im String und fehlte mal ("AbgelehntStorno?"). */
+#docDocBtns,#docStatusBtns{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
 .card.hl{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc);transition:box-shadow .3s}
 /* Aufbau der Startseite: Bereiche (fett) mit ihren Modulen eingerueckt darunter */
 .aufb-sec,.aufb-mod,.aufb-fix{display:flex;align-items:center;gap:10px;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.05)}
@@ -286,6 +297,14 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
 .it-row.sml{grid-template-columns:30px 1fr 56px 84px 70px 70px 20px;gap:4px;margin-bottom:2px}
 /* Auf dem Handy passen sieben feste Spalten nicht nebeneinander (450px Mindestbreite) -
    dort untereinander, damit der Belegeditor nicht waagerecht scrollt. */
+.it-lbl{display:none}
+/* Hoch/Runter je Position: Drag & Drop gibt es auf dem Handy nicht zuverlaessig. */
+.it-act{display:flex;align-items:center;gap:6px;justify-content:center}
+.it-mv{display:none;gap:2px}
+.it-mv button{background:none;border:1px solid var(--line);color:var(--gll);border-radius:4px;padding:6px;line-height:0;cursor:pointer}
+.it-mv button:disabled{opacity:.35;cursor:default}
+.it-mv .ic{width:14px;height:14px;margin:0;opacity:1}
+#docSaveBottom{display:none;margin-top:4px}
 @media(max-width:560px){
   .it-row,.it-row.sml{grid-template-columns:28px 1fr;gap:5px;row-gap:4px;
     padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
@@ -297,6 +316,12 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
   /* Notiz und Rabatt darunter ebenfalls untereinander, sonst bleiben 32px Breite uebrig. */
   #docItems .it-row+div{padding:0 0 10px 28px !important;flex-wrap:wrap}
   #docItems .it-row+div>input:first-child{flex:1 1 100%}
+  /* Untereinander braucht jedes Feld eine sichtbare Beschriftung - ein Platzhalter
+     verschwindet, sobald ein Wert drinsteht. */
+  .it-lbl{display:block;font-size:9px;color:var(--gl);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+  .it-mv{display:inline-flex}
+  .it-mv button{padding:12px 10px}
+  #docSaveBottom{display:block}
 }
 .it-row.sml input,.it-row.sml select{padding:2px 5px;font-size:10px}
 .it-row.sml>div:first-child{padding:2px 0;font-size:9px;min-height:0}
@@ -308,7 +333,9 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
 .totals{margin-top:12px;text-align:right;font-size:12px}
 .totals b{font-size:15px;color:var(--acc)}
 
-.toast{position:fixed;bottom:20px;right:20px;background:var(--cd2);border:1px solid var(--acc);color:var(--wh);padding:11px 34px 11px 18px;font-size:12px;z-index:300;display:none;max-width:420px;cursor:pointer;user-select:text}
+.toasts{position:fixed;bottom:20px;right:20px;z-index:300;display:flex;flex-direction:column;align-items:flex-end;gap:8px;max-width:calc(100vw - 40px)}
+.toast{position:relative;background:var(--cd2);border:1px solid var(--acc);color:var(--wh);padding:11px 34px 11px 18px;font-size:12px;display:none;max-width:420px;cursor:pointer;user-select:text}
+.toast.old{opacity:.85}
 .toast.err{border-color:var(--red)}
 /* Schliessen-Kreuz als Pseudo-Element: der Toast-Text bleibt reiner Text (textContent),
    das Kreuz ist trotzdem immer sichtbar - Klick irgendwo auf den Toast blendet aus. */
@@ -634,6 +661,8 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
     </div>
     <div class="card"><label>Schlusstext</label><textarea id="docOutro" style="min-height:46px"></textarea>
       <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('docOutro')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div></div>
+    <!-- Auf dem Handy liegt der Speichern-Knopf im Kopf weit weg vom Ende der Positionen -->
+    <div id="docSaveBottom"><button class="btn" type="button" style="width:100%" onclick="document.getElementById('docSaveBtn').click()">Speichern</button></div>
   </div>
 
   <!-- STATISTIK -->
@@ -1180,7 +1209,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
 <!-- ===== MODALS ===== -->
 <div class="modal-bg" id="modalBg"><div class="modal" id="modalBox"></div></div>
 <div class="modal-bg" id="ovl2Bg" style="z-index:400"><div class="modal" id="ovl2Box"></div></div>
-<div class="toast" id="toast"></div>
+<div class="toasts" id="toasts"><div class="toast" id="toast"></div></div>
 <div id="printArea"></div>
 
 <script>
@@ -1193,7 +1222,17 @@ var API='api.php';
 var TOKEN=null,S={},CACHE={};
 var TOAST_HIDE_T=null;
 function toast(msg,err){
-  var t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(err?' err':'');
+  var t=document.getElementById('toast');
+  /* Steht noch ein Hinweis (z. B. ein Fehler mit 8 s), rueckt er als Kopie nach oben und
+     bleibt kurz lesbar, statt vom naechsten Toast ueberschrieben zu werden. #toast selbst
+     zeigt immer die neueste Meldung. */
+  if(t.style.display==='block'&&t.textContent){
+    var alt=t.cloneNode(true);alt.removeAttribute('id');alt.classList.add('old');
+    alt.onclick=function(){alt.remove()};
+    document.getElementById('toasts').insertBefore(alt,t);
+    setTimeout(function(){alt.remove()},4000);
+  }
+  t.textContent=msg;t.className='toast'+(err?' err':'');
   t.title=err?'Zum Ausblenden klicken':'';
   t.onclick=function(){t.style.display='none';if(TOAST_HIDE_T)clearTimeout(TOAST_HIDE_T)};
   t.style.display='block';
@@ -1270,6 +1309,9 @@ var SUBPAGE_PARENT={custd:'cust',bookd:'book',doc:'docs'};
 function showPage(id){
   /* "Module" war frueher eine eigene Seite - alte Links und Lesezeichen landen auf Inhalte. */
   if(id==='blocks')id='cms';
+  /* Beleg-Editor mit ungespeicherten Eingaben: nachfragen statt still verwerfen. */
+  if(docIsDirty()&&!confirm('Im Beleg gibt es ungespeicherte Änderungen. Seite trotzdem verlassen? Die Änderungen gehen dann verloren.'))return;
+  DOC_DIRTY=false;
   document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('a')});
   document.getElementById('pg-'+id).classList.add('a');
   var navId=SUBPAGE_PARENT[id]||id;
@@ -1280,6 +1322,21 @@ function showPage(id){
   if(id==='media')loadMediaPage();
   window.scrollTo(0,0);
 }
+
+/* Ungespeicherte Eingaben im Beleg-Editor: Kopf, Positionen und Positionsaktionen setzen
+   das Kennzeichen; Speichern und Oeffnen loeschen es. Browser-Zurueck / Tab schliessen
+   fragt ueber beforeunload nach. */
+var DOC_DIRTY=false;
+function docMarkDirty(){DOC_DIRTY=true}
+function docIsDirty(){
+  var pg=document.getElementById('pg-doc');
+  return DOC_DIRTY&&!!pg&&pg.classList.contains('a');
+}
+(function(){
+  var pg=document.getElementById('pg-doc');
+  if(pg){pg.addEventListener('input',docMarkDirty);pg.addEventListener('change',docMarkDirty)}
+  window.addEventListener('beforeunload',function(e){if(docIsDirty()){e.preventDefault();e.returnValue=''}});
+})();
 
 /* ===== Daten laden ===== */
 function loadAll(){
@@ -1357,7 +1414,7 @@ function wsWaitlist(wid){return (CACHE.wsSignups||[]).filter(function(s){return 
   .reduce(function(a,s){return a+(Number(s.seats)||1)},0)}
 function renderWsAdmin(){
   var list=applySort((CACHE.wsEvents||[]).slice(),'workshops');
-  document.getElementById('wsAdminList').innerHTML=list.length?('<table><thead><tr><th>Datum</th><th>Titel</th><th class="num">Preis p. P.</th><th class="num">Belegt</th><th>Sichtbar</th><th></th></tr></thead><tbody>'+
+  document.getElementById('wsAdminList').innerHTML=list.length?('<div class="tbl-wrap"><table><thead><tr><th>Datum</th><th>Titel</th><th class="num">Preis p. P.</th><th class="num">Belegt</th><th>Sichtbar</th><th></th></tr></thead><tbody>'+
     list.map(function(w){
       var b=wsBooked(w.id),wl=wsWaitlist(w.id);
       return '<tr><td>'+dt(w.event_date)+(w.start_time?' '+w.start_time.slice(0,5):'')+'</td>'+
@@ -1367,7 +1424,7 @@ function renderWsAdmin(){
       (wl?' <span class="b blue">+'+wl+' WL</span>':'')+'</td>'+
       '<td>'+(w.public?'<span class="b green">live</span>':'<span class="b grey">aus</span>')+'</td>'+
       '<td><a onclick="openWsModal(\''+w.id+'\')">Bearbeiten</a></td></tr>';
-    }).join('')+'</tbody></table>'):'<span class="mut">Noch keine Termine – lege den ersten an, dann erscheint er buchbar auf der Technik-Seite.</span>';
+    }).join('')+'</tbody></table></div>'):'<span class="mut">Noch keine Termine – lege den ersten an, dann erscheint er buchbar auf der Technik-Seite.</span>';
   wireTable('workshops');
 }
 function openWsModal(id){
@@ -1606,7 +1663,7 @@ function renderDash(){
     .reduce(function(s,d){return s+Number(d.total_gross)-Number(d.deposit_deducted||0)},0);
   document.getElementById('dashTiles').innerHTML=
     tile(newInq.length,'Neue Anfragen',"showPage('inq')")+tile(upcoming.length,'Kommende Gigs',"showPage('book')")+
-    (unbestaetigt?tile(unbestaetigt,'davon unbestätigte Anfragen',"showPage('book')"):'')+
+    (unbestaetigt?tile(unbestaetigt,'dazu unbestätigte Anfragen',"showPage('book')"):'')+
     tile(openQ.length,'Offene Angebote',"gotoDocs('angebot','versendet')")+tile(openInv.length,'Offene Rechnungen',"gotoDocs('','versendet')")+
     tile(euro(rev),'Umsatz '+year);
   /* Der Zähler muss zur Liste passen: Warenkorb-Mietanfragen sind Buchungen und stehen
@@ -1645,7 +1702,10 @@ function renderDash(){
   /* Angebote/ABs, die raus sind und auf die nichts zurueckkam - nach Wartezeit sortiert.
      Ab der Nachfassen-Frist (Einstellungen) oder nach Ablauf der Gueltigkeit hervorgehoben. */
   var fuDays=Number((S.defaults||{}).followup_days)||7;
-  var silent=CACHE.documents.filter(function(d){return ['angebot','bestaetigung'].indexOf(d.doc_type)>=0&&d.status==='versendet'})
+  /* Hat der Kunde ueber das Portal schon geschrieben oder um Rueckruf gebeten, schweigt
+     er nicht - solche Angebote gehoeren nicht in diese Liste. */
+  var reagiert={};(CACHE.docEvents||[]).forEach(function(e){if(e.kind==='comment'||e.kind==='callback')reagiert[e.document_id]=1});
+  var silent=CACHE.documents.filter(function(d){return ['angebot','bestaetigung'].indexOf(d.doc_type)>=0&&d.status==='versendet'&&!reagiert[d.id]})
     .map(function(d){
       var sent=(d.sent_at||d.doc_date||d.created_at||today).slice(0,10);
       var days=Math.max(0,Math.round((new Date(today)-new Date(sent))/86400000));
@@ -1843,7 +1903,7 @@ function renderInq(){
       (konf.length?' <span class="b gold" title="'+esc(konf.join(' · '))+'">Termin belegt</span>':'')+'</td>'+
     '<td><span class="b '+(INQ_BADGE[i.status]||'grey')+'">'+i.status.replace('_',' ')+'</span></td>'+
     '<td style="white-space:nowrap"><button class="btn g sm" onclick="viewInq(\''+i.id+'\')">Ansehen</button> '+
-    (i.customer_id?'<a class="sml" onclick="openCustDetail(\''+i.customer_id+'\')">→ Kunde</a>':'<button class="btn sm" onclick="inqToCust(\''+i.id+'\')">→ CRM übernehmen</button>')+'</td></tr>';
+    (i.customer_id?'<a class="sml" onclick="openCustDetail(\''+i.customer_id+'\')">→ Kunde</a>':'<button class="btn sm" onclick="inqToCust(\''+i.id+'\')">Als Kunde anlegen</button>')+'</td></tr>';
   }).join('')||'<tr><td colspan="6" class="mut">Noch keine Anfragen.</td></tr>';
 }
 function viewInq(id){
@@ -1868,7 +1928,7 @@ function viewInq(id){
     replyTplOptions(konf.length?/^Termin belegt/i:null)+
     '</select><button class="btn" style="white-space:nowrap" onclick="composeReply(\''+i.id+'\')">Verfassen</button></div></div>'+
     '<div style="margin-top:14px">'+
-    (i.customer_id?'':'<button class="btn g" onclick="inqToCust(\''+i.id+'\')">→ Als Kunde anlegen</button>')+
+    (i.customer_id?'':'<button class="btn g" onclick="inqToCust(\''+i.id+'\')">Als Kunde anlegen</button>')+
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'erledigt\')">Erledigt</button> '+
     (i.status==='abgesagt'?'':'<button class="btn g" onclick="inqAbsagen(\''+i.id+'\')">Absagen</button> ')+
     '<button class="btn g" onclick="setInqStatus(\''+i.id+'\',\'archiviert\')">Archivieren</button></div>');
@@ -1950,6 +2010,8 @@ function inqToCust(id){
 
 /* ===== Kunden ===== */
 var curCust=null;
+function custKindLabel(k){return {privat:'Privat',firma:'Firma',verein:'Verein'}[k]||'Privat'}
+function custStatusLabel(st){st=String(st||'');return st?st.charAt(0).toUpperCase()+st.slice(1):''}
 function renderCustList(){
   var q=(document.getElementById('custSearch').value||'').toLowerCase();
   var list=CACHE.customers.filter(function(c){
@@ -1967,7 +2029,7 @@ function openCustDetail(id){
   curCust=CACHE.customers.find(function(c){return c.id===id});if(!curCust)return;
   var c=curCust;
   document.getElementById('cdName').textContent=custName(c);
-  document.getElementById('cdSub').textContent=(c.kind==='firma'?'Firma':'Privat')+' · '+c.status+(c.source?' · Quelle: '+c.source:'');
+  document.getElementById('cdSub').textContent=custKindLabel(c.kind)+' · '+custStatusLabel(c.status)+(c.source?' · Quelle: '+c.source:'');
   /* Technik-Check ist ein seltenes Zusatzprodukt - deshalb kein "erfassen"-Link mehr
      bei jedem Kunden. Nur wenn schon welche existieren (angelegt über Technik-Checks
      bei Angebots-Annahme), stehen sie hier zur Info und zum Weiterspringen. */
@@ -3118,20 +3180,10 @@ var curDoc=null,curItems=[],DOC_RETURN='docs';
 /* "Zurueck" im Beleg-Editor soll dahin fuehren, von wo aus er geoeffnet wurde
    (Kunde, Buchung oder Dokumente-Liste) - nicht immer zur Dokumente-Liste. */
 function docBack(){showPage(DOC_RETURN||'docs')}
-function nextNumber(type){
-  var n=S.numbering||{angebot:{prefix:'AN-',next:1},rechnung:{prefix:'RE-',next:1},year_in_number:true};
-  var kind=type==='angebot'?'angebot'
-    :(type==='bestaetigung'?'bestaetigung'
-    :(type==='lieferschein'?'lieferschein'
-    :(type==='gutschrift'?'gutschrift':'rechnung')));
-  if(!n[kind])n[kind]={prefix:type==='bestaetigung'?'AB-':(type==='lieferschein'?'LS-':(type==='gutschrift'?'GS-':'RE-')),next:1};
-  var cfg=n[kind];
-  var num=cfg.prefix+(n.year_in_number?new Date().getFullYear()+'-':'')+String(cfg.next).padStart(4,'0');
-  return {number:num,commit:function(){
-    cfg.next++;
-    return api('settings?key=eq.numbering',{method:'PATCH',body:{value:n}}).then(function(){S.numbering=n});
-  }};
-}
+/* Die Belegnummer vergibt der Server beim Anlegen (api.php, allocDocNumber) und zaehlt
+   den Nummernkreis dort hoch - der Client schickt keine Nummer mehr mit. Vorher schrieb
+   er das komplette numbering-Objekt aus seinem Stand zurueck und setzte damit Zaehler
+   zurueck, die inzwischen anderswo weitergelaufen waren (zweites Geraet, Workshop-Rechnung). */
 /* Kunden in Auswahllisten eindeutig machen: Zwei "Anna Müller" sind ohne Ort und Adresse
    nicht zu unterscheiden - ein Beleg am falschen Kunden ist die Folge. */
 function custOptionLabel(c){
@@ -3155,7 +3207,7 @@ function openDocEditor(id,newType){
     curDoc=CACHE.documents.find(function(d){return d.id===id});
     if(!curDoc)return;
     api('document_items?document_id=eq.'+id+'&select=*&order=pos').then(function(items){
-      curItems=items||[];fillDocForm();showPage('doc');
+      curItems=items||[];fillDocForm();showPage('doc');DOC_DIRTY=false;
     });
   }else{
     var defs=S.defaults||{};
@@ -3177,7 +3229,7 @@ function openDocEditor(id,newType){
     curDoc[zahl?'due_date':'valid_until']=d2.toISOString().slice(0,10);
     curItems=[{pos:1,description:'',qty:1,unit:'Stk.',unit_price:0}];
     curDoc.event_info=null;
-    fillDocForm();showPage('doc');
+    fillDocForm();showPage('doc');DOC_DIRTY=false;
   }
 }
 function docCustChanged(){
@@ -3327,6 +3379,7 @@ function applyDocLock(){
     .forEach(function(i){var el=document.getElementById(i);if(el)el.disabled=locked});
   document.querySelectorAll('#docItems input, #docItems select').forEach(function(el){el.disabled=locked});
   document.getElementById('docSaveBtn').style.display=locked?'none':'';
+  document.getElementById('docSaveBottom').hidden=locked;
   document.getElementById('docAddBtns').style.display=locked?'none':'';
   document.getElementById('docLockNote').style.display=locked?'':'none';
 }
@@ -3532,14 +3585,37 @@ function askPaid(){
   var today=new Date().toISOString().slice(0,10);
   openModal('Zahlung eingegangen – '+esc(d.number),
     '<div class="grid2"><div><label>Zahldatum *</label><input type="date" id="paidDate" value="'+today+'"></div>'+
-    '<div><label>Betrag (€, optional)</label><input type="number" step="0.01" id="paidAmount" placeholder="'+esc(String(d.total_gross!=null?d.total_gross:''))+'"></div></div>'+
+    '<div><label>Betrag (€, optional)</label><input type="number" step="0.01" id="paidAmount" oninput="renderPaidRest()" placeholder="'+esc(String(d.total_gross!=null?d.total_gross:''))+'"></div></div>'+
     '<label>Notiz (optional)</label><input id="paidNote" placeholder="z. B. Überweisung, PayPal, bar">'+
-    '<div class="sml mut" style="margin-top:6px">Das Zahldatum zählt für Umsatz und Export – lieber das Datum vom Kontoauszug als „heute“. Weicht der Betrag ab, entsteht eine Notiz in der Timeline.</div>'+
-    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="doPaid()">Als bezahlt markieren</button><button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+    '<div class="sml" id="paidRest" style="margin-top:8px"></div>'+
+    '<div class="sml mut" style="margin-top:6px">Das Zahldatum zählt für Umsatz und Export – lieber das Datum vom Kontoauszug als „heute“. Liegt der Betrag unter dem Rechnungsbetrag, bleibt die Rechnung offen und die Teilzahlung landet als Notiz in der Timeline.</div>'+
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="paidBtn" onclick="doPaid()">Als bezahlt markieren</button><button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+  renderPaidRest();
+}
+/* Offener Betrag der Rechnung (brutto abzueglich verrechneter Abschlaege) */
+function paidOpenAmount(d){return Math.round((Number(d.total_gross)-Number(d.deposit_deducted||0))*100)/100}
+function renderPaidRest(){
+  var el=document.getElementById('paidRest'),btn=document.getElementById('paidBtn');if(!el||!curDoc)return;
+  var soll=paidOpenAmount(curDoc),raw=v('paidAmount'),amt=raw===''?null:Number(raw);
+  if(amt==null||isNaN(amt)||amt>=soll-0.005){el.innerHTML='';if(btn)btn.textContent='Als bezahlt markieren';return}
+  var rest=Math.round((soll-amt)*100)/100;
+  el.innerHTML='<b style="color:var(--yel)">Teilzahlung:</b> '+euro(amt)+' von '+euro(soll)+' – <b>Rest '+euro(rest)+' offen</b>. Die Rechnung bleibt offen.';
+  if(btn)btn.textContent='Teilzahlung notieren';
 }
 function doPaid(){
   var date=v('paidDate');if(!date){toast('Bitte ein Zahldatum angeben.',1);return}
-  docAction(curDoc.id,'paid',{paid_at:date,amount:v('paidAmount'),note:v('paidNote')})
+  var d=curDoc,soll=paidOpenAmount(d),raw=v('paidAmount'),amt=raw===''?null:Number(raw);
+  if(amt!=null&&!isNaN(amt)&&amt<soll-0.005){
+    /* Teilzahlung: Status bleibt, nur eine Notiz in der Kunden-Timeline mit dem Rest. */
+    var rest=Math.round((soll-amt)*100)/100,note=v('paidNote');
+    api('communications',{method:'POST',body:{customer_id:d.customer_id,booking_id:d.booking_id||null,channel:'note',direction:'in',
+      subject:'Teilzahlung zu '+d.number,content:'Teilzahlung '+euro(amt)+' am '+dt(date)+' – Rest '+euro(rest)+' offen'+(note?'\n'+note:''),
+      occurred_at:date+'T12:00:00Z'}})
+      .then(function(){closeModal();toast('Teilzahlung notiert – Rest '+euro(rest)+' offen, Rechnung bleibt offen.');refreshComms()})
+      .catch(function(e){toast(e.message,1)});
+    return;
+  }
+  docAction(d.id,'paid',{paid_at:date,amount:raw,note:v('paidNote')})
     .then(function(j){closeModal();curDoc.paid_at=j.paid_at;toast('Bezahlt ✓');return docAfterStatus('bezahlt')})
     .catch(function(e){toast(e.message,1)});
 }
@@ -3616,11 +3692,11 @@ function itemRowHtml(it,i,posLabel,locked,sml){
   return '<div class="it-row" style="margin-bottom:3px">'+
   '<div'+(locked?'':' draggable="true" ondragstart="itDragStart('+i+',event)" title="Ziehen zum Umsortieren"')+' style="display:flex;align-items:center;justify-content:center;gap:3px;cursor:'+(locked?'default':'grab')+';color:var(--gll);font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:6px;user-select:none">'+(locked?'':'<span style="opacity:.55">⠿</span>')+posLabel+'</div>'+
   '<input value="'+esc(it.description)+'" placeholder="Beschreibung" list="artikelVorschlaege" oninput="itSet('+i+',\'description\',this.value)" onchange="itAutoFill('+i+',this.value)">'+
-  '<input type="number" step="1" value="'+it.qty+'" placeholder="Menge" title="Menge" oninput="itSet('+i+',\'qty\',this.value)">'+
-  '<select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
-  '<input type="number" step="0.01" value="'+it.unit_price+'" placeholder="Einzelpreis" title="Einzelpreis brutto" oninput="itSet('+i+',\'unit_price\',this.value)">'+
-  '<input value="'+euro(sum)+'" disabled class="num" title="Gesamt" data-sum="'+i+'">'+
-  (locked?'<span></span>':'<a onclick="itDel('+i+')" style="color:var(--redl)" title="Position löschen">✕</a>')+'</div>'+
+  '<span class="it-lbl">Menge</span><input type="number" step="1" value="'+it.qty+'" placeholder="Menge" title="Menge" oninput="itSet('+i+',\'qty\',this.value)">'+
+  '<span class="it-lbl">Einheit</span><select onchange="itSet('+i+',\'unit\',this.value)">'+unitOptionsHtml(it.unit||'Stk.')+'</select>'+
+  '<span class="it-lbl">Einzelpreis brutto</span><input type="number" step="0.01" value="'+it.unit_price+'" placeholder="Einzelpreis" title="Einzelpreis brutto" oninput="itSet('+i+',\'unit_price\',this.value)">'+
+  '<span class="it-lbl">Gesamt</span><input value="'+euro(sum)+'" disabled class="num" title="Gesamt" data-sum="'+i+'">'+
+  (locked?'<span></span>':'<span class="it-act">'+itMoveBtns(i)+'<a onclick="itDel('+i+')" style="color:var(--redl)" title="Position löschen">✕</a></span>')+'</div>'+
   '<div style="padding-left:42px;padding-right:34px;display:flex;gap:6px">'+
   '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Erklärung fürs Kundenkonto (erscheint beim Drüberfahren) – optional" style="font-size:10px;padding:5px 8px;color:var(--gll)">'+
   '<input type="number" step="0.01" value="'+(it.discount_value||0)+'" oninput="itSet('+i+',\'discount_value\',this.value)" title="Rabatt auf diese Position" style="width:74px;font-size:10px;padding:5px 8px" placeholder="Rabatt">'+
@@ -3701,6 +3777,7 @@ function lineTotal(it){
   return it.discount_type==='eur'?Math.max(0,g-d):g*(1-Math.min(100,d)/100);
 }
 function itDel(i){
+  docMarkDirty();
   var it=curItems[i];
   if(it.is_header){
     var g=groupDocItems(curItems).find(function(g){return g.main===i});
@@ -3709,12 +3786,31 @@ function itDel(i){
   } else curItems.splice(i,1);
   renderItems();
 }
+/* Position (samt Rabattstaffel) eine Stelle hoch/runter - Alternative zum Ziehen. */
+function itMoveBtns(i){
+  var groups=groupDocItems(curItems),gi=-1;
+  groups.forEach(function(g,k){if(g.main===i)gi=k});
+  if(gi<0)return '';
+  var up='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>',
+      down='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
+  return '<span class="it-mv"><button type="button" title="Nach oben" aria-label="Nach oben" onclick="itMove('+i+',-1)"'+(gi===0?' disabled':'')+'>'+up+'</button>'+
+    '<button type="button" title="Nach unten" aria-label="Nach unten" onclick="itMove('+i+',1)"'+(gi===groups.length-1?' disabled':'')+'>'+down+'</button></span>';
+}
+function itMove(i,dir){
+  var groups=groupDocItems(curItems),gi=-1;
+  groups.forEach(function(g,k){if(g.main===i)gi=k});
+  var ziel=gi+dir;
+  if(gi<0||ziel<0||ziel>=groups.length)return;
+  var tmp=groups[gi];groups[gi]=groups[ziel];groups[ziel]=tmp;
+  curItems=[].concat.apply([],groups.map(function(g){return [curItems[g.main]].concat(g.subs.map(function(si){return curItems[si]}))}));
+  docMarkDirty();renderItems();
+}
 var itDragIdx=null;
 function itDragStart(i,ev){itDragIdx=i;ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',String(i))}catch(e){}}
 function itDragOver(ev){if(itDragIdx!==null)ev.preventDefault()}
 function itDrop(i,ev){ev.preventDefault();if(itDragIdx===null||itDragIdx===i){itDragIdx=null;return}
-  var m=curItems.splice(itDragIdx,1)[0];curItems.splice(i,0,m);itDragIdx=null;renderItems()}
-function addItemRow(){curItems.push({pos:curItems.length+1,description:'',qty:1,unit:'Stk.',unit_price:0});renderItems()}
+  var m=curItems.splice(itDragIdx,1)[0];curItems.splice(i,0,m);itDragIdx=null;docMarkDirty();renderItems()}
+function addItemRow(){curItems.push({pos:curItems.length+1,description:'',qty:1,unit:'Stk.',unit_price:0});docMarkDirty();renderItems()}
 /* Positionspreise (unit_price) sind brutto - Markus pflegt und nennt Kunden immer den Preis
    inkl. USt. Netto wird daraus abgeleitet, nicht umgekehrt draufgerechnet. */
 function docCalc(){
@@ -3760,7 +3856,11 @@ document.getElementById('docDiscVal').addEventListener('input',renderTotals);
 document.getElementById('docDiscType').addEventListener('change',renderTotals);
 document.getElementById('docTotalOverride').addEventListener('input',renderTotals);
 
+var DOC_SAVING=false;
 function saveDoc(){
+  /* Doppelklick auf "Speichern" legte einen neuen Beleg zweimal an (zwei Nummern) -
+     solange das Speichern laeuft, ist der Knopf aus und ein zweiter Aufruf tut nichts. */
+  if(DOC_SAVING)return;
   var custId=v('docCust');
   if(!custId){toast('Bitte Kunden wählen.',1);return}
   var type=v('docType'),c=docCalc();
@@ -3776,12 +3876,16 @@ function saveDoc(){
     event_info:evVal(),
     total_net:c.net,total_tax:c.tax,total_gross:c.gross,total_override:c.override,deposit_deducted:type==='schluss'?c.dep:0};
   body[istZahlbeleg(type)?'due_date':'valid_until']=v('docDate2')||null;
+  DOC_SAVING=true;
+  document.querySelectorAll('#docSaveBtn,#docSaveBottom button').forEach(function(b){b.disabled=true});
   var p;
   if(curDoc.id){p=api('documents?id=eq.'+curDoc.id,{method:'PATCH',prefer:'return=representation',body:body})}
   else{
-    var nn=nextNumber(type);body.number=nn.number;body.status='entwurf';
-    p=api('documents',{method:'POST',prefer:'return=representation',body:body}).then(function(rows){
-      return nn.commit().then(function(){return rows})});
+    /* Nummer vergibt der Server (Nummernkreis in einer Transaktion) - sie kommt mit
+       der Antwortzeile zurueck. */
+    body.status='entwurf';
+    p=api('documents',{method:'POST',prefer:'return=representation',body:body})
+      .then(function(rows){return api('settings?key=eq.numbering').then(function(r){if(r&&r[0])S.numbering=r[0].value;return rows})});
   }
   p.then(function(rows){
     /* Komplette gespeicherte Zeile übernehmen, nicht nur id/number/status: sonst stehen
@@ -3814,8 +3918,12 @@ function saveDoc(){
   }).then(function(){
     toast('Gespeichert ✓ '+curDoc.number);
     document.getElementById('docTitle').textContent=docTypeName(curDoc.doc_type)+' '+curDoc.number;
+    DOC_DIRTY=false;
     renderStatusBtns();refreshDocs();
-  }).catch(function(e){toast('Fehler: '+e.message,1)});
+  }).catch(function(e){toast('Fehler: '+e.message,1)}).finally(function(){
+    DOC_SAVING=false;
+    document.querySelectorAll('#docSaveBtn,#docSaveBottom button').forEach(function(b){b.disabled=false});
+  });
 }
 
 /* Markus legt keine Veranstaltung an - er schreibt ein Angebot mit einem Datum. Genau
@@ -4340,23 +4448,6 @@ function bookEquipList(b){
     var eq=CACHE.equipment.find(function(e){return e.id===x.equipment_id})||{};
     return {name:eq.name||'?',qty:x.qty,price:x.price_override!=null?Number(x.price_override):rentPrice(eq,b)*x.qty,notes:x.notes};
   });
-}
-function createLieferschein(){
-  var b=curBook,list=bookEquipList(b);
-  if(!list.length){toast('Keine Technik zugeordnet – erst Technik zum Gig hinzufügen.',1);return}
-  var nn=nextNumber('lieferschein');
-  api('documents',{method:'POST',prefer:'return=representation',body:{
-    doc_type:'lieferschein',number:nn.number,customer_id:b.customer_id,booking_id:b.id,status:'versendet',
-    doc_date:new Date().toISOString().slice(0,10),tax_rate:0,total_net:0,total_tax:0,total_gross:0
-  }}).then(function(rows){
-    return nn.commit().then(function(){return rows[0]});
-  }).then(function(d){
-    var items=list.map(function(it,i){return {document_id:d.id,pos:i+1,description:it.name,qty:it.qty,unit:'Stk.',unit_price:0,note:it.notes||null}});
-    return api('document_items',{method:'POST',body:items}).then(function(){return d});
-  }).then(function(d){
-    refreshDocs();openBookDetail(b.id);
-    printLieferschein(d,list);
-  }).catch(function(e){toast(e.message,1)});
 }
 function printLieferschein(d,list,b){
   b=b||curBook;
@@ -7026,7 +7117,7 @@ function saveOperator(){
     .then(function(){S.company=val;renderSetupCard();renderTpls();toast('Betreiber-Angaben gespeichert ✓')}).catch(function(e){toast(e.message,1)});
 }
 function saveNumbering(){
-  /* Vorhandene Kreise erhalten: nextNumber() legt bei Bedarf weitere an (Lieferschein),
+  /* Vorhandene Kreise erhalten: der Server legt bei Bedarf weitere an (Lieferschein),
      die hier sonst beim Speichern verloren gingen und wieder bei 1 anfangen wuerden. */
   var n=Object.assign({},S.numbering||{});
   n.angebot={prefix:v('sQPre'),next:Number(v('sQNext'))||1};
@@ -7084,6 +7175,10 @@ function shareDoc(){
    auf "versendet" gesetzt - nichts geht ohne Klick auf "Direkt senden" los. */
 function docSendMail(mode){
   if(istZahlbeleg(curDoc.doc_type)){var bl=docSendBlockers();if(bl.length){showSendBlockers(bl,'send');return}}
+  /* Ohne E-Mail-Adresse gleich abbrechen - sonst fragt ensureDocShare erst nach der PLZ
+     und legt ein Freigabe-Token an, obwohl gar keine Mail rausgehen kann. */
+  var c0=CACHE.customers.find(function(c){return c.id===curDoc.customer_id});
+  if(c0&&!c0.email){toast('Der Kunde hat keine E-Mail-Adresse – bitte erst am Kunden eintragen.',1);return}
   ensureDocShare().then(function(r){
     var d=curDoc,cust=r.cust;
     if(!cust.email){toast('Der Kunde hat keine E-Mail-Adresse – bitte erst am Kunden eintragen.',1);return}
@@ -7168,6 +7263,7 @@ function formSendMail(formId,reminder){
   var c=f.customer_id?CACHE.customers.find(function(x){return x.id===f.customer_id}):null;
   var link=portalUrl('f',f.token);
   if(!c||!c.email){
+    closeModal();
     toast(c?'Der Kunde hat keine E-Mail-Adresse – Link ist kopiert, bitte selbst schicken.':'Dem Bogen ist kein Kunde zugeordnet – Link ist kopiert, bitte selbst schicken.',1);
     copyFormLink(f.token);return;
   }
@@ -7974,16 +8070,28 @@ function openUpsellPicker(){
 function insertUpsell(id){
   var u=(CACHE.upsells||[]).find(function(x){return x.id===id});if(!u)return;
   curItems.push({pos:curItems.length+1,description:u.title,note:u.description||'',qty:1,unit:'pausch.',unit_price:Number(u.price_net)||0});
-  closeModal();renderItems();toast('„'+u.title+'“ eingefügt ✓');
+  closeModal();docMarkDirty();renderItems();toast('„'+u.title+'“ eingefügt ✓');
 }
 
 /* Antwort aus Anfrage verfassen */
+/* Anrede-Vorname wie anredeVorname() in api.php: Firma/Verein -> "zusammen", sonst der
+   Vorname am Kunden. Vorher wurde das erste Wort aus custName() genommen - bei einer
+   Firma stand dann "Hallo O'Brien & Söhne GmbH (Pat," in der Mail. */
+function anredeVorname(c){
+  if(!c)return 'zusammen';
+  if(c.kind==='firma'||c.kind==='verein')return 'zusammen';
+  var vn=String(c.first_name||'').trim();
+  return vn||'zusammen';
+}
 function fillTpl(text,i){
   var parts=namensTeile(i.name);
   var rv=(CACHE.content&&CACHE.content.reviews)||{};
   var links=rv.google_url||'';
+  /* Haengt ein Kunde dran (Belegmails, Fragebogen, Erinnerung, Kundenseite), zaehlt
+     dessen Vorname - bei Anfragen ohne Kunde weiter das Namensfeld der Anfrage. */
+  var cust=i.customer_id?(CACHE.customers||[]).find(function(c){return c.id===i.customer_id}):null;
   var map={
-    '{vorname}':parts[0]||i.name||'','{name}':i.name||'',
+    '{vorname}':cust?anredeVorname(cust):(parts[0]||i.name||''),'{name}':i.name||'',
     '{datum}':(i.event_date||i._datum)?dt(i.event_date||i._datum):'eurem Wunschtermin',
     '{anlass}':i.event_type||'eurer Feier','{ort}':i.location||'',
     '{bewertungen}':links||'(Bewertungslinks unter Inhalte → Bewertungen eintragen)',

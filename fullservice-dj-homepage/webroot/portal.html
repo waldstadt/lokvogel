@@ -193,9 +193,17 @@ function loadOffer(){
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
       if(res.s===401){renderPlzGate();return}
+      if(res.s===429){renderPlzBlocked(res.j.error,renderPlzGate);return}
       if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte prüft den Link oder meldet euch direkt bei mir.')+'</p></div>');return}
       DOC=res.j;setDesignKind(docKind(DOC));renderOffer();
     }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
+}
+/* Nach zu vielen Fehlversuchen: Hinweis mit Weg zurueck zur Eingabe - vorher blieb nur
+   eine Sackgasse ohne Knopf. */
+function renderPlzBlocked(msg,again){
+  app('<div class="card"><div class="kicker">Eure Unterlagen</div><h1>Kurz gesperrt</h1>'+
+    '<div class="msg warn" style="margin-top:10px">'+esc(msg||'Zu viele Fehlversuche. Bitte in etwa 15 Minuten erneut versuchen.')+'</div>'+
+    '<div style="margin-top:16px"><button class="btn" onclick="'+(again===renderMvGate?'renderMvGate()':'renderPlzGate()')+'">Erneut versuchen</button></div></div>');
 }
 function renderPlzGate(){
   /* Der Gate steht vor dem Laden des Belegs - welcher Typ dahintersteckt, ist hier
@@ -382,7 +390,7 @@ function renderOffer(){
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
     '<div><h1>Hallo '+esc(DOC.customer)+'!</h1>'+
     (custAddressLine()?'<p class="sub">'+custAddressLine()+'</p>':'')+
-    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until&&!storniert?' · gültig bis '+dt(d.valid_until):'')+(d.due_date&&!storniert&&d.doc_type!=='gutschrift'?' · zahlbar bis '+dt(d.due_date):'')+(rentalPeriodLabel(d.rental_from,d.rental_to)?' · '+rentalPeriodLabel(d.rental_from,d.rental_to):'')+'</p></div>'+
+    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until&&!storniert?' · gültig bis '+dt(d.valid_until):'')+(d.status==='bezahlt'&&d.doc_type!=='gutschrift'?' · bezahlt'+(d.paid_at?' am '+dt(d.paid_at.slice(0,10)):''):(d.due_date&&!storniert&&d.doc_type!=='gutschrift'?' · zahlbar bis '+dt(d.due_date):''))+(rentalPeriodLabel(d.rental_from,d.rental_to)?' · '+rentalPeriodLabel(d.rental_from,d.rental_to):'')+'</p></div>'+
     '<button class="btn g" onclick="downloadPdf()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Als PDF speichern</button></div>'+
     (eventInfoRows(d)?'<div class="sub" style="margin-top:12px;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:9px 12px">'+eventInfoRows(d)+'</div>':'')+
     (statusLine?'<div style="margin-top:12px">'+statusLine+'</div>':'')+
@@ -739,6 +747,7 @@ function loadRental(){
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){
       if(res.s===401){renderMvGate();return}
+      if(res.s===429){renderPlzBlocked(res.j.error,renderMvGate);return}
       if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte prüft den Link oder meldet euch direkt bei mir.')+'</p></div>');return}
       MVDATA=res.j;setDesignKind('technik');renderRental();
     }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
@@ -866,6 +875,18 @@ function submitRental(){
 /* ===================== KUNDENKONTO ===================== */
 var CTOK=localStorage.getItem('cust_tok')||'',ME=null;
 function cfetch(p,opt){opt=opt||{};opt.headers=Object.assign({},opt.headers||{},{Authorization:'Bearer '+CTOK});return fetch(API+'/'+p,opt)}
+/* Einladungslink erst serverseitig pruefen: verbraucht oder falsch -> sofort "geht nicht
+   mehr" statt erst nach dem Eintippen des Passworts. */
+function loadInvite(){
+  app('<div class="card"><p class="sub">Einen Moment …</p></div>');
+  fetch(API+'/portal/account/invite?invite='+encodeURIComponent(INVITE))
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s===404||res.s===410){renderInviteGone();return}
+      if(res.s>=400)throw new Error(res.j.error||'Fehlgeschlagen.');
+      renderSetPw();
+    }).catch(function(){renderSetPw()});
+}
 function renderSetPw(){
   app('<div class="card"><div class="kicker">Dein Kundenkonto</div><h1>Passwort festlegen</h1>'+
     '<p class="sub">Einmal ein Passwort setzen – danach kommst du jederzeit mit E-Mail und Passwort an alle Unterlagen.</p>'+
@@ -1285,7 +1306,7 @@ var LEER=['a','f','mv','einladung'].filter(function(k){return qs.has(k)&&!qs.get
 if(OFFER)loadOffer();
 else if(FORM)loadForm();
 else if(MV)loadRental();
-else if(INVITE)renderSetPw();
+else if(INVITE)loadInvite();
 else if(LEER.length)
   app('<div class="card"><h1>Der Link ist unvollständig</h1>'+
     '<p class="sub">Da fehlt das Stück hinter dem Gleichheitszeichen – beim Kopieren aus einer E-Mail geht das leicht verloren. '+

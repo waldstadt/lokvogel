@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 87;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 88;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -240,6 +240,59 @@ function db(): PDO {
 }
 
 /* Schema-Upgrades für bereits vorhandene Datenbanken (idempotent) */
+/* Indizes fuer die haeufigsten Filter - gleicher Stand fuer frische Datenbanken (migrate)
+   und bestehende (upgrade v88). */
+function docIndexDdl(): array {
+  return [
+    'create index if not exists idx_document_items_doc on document_items(document_id)',
+    'create index if not exists idx_booking_equipment_booking on booking_equipment(booking_id)',
+    'create index if not exists idx_booking_equipment_equipment on booking_equipment(equipment_id)',
+    'create index if not exists idx_documents_customer on documents(customer_id)',
+    'create index if not exists idx_documents_booking on documents(booking_id)',
+    'create index if not exists idx_documents_status on documents(status)',
+    'create index if not exists idx_documents_share_token on documents(share_token)',
+    'create index if not exists idx_communications_customer on communications(customer_id)',
+    'create index if not exists idx_communications_followup on communications(followup_at)',
+    'create index if not exists idx_doc_events_doc on doc_events(document_id)',
+    'create index if not exists idx_bookings_customer on bookings(customer_id)',
+    'create index if not exists idx_bookings_event_date on bookings(event_date)',
+    'create index if not exists idx_forms_customer on forms(customer_id)',
+  ];
+}
+
+/* Belegnummer aus dem Nummernkreis vergeben - serverseitig und innerhalb der laufenden
+   Transaktion, damit zwei Geraete (oder Editor und Workshop-Automatik) nie dieselbe
+   Nummer ziehen. Schickt der Client selbst eine Nummer, gilt sie, solange sie frei ist;
+   der Zaehler wird trotzdem hinter die vergebene Nummer geschoben. Belegte oder fehlende
+   Nummer: naechste freie aus dem Kreis. */
+function allocDocNumber(PDO $p, string $docType, ?string $wanted = null): string {
+  $kind = in_array($docType, ['angebot','bestaetigung','lieferschein','gutschrift'], true) ? $docType : 'rechnung';
+  $defPrefix = ['angebot' => 'AN-', 'bestaetigung' => 'AB-', 'lieferschein' => 'LS-', 'gutschrift' => 'GS-', 'rechnung' => 'RE-'][$kind];
+  $numRow = $p->query("select value from settings where key='numbering'")->fetchColumn() ?: '{}';
+  $num = json_decode($numRow, true) ?: [];
+  $cfg = is_array($num[$kind] ?? null) ? $num[$kind] : ['prefix' => $defPrefix, 'next' => 1];
+  $prefix = (string)($cfg['prefix'] ?? $defPrefix);
+  $year = ($num['year_in_number'] ?? true) ? gmdate('Y') . '-' : '';
+  $next = max(1, (int)($cfg['next'] ?? 1));
+  $exists = $p->prepare('select 1 from documents where number = ?');
+  $taken = function (string $n) use ($exists): bool { $exists->execute([$n]); return (bool)$exists->fetchColumn(); };
+  $wanted = trim((string)$wanted);
+  if ($wanted !== '' && !$taken($wanted)) {
+    $number = $wanted;
+    /* Zaehler nachziehen, wenn die Nummer aus diesem Kreis stammt */
+    if (preg_match('/^' . preg_quote($prefix . $year, '/') . '(\d+)$/', $wanted, $mm) && (int)$mm[1] >= $next) $next = (int)$mm[1] + 1;
+  } else {
+    do { $number = $prefix . $year . str_pad((string)$next, 4, '0', STR_PAD_LEFT); $next++; } while ($taken($number));
+  }
+  $cfg['prefix'] = $prefix; $cfg['next'] = $next;
+  $num[$kind] = $cfg;
+  $up = $p->prepare("update settings set value = ?, updated_at = ? where key='numbering'");
+  $up->execute([json_encode($num, JSON_UNESCAPED_UNICODE), now()]);
+  if (!$up->rowCount())
+    $p->prepare("insert into settings (key, value, updated_at) values ('numbering', ?, ?)")->execute([json_encode($num, JSON_UNESCAPED_UNICODE), now()]);
+  return $number;
+}
+
 function upgrade(PDO $p): void {
   $v = (int)$p->query('PRAGMA user_version')->fetchColumn();
   if ($v >= SCHEMA_VERSION) return;
@@ -248,6 +301,12 @@ function upgrade(PDO $p): void {
      beiden Sonderfaelle bei der Annahme (Termin inzwischen belegt / Angebot abgelaufen),
      v83 "Nachfassen zum Angebot" fuer Kunden, die sich nach dem Angebot nicht melden,
      v85 die Eingangsbestaetigungen fuer Absage, Frage und Rueckrufwunsch im Portal. */
+  if ($v < 88) {
+    /* v88: Indizes auf den Spalten, ueber die das Backoffice und das Portal staendig
+       filtern (Positionen je Beleg, Technik je Gig, Belege je Kunde/Status/Token ...).
+       Ohne sie liest SQLite bei jeder Abfrage die ganze Tabelle. */
+    foreach (docIndexDdl() as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+  }
   if ($v < 87) {
     /* v87: Vorlagen bekommen einen stabilen Schluessel (key) - bisher suchte der Server
        seine Automatik-Mails ueber den Namen, ein Umbenennen der Vorlage brach die Automatik
@@ -2603,6 +2662,7 @@ SQL);
     values (?,?,?,?,?,?,?,?,?,?,?)')
     ->execute([uuid(), 'start', 'galerie', 0, 'instagram', 'Frisch aus Instagram', '', '[]', '4', 0, now()]);
   foreach (workshopsDdl() as $sql) $p->exec($sql);
+  foreach (docIndexDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
   foreach (portalAccountDdl() as $sql) $p->exec($sql);
   foreach (statsNewsletterDdl() as $sql) $p->exec($sql);
@@ -3107,6 +3167,14 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         if (in_array('created_at', tableCols($t))) $row['created_at'] ??= now();
         if (in_array('updated_at', tableCols($t))) $row['updated_at'] = now();
         foreach ($row as $c => $v) $row[$c] = encodeVal($t, $c, $v);
+        /* Belegnummer serverseitig in einer Transaktion vergeben (siehe allocDocNumber) -
+           der Client zaehlte bisher selbst hoch und ueberschrieb dabei Zaehler, die
+           inzwischen woanders (anderes Geraet, Workshop-Rechnung) weitergelaufen waren. */
+        $ownTx = false;
+        if ($t === 'documents' && !$merge) {
+          if (!$p->inTransaction()) { $p->beginTransaction(); $ownTx = true; }
+          $row['number'] = allocDocNumber($p, (string)($row['doc_type'] ?? 'rechnung'), $row['number'] ?? null);
+        }
         $cols = array_keys($row);
         $sql = "insert into \"$t\" (" . implode(',', array_map(fn($c) => "\"$c\"", $cols)) . ") values (" .
           implode(',', array_fill(0, count($cols), '?')) . ")";
@@ -3121,8 +3189,13 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
           $chk = $p->prepare('select 1 from bookings where id = ?'); $chk->execute([$row['id']]);
           $bookingNeu = !$chk->fetchColumn();
         }
-        try { $p->prepare($sql)->execute(array_values($row)); }
-        catch (PDOException $e) { fail('Konflikt: ' . $e->getMessage(), 409); }
+        try { $p->prepare($sql)->execute(array_values($row)); if ($ownTx) $p->commit(); }
+        catch (PDOException $e) {
+          if ($ownTx) $p->rollBack();
+          if ($t === 'documents' && str_contains($e->getMessage(), 'documents.number'))
+            fail('Nummer ' . ($row['number'] ?? '') . ' ist schon vergeben – bitte den Nummernkreis in den Einstellungen prüfen.', 409);
+          fail('Konflikt: ' . $e->getMessage(), 409);
+        }
         if ($bookingNeu) applyDefaultSet($p, (string)$row['id'], (string)($row['kind'] ?? 'dj'));
         if ($t === 'documents') docAudit($p, $row['id'] ?? null, 'erstellt', ($row['number'] ?? '') . ' (' . ($row['doc_type'] ?? '') . ')');
         /* Nur protokollieren, wenn der Beleg schon versendet ist - sonst wuerde jede
@@ -3602,14 +3675,7 @@ function workshopInvoice(PDO $p, string $signupId, bool $quiet = false): array {
   /* Nummernkreis fortschreiben + Rechnung anlegen (atomar) */
   $p->beginTransaction();
   try {
-    $numRow = $p->query("select value from settings where key='numbering'")->fetchColumn() ?: '{}';
-    $num = json_decode($numRow, true) ?: [];
-    $cfg = $num['rechnung'] ?? ['prefix' => 'RE-', 'next' => 1];
-    $number = $cfg['prefix'] . (($num['year_in_number'] ?? true) ? gmdate('Y') . '-' : '') . str_pad((string)$cfg['next'], 4, '0', STR_PAD_LEFT);
-    $cfg['next'] = (int)$cfg['next'] + 1;
-    $num['rechnung'] = $cfg;
-    $p->prepare("update settings set value = ?, updated_at = ? where key='numbering'")
-      ->execute([json_encode($num, JSON_UNESCAPED_UNICODE), now()]);
+    $number = allocDocNumber($p, 'rechnung');
 
     $small = !empty($comp['small_business']);
     $rate = $small ? 0.0 : (float)($defs['tax_rate'] ?? 19);
@@ -4314,6 +4380,17 @@ function handlePortal(string $path, string $method, $body): never {
     }
     out(['token' => custToken($p, $custId), 'name' => $name, 'partner' => partnerInfoForEmail($p, $email)], 201);
   }
+  /* Einladungslink schon beim Oeffnen pruefen: Ein verbrauchter oder falscher Link soll
+     sofort "geht nicht mehr" zeigen, nicht erst nach dem Eintippen des Passworts. */
+  if ($path === 'portal/account/invite' && $method === 'GET') {
+    $inv = (string)($_GET['invite'] ?? '');
+    if (!preg_match('/^[a-f0-9]{24,64}$/', $inv)) fail('Ungültiger Link.', 404);
+    $st = $p->prepare('select first_name, company from customers where portal_invite = ? and portal_invite_expires > ?');
+    $st->execute([$inv, time()]);
+    $c = $st->fetch();
+    if (!$c) fail('Der Link wurde schon benutzt oder ist abgelaufen.', 410);
+    out(['ok' => true, 'name' => trim((string)($c['company'] ?: $c['first_name']))]);
+  }
   if ($path === 'portal/account/set_password' && $method === 'POST') {
     $inv = (string)($body['invite'] ?? '');
     $pass = (string)($body['password'] ?? '');
@@ -4586,7 +4663,7 @@ function handlePortal(string $path, string $method, $body): never {
         'price_mode','discount_value','discount_type','event_info','rental_from','rental_to',
         /* Versionsstand: Der Kunde soll sehen, wenn sich das Angebot seit seinem letzten
            Besuch geaendert hat (bisher stillschweigend derselbe Link, neuer Inhalt). */
-        'version','version_at','accepted_version','parent_id','storno_at'])),
+        'version','version_at','accepted_version','parent_id','storno_at','paid_at'])),
       /* Storno und Gutschrift muessen auch beim Kunden unmissverstaendlich sein: "STORNIERT
          am ...", "Korrigiert durch ..." bzw. "zu Rechnung ... vom ...". */
       'bezug' => docBezug($p, $d),
