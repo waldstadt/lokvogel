@@ -912,15 +912,18 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('tech')">Speichern</button></div></div>
     <div class="sec-label">Kontakt</div>
         <div class="card" id="cms-kontakt"><h3>Kontaktdaten (öffentlich)</h3>
-          <label>Telefon</label><input id="cCtPhone">
-          <label>E-Mail</label><input id="cCtMail">
-          <label>Adresse</label><input id="cCtAddr">
+          <div class="mut sml" style="margin-bottom:10px">Telefon, E-Mail und Adresse kommen automatisch aus den Firmendaten (Einstellungen → Firmendaten) – einmal dort eintragen, überall auf der Website aktuell.</div>
+          <label>Instagram-Link</label><input id="cCtIg" placeholder="https://www.instagram.com/…">
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('contact')">Speichern</button></div></div>
     <div class="sec-label">Sammlungen &amp; Listen</div>
         <div class="card" id="cms-reports"><h3>Veranstaltungsberichte <button class="btn sm" style="float:right" onclick="openReportModal()">+ Bericht</button></h3>
           <div class="mut sml" style="margin-bottom:8px">Echte Feiern mit kurzem Text und Fotos. Auf der Seite erscheinen nur Kacheln – der ganze Text steht erst im Detailfenster, damit die Startseite kompakt bleibt. Erscheint auf der Startseite über das Modul „Berichte“ (Module → + Modul → Veranstaltungsberichte). Reihenfolge per Ziehen am ⠿-Griff.</div>
           <div id="reportList" class="sml"></div></div>
         <div class="card" id="cms-leistungen"><h3>Leistungspakete <button class="btn sm" style="float:right" onclick="openPackModal()">+ Paket</button></h3>
+          <label>Überschrift der Sektion</label><input id="cServTitle">
+          <label>Einleitungstext</label><textarea id="cServText" style="min-height:70px"></textarea>
+          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('services')">Text speichern</button></div>
+          <div class="sml" style="margin:14px 0 8px;font-weight:600;color:var(--wh)">Pakete</div>
           <label style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cPackImgs" style="width:auto;margin-right:6px" onchange="savePackSec()">Bilder in den Paketkacheln anzeigen</label>
           <div class="mut sml" style="margin-bottom:8px">Ohne Haken sehen die Kacheln aus wie bisher – nützlich, solange noch nicht jedes Paket ein Bild hat. Reihenfolge per Ziehen am ⠿-Griff ändern, Klick aufs Badge schaltet live/aus.</div>
           <div id="packList" class="sml"></div></div>
@@ -5969,9 +5972,7 @@ function renderCms(){
   document.getElementById('cAboutImg').value=g('about','image');
   document.getElementById('cAboutFocalWrap').innerHTML=focalWidget(g('about','image'),g('about','image_focal'),'cAboutFocal','4/5');
   document.getElementById('cAboutGear').value=(g('about','gear')||[]).join(', ');
-  document.getElementById('cCtPhone').value=g('contact','phone');
-  document.getElementById('cCtMail').value=g('contact','email');
-  document.getElementById('cCtAddr').value=g('contact','address');
+  document.getElementById('cCtIg').value=g('contact','instagram');
   document.getElementById('cSeoTitle').value=g('seo','title');
   document.getElementById('cSeoDesc').value=g('seo','description');
   document.getElementById('cThTitle').value=g('tech_hero','headline');
@@ -5987,6 +5988,8 @@ function renderCms(){
   document.getElementById('cThRentText').value=g('rental','text');
   document.getElementById('cThTeaTitle').value=g('tech_teaser','title');
   document.getElementById('cThTeaText').value=g('tech_teaser','text');
+  document.getElementById('cServTitle').value=g('services','title')||'Das bekommt ihr';
+  document.getElementById('cServText').value=g('services','text')||'Vom Sektempfang bis zum letzten Song: Musik, Ton für die freie Trauung, dezentes Licht passend zur Location – und ein Plan B für alle Fälle. Ihr feiert, ich kümmere mich um den Rest.';
   document.getElementById('cLocTitle').value=g('loc_section','title')||'Orte, an denen ich besonders gerne auflege';
   document.getElementById('cLocText').value=g('loc_section','text')||'Deutschlandweit gibt es Locations, mit denen die Zusammenarbeit einfach herausragend läuft – eingespielte Teams, gute Technik-Bedingungen, tolle Räume. Diese Häuser empfehle ich aus voller Überzeugung.';
   document.getElementById('cLocMax').value=Number(g('loc_section','max_count'))||0;
@@ -6174,9 +6177,10 @@ function buildContentVal(key){
   if(key==='hero')return {title:(S.company&&S.company.name)||'',headline:v('cHeroTitle'),badges:badgeFields('cHeroBadge'),scrim:scrimVal('cHeroScrim'),subtitle:v('cHeroSub'),text:v('cHeroText'),cta:v('cHeroCta'),image:v('cHeroImg'),image_focal:v('cHeroFocal'),video:v('cHeroVid')};
   if(key==='about')return {title:v('cAboutTitle'),text:v('cAboutText'),image:v('cAboutImg'),image_focal:v('cAboutFocal'),
     gear:v('cAboutGear').split(',').map(function(s){return s.trim()}).filter(Boolean)};
-  if(key==='contact')return {title:'Kontakt',phone:v('cCtPhone'),email:v('cCtMail'),address:v('cCtAddr')};
+  if(key==='contact')return Object.assign({},CACHE.content&&CACHE.content.contact||{},{title:'Kontakt',instagram:v('cCtIg')});
   if(key==='seo')return {title:v('cSeoTitle'),description:v('cSeoDesc')};
   if(key==='guarantee')return {title:v('cGTitle'),text:v('cGText')};
+  if(key==='services')return Object.assign({},CACHE.content&&CACHE.content.services||{},{title:v('cServTitle'),text:v('cServText')});
   if(key==='loc_section'){
     var oldL=CACHE.content.loc_section||{};
     return Object.assign({},oldL,{title:v('cLocTitle'),text:v('cLocText'),
@@ -9795,6 +9799,7 @@ function fillContent(key,val){
     document.getElementById('cAboutFocalWrap').innerHTML=focalWidget(val.image,val.image_focal,'cAboutFocal','4/5');
   }
   if(key==='guarantee'){set('cGTitle',val.title);set('cGText',val.text)}
+  if(key==='services'){set('cServTitle',val.title);set('cServText',val.text)}
   if(key==='loc_section'){
     set('cLocTitle',val.title);set('cLocText',val.text);set('cLocMax',Number(val.max_count)||0);
     document.getElementById('cLocRotate').checked=!!val.rotate;

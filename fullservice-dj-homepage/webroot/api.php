@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 94;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 95;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -994,6 +994,17 @@ function upgrade(PDO $p): void {
         }
         if ($chg) $p->prepare("update site_content set value = ? where key='legal'")->execute([json_encode($legal, JSON_UNESCAPED_UNICODE)]);
       }
+    } catch (Throwable $e) {}
+  }
+  if ($v < 95) {
+    /* v95: Telefon, E-Mail und Adresse der oeffentlichen Kontaktkarte kommen ab jetzt
+       ausschliesslich aus den Firmendaten (syncContactFromCompany, ab hier bei jedem
+       Speichern automatisch). Einmalig den aktuellen Firmendaten-Stand nachziehen, damit
+       ein zwischenzeitlich in den Firmendaten geaenderter Wert, der die Kontaktkarte nie
+       erreicht hat, sofort stimmt. */
+    try {
+      $comp = json_decode((string)$p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+      if (is_array($comp)) syncContactFromCompany($p, $comp);
     } catch (Throwable $e) {}
   }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
@@ -3530,6 +3541,33 @@ function publicCallback(PDO $p, array $body): never {
   out(['ok' => true], 201);
 }
 
+/* Telefon, E-Mail und Adresse duerfen nur an EINER Stelle gepflegt werden - den
+   Firmendaten. Die oeffentliche "contact"-Karte in den Inhalten zeigte bisher eigene,
+   nie synchronisierte Werte (Reste aus der Zeit vor den Firmendaten); wer nur dort oder
+   nur in den Firmendaten etwas aenderte, sah auf der Website weiterhin den alten Stand.
+   Jedes Speichern der Firmendaten schreibt die drei Felder deshalb sofort in "contact"
+   zurueck; Titel, Instagram-Link und Whatsapp-Feld der Karte bleiben unangetastet. */
+function syncContactFromCompany(PDO $p, array $company): void {
+  try {
+    $row = $p->query("select value from site_content where key='contact'")->fetchColumn();
+    $ct = $row ? (json_decode((string)$row, true) ?: []) : [];
+    if (!is_array($ct)) $ct = [];
+    /* Nur wirklich befuellte Firmendaten-Felder uebernehmen: eine noch leere Firmendaten-
+       Seite (frische Installation, Ersteinrichtung laeuft noch) soll die bestehende
+       Kontaktkarte nicht mit Leerfeldern ueberschreiben. */
+    $phone = trim((string)($company['phone'] ?? ''));
+    $email = trim((string)($company['email'] ?? ''));
+    $addr = trim(trim((string)($company['street'] ?? '')) . ', ' . trim((string)($company['zip_city'] ?? '')), ', ');
+    if ($phone !== '') $ct['phone'] = $phone;
+    if ($email !== '') $ct['email'] = $email;
+    if ($addr !== '') $ct['address'] = $addr;
+    $ct['title'] = $ct['title'] ?? 'Kontakt';
+    $p->prepare("insert into site_content (key, value) values ('contact', ?)
+        on conflict(key) do update set value = excluded.value")
+      ->execute([json_encode($ct, JSON_UNESCAPED_UNICODE)]);
+  } catch (Throwable $e) {}
+}
+
 function handleRest(string $t, string $method, array $q, $body, array $prefer): never {
   if (!in_array($t, TABLES)) fail('Unbekannte Tabelle.', 404);
   $auth = currentUser() !== null;
@@ -3689,6 +3727,10 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
             fail('Nummer ' . ($row['number'] ?? '') . ' ist schon vergeben – bitte den Nummernkreis in den Einstellungen prüfen.', 409);
           fail('Konflikt: ' . $e->getMessage(), 409);
         }
+        if ($t === 'settings' && ($row['key'] ?? '') === 'company') {
+          $companyNow = json_decode((string)($row['value'] ?? '{}'), true);
+          if (is_array($companyNow)) syncContactFromCompany($p, $companyNow);
+        }
         if ($bookingNeu) applyDefaultSet($p, (string)$row['id'], (string)($row['kind'] ?? 'dj'));
         if ($t === 'documents') {
           docAudit($p, $row['id'] ?? null, 'erstellt', ($row['number'] ?? '') . ' (' . ($row['doc_type'] ?? '') . ')');
@@ -3757,6 +3799,10 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       $set = implode(',', array_map(fn($c) => "\"$c\"=?", array_keys($row)));
       $st = $p->prepare("update \"$t\" set $set$wsql");
       $st->execute(array_merge(array_values($row), $args));
+      if ($t === 'settings' && isset($row['value']) && (($q['key'] ?? '') === 'eq.company')) {
+        $companyNow = json_decode((string)$row['value'], true);
+        if (is_array($companyNow)) syncContactFromCompany($p, $companyNow);
+      }
       if ($t === 'documents' && !empty($before)) {
         foreach ($before as $b) {
           $changes = [];
