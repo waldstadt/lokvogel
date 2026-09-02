@@ -170,6 +170,28 @@ table.batch td.chk,table.batch th.chk{text-align:center}
 .msg.ok{border-color:var(--grn);color:#8cc98c}
 .hint{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid var(--gll);border-radius:50%;font-size:10px;line-height:1;color:var(--gll);cursor:help;margin:0 6px 0 2px;vertical-align:middle}
 .card.hl{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc);transition:box-shadow .3s}
+/* Aufbau der Startseite: Bereiche (fett) mit ihren Modulen eingerueckt darunter */
+.aufb-sec,.aufb-mod,.aufb-fix{display:flex;align-items:center;gap:10px;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.05)}
+.aufb-sec{cursor:grab;font-weight:600}
+.aufb-fix{color:var(--gl)}
+.aufb-grp{border-left:2px solid var(--bdr);margin:0 0 6px 14px}
+.aufb-mod{cursor:grab;padding:5px 8px;flex-wrap:wrap}
+.aufb-mod>a{flex:1 1 120px;min-width:0}
+.aufb-meta,.aufb-sec .b,.aufb-mod .b{white-space:nowrap}
+@media(max-width:820px){
+  .aufb-meta{flex-basis:100%;order:9;padding-left:24px;white-space:normal}
+}
+/* Knoepfe rechts neben der Ueberschrift, auf dem Handy in einer eigenen Zeile darunter */
+#cms-aufbau>h3{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#cms-aufbau>h3>span:last-child{float:none!important;margin-left:auto}
+.aufb-name{flex:1}
+.aufb-sec.off .aufb-name,.aufb-mod.off>a{color:var(--gl)}
+.aufb-add{display:inline-block;margin:4px 0 6px 8px;color:var(--gll)}.aufb-add:hover{color:var(--acc)}
+.aufb-over{outline:2px solid var(--acc);outline-offset:-2px}
+.aufb-mv{background:none;border:1px solid var(--bdr);color:var(--gll);padding:2px 4px;line-height:0;cursor:pointer;border-radius:4px}
+.aufb-mv:hover{border-color:var(--acc);color:var(--acc)}
+.aufb-mv .ic{width:12px;height:12px;margin:0;opacity:1}
+.aufb-mv:disabled{opacity:.35;cursor:default}
 /* Einklappbare Bloecke im Beleg-Editor (Miettage, Eckdaten, Rabatt) */
 .dblk{border:1px solid var(--line);border-radius:8px;padding:0 14px;margin-bottom:14px}
 .dblk-h{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--gll);padding:9px 0}
@@ -371,7 +393,6 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
       <div class="grp">Website</div>
       <a data-pg="cms"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Inhalte</a>
       <a data-pg="camp"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>Aktionsseiten</a>
-      <a data-pg="blocks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Module</a>
       <a data-pg="media"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Medien-Pool</a>
       <div class="grp">System</div>
       <a data-pg="set"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Einstellungen</a>
@@ -733,18 +754,15 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
     <div class="mut sml" style="margin-top:10px">Eine neue Aktionsseite braucht zusätzlich eine kleine HTML-Datei auf dem Server – sag dafür kurz Bescheid, die Inhalte pflegst du danach komplett hier.</div>
   </div>
 
-  <div class="pg" id="pg-blocks">
-    <div class="phead"><div><div class="pt">Module</div>
-      <div class="ps">Foto-, Video- und Instagram-Bausteine, die du zwischen die festen Bereiche der Seite setzt</div></div>
-      <button class="btn" onclick="openModulModal()">+ Modul</button></div>
-    <div class="mut sml" style="margin-bottom:12px">Jedes Modul hängt hinter einem festen Bereich. Reihenfolge innerhalb desselben Ankers per Ziehen am ⠿-Griff, Klick aufs Badge schaltet live/aus. Ist der Bereich davor ausgeschaltet, wird das Modul mit ausgeblendet.</div>
-    <div id="blockList" class="sml"></div>
-    <div class="mut sml" style="margin-top:14px">Die Veranstaltungsberichte selbst pflegst du unter <a onclick="gotoSetting('cms-reports')">Inhalte → Sammlungen &amp; Listen</a> – hier legst du nur das Modul an, das sie auf der Startseite zeigt.</div>
-  </div>
-
   <!-- CMS -->
   <div class="pg" id="pg-cms">
     <div class="pt">Website-Inhalte</div><div class="ps">Texte, Fotos, Pakete, FAQ &amp; Design der öffentlichen Homepage – zum Bearbeiten Abschnitt anklicken</div>
+    <div class="sec-label">Aufbau</div>
+    <div class="card open" id="cms-aufbau"><h3><span>Aufbau der Startseite</span> <span style="display:flex;gap:6px"><a class="btn g sm" href="index.html" target="_blank" rel="noopener">Startseite ansehen</a><button class="btn sm" onclick="openModulModal()">+ Modul</button></span></h3>
+      <div class="mut sml" style="margin-bottom:8px">Bereiche und Module in einer Liste, von oben nach unten so wie auf der Startseite. Ziehen am ⠿-Griff oder die Pfeile verschieben, „an/aus" und „live/aus" blenden ein oder aus – die Inhalte bleiben dabei erhalten. Module hängen unter dem Bereich, hinter dem sie erscheinen; ist der Bereich aus, sind sie mit weg. „Bearbeiten" springt zur passenden Karte weiter unten.</div>
+      <div id="aufbauList" class="sml"></div>
+      <div id="aufbauLive" class="mut sml" hidden style="margin-top:8px">Änderungen sind sofort live – einmal „Startseite ansehen" und neu laden, dann siehst du sie.</div>
+      <div class="mut sml" style="margin-top:8px">Die Veranstaltungsberichte selbst pflegst du unter <a onclick="gotoSetting('cms-reports')">Sammlungen &amp; Listen</a> – das Modul hier zeigt sie nur auf der Startseite.</div></div>
     <div class="sec-label">Design &amp; Schrift</div>
     <div class="card"><h3>Design / Farbschema</h3>
       <label class="sml mut" style="text-transform:none;letter-spacing:0;font-weight:400">Farben DJ-Seite (index.html)</label>
@@ -768,7 +786,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
       </div>
     </div>
     <div class="sec-label">Startseite (DJ)</div>
-        <div class="card"><h3>Hero (Startbereich)</h3>
+        <div class="card" id="cms-hero"><h3>Hero (Startbereich)</h3>
           <label>Überschrift</label><textarea id="cHeroTitle" style="min-height:62px" placeholder="Volle Tanzfläche.&#10;*Ohne Schnickschnack.*"></textarea>
           <div class="mut sml" style="margin-top:4px">Jede Zeile hier wird auch auf der Seite eine eigene Zeile – eine reicht, mehr gehen auch. Setzt du eine Zeile in *Sternchen*, erscheint sie in der Akzentfarbe. Leer lassen behält die aktuelle Überschrift.</div>
           <label style="margin-top:12px">Unterzeile (Kicker)</label><input id="cHeroSub">
@@ -785,7 +803,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <label style="margin-top:12px">Abdunklung über Bild und Video</label><div class="mut sml" style="margin:2px 0 8px">Damit die Überschrift auf jedem Foto lesbar bleibt. Ganz ohne Abdunklung kann die Schrift auf hellen Bildern untergehen – unter der Vorschau steht der gemessene Kontrastwert.</div><div class="grid3"><div><label>Art</label><select id="cHeroScrimMode" onchange="scrimUi('cHeroScrim')"><option value="gleich">Gleichmäßig</option><option value="oben">Verlauf von oben nach unten</option><option value="unten">Verlauf von unten nach oben</option></select></div><div id="cHeroScrimPctWrap"><label>Deckkraft %</label><input type="number" min="0" max="100" id="cHeroScrimPct" oninput="scrimUi('cHeroScrim')"></div><div></div></div><div class="grid3" id="cHeroScrimGradWrap" style="display:none"><div><label>Start %</label><input type="number" min="0" max="100" id="cHeroScrimFrom" oninput="scrimUi('cHeroScrim')"></div><div><label>Ende %</label><input type="number" min="0" max="100" id="cHeroScrimTo" oninput="scrimUi('cHeroScrim')"></div><div></div></div><div id="cHeroScrimPrev"></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('hero')">Speichern</button></div>
           <div id="vb_hero"></div></div>
-        <div class="card"><h3>Über mich</h3>
+        <div class="card" id="cms-ueber"><h3>Über mich</h3>
           <label>Überschrift</label><textarea id="cAboutTitle" style="min-height:56px"></textarea>
           <div class="mut sml" style="margin-top:4px">Wie im Hero: jede Zeile hier wird auch auf der Seite eine eigene Zeile, eine reicht. Eine Zeile in *Sternchen* erscheint in der Akzentfarbe.</div>
           <label>Text</label><textarea id="cAboutText" style="min-height:110px"></textarea>
@@ -795,14 +813,14 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <label>Technik-Marken <span class="mut sml" style="text-transform:none;letter-spacing:0">(kommagetrennt, erscheinen als Text-Leiste unter „Über mich")</span></label><input id="cAboutGear" placeholder="z. B. Seeburg Acoustic Line, Sennheiser, Rane">
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('about')">Speichern</button></div>
           <div id="vb_about"></div></div>
-        <div class="card"><h3>Garantie / DJ-Vermittlung</h3>
+        <div class="card" id="cms-garantie"><h3>Garantie / DJ-Vermittlung</h3>
           <label>Überschrift</label><input id="cGTitle">
           <label>Text</label><textarea id="cGText" style="min-height:90px"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cGText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('guarantee')">Speichern</button></div>
           <div id="vb_guarantee"></div></div>
     <div class="sec-label">Technik-Seite</div>
-        <div class="card"><h3>Technik-Seite (technik.html)</h3>
+        <div class="card" id="cms-technik"><h3>Technik-Seite (technik.html)</h3>
           <label style="margin-bottom:12px"><input type="checkbox" id="cThEnabled" style="width:auto;margin-right:6px" checked><b>Technik-Seite online</b> – ausschalten zeigt Besuchern nur einen Hinweis „gerade nicht verfügbar" statt der Seite</label>
           <label>Hero-Überschrift</label><textarea id="cThTitle" style="min-height:62px" placeholder="Jedes Wort verständlich.&#10;*Auch in der schwierigsten Location.*"></textarea>
           <div class="mut sml" style="margin-top:4px">Jede Zeile hier wird auch auf der Seite eine eigene Zeile – eine reicht, mehr gehen auch. Setzt du eine Zeile in *Sternchen*, erscheint sie in der Akzentfarbe. Leer lassen behält die aktuelle Überschrift.</div>
@@ -827,7 +845,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cThTeaText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
           <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('tech')">Speichern</button></div></div>
     <div class="sec-label">Kontakt</div>
-        <div class="card"><h3>Kontaktdaten (öffentlich)</h3>
+        <div class="card" id="cms-kontakt"><h3>Kontaktdaten (öffentlich)</h3>
           <label>Telefon</label><input id="cCtPhone">
           <label>E-Mail</label><input id="cCtMail">
           <label>Adresse</label><input id="cCtAddr">
@@ -836,14 +854,14 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
         <div class="card" id="cms-reports"><h3>Veranstaltungsberichte <button class="btn sm" style="float:right" onclick="openReportModal()">+ Bericht</button></h3>
           <div class="mut sml" style="margin-bottom:8px">Echte Feiern mit kurzem Text und Fotos. Auf der Seite erscheinen nur Kacheln – der ganze Text steht erst im Detailfenster, damit die Startseite kompakt bleibt. Erscheint auf der Startseite über das Modul „Berichte“ (Module → + Modul → Veranstaltungsberichte). Reihenfolge per Ziehen am ⠿-Griff.</div>
           <div id="reportList" class="sml"></div></div>
-        <div class="card"><h3>Leistungspakete <button class="btn sm" style="float:right" onclick="openPackModal()">+ Paket</button></h3>
+        <div class="card" id="cms-leistungen"><h3>Leistungspakete <button class="btn sm" style="float:right" onclick="openPackModal()">+ Paket</button></h3>
           <label style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cPackImgs" style="width:auto;margin-right:6px" onchange="savePackSec()">Bilder in den Paketkacheln anzeigen</label>
           <div class="mut sml" style="margin-bottom:8px">Ohne Haken sehen die Kacheln aus wie bisher – nützlich, solange noch nicht jedes Paket ein Bild hat. Reihenfolge per Ziehen am ⠿-Griff ändern, Klick aufs Badge schaltet live/aus.</div>
           <div id="packList" class="sml"></div></div>
-        <div class="card"><h3>FAQ <span style="float:right;display:flex;gap:6px"><button class="btn g sm" id="faqAiBtn" onclick="suggestFaq()">KI-Vorschlag</button><button class="btn sm" onclick="openFaqModal()">+ Frage</button></span></h3>
+        <div class="card" id="cms-faq"><h3>FAQ <span style="float:right;display:flex;gap:6px"><button class="btn g sm" id="faqAiBtn" onclick="suggestFaq()">KI-Vorschlag</button><button class="btn sm" onclick="openFaqModal()">+ Frage</button></span></h3>
           <div class="mut sml" style="margin-bottom:8px">Reihenfolge per Ziehen am ⠿-Griff ändern – Klick aufs Badge schaltet live/aus.</div>
           <div id="faqAdminList" class="sml"></div></div>
-        <div class="card"><h3>Location-Empfehlungen <button class="btn sm" style="float:right" onclick="openLocModal()">+ Location</button></h3>
+        <div class="card" id="cms-locations"><h3>Location-Empfehlungen <button class="btn sm" style="float:right" onclick="openLocModal()">+ Location</button></h3>
           <label>Überschrift der Sektion</label><input id="cLocTitle">
           <label>Einleitungstext</label><textarea id="cLocText" style="min-height:60px"></textarea>
           <div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor('cLocText')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>
@@ -853,10 +871,10 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div class="mut sml" style="margin-bottom:8px">Reihenfolge per Ziehen am ⠿-Griff ändern – Klick aufs Badge schaltet live/aus. Stern = Highlight, wird immer angezeigt.</div>
           <div id="locAdminList" class="sml"></div>
           <div id="vb_loc_section"></div></div>
-        <div class="card"><h3>Freunde &amp; Empfehlungen <button class="btn sm" style="float:right" onclick="openFriendModal()">+ Empfehlung</button></h3>
+        <div class="card" id="cms-freunde"><h3>Freunde &amp; Empfehlungen <button class="btn sm" style="float:right" onclick="openFriendModal()">+ Empfehlung</button></h3>
           <div class="mut sml" style="margin-bottom:8px">Fotografen, Musiker, Planer, Kollegen – erscheinen auf der DJ-Homepage. Gegenseitige Verlinkung hilft beim Google-Ranking. Reihenfolge per Ziehen am ⠿-Griff ändern.</div>
           <div id="friendAdminList" class="sml"></div></div>
-        <div class="card"><h3>Logos: Netzwerke &amp; Bewertungen <button class="btn sm" style="float:right" onclick="openBadgeModal('mitglied')">+ Logo</button></h3>
+        <div class="card" id="cms-partner"><h3>Logos: Netzwerke &amp; Bewertungen <button class="btn sm" style="float:right" onclick="openBadgeModal('mitglied')">+ Logo</button></h3>
           <div class="mut sml" style="margin-bottom:8px">Verbände, Agenturen und Portale, in denen du gelistet bist – Partner-Agentur, Verband, Google, Trustpilot. Erscheinen als kleine Logo-Leiste. Reihenfolge per Ziehen am ⠿-Griff ändern. <b>Wichtig:</b> Fremde Logos nur verwenden, wenn du sie verwenden darfst – bei Portalen wie Google gibt es Vorgaben zur Darstellung.</div>
           <div class="grid2"><div><label>Überschrift</label><input id="cBadgeMTitle"></div>
           <div><label>Kurztext darunter</label><input id="cBadgeMText"></div></div>
@@ -872,7 +890,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <label style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cBadgeTTech" style="width:auto;margin-right:6px">Zusätzlich auf der Technik-Seite zeigen</label>
           <div style="margin:10px 0"><button class="btn sm" onclick="saveBadgeSec()">Texte &amp; Anzeige speichern</button></div>
           <div id="badgeListTechnik" class="sml"></div></div>
-        <div class="card"><h3>Bewertungen <button class="btn sm" style="float:right" onclick="openRevModal()">+ Bewertung</button></h3>
+        <div class="card" id="cms-bewertungen"><h3>Bewertungen <button class="btn sm" style="float:right" onclick="openRevModal()">+ Bewertung</button></h3>
           <label>Google-Bewertungslink (am besten der „Rezension schreiben“-Link – wird auch in Mails verwendet)</label><input id="cRevGoogle" placeholder="https://g.page/r/…">
           <label>Profil bei der Partner-Agentur (URL, nur zum Lesen verlinkt – Bewertungen sammelt die Agentur selbst)</label><input id="cRevBande" placeholder="https://…">
           <label>Kurzfazit (z. B. „Ø 5,0 ★ aus 87 Bewertungen“)</label><input id="cRevTagline">
@@ -882,7 +900,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div class="mut sml" style="margin-bottom:8px">Reihenfolge per Ziehen am ⠿-Griff ändern – Klick aufs Badge schaltet live/aus.</div>
           <div id="revAdminList" class="sml"></div>
           <div class="mut sml" style="margin-top:8px">Tipp: Bewertungen wörtlich mit Name nur übernehmen, wenn der Kunde zugestimmt hat – sonst kürzen/anonymisieren (z. B. „Lisa H.“).</div></div>
-        <div class="card"><h3>Foto-Galerie <span class="mut sml" style="font-weight:400">— erscheint auf der Startseite unter „Über mich"</span></h3>
+        <div class="card" id="cms-galerie"><h3>Foto-Galerie <span class="mut sml" style="font-weight:400">— erscheint auf der Startseite unter „Über mich"</span></h3>
           <label>Überschrift</label><input id="cGalTitle">
           <label>Bilder <span class="mut sml" style="text-transform:none;letter-spacing:0">(Ziehen zum Umsortieren, ✕ entfernt ein Bild)</span></label>
           <div id="galGrid" class="sml mut">–</div>
@@ -910,10 +928,6 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           </div>
           <div id="igPreview" class="sml mut" style="margin-top:12px">–</div>
           <div class="mut sml" style="margin-top:8px">Die Bilder werden auf den eigenen Server kopiert – Besucher laden nichts von Instagram (DSGVO). Token: Meta-Developer-Konto → Instagram-API, Long-lived Access Token.</div></div>
-    <div class="sec-label">Struktur</div>
-        <div class="card"><h3>Bereiche der Startseite</h3>
-          <div class="mut sml" style="margin-bottom:8px">„aus" nimmt den Bereich komplett von der Homepage. Die Inhalte bleiben erhalten – einfach wieder einschalten, wenn du sie brauchst.</div>
-          <div id="secList" class="sml"></div></div>
     <div class="sec-label">SEO &amp; Rechtliches</div>
         <div class="card"><h3>SEO</h3>
           <label>Seitentitel</label><input id="cSeoTitle">
@@ -1251,6 +1265,8 @@ function closeMobileNav(){document.getElementById('side').classList.remove('open
    damit man sieht, in welchem Bereich man gerade steckt. */
 var SUBPAGE_PARENT={custd:'cust',bookd:'book',doc:'docs'};
 function showPage(id){
+  /* "Module" war frueher eine eigene Seite - alte Links und Lesezeichen landen auf Inhalte. */
+  if(id==='blocks')id='cms';
   document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('a')});
   document.getElementById('pg-'+id).classList.add('a');
   var navId=SUBPAGE_PARENT[id]||id;
@@ -6154,38 +6170,20 @@ var BLOCK_ANCHORS=[['ueber','hinter „Über mich"'],['leistungen','hinter „Le
 function blockTypeName(t){var f=BLOCK_TYPES.find(function(x){return x[0]===t});return f?f[1]:t}
 function blockAnchorName(a){var f=BLOCK_ANCHORS.find(function(x){return x[0]===a});return f?f[1]:a}
 function modulZeile(b){
-  var rows=(CACHE.module||[]);
-  var i=rows.indexOf(b);
   var med=Array.isArray(b.media)?b.media:[];
   var anz=b.type==='instagram'?'aus dem Instagram-Feed':(med.length+(med.length===1?' Datei':' Dateien'));
-  return '<div'+ddAttrs('blocks',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
-  '<a onclick="openModulModal(\''+b.id+'\')" style="flex:1">'+esc(b.title||blockTypeName(b.type))+'</a>'+
-  '<span class="mut sml">'+esc(blockTypeName(b.type))+' · '+esc(anz)+'</span>'+
-  pubSwitch('blocks',b.id,!!b.public)+'</div>';
+  return '<div class="aufb-mod'+(b.public?'':' off')+'"'+abDdAttrs('mod',b.id)+'>'+ddGrip()+
+  '<a onclick="openModulModal(\''+b.id+'\')">'+esc(b.title||blockTypeName(b.type))+'</a>'+
+  '<span class="mut sml aufb-meta">'+esc(blockTypeName(b.type))+' · '+esc(anz)+'</span>'+
+  aufbMv('modulMove',b.id)+pubSwitch('blocks',b.id,!!b.public)+'</div>';
 }
-function renderModulAdmin(){
-  var el=document.getElementById('blockList');if(!el)return;
-  var rows=(CACHE.module||[]);
-  if(!rows.length){el.innerHTML='<span class="mut">Noch keine Module. Über „+ Modul" legst du das erste an.</span>';return}
-  var html='';
-  BLOCK_ANCHORS.forEach(function(a){
-    var list=rows.filter(function(b){return (b.anchor||'ende')===a[0]});
-    if(!list.length)return;
-    html+='<div class="mut sml" style="margin:14px 0 4px;text-transform:uppercase;letter-spacing:.1em;font-size:10.5px">'+esc(a[1])+'</div>';
-    html+=list.map(modulZeile).join('');
-  });
-  /* Module mit unbekanntem Anker duerfen nicht unsichtbar werden - sonst kaeme man nicht
-     mehr an sie heran, um sie zu korrigieren oder zu loeschen. */
-  var bekannt=BLOCK_ANCHORS.map(function(a){return a[0]});
-  var rest=rows.filter(function(b){return bekannt.indexOf(b.anchor||'ende')<0});
-  if(rest.length)
-    html+='<div class="mut sml" style="margin:14px 0 4px;text-transform:uppercase;letter-spacing:.1em;font-size:10.5px">Unbekannter Platz – erscheint ganz unten</div>'
-      +rest.map(modulZeile).join('');
-  el.innerHTML=html;
-}
+/* Die Modul-Liste steckt seit dem Umbau in "Aufbau der Startseite" (Inhalte). */
+function renderModulAdmin(){renderSectionsCard()}
 var curBlockMedia=[];
-function openModulModal(id){
+function openModulModal(id,anchorVor){
   var b=id?(CACHE.module||[]).find(function(x){return x.id===id}):{};b=b||{};
+  /* "+ Modul hier" aus der Aufbau-Liste bringt den Platz gleich mit. */
+  if(!id&&anchorVor)b.anchor=anchorVor;
   curBlockMedia=Array.isArray(b.media)?JSON.parse(JSON.stringify(b.media)):[];
   var typeSel=BLOCK_TYPES.map(function(t){return '<option value="'+t[0]+'"'+((b.type||'kacheln')===t[0]?' selected':'')+'>'+esc(t[1])+'</option>'}).join('');
   var ancSel=BLOCK_ANCHORS.map(function(a){return '<option value="'+a[0]+'"'+((b.anchor||'ende')===a[0]?' selected':'')+'>'+esc(a[1])+'</option>'}).join('');
@@ -8741,26 +8739,169 @@ function edApply(){
   toast('Übernommen – „Speichern" nicht vergessen.');
 }
 
-/* ===== Bereiche der Startseite (site_content sections {hidden:[…]}) ===== */
+/* ===== Aufbau der Startseite: Bereiche und Module in EINER Liste
+   (site_content.sections = {hidden:[…], order:[…]}) ===== */
+/* Muss zu DEFAULT_SECTION_ORDER in index.html passen - Hero und Anfrage sind fest. */
+var HOME_SECTION_ORDER_DEFAULT=['ueber','leistungen','ablauf','galerie','bewertungen','garantie','technik','locations','freunde','partner','faq'];
 var HOME_SECTIONS=[['ueber','Über mich'],['leistungen','Leistungen'],['ablauf','Ablauf'],['galerie','Galerie'],
   ['bewertungen','Bewertungen'],['garantie','Garantie'],['technik','Technik-Teaser'],['locations','Locations'],
-  ['freunde','Freunde'],['faq','FAQ']];
-function renderSectionsCard(){
-  var el=document.getElementById('secList');if(!el)return;
-  var hidden=((CACHE.content.sections||{}).hidden)||[];
-  el.innerHTML=HOME_SECTIONS.map(function(s){
-    var on=hidden.indexOf(s[0])<0;
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+
-    '<span>'+s[1]+'</span><span class="b '+(on?'green':'grey')+'" style="cursor:pointer" title="Klicken zum Ein-/Ausschalten" onclick="toggleSection(\''+s[0]+'\')">'+(on?'an':'aus')+'</span></div>';
-  }).join('');
+  ['freunde','Freunde'],['partner','Logo-Leisten'],['faq','FAQ']];
+/* Welche Karte weiter unten die Texte pflegt - "Ablauf" hat feste Texte, darum keine. */
+var HOME_SECTION_CARDS={hero:'cms-hero',ueber:'cms-ueber',leistungen:'cms-leistungen',galerie:'cms-galerie',
+  bewertungen:'cms-bewertungen',garantie:'cms-garantie',technik:'cms-technik',locations:'cms-locations',
+  freunde:'cms-freunde',partner:'cms-partner',faq:'cms-faq',anfrage:'cms-kontakt'};
+function homeSectionName(id){var f=HOME_SECTIONS.find(function(s){return s[0]===id});return f?f[1]:id}
+/* Wie in index.html: unvollstaendige/fremde Eintraege abfangen, Fehlendes hinten anhaengen. */
+function resolveSectionOrder(saved){
+  var out=(saved||[]).filter(function(id){return HOME_SECTION_ORDER_DEFAULT.indexOf(id)>=0});
+  HOME_SECTION_ORDER_DEFAULT.forEach(function(id){if(out.indexOf(id)<0)out.push(id)});
+  return out;
+}
+function sectionsState(){
+  var s=CACHE.content.sections||{};
+  return {hidden:(s.hidden||[]).slice(),order:resolveSectionOrder(s.order)};
+}
+/* hidden und order immer zusammen schreiben - sonst loescht das eine Feld das andere. */
+function saveSections(st,msg){
+  var val={hidden:st.hidden,order:st.order};
+  CACHE.content.sections=val;
+  renderSectionsCard();
+  api('site_content',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'sections',value:val}})
+    .then(function(){aufbauLive(msg)}).catch(function(e){toast(e.message,1)});
+}
+function aufbauLive(msg){
+  toast(msg+' – ist sofort auf der Startseite zu sehen.');
+  var h=document.getElementById('aufbauLive');if(h)h.hidden=false;
 }
 function toggleSection(id){
-  var hidden=(((CACHE.content.sections||{}).hidden)||[]).slice();
-  var ix=hidden.indexOf(id);
-  if(ix>=0)hidden.splice(ix,1);else hidden.push(id);
-  CACHE.content.sections={hidden:hidden};
+  var st=sectionsState(),ix=st.hidden.indexOf(id);
+  if(ix>=0)st.hidden.splice(ix,1);else st.hidden.push(id);
+  saveSections(st,'„'+homeSectionName(id)+'“ '+(ix>=0?'eingeschaltet ✓':'ausgeblendet ✓'));
+}
+function moveSection(id,dir){
+  var st=sectionsState(),i=st.order.indexOf(id),j=i+dir;
+  if(i<0||j<0||j>=st.order.length)return;
+  st.order.splice(i,1);st.order.splice(j,0,id);
+  saveSections(st,'Reihenfolge gespeichert ✓');
+}
+function moveSectionTo(id,targetId){
+  var st=sectionsState(),i=st.order.indexOf(id),j=st.order.indexOf(targetId);
+  if(i<0||j<0||i===j)return;
+  st.order.splice(i,1);st.order.splice(j,0,id);
+  saveSections(st,'Reihenfolge gespeichert ✓');
+}
+/* Module je Anker in Seitenreihenfolge; unbekannte Anker landen wie auf der Seite ganz unten. */
+function modulGruppen(order){
+  var rows=CACHE.module||[],keys=order.concat(['ende']);
+  var groups=keys.map(function(a){return {anchor:a,list:rows.filter(function(b){return (b.anchor||'ende')===a})}});
+  var rest=rows.filter(function(b){return keys.indexOf(b.anchor||'ende')<0});
+  groups[groups.length-1].list=groups[groups.length-1].list.concat(rest);
+  return groups;
+}
+function modulGruppeVon(groups,b){
+  return groups.find(function(g){return g.list.indexOf(b)>=0});
+}
+/* Modul an Position pos (-1 = ans Ende) der Gruppe anchor setzen; Gruppe neu durchnummerieren.
+   Der Anker wird nur fuer das verschobene Modul geschrieben - Module mit unbekanntem Anker
+   in der Schlussgruppe behalten ihren Wert, damit man sie bewusst korrigieren kann. */
+function modulVerschieben(id,anchor,pos){
+  var rows=CACHE.module||[],b=rows.find(function(x){return String(x.id)===String(id)});if(!b)return;
+  var st=sectionsState(),groups=modulGruppen(st.order);
+  var g=groups.find(function(x){return x.anchor===anchor});if(!g)return;
+  var tgt=g.list.filter(function(x){return x!==b});
+  if(pos<0||pos>tgt.length)pos=tgt.length;
+  tgt.splice(pos,0,b);
+  var ankerNeu=(b.anchor||'ende')!==anchor;
+  b.anchor=anchor;
+  tgt.forEach(function(x,idx){x.sort=idx});
+  /* CACHE.module in Anker/Sort-Reihenfolge halten, damit die Gruppen stabil bleiben */
+  CACHE.module=groups.reduce(function(acc,x){return acc.concat(x.anchor===anchor?tgt:x.list.filter(function(y){return y!==b}))},[]);
   renderSectionsCard();
-  upsertContent('sections',{hidden:hidden});
+  Promise.all(tgt.map(function(x,idx){
+    var body={sort:idx};if(x===b&&ankerNeu)body.anchor=anchor;
+    return api('blocks?id=eq.'+x.id,{method:'PATCH',body:body});
+  })).then(function(){aufbauLive(ankerNeu?'Modul verschoben ✓':'Reihenfolge gespeichert ✓')})
+    .catch(function(e){toast(e.message,1)});
+}
+/* Pfeile: innerhalb der Gruppe tauschen, an der Gruppengrenze in den Nachbarbereich wechseln */
+function modulMove(id,dir){
+  var rows=CACHE.module||[],b=rows.find(function(x){return String(x.id)===String(id)});if(!b)return;
+  var st=sectionsState(),groups=modulGruppen(st.order),g=modulGruppeVon(groups,b);if(!g)return;
+  var gi=groups.indexOf(g),i=g.list.indexOf(b),j=i+dir;
+  if(j>=0&&j<g.list.length){modulVerschieben(id,g.anchor,j);return}
+  var ng=groups[gi+dir];if(!ng)return;
+  modulVerschieben(id,ng.anchor,dir<0?-1:0);
+}
+/* Eigenes Drag&Drop: Bereiche untereinander, Module innerhalb und ueber Gruppengrenzen hinweg */
+var abDrag=null;
+function abDdAttrs(kind,id){
+  return ' draggable="true" ondragstart="abDdStart(\''+kind+'\',\''+id+'\',event)" ondragend="abDdEnd()"'+
+    ' ondragover="abDdOver(\''+kind+'\',event)" ondragleave="this.classList.remove(\'aufb-over\')"'+
+    ' ondrop="abDdDrop(\''+kind+'\',\''+id+'\',event)"';
+}
+/* Ablagezonen (Gruppen), die selbst nicht gezogen werden */
+function abDropAttrs(kind,id){
+  return ' ondragover="abDdOver(\''+kind+'\',event)" ondragleave="this.classList.remove(\'aufb-over\')"'+
+    ' ondrop="abDdDrop(\''+kind+'\',\''+id+'\',event)"';
+}
+function abDdStart(kind,id,ev){abDrag={kind:kind,id:id};ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',id)}catch(e){}}
+function abDdEnd(){abDrag=null;document.querySelectorAll('.aufb-over').forEach(function(el){el.classList.remove('aufb-over')})}
+function abDdErlaubt(kind){
+  if(!abDrag)return false;
+  if(abDrag.kind==='sec')return kind==='sec';
+  return kind==='sec'||kind==='mod'||kind==='grp';
+}
+function abDdOver(kind,ev){
+  if(!abDdErlaubt(kind))return;
+  ev.preventDefault();ev.stopPropagation();
+  ev.currentTarget.classList.add('aufb-over');
+}
+function abDdDrop(kind,id,ev){
+  ev.preventDefault();ev.stopPropagation();
+  ev.currentTarget.classList.remove('aufb-over');
+  var ok=abDdErlaubt(kind),d=abDrag;abDdEnd();
+  if(!ok||!d)return;
+  if(d.kind==='sec'){if(kind==='sec')moveSectionTo(d.id,id);return}
+  if(String(d.id)===String(id)&&kind==='mod')return;
+  if(kind==='sec'||kind==='grp'){modulVerschieben(d.id,id,-1);return}
+  var rows=CACHE.module||[],ziel=rows.find(function(x){return String(x.id)===String(id)});if(!ziel)return;
+  var groups=modulGruppen(sectionsState().order),g=modulGruppeVon(groups,ziel);if(!g)return;
+  var b=rows.find(function(x){return String(x.id)===String(d.id)});
+  var pos=g.list.filter(function(x){return x!==b}).indexOf(ziel);
+  modulVerschieben(d.id,g.anchor,pos);
+}
+function aufbMv(fn,id){
+  var up='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>';
+  var dn='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
+  return '<span style="display:flex;gap:3px"><button class="aufb-mv" type="button" title="Nach oben" aria-label="Nach oben" onclick="'+fn+'(\''+id+'\',-1)">'+up+'</button>'+
+    '<button class="aufb-mv" type="button" title="Nach unten" aria-label="Nach unten" onclick="'+fn+'(\''+id+'\',1)">'+dn+'</button></span>';
+}
+function aufbFix(id,name,hinweis){
+  var card=HOME_SECTION_CARDS[id];
+  return '<div class="aufb-fix"><span style="width:14px;display:inline-block"></span><span class="aufb-name">'+name+'</span>'+
+    '<span class="mut sml">'+hinweis+'</span>'+(card?'<a class="sml" onclick="gotoSetting(\''+card+'\')">Bearbeiten</a>':'')+'</div>';
+}
+function renderSectionsCard(){
+  var el=document.getElementById('aufbauList');if(!el)return;
+  var st=sectionsState(),groups=modulGruppen(st.order);
+  var html=aufbFix('hero','Hero (Startbereich)','immer oben');
+  st.order.forEach(function(id){
+    var on=st.hidden.indexOf(id)<0,card=HOME_SECTION_CARDS[id];
+    var g=groups.find(function(x){return x.anchor===id});
+    html+='<div class="aufb-sec'+(on?'':' off')+'"'+abDdAttrs('sec',id)+'>'+ddGrip()+
+      '<span class="aufb-name">'+esc(homeSectionName(id))+(on?'':' <span class="mut sml" style="font-weight:400">ausgeblendet</span>')+'</span>'+
+      (card?'<a class="sml" style="font-weight:400" onclick="gotoSetting(\''+card+'\')">Bearbeiten</a>':'<span class="mut sml" style="font-weight:400">feste Texte</span>')+
+      aufbMv('moveSection',id)+
+      '<span class="b '+(on?'green':'grey')+'" style="cursor:pointer" title="Klicken zum Ein-/Ausschalten" onclick="toggleSection(\''+id+'\')">'+(on?'an':'aus')+'</span></div>';
+    html+='<div class="aufb-grp"'+abDropAttrs('grp',id)+'>'+g.list.map(modulZeile).join('')+
+      '<a class="aufb-add sml" onclick="openModulModal(null,\''+id+'\')">+ Modul hier</a></div>';
+  });
+  var ende=groups[groups.length-1];
+  html+='<div class="aufb-fix"'+abDropAttrs('grp','ende')+'><span style="width:14px;display:inline-block"></span><span class="aufb-name">Ganz unten, vor dem Anfrage-Formular</span><span class="mut sml">Module ohne festen Bereich</span></div>'+
+    '<div class="aufb-grp"'+abDropAttrs('grp','ende')+'>'+ende.list.map(modulZeile).join('')+
+    '<a class="aufb-add sml" onclick="openModulModal(null,\'ende\')">+ Modul hier</a></div>';
+  html+=aufbFix('anfrage','Anfrage-Formular','immer unten');
+  el.innerHTML=html;
 }
 
 /* ===== Versionen: site_content = die EINE Live-Fassung, content_versions = Entwürfe/Archiv ===== */

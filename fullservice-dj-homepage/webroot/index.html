@@ -685,6 +685,10 @@ function reorderSections(order){
     document.body.insertBefore(sec,anchor);
     if(slot)document.body.insertBefore(slot,anchor);
   });
+  /* Der Schluss-Einhaengepunkt (Module "ganz unten") muss hinter den verschobenen
+     Bereichen bleiben - sonst rutscht er beim Umsortieren an den Seitenanfang. */
+  var ende=document.getElementById('blkslot-ende');
+  if(ende)document.body.insertBefore(ende,anchor);
 }
 /* Optionales Header-Video. Bewusst zurueckhaltend:
    - kein Ton, Endlosschleife, laeuft im Hintergrund hinter dem Text
