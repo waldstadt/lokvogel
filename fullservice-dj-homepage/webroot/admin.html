@@ -437,6 +437,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
       <div class="grp">Vertrieb</div>
       <a data-pg="inq"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Anfragen <span class="cnt-b" id="inqBadge" style="display:none">0</span></a>
       <a data-pg="cust"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Kunden</a>
+      <a data-pg="mail"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Postfach</a>
       <a data-pg="book"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Gigs</a>
       <a data-pg="tpl"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Vorlagen</a>
       <a data-pg="forms"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>Fragebögen</a>
@@ -521,6 +522,17 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div class="mut sml" style="margin-bottom:6px">Reihenfolge: Angebot → Auftragsbestätigung → Abschlagsrechnung → Rechnung. Die nächsten Schritte stehen jeweils im Dokument selbst.</div>
           <div id="cdDocs" class="sml mut">–</div></div>
       </div>
+    </div>
+  </div>
+
+  <!-- POSTFACH -->
+  <div class="pg" id="pg-mail">
+    <div class="phead"><div><div class="pt">Postfach</div><div class="ps">Eingehende Mails abrufen &amp; unbekannte Absender einordnen</div></div>
+      <div><button class="btn g sm" onclick="mailFetch('personal')">Persönlich aktualisieren</button>
+      <button class="btn sm" onclick="mailFetch('system')">System aktualisieren</button></div></div>
+    <div class="card"><h3>Postfach – unbekannter Absender</h3>
+      <div class="mut sml" style="margin-bottom:8px">Mails, deren Absenderadresse zu keinem Kunden passt. Bekannte Absender erscheinen stattdessen direkt in der Kommunikation auf der jeweiligen Kundenseite.</div>
+      <div id="mailUnknownRows">–</div>
     </div>
   </div>
 
@@ -1099,6 +1111,10 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div id="tgStatus" class="sml" style="margin-top:8px"></div>
           <div class="sml mut" style="margin-top:6px">Datenschutz: Die Nachrichten bleiben kurz (Betreff plus ein paar Zeilen) – die Details stehen weiterhin nur im Backoffice.</div>
         </div>
+        <div class="card" id="set-mail"><h3>E-Mail-Konten</h3>
+          <div class="sml mut" style="margin-bottom:10px">Zwei Postfächer: <b>Persönlich</b> ist deine eigene Adresse für Korrespondenz, auf die Kunden antworten sollen. <b>System</b> verschickt automatische Mails (Bestätigungen, Rechnungen, Einladungen, Newsletter) – Antworten landen trotzdem in „Persönlich", weil das System-Konto als Reply-To eingetragen wird. Ohne echten SMTP-Versand über ein Postfach kommen Mails auf Shared Hosting manchmal einfach nicht an, ohne dass du es merkst – deshalb hier eintragen statt dem eingebauten PHP-Versand zu vertrauen.</div>
+          <div id="mailAccBoxes"></div>
+        </div>
         <div class="card" id="set-numbering"><h3>Nummernkreise &amp; Vorgaben</h3>
           <div class="grid2">
             <div><label>Angebots-Präfix</label><input id="sQPre"></div>
@@ -1399,6 +1415,7 @@ function showPage(id){
   if(id==='einsatz')renderEinsatz();
   if(id==='workshops')loadNewsletter();
   if(id==='media')loadMediaPage();
+  if(id==='mail')loadMailUnknown();
   window.scrollTo(0,0);
 }
 
@@ -1466,9 +1483,18 @@ function loadAll(){
     applyBrand();
     renderAll();
     renderOrtDatalist2();
+    loadMailAccountsStatus();
     /* Vollstaendiges Neuladen (z. B. nach Kunden-Aenderung): war der Rest schon da, auch ihn nachziehen. */
     if(REST_LOADED){REST_PROMISE=null;ensureRest()}
   }).catch(function(e){toast('Laden fehlgeschlagen: '+e.message,1)});
+}
+/* Nur der redigierte Status (nie das Passwort) - fuer den Konto-Auswahlpunkt im Compose-
+   Dialog und die Einrichtungs-Checkliste, unabhaengig davon, ob die Einstellungsseite
+   schon geoeffnet war. */
+function loadMailAccountsStatus(){
+  fetch('api.php/mail/accounts',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(j){
+    S.mailAccounts=j||{};renderSetupCard();
+  }).catch(function(){});
 }
 /* Seiten, die Rest-Daten brauchen - beim ersten Aufruf nachladen (Promise-Cache). */
 var REST_PAGES={cms:1,set:1,partners:1,camp:1,media:1,prod:1,dash:1};
@@ -1906,6 +1932,8 @@ function setupChecklist(){
   ];
   if(c.agency_enabled)items.splice(8,0,{ok:!!String(c.agency_name||'').trim(),text:'Partner-Agentur für die DJ-Vermittlung benannt',go:'set-operator'});
   items.push({ok:!!tg.telegram_enabled,text:'Telegram-Benachrichtigungen',go:'set-telegram',optional:true});
+  var ma=S.mailAccounts||{};
+  items.push({ok:!!(ma.system&&ma.system.has_password),text:'E-Mail-Konten einrichten (eigener Mailversand statt unzuverlässigem PHP-mail())',go:'set-mail',optional:true});
   return items;
 }
 function renderSetupCard(){
@@ -2211,6 +2239,7 @@ function openCustDetail(id){
   }).join(''):'Sobald es einen Gig gibt, kannst du hier Location, Ablaufplan und Musikwünsche pflegen.';
   document.getElementById('cdDocs').innerHTML=renderDocList(function(d){return d.customer_id===id})||'Keine Dokumente.';
   renderComms();
+  if(!CACHE.mailInbox)reloadMailInbox();
   showPage('custd');
 }
 function markReferred(){
@@ -2226,14 +2255,69 @@ function row(l,v){return v?('<div style="padding:3px 0"><span class="mut" style=
 var CH_ICON={email:'',whatsapp:'',phone:'',meeting:'',note:''};
 var CH_NAME={email:'E-Mail',whatsapp:'WhatsApp',phone:'Telefonat',meeting:'Treffen',note:'Notiz'};
 function renderComms(){
-  var list=CACHE.comms.filter(function(c){return c.customer_id===curCust.id});
-  document.getElementById('cdComms').innerHTML=list.map(function(c){
+  var list=CACHE.comms.filter(function(c){return c.customer_id===curCust.id})
+    .map(function(c){return {kind:'comm',at:c.occurred_at,c:c}});
+  var inbox=(CACHE.mailInbox||[]).filter(function(m){return m.customer_id===curCust.id})
+    .map(function(m){return {kind:'mail',at:m.date_at,m:m}});
+  var all=list.concat(inbox).sort(function(a,b){return (b.at||'').localeCompare(a.at||'')});
+  document.getElementById('cdComms').innerHTML=all.map(function(x){
+    if(x.kind==='mail'){var m=x.m;
+      return '<div class="tl-item"><div class="tl-ico">'+CH_ICON.email+'</div><div class="tl-body">'+
+        '<div class="tl-meta">E-Mail eingehend · '+dtt(m.date_at)+(m.seen?'':' · <span style="color:var(--yel)">ungelesen</span>')+'</div>'+
+        '<div class="tl-sub">'+esc(m.subject||'(kein Betreff)')+'</div>'+
+        (m.body_text?'<div class="tl-txt">'+esc(m.body_text.slice(0,600))+(m.body_text.length>600?' …':'')+'</div>':'')+
+        '<button class="btn g sm" style="margin-top:6px" onclick="mailReplyFromInbox(\''+m.id+'\')">Antworten</button>'+
+        '</div></div>';
+    }
+    var c=x.c;
     return '<div class="tl-item"><div class="tl-ico">'+(CH_ICON[c.channel]||'•')+'</div><div class="tl-body">'+
       '<div class="tl-meta">'+CH_NAME[c.channel]+' '+(c.direction==='in'?'eingehend':'ausgehend')+' · '+dtt(c.occurred_at)+
       (c.followup_at&&!c.followup_done?' · <span style="color:var(--yel)">nachfassen '+dt(c.followup_at)+'</span>':'')+'</div>'+
       (c.subject?'<div class="tl-sub">'+esc(c.subject)+'</div>':'')+
       (c.content?'<div class="tl-txt">'+esc(c.content)+'</div>':'')+'</div></div>';
   }).join('')||'<div class="mut sml">Noch keine Einträge. Protokolliere hier E-Mails, WhatsApp-Nachrichten und Telefonate.</div>';
+}
+/* Auf eine eingegangene Mail antworten: Compose mit "Re: …" und In-Reply-To fuers
+   Threading vorbelegt. */
+function mailReplyFromInbox(id){
+  var m=(CACHE.mailInbox||[]).find(function(x){return x.id===id});if(!m)return;
+  var subj=/^re:/i.test(m.subject||'')?m.subject:'Re: '+(m.subject||'');
+  openCompose({name:m.from_name||m.from_email,email:m.from_email,customer_id:m.customer_id||null,
+    in_reply_to:m.message_id||'',_title:'Antwort an '+esc(m.from_name||m.from_email),_doc:true},
+    {subject:subj,body:'Hallo,\n\n\n\nViele Grüße\n{inhaber}'},null,null);
+}
+/* IMAP-Abruf auf Knopfdruck ("Postfach aktualisieren") - kein Dauer-Polling. Laedt
+   danach den Zwischenspeicher neu, damit Kundenseite und unbekannte-Absender-Liste
+   den frischen Stand zeigen. */
+function mailFetch(account){
+  toast('Postfach wird abgerufen …');
+  fetch('api.php/mail/fetch',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify({account:account})})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Abruf fehlgeschlagen');return j})})
+    .then(function(j){toast('Postfach aktualisiert ✓ ('+j.count+' Mail'+(j.count===1?'':'s')+')');reloadMailInbox()})
+    .catch(function(e){toast(e.message,1)});
+}
+function reloadMailInbox(){
+  return api('mail_inbox?select=*&order=date_at.desc').then(function(r){CACHE.mailInbox=r||[];
+    if(curCust&&document.getElementById('pg-custd').classList.contains('a'))renderComms();
+    if(document.getElementById('pg-mail').classList.contains('a'))loadMailUnknown();
+  });
+}
+function loadMailUnknown(){
+  reloadMailInbox().then(function(){
+    var rows=(CACHE.mailInbox||[]).filter(function(m){return !m.customer_id});
+    document.getElementById('mailUnknownRows').innerHTML=rows.map(function(m){
+      return '<div class="tl-item"><div class="tl-ico">'+CH_ICON.email+'</div><div class="tl-body">'+
+        '<div class="tl-meta">'+esc(m.from_name?m.from_name+' <'+m.from_email+'>':m.from_email)+' · '+dtt(m.date_at)+'</div>'+
+        '<div class="tl-sub">'+esc(m.subject||'(kein Betreff)')+'</div>'+
+        '<button class="btn g sm" style="margin-top:6px" onclick="mailInboxToCustomer(\''+m.id+'\')">Als Kunde anlegen</button></div></div>';
+    }).join('')||'<div class="mut sml">Keine Mails unbekannter Absender.</div>';
+  });
+}
+function mailInboxToCustomer(id){
+  fetch('api.php/mail/inbox/'+id+'/to-customer',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Anlegen fehlgeschlagen');return j})})
+    .then(function(){toast('Kunde angelegt ✓');loadAll();loadMailUnknown()})
+    .catch(function(e){toast(e.message,1)});
 }
 function openCommModal(){
   openModal('Kommunikation protokollieren',
@@ -7584,9 +7668,63 @@ function tgTest(){
   }).catch(function(e){toast(e.message,1)});
 }
 
+/* ===== E-Mail-Konten (SMTP/IMAP) =====
+   Zwei feste Karten (persoenlich/system) - Passwort wird nie vom Server zurueckgegeben,
+   nur has_password. Ein leeres Passwortfeld beim Speichern ueberschreibt ein zuvor
+   gesetztes Passwort NICHT (gleiches Muster wie der KI-Textassistent). */
+var MAIL_ACC_LABEL={personal:'Persönlich',system:'System'};
+function renderMailAccounts(){
+  fetch('api.php/mail/accounts',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(j){
+    S.mailAccounts=j||{};
+    document.getElementById('mailAccBoxes').innerHTML=['personal','system'].map(function(k){
+      var a=j[k]||{};
+      return '<fieldset style="border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:12px;margin-bottom:12px">'+
+        '<legend style="padding:0 6px">'+MAIL_ACC_LABEL[k]+'</legend>'+
+        '<div class="grid2"><div><label>Anzeigename</label><input id="ma_'+k+'_name" value="'+esc(a.name||'')+'"></div>'+
+        '<div><label>E-Mail-Adresse</label><input id="ma_'+k+'_email" value="'+esc(a.email||'')+'" placeholder="'+(k==='system'?'backoffice@…':'markus@…')+'"></div></div>'+
+        '<div class="grid3"><div><label>SMTP-Host</label><input id="ma_'+k+'_shost" value="'+esc(a.smtp_host||'')+'" placeholder="w0…kasserver.com"></div>'+
+        '<div><label>SMTP-Port</label><input type="number" id="ma_'+k+'_sport" value="'+(a.smtp_port||'')+'" placeholder="465 / 587"></div>'+
+        '<div><label>Verschlüsselung</label><select id="ma_'+k+'_senc"><option value="ssl"'+(a.smtp_enc!=='starttls'?' selected':'')+'>SSL (Port 465, sofort verschlüsselt)</option><option value="starttls"'+(a.smtp_enc==='starttls'?' selected':'')+'>STARTTLS (Port 587)</option></select></div></div>'+
+        '<div class="grid3"><div><label>IMAP-Host</label><input id="ma_'+k+'_ihost" value="'+esc(a.imap_host||'')+'" placeholder="w0…kasserver.com"></div>'+
+        '<div><label>IMAP-Port</label><input type="number" id="ma_'+k+'_iport" value="'+(a.imap_port||'')+'" placeholder="993"></div>'+
+        '<div><label>Benutzername</label><input id="ma_'+k+'_user" value="'+esc(a.username||'')+'" placeholder="= E-Mail-Adresse, falls leer"></div></div>'+
+        '<div class="grid2"><div><label>Passwort '+(a.has_password?'<span class="mut sml">(hinterlegt ✓ – Feld leer lassen, um es zu behalten)</span>':'<span class="mut sml">(noch keins hinterlegt)</span>')+'</label><input type="password" autocomplete="off" id="ma_'+k+'_pass" placeholder="nur zum Ändern ausfüllen"></div>'+
+        '<div style="display:flex;align-items:flex-end;gap:8px">'+
+        '<button class="btn sm" onclick="saveMailAccount(\''+k+'\')">Speichern</button>'+
+        '<button class="btn g sm" onclick="testMailAccount(\''+k+'\')">Verbindung testen</button></div></div>'+
+        '<div class="sml" style="margin-top:8px" id="ma_'+k+'_status">'+(!j.imap_available?'<span class="mut">IMAP-Erweiterung ist auf diesem Server nicht aktiv – Postfach-Abruf geht dann nicht, Versand funktioniert unabhängig davon.</span>':'')+'</div>'+
+        '</fieldset>';
+    }).join('')+(j.state&&j.state.last_error?'<div class="msg err sml">Letzter automatischer Versand fehlgeschlagen ('+esc(dtt(j.state.last_error_at))+'): '+esc(j.state.last_error)+'</div>':'');
+  }).catch(function(){});
+}
+function mailAccBody(k){
+  return {account:k,name:v('ma_'+k+'_name'),email:v('ma_'+k+'_email'),
+    smtp_host:v('ma_'+k+'_shost'),smtp_port:parseInt(v('ma_'+k+'_sport'))||0,smtp_enc:v('ma_'+k+'_senc'),
+    imap_host:v('ma_'+k+'_ihost'),imap_port:parseInt(v('ma_'+k+'_iport'))||0,username:v('ma_'+k+'_user'),
+    password:v('ma_'+k+'_pass')||undefined};
+}
+function saveMailAccount(k){
+  fetch('api.php/mail/accounts',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(mailAccBody(k))})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Speichern fehlgeschlagen');return j})})
+    .then(function(){toast(MAIL_ACC_LABEL[k]+' gespeichert ✓');renderMailAccounts();loadMailAccountsStatus()})
+    .catch(function(e){toast(e.message,1)});
+}
+function testMailAccount(k){
+  var el=document.getElementById('ma_'+k+'_status');if(el)el.innerHTML='Teste …';
+  var body=mailAccBody(k);
+  fetch('api.php/mail/test',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json()}).then(function(j){
+      if(!el)return;
+      if(j.error){el.innerHTML='<span style="color:var(--redl)">'+esc(j.error)+'</span>';return}
+      var s=j.smtp||{},im=j.imap||{};
+      el.innerHTML='SMTP: '+(s.ok?'<span style="color:var(--grn)">verbunden ✓</span>':'<span style="color:var(--redl)">'+esc(s.error||'fehlgeschlagen')+'</span>')+
+        ' · IMAP: '+(im.ok?'<span style="color:var(--grn)">verbunden ✓</span>':'<span style="color:var(--redl)">'+esc(im.error||'fehlgeschlagen')+'</span>');
+    }).catch(function(e){if(el)el.innerHTML='<span style="color:var(--redl)">'+esc(e.message)+'</span>'});
+}
+
 /* ===== Einstellungen ===== */
 function renderSet(){
-  loadBackups();loadDeploy();loadIcal();loadAiConfig();loadRoutingConfig();renderTelegram();renderPacking();
+  loadBackups();loadDeploy();loadIcal();loadAiConfig();loadRoutingConfig();renderTelegram();renderPacking();renderMailAccounts();
   var c=S.company||{},n=S.numbering||{},d=S.defaults||{};
   document.getElementById('sName').value=c.name||'';
   document.getElementById('sOwner').value=c.owner||'';
@@ -8819,15 +8957,25 @@ function openCompose(i,t,formLink,onSent){
   var picker='<label>Vorlage</label><select id="rTpl" onchange="composeSwitchTpl()"><option value="">'+(t.id?'– eingebaute Vorlage –':'– eingebauter Text –')+'</option>'+
     (CACHE.tpls||[]).map(function(x){return '<option value="'+x.id+'"'+(x.id===t.id?' selected':'')+'>'+esc(x.name)+'</option>'}).join('')+'</select>';
   window._composeBuiltin=t.id?null:t;
+  var mailAcc=S.mailAccounts||{};
+  var accOpts='<option value="personal"'+(i._account==='system'?'':' selected')+'>Persönlich'+(mailAcc.personal&&mailAcc.personal.email?' ('+esc(mailAcc.personal.email)+')':'')+'</option>'+
+    '<option value="system"'+(i._account==='system'?' selected':'')+'>System'+(mailAcc.system&&mailAcc.system.email?' ('+esc(mailAcc.system.email)+')':'')+'</option>';
+  var accRow=(mailAcc.personal&&mailAcc.personal.has_password)||(mailAcc.system&&mailAcc.system.has_password)?
+    '<label>Absender-Konto</label><select id="rAccount">'+accOpts+'</select>':'';
+  var attachRow=i.customer_id?'<label>Anhang <span class="mut sml" style="text-transform:none;letter-spacing:0">(aus den Kundendateien)</span></label><select id="rAttach"><option value="">– kein Anhang –</option></select>':'';
   openModal((i._title||'Antwort an '+esc(i.name))+(i.email?' <span class="mut sml">('+esc(i.email)+')</span>':''),
-    hinweis+picker+
+    hinweis+picker+accRow+attachRow+
     '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
     '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+edBtn('rBody')+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
-    (i.email?'<button class="btn" onclick="adminSendMail(\''+jsq(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+jsq(i.customer_id||i.id||'')+'\',function(){composeSent();closeModal()},\''+jsq(i.booking_id||'')+'\')">Direkt senden</button>':'')+
+    (i.email?'<button class="btn" onclick="adminSendMail(\''+jsq(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+jsq(i.customer_id||i.id||'')+'\',function(){composeSent();closeModal()},\''+jsq(i.booking_id||'')+'\',\''+jsq(i.in_reply_to||'')+'\')">Direkt senden</button>':'')+
     '<button class="btn g" onclick="copyReply()">Text kopieren</button>'+
     (i.email?'<button class="btn g" onclick="mailReply(\''+jsq(i.email)+'\')">Im Mail-Programm öffnen</button>':'')+
     '</div>'+(konflikt.length||i._doc?'':'<div class="sml mut" style="margin-top:8px">Am '+(i.event_date?dt(i.event_date):'angefragten Termin')+' ist bei dir nichts eingetragen – die Vorlage passt.</div>'));
+  if(i.customer_id)api('customer_files?customer_id=eq.'+i.customer_id+'&order=created_at.desc').then(function(files){
+    var sel=document.getElementById('rAttach');if(!sel)return;
+    sel.innerHTML='<option value="">– kein Anhang –</option>'+(files||[]).map(function(f){return '<option value="'+f.id+'">'+esc(f.name)+'</option>'}).join('');
+  }).catch(function(){});
 }
 /* Andere Vorlage im offenen Compose-Dialog: Betreff und Text neu fuellen, Rest bleibt. */
 function composeSwitchTpl(){
@@ -8849,13 +8997,16 @@ function custComposeMail(){
     location:b.venue_name||'',event_type:b.event_type||b.title||'',_title:'E-Mail an '+esc(custName(c)),_doc:true},
     {subject:'',body:'Hallo {vorname},\n\n\n\nViele Grüße\n{inhaber}'},null,null);
 }
-function adminSendMail(to,subject,body,custId,cb,bookingId){
+function adminSendMail(to,subject,body,custId,cb,bookingId,inReplyTo){
+  var accEl=document.getElementById('rAccount'),attEl=document.getElementById('rAttach');
   fetch('api.php/sendmail',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},
     body:JSON.stringify({to:to,subject:subject,body:body,customer_id:custId&&custId.length>30?custId:null,
-      booking_id:bookingId&&bookingId.length>30?bookingId:null})})
+      booking_id:bookingId&&bookingId.length>30?bookingId:null,
+      account:accEl?accEl.value:'personal',attach_file_id:(attEl&&attEl.value)?attEl.value:null,
+      in_reply_to:inReplyTo||null})})
     .then(function(r){return r.json()}).then(function(j){
-      if(j.mailed){toast('E-Mail versendet ✓ (in der Timeline protokolliert)');if(cb)cb()}
-      else toast(j.error||'Direktversand fehlgeschlagen – Firmen-E-Mail in den Einstellungen prüfen oder „Im Mail-Programm öffnen" nutzen.',1);
+      if(j.mailed){toast('E-Mail versendet ✓ (in der Timeline protokolliert)');if(cb)cb();if(curCust)refreshComms()}
+      else toast(j.error||'Direktversand fehlgeschlagen – E-Mail-Konten in den Einstellungen prüfen oder „Im Mail-Programm öffnen" nutzen.',1);
     }).catch(function(e){toast(e.message,1)});
 }
 function copyReply(){

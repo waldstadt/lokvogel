@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 95;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 96;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -199,7 +199,7 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks','payments'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks','payments','mail_inbox'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -1007,6 +1007,12 @@ function upgrade(PDO $p): void {
       if (is_array($comp)) syncContactFromCompany($p, $comp);
     } catch (Throwable $e) {}
   }
+  if ($v < 96) {
+    /* v96: eigener SMTP/IMAP-Versand ueber die beiden Postfaecher (persoenlich/system) -
+       Zwischenspeicher fuer abgerufene Mails (mail_inbox) kommt neu hinzu, die Konten
+       selbst liegen wie "ai"/"notify" nur in settings (kein Schema-Bedarf dafuer). */
+    try { $p->exec(mailInboxDdl()); } catch (Throwable $e) {}
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1309,6 +1315,16 @@ function paymentsDdl(): string {
   return 'create table if not exists payments (id text primary key,
     document_id text not null references documents(id) on delete cascade,
     amount real not null default 0, paid_at text, method text, note text, created_at text)';
+}
+/* Zwischenspeicher fuer per IMAP abgerufene Mails (Knopf "Postfach aktualisieren") - kein
+   Dauer-Polling. account = 'personal'|'system'. customer_id gesetzt, sobald die
+   Absenderadresse zu einem Kunden passt (E-Mail-Abgleich) oder manuell zugeordnet wurde;
+   sonst taucht die Mail in "Postfach – unbekannter Absender" auf. */
+function mailInboxDdl(): string {
+  return "create table if not exists mail_inbox (id text primary key, account text not null,
+    uid text, message_id text, in_reply_to text, from_email text, from_name text, subject text,
+    date_at text, seen integer default 0, customer_id text, body_text text, created_at text);
+    create unique index if not exists ux_mail_inbox on mail_inbox(account, message_id)";
 }
 function docPaidSum(PDO $p, string $docId): float {
   try {
@@ -3112,6 +3128,7 @@ SQL);
   $p->exec(docAuditDdl());
   foreach (portalAccountDdl() as $sql) $p->exec($sql);
   foreach (statsNewsletterDdl() as $sql) $p->exec($sql);
+  $p->exec(mailInboxDdl());
   $p->exec(campaignPagesDdl());
   seedCampaignPages($p);
   seed($p);
@@ -4154,7 +4171,302 @@ function tplMap(): array {
 }
 function fillTplPhp(string $text, array $map = []): string { return strtr($text, $map + tplMap()); }
 
+/* ==================== E-Mail-Konten (eigener SMTP/IMAP-Versand) ====================
+   Zwei feste Konten - "personal" (markus@…, persoenliche Korrespondenz und Reply-To
+   fuer System-Mails) und "system" (backoffice@…, automatischer Versand). Beide liegen
+   wie "ai"/"notify"/"routing" als ein JSON unter settings (Schluessel "mail_accounts");
+   das Passwort wird nie zurueckgegeben (Muster wie ai/config: POST setzt nur bei
+   nicht-leerem Wert, GET liefert has_password statt des Werts) und nie geloggt. Ohne
+   eingetragenes Passwort gilt ein Konto als "nicht eingerichtet" - dann bleibt fuer
+   System-Mails der alte mail()-Fallback aktiv (nicht schlechter als vorher). */
+const MAIL_ACCOUNT_KEYS = ['personal', 'system'];
+
+function mailAccountsRaw(): array {
+  $j = json_decode((string)db()->query("select value from settings where key='mail_accounts'")->fetchColumn() ?: '{}', true);
+  return is_array($j) ? $j : [];
+}
+/* Volle Konfiguration inkl. Passwort - nur fuer den internen Gebrauch beim Versand/Test,
+   NIE als API-Antwort ausgeben. null = kein Passwort hinterlegt (Konto "aus"). */
+function mailAccount(string $which): ?array {
+  if (!in_array($which, MAIL_ACCOUNT_KEYS, true)) return null;
+  $a = mailAccountsRaw()[$which] ?? null;
+  if (!is_array($a) || trim((string)($a['password'] ?? '')) === '' || trim((string)($a['email'] ?? '')) === '') return null;
+  return $a;
+}
+/* Oeffentliche Sicht fuers Backoffice: nie das Passwort, nur ob eins hinterlegt ist. */
+function mailAccountPublic(string $which): array {
+  $a = mailAccountsRaw()[$which] ?? [];
+  if (!is_array($a)) $a = [];
+  return ['name' => (string)($a['name'] ?? ''), 'email' => (string)($a['email'] ?? ''),
+    'smtp_host' => (string)($a['smtp_host'] ?? ''), 'smtp_port' => (int)($a['smtp_port'] ?? 0),
+    'smtp_enc' => (string)($a['smtp_enc'] ?? 'ssl'), 'imap_host' => (string)($a['imap_host'] ?? ''),
+    'imap_port' => (int)($a['imap_port'] ?? 0), 'username' => (string)($a['username'] ?? ''),
+    'has_password' => trim((string)($a['password'] ?? '')) !== ''];
+}
+
+/* ==================== SMTP-Client (Rohsocket, ohne Bibliothek) ====================
+   All-Inkl-Postfaecher sprechen Standard-SMTP mit AUTH LOGIN - dafuer braucht es kein
+   PHPMailer/Composer (gibt es in diesem Projekt bewusst nicht). Implizites TLS (Port 465,
+   "ssl://" von Anfang an) und STARTTLS (Port 587, erst Klartext, dann verschluesselt)
+   werden beide unterstuetzt, weil vorab unklar ist, welchen Port All-Inkl am Ende
+   vorgibt - die Kontoeinstellung waehlt den Modus.
+   Zertifikatspruefung bewusst entspannt (verify_peer aus): Shared-Hosting-Mailserver
+   laufen haeufig unter einem Hostnamen, der vom Zertifikats-CN abweicht - das soll nicht
+   an einer strengen Pruefung scheitern, die Verbindung bleibt trotzdem TLS-verschluesselt.
+   Rueckgabe ist IMMER ein Ergebnis-Array (ok/error/message_id) - nie nur true/false wie
+   das alte mail(), das genau das Problem war (mail() meldet "true", auch wenn der
+   Empfangsserver die Mail laengst verworfen hat). */
+function smtpTlsContext() {
+  return stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]]);
+}
+/* Liest eine (moeglicherweise mehrzeilige) SMTP-Antwort komplett ein, z. B.
+   "250-STARTTLS\r\n250 AUTH LOGIN\r\n" - erst die letzte Zeile hat ein Leerzeichen an
+   Position 4 statt eines Bindestrichs. */
+function smtpReadResponse($sock): array {
+  $full = ''; $code = 0;
+  while (!feof($sock)) {
+    $line = fgets($sock, 2048);
+    if ($line === false) break;
+    $full .= $line;
+    $code = (int)substr($line, 0, 3);
+    if (strlen($line) >= 4 && $line[3] === ' ') break;
+  }
+  if ($full === '') return ['code' => 0, 'text' => 'Keine Antwort vom Server (Verbindung abgebrochen).'];
+  return ['code' => $code, 'text' => trim($full)];
+}
+function smtpCmd($sock, string $cmd): array {
+  fwrite($sock, $cmd . "\r\n");
+  return smtpReadResponse($sock);
+}
+/* Baut Verbindung auf, EHLO, ggf. STARTTLS, AUTH LOGIN. $sock=null bei Fehler (dann steht
+   die Fehlermeldung in $err). Bei Erfolg ist der Aufrufer fuer fclose() zustaendig. */
+function smtpConnectAuth(array $account, ?string &$err) {
+  $host = trim((string)($account['smtp_host'] ?? ''));
+  $port = (int)($account['smtp_port'] ?? 0);
+  $enc = (string)($account['smtp_enc'] ?? 'ssl'); // 'ssl' (implizit) oder 'starttls'
+  $user = trim((string)($account['username'] ?? '')) ?: trim((string)($account['email'] ?? ''));
+  $pass = (string)($account['password'] ?? '');
+  if ($host === '' || $port <= 0) { $err = 'SMTP-Host oder -Port fehlt.'; return null; }
+  if ($pass === '') { $err = 'Kein Passwort für dieses Konto hinterlegt.'; return null; }
+  $transport = $enc === 'starttls' ? 'tcp' : 'ssl';
+  $sock = @stream_socket_client("$transport://$host:$port", $errno, $errstr, 15, STREAM_CLIENT_CONNECT, smtpTlsContext());
+  if (!$sock) { $err = "Verbindung zu $host:$port fehlgeschlagen: " . ($errstr ?: 'unbekannter Fehler') . " ($errno)."; return null; }
+  stream_set_timeout($sock, 15);
+  $r = smtpReadResponse($sock);
+  if ($r['code'] !== 220) { $err = 'Server antwortet nicht wie erwartet (' . $r['code'] . ' ' . $r['text'] . ').'; fclose($sock); return null; }
+  $r = smtpCmd($sock, 'EHLO ' . companyDomain());
+  if ($r['code'] !== 250) { $err = 'EHLO abgelehnt (' . $r['code'] . ' ' . $r['text'] . ').'; fclose($sock); return null; }
+  if ($enc === 'starttls') {
+    $r = smtpCmd($sock, 'STARTTLS');
+    if ($r['code'] !== 220) { $err = 'STARTTLS abgelehnt (' . $r['code'] . ' ' . $r['text'] . ').'; fclose($sock); return null; }
+    if (!@stream_socket_enable_crypto($sock, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+      $err = 'TLS-Verschlüsselung nach STARTTLS ist fehlgeschlagen.'; fclose($sock); return null;
+    }
+    $r = smtpCmd($sock, 'EHLO ' . companyDomain());
+    if ($r['code'] !== 250) { $err = 'EHLO nach STARTTLS abgelehnt (' . $r['code'] . ' ' . $r['text'] . ').'; fclose($sock); return null; }
+  }
+  $r = smtpCmd($sock, 'AUTH LOGIN');
+  if ($r['code'] !== 334) { $err = 'AUTH LOGIN wird vom Server nicht angeboten (' . $r['code'] . ' ' . $r['text'] . ').'; fclose($sock); return null; }
+  $r = smtpCmd($sock, base64_encode($user));
+  if ($r['code'] !== 334) { $err = 'Benutzername abgelehnt (Server: ' . $r['code'] . ' ' . $r['text'] . ').'; fclose($sock); return null; }
+  $r = smtpCmd($sock, base64_encode($pass));
+  if ($r['code'] !== 235) { $err = 'Anmeldung fehlgeschlagen – Benutzername oder Passwort falsch (Server: ' . $r['code'] . ' ' . $r['text'] . ').'; fclose($sock); return null; }
+  $err = null;
+  return $sock;
+}
+/* Nur Verbindungsaufbau + Anmeldung, ohne etwas zu versenden - fuer "Verbindung testen". */
+function smtpTestAuth(array $account): array {
+  $sock = smtpConnectAuth($account, $err);
+  if (!$sock) return ['ok' => false, 'error' => $err];
+  smtpCmd($sock, 'QUIT');
+  fclose($sock);
+  return ['ok' => true, 'error' => null];
+}
+/* Verschickt eine Mail mit Text (und optional HTML) sowie Anhaengen. $attachments ist
+   eine Liste von ['name'=>..,'mime'=>..,'data'=>Rohdaten (nicht base64)]. Rueckgabe immer
+   mit genauem Fehlertext statt nur true/false. */
+function smtpSend(array $account, string $to, string $subject, string $textBody, ?string $htmlBody,
+    array $attachments, ?string $replyTo, ?string $inReplyTo, ?string $references): array {
+  $from = trim((string)($account['email'] ?? ''));
+  $fromName = preg_replace('/[\r\n"]+/', '', (string)($account['name'] ?? '')) ?: $from;
+  if (!filter_var($from, FILTER_VALIDATE_EMAIL)) return ['ok' => false, 'error' => 'Konto hat keine gültige Absenderadresse.'];
+  if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return ['ok' => false, 'error' => 'Ungültige Empfänger-E-Mail-Adresse: ' . $to];
+  $sock = smtpConnectAuth($account, $err);
+  if (!$sock) return ['ok' => false, 'error' => $err];
+  $fail = function (string $msg) use ($sock): array { fclose($sock); return ['ok' => false, 'error' => $msg]; };
+  $r = smtpCmd($sock, "MAIL FROM:<$from>");
+  if ($r['code'] !== 250) return $fail('Absender vom Server abgelehnt (' . $r['code'] . ' ' . $r['text'] . ').');
+  $r = smtpCmd($sock, "RCPT TO:<$to>");
+  if (!in_array($r['code'], [250, 251], true)) return $fail('Empfänger vom Server abgelehnt (' . $r['code'] . ' ' . $r['text'] . ').');
+  $r = smtpCmd($sock, 'DATA');
+  if ($r['code'] !== 354) return $fail('Server nimmt die Nachricht nicht an (' . $r['code'] . ' ' . $r['text'] . ').');
+  $messageId = '<' . bin2hex(random_bytes(16)) . '@' . companyDomain() . '>';
+  $boundaryMixed = 'mix_' . bin2hex(random_bytes(8));
+  $boundaryAlt = 'alt_' . bin2hex(random_bytes(8));
+  $headers = [];
+  $headers[] = 'Date: ' . date('r');
+  $headers[] = "Message-ID: $messageId";
+  if ($inReplyTo) $headers[] = "In-Reply-To: $inReplyTo";
+  if ($references) $headers[] = "References: $references";
+  $headers[] = 'From: =?UTF-8?B?' . base64_encode($fromName) . "?= <$from>";
+  $headers[] = "To: <$to>";
+  if ($replyTo && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) $headers[] = "Reply-To: <$replyTo>";
+  $headers[] = 'Subject: =?UTF-8?B?' . base64_encode($subject) . '?=';
+  $headers[] = 'MIME-Version: 1.0';
+  $hasAlt = $htmlBody !== null && trim($htmlBody) !== '';
+  $textPart = "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($textBody));
+  if ($hasAlt) {
+    $htmlPart = "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($htmlBody));
+    $inner = "--$boundaryAlt\r\n$textPart--$boundaryAlt\r\n$htmlPart--$boundaryAlt--\r\n";
+    $innerType = "multipart/alternative; boundary=\"$boundaryAlt\"";
+  } else { $inner = $textPart; $innerType = null; }
+  if (!empty($attachments)) {
+    $headers[] = "Content-Type: multipart/mixed; boundary=\"$boundaryMixed\"";
+    $msg = "--$boundaryMixed\r\n" . ($innerType ? "Content-Type: $innerType\r\n\r\n$inner" : $inner) . "\r\n";
+    foreach ($attachments as $att) {
+      $fname = preg_replace('/[\r\n"]+/', '_', (string)($att['name'] ?? 'anhang'));
+      $mime = (string)($att['mime'] ?? 'application/octet-stream');
+      $msg .= "--$boundaryMixed\r\nContent-Type: $mime; name=\"$fname\"\r\nContent-Transfer-Encoding: base64\r\n" .
+        "Content-Disposition: attachment; filename=\"$fname\"\r\n\r\n" . chunk_split(base64_encode((string)($att['data'] ?? ''))) . "\r\n";
+    }
+    $msg .= "--$boundaryMixed--\r\n";
+  } else {
+    if ($innerType) { $headers[] = "Content-Type: $innerType"; $msg = $inner; }
+    else { $headers[] = 'Content-Type: text/plain; charset=UTF-8'; $headers[] = 'Content-Transfer-Encoding: base64'; $msg = chunk_split(base64_encode($textBody)); }
+  }
+  $data = implode("\r\n", $headers) . "\r\n\r\n" . $msg;
+  /* Byte-Stuffing: eine Datenzeile, die nur aus einem Punkt besteht, wuerde sonst als
+     Ende der Nachricht missverstanden (RFC 5321) - fuehrende Punkte werden verdoppelt. */
+  $data = preg_replace('/\r\n\./', "\r\n..", $data);
+  fwrite($sock, $data . "\r\n.\r\n");
+  $r = smtpReadResponse($sock);
+  if ($r['code'] !== 250) return $fail('Zustellung vom Server abgelehnt (' . $r['code'] . ' ' . $r['text'] . ').');
+  smtpCmd($sock, 'QUIT');
+  fclose($sock);
+  return ['ok' => true, 'error' => null, 'message_id' => $messageId];
+}
+
+/* ==================== IMAP-Abruf (ext-imap) ====================
+   Kein selbstgebauter IMAP-Parser (zu fehleranfaellig ohne echten Server zum Testen) -
+   stattdessen die eingebaute PHP-IMAP-Erweiterung, wenn vorhanden. */
+function imapAvailable(): bool { return function_exists('imap_open'); }
+function imapMailboxString(array $account): string {
+  $enc = (string)($account['imap_enc'] ?? 'ssl');
+  $flags = ($enc === 'none' ? '/notls' : '/ssl') . '/novalidate-cert';
+  return '{' . $account['imap_host'] . ':' . $account['imap_port'] . '/imap' . $flags . '}INBOX';
+}
+function imapOpen(array $account, ?string &$err) {
+  if (!imapAvailable()) { $err = 'IMAP-Erweiterung ist auf dem Server nicht aktiv – bitte im KAS unter PHP-Einstellungen aktivieren.'; return false; }
+  $host = trim((string)($account['imap_host'] ?? ''));
+  if ($host === '' || (int)($account['imap_port'] ?? 0) <= 0) { $err = 'IMAP-Host oder -Port fehlt.'; return false; }
+  $user = trim((string)($account['username'] ?? '')) ?: trim((string)($account['email'] ?? ''));
+  $pass = (string)($account['password'] ?? '');
+  if ($pass === '') { $err = 'Kein Passwort für dieses Konto hinterlegt.'; return false; }
+  $mbx = imapMailboxString($account);
+  $conn = @imap_open($mbx, $user, $pass, 0, 1);
+  if (!$conn) { $e = imap_last_error(); $err = 'Anmeldung fehlgeschlagen' . ($e ? ": $e" : '.'); return false; }
+  $err = null;
+  return $conn;
+}
+function imapTest(array $account): array {
+  $conn = imapOpen($account, $err);
+  if (!$conn) return ['ok' => false, 'error' => $err];
+  imap_close($conn);
+  return ['ok' => true, 'error' => null];
+}
+function imapDecodeHeader(string $s): string {
+  $parts = @imap_mime_header_decode($s);
+  if (!$parts) return $s;
+  $out = '';
+  foreach ($parts as $part) $out .= (string)$part->text;
+  return $out;
+}
+function imapDecodeBody(string $data, int $encoding): string {
+  if ($encoding === 3) return (string)base64_decode($data);
+  if ($encoding === 4) return quoted_printable_decode($data);
+  return $data;
+}
+/* Sucht im (evtl. verschachtelten) MIME-Baum den ersten Text-Teil - Klartext bevorzugt,
+   sonst HTML (dann von Tags befreit; einfache Blockumbrueche vorher als Zeilenumbruch). */
+function imapPlainBody($conn, int $msgno, $struct): string {
+  if (!$struct) return '';
+  if (empty($struct->parts)) return imapDecodeBody((string)imap_body($conn, $msgno), (int)($struct->encoding ?? 0));
+  $plain = null; $html = null;
+  $walk = function ($parts, string $prefix) use (&$walk, &$plain, &$html, $conn, $msgno) {
+    foreach ($parts as $idx => $part) {
+      $num = $prefix . ($idx + 1);
+      if (!empty($part->parts) && (int)$part->type === 1) { $walk($part->parts, $num . '.'); continue; }
+      $sub = strtoupper((string)($part->subtype ?? ''));
+      if ((int)$part->type === 0 && $sub === 'PLAIN' && $plain === null)
+        $plain = imapDecodeBody((string)imap_fetchbody($conn, $msgno, $num), (int)($part->encoding ?? 0));
+      elseif ((int)$part->type === 0 && $sub === 'HTML' && $html === null)
+        $html = imapDecodeBody((string)imap_fetchbody($conn, $msgno, $num), (int)($part->encoding ?? 0));
+    }
+  };
+  $walk($struct->parts, '');
+  if ($plain !== null) return $plain;
+  if ($html !== null) return trim(preg_replace('/[ \t]+/', ' ', strip_tags(preg_replace('#<(br|/p|/div|/li)[^>]*>#i', "\n", $html))));
+  return '';
+}
+/* Letzte $limit Mails (neueste zuerst). Rueckgabe hat immer 'ok' + 'error' - der Aufrufer
+   zeigt den genauen Grund, falls IMAP fehlt oder die Anmeldung scheitert. */
+function imapFetchList(array $account, int $limit = 30): array {
+  $conn = imapOpen($account, $err);
+  if (!$conn) return ['ok' => false, 'error' => $err, 'messages' => []];
+  $total = imap_num_msg($conn);
+  $from = max(1, $total - $limit + 1);
+  $out = [];
+  for ($i = $total; $i >= $from; $i--) {
+    $h = @imap_headerinfo($conn, $i);
+    if (!$h) continue;
+    $fromAddr = ''; $fromName = '';
+    if (!empty($h->from) && !empty($h->from[0])) {
+      $fromAddr = strtolower(trim(($h->from[0]->mailbox ?? '') . '@' . ($h->from[0]->host ?? '')));
+      $fromName = imapDecodeHeader((string)($h->from[0]->personal ?? ''));
+    }
+    $struct = @imap_fetchstructure($conn, $i);
+    $out[] = [
+      'uid' => (string)imap_uid($conn, $i),
+      'message_id' => trim((string)($h->message_id ?? '')),
+      'in_reply_to' => trim((string)($h->in_reply_to ?? '')),
+      'from_email' => $fromAddr, 'from_name' => $fromName,
+      'subject' => imapDecodeHeader((string)($h->subject ?? '(kein Betreff)')),
+      'date_at' => date('c', (int)($h->udate ?? time())),
+      'seen' => (($h->Unseen ?? '') === 'U') ? 0 : 1,
+      'body_text' => mb_substr(imapPlainBody($conn, $i, $struct), 0, 20000),
+    ];
+  }
+  imap_close($conn);
+  return ['ok' => true, 'error' => null, 'messages' => $out];
+}
+
+/* Merkt sich Zustand des automatischen Versands (letzter Fehler/Erfolg) - gleiches
+   Muster wie telegramState(), damit das Dashboard einen Hinweis zeigen kann, wenn Mails
+   trotz eingerichtetem System-Konto zuletzt nicht rausgingen. */
+function mailState(?array $set = null): array {
+  $file = DATA_DIR . '/mail_state.json';
+  $st = is_file($file) ? (json_decode((string)@file_get_contents($file), true) ?: []) : [];
+  if ($set !== null) { $st = array_merge($st, $set); @file_put_contents($file, json_encode($st, JSON_UNESCAPED_UNICODE), LOCK_EX); }
+  return ['last_error' => $st['last_error'] ?? null, 'last_error_at' => $st['last_error_at'] ?? null, 'last_ok_at' => $st['last_ok_at'] ?? null];
+}
+/* Automatische System-Mails (Bestaetigungen, Rechnungen, Einladungen, Erinnerungen,
+   Newsletter): Ist das Konto "system" (backoffice@…) eingerichtet, geht der Versand
+   echt per SMTP raus, mit Reply-To auf das persoenliche Konto (markus@…) - Kundenantworten
+   landen so in seinem persoenlichen Postfach, waehrend der Versand technisch stabil ueber
+   das System-Konto laeuft. Ohne eingerichtetes System-Konto bleibt der alte, auf Shared-
+   Hosting unzuverlaessige mail()-Fallback aktiv (nicht schlechter als vorher). Signatur
+   bleibt kompatibel (gleicher Name, bool-Rueckgabe) - alle bestehenden Aufrufstellen im
+   ganzen File funktionieren unveraendert weiter. */
 function sendMailSafe(string $to, string $subject, string $bodyText): bool {
+  $sys = mailAccount('system');
+  if ($sys !== null) {
+    $personal = mailAccount('personal');
+    $replyTo = $personal['email'] ?? null;
+    $r = smtpSend($sys, $to, $subject, $bodyText, null, [], $replyTo, null, null);
+    if ($r['ok']) mailState(['last_ok_at' => now(), 'last_error' => null, 'last_error_at' => null]);
+    else mailState(['last_error' => $r['error'], 'last_error_at' => now()]);
+    return $r['ok'];
+  }
   $comp = json_decode(db()->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
   $from = trim((string)($comp['email'] ?? ''));
   if ($from === '' || !filter_var($from, FILTER_VALIDATE_EMAIL) || !filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
@@ -4162,6 +4474,18 @@ function sendMailSafe(string $to, string $subject, string $bodyText): bool {
   $headers = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$from>\r\n" .
              "Reply-To: $from\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit";
   return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $bodyText, $headers);
+}
+/* Fuer Compose/manuellen Versand aus dem Backoffice: liefert Erfolg + genauen Fehlertext
+   statt nur bool. $account 'personal' oder 'system' (Vorgabe fuer Freitext: persoenlich). */
+function mailSendManual(string $account, string $to, string $subject, string $bodyText,
+    array $attachments = [], ?string $inReplyTo = null, ?string $references = null): array {
+  if (!in_array($account, MAIL_ACCOUNT_KEYS, true)) $account = 'personal';
+  $acc = mailAccount($account);
+  if ($acc === null) return ['ok' => false, 'error' => 'Für das Konto „' . ($account === 'system' ? 'System' : 'Persönlich') .
+    '" ist noch kein Passwort hinterlegt – bitte zuerst unter Einstellungen → E-Mail-Konten eintragen.'];
+  $replyTo = null;
+  if ($account === 'system') { $personal = mailAccount('personal'); $replyTo = $personal['email'] ?? null; }
+  return smtpSend($acc, $to, $subject, $bodyText, null, $attachments, $replyTo, $inReplyTo, $references);
 }
 
 function baseUrl(): string {
@@ -6519,21 +6843,132 @@ try {
     }
     out(['sent' => $sent, 'failed' => $failed, 'total' => count($subs)]);
   }
-  /* Direktversand aus dem Backoffice */
+  /* Direktversand aus dem Backoffice (Compose) - ueber das gewaehlte E-Mail-Konto
+     (Vorgabe: persoenlich), mit klarem Fehlertext statt nur true/false. Optional ein
+     Anhang aus dem Kundendateien-Pool sowie In-Reply-To/References fuers Threading
+     beim Beantworten einer eingegangenen Mail. */
   if ($path === 'sendmail' && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
     $to = trim((string)($body['to'] ?? ''));
     $subject = trim((string)($body['subject'] ?? ''));
     $text = (string)($body['body'] ?? '');
     if ($to === '' || $subject === '' || trim($text) === '') fail('Empfänger, Betreff und Text erforderlich.');
-    $mailed = sendMailSafe($to, $subject, $text);
-    if ($mailed && !empty($body['customer_id'])) {
-      db()->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, created_at)
-          values (?,?,?,?,?,?,?,?,?)')
-        ->execute([uuid(), (string)$body['customer_id'], !empty($body['booking_id']) ? (string)$body['booking_id'] : null,
-          'email', 'out', $subject, $text, now(), now()]);
+    $account = in_array((string)($body['account'] ?? ''), MAIL_ACCOUNT_KEYS, true) ? (string)$body['account'] : 'personal';
+    $attachments = [];
+    if (!empty($body['attach_file_id'])) {
+      $p = db();
+      $st = $p->prepare('select * from customer_files where id = ?');
+      $st->execute([(string)$body['attach_file_id']]);
+      $cf = $st->fetch();
+      $full = $cf ? DATA_DIR . '/custfiles/' . $cf['file'] : null;
+      if ($cf && $full && is_file($full)) {
+        $ext = strtolower(pathinfo((string)$cf['file'], PATHINFO_EXTENSION));
+        $mime = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp',
+          'gif' => 'image/gif', 'pdf' => 'application/pdf'][$ext] ?? 'application/octet-stream';
+        $attachments[] = ['name' => (string)$cf['name'], 'mime' => $mime, 'data' => (string)file_get_contents($full)];
+      }
     }
-    out(['mailed' => $mailed]);
+    $inReplyTo = trim((string)($body['in_reply_to'] ?? '')) ?: null;
+    $references = trim((string)($body['references'] ?? '')) ?: null;
+    $r = mailSendManual($account, $to, $subject, $text, $attachments, $inReplyTo, $references);
+    $mailed = !empty($r['ok']);
+    if ($mailed && !empty($body['customer_id'])) {
+      db()->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, ref_doc_id, ref_kind, created_at)
+          values (?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([uuid(), (string)$body['customer_id'], !empty($body['booking_id']) ? (string)$body['booking_id'] : null,
+          'email', 'out', $subject, $text, now(), $r['message_id'] ?? null, 'email', now()]);
+    }
+    out(['mailed' => $mailed, 'error' => $r['error'] ?? null]);
+  }
+  /* ==================== E-Mail-Konten: Einstellungen, Verbindungstest, IMAP-Abruf ==================== */
+  if ($path === 'mail/accounts' && in_array($method, ['GET', 'POST'])) {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    if ($method === 'POST') {
+      $which = (string)($body['account'] ?? '');
+      if (!in_array($which, MAIL_ACCOUNT_KEYS, true)) fail('Unbekanntes Konto.', 400);
+      $all = mailAccountsRaw();
+      $a = is_array($all[$which] ?? null) ? $all[$which] : [];
+      foreach (['name', 'email', 'smtp_host', 'imap_host', 'username'] as $f)
+        if (isset($body[$f])) $a[$f] = mb_substr(trim((string)$body[$f]), 0, 200);
+      if (isset($body['smtp_port'])) $a['smtp_port'] = max(0, (int)$body['smtp_port']);
+      if (isset($body['imap_port'])) $a['imap_port'] = max(0, (int)$body['imap_port']);
+      if (isset($body['smtp_enc']) && in_array($body['smtp_enc'], ['ssl', 'starttls'], true)) $a['smtp_enc'] = $body['smtp_enc'];
+      if (!empty($body['email']) && !filter_var(trim((string)$body['email']), FILTER_VALIDATE_EMAIL)) fail('Bitte eine gültige E-Mail-Adresse angeben.', 400);
+      /* Wie ai/config: Passwort wird nur bei nicht-leerem Wert ueberschrieben - ein leeres
+         Feld beim Speichern loescht kein zuvor gesetztes Passwort versehentlich. */
+      if (!empty($body['password'])) $a['password'] = (string)$body['password'];
+      $all[$which] = $a;
+      $p->prepare("insert into settings (key, value, updated_at) values ('mail_accounts', ?, ?)
+          on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
+        ->execute([json_encode($all, JSON_UNESCAPED_UNICODE), now()]);
+    }
+    out(['personal' => mailAccountPublic('personal'), 'system' => mailAccountPublic('system'),
+      'imap_available' => imapAvailable(), 'state' => mailState()]);
+  }
+  /* Verbindung testen: SMTP-Verbindungsaufbau + AUTH (ohne Versand) UND IMAP-Login,
+     jeweils mit dem genauen Fehlertext. Nimmt unbekannte Felder als Vorschau (der
+     Nutzer kann testen, bevor er speichert), Passwort/Host fehlen dann aus dem
+     gespeicherten Konto, sofern im Aufruf nicht mitgegeben. */
+  if ($path === 'mail/test' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $which = (string)($body['account'] ?? '');
+    if (!in_array($which, MAIL_ACCOUNT_KEYS, true)) fail('Unbekanntes Konto.', 400);
+    $all = mailAccountsRaw();
+    $a = is_array($all[$which] ?? null) ? $all[$which] : [];
+    foreach (['name', 'email', 'smtp_host', 'imap_host', 'username', 'smtp_enc', 'imap_enc'] as $f)
+      if (!empty($body[$f])) $a[$f] = (string)$body[$f];
+    if (!empty($body['smtp_port'])) $a['smtp_port'] = (int)$body['smtp_port'];
+    if (!empty($body['imap_port'])) $a['imap_port'] = (int)$body['imap_port'];
+    if (!empty($body['password'])) $a['password'] = (string)$body['password'];
+    if (trim((string)($a['password'] ?? '')) === '') fail('Bitte zuerst ein Passwort eingeben (zum Testen reicht es unten im Formular, ohne zu speichern).', 400);
+    out(['smtp' => smtpTestAuth($a), 'imap' => imapTest($a)]);
+  }
+  /* IMAP-Abruf auf Knopfdruck ("Postfach aktualisieren") - kein Dauer-Polling. Speichert
+     die letzten Mails im Zwischenspeicher (mail_inbox), gleicht Absender gegen Kunden ab. */
+  if ($path === 'mail/fetch' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $which = (string)($body['account'] ?? '');
+    if (!in_array($which, MAIL_ACCOUNT_KEYS, true)) fail('Unbekanntes Konto.', 400);
+    $acc = mailAccount($which);
+    if ($acc === null) fail('Für dieses Konto ist noch kein IMAP-Zugang hinterlegt.', 400);
+    $r = imapFetchList($acc, 40);
+    if (!$r['ok']) fail((string)$r['error'], 502);
+    $p = db();
+    $ins = $p->prepare("insert into mail_inbox (id, account, uid, message_id, in_reply_to, from_email, from_name, subject, date_at, seen, customer_id, body_text, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        on conflict(account, message_id) do update set uid=excluded.uid, seen=excluded.seen, body_text=excluded.body_text");
+    foreach ($r['messages'] as $m) {
+      $mid = $m['message_id'] !== '' ? $m['message_id'] : ('noid-' . $which . '-' . $m['uid']);
+      $custId = null;
+      if ($m['from_email'] !== '') {
+        $cst = $p->prepare('select id from customers where lower(email) = ? order by coalesce(created_at, "") asc limit 1');
+        $cst->execute([$m['from_email']]);
+        $custId = $cst->fetchColumn() ?: null;
+      }
+      $ins->execute([uuid(), $which, $m['uid'], $mid, $m['in_reply_to'], $m['from_email'], $m['from_name'],
+        $m['subject'], $m['date_at'], $m['seen'], $custId, $m['body_text'], now()]);
+    }
+    out(['ok' => true, 'count' => count($r['messages'])]);
+  }
+  /* Aus einer Mail unbekannten Absenders einen Kunden anlegen - gleiches Muster wie
+     "Als Kunde anlegen" bei Anfragen. */
+  if (preg_match('#^mail/inbox/([a-f0-9-]{30,40})/to-customer$#', $path, $m) && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $p = db();
+    $st = $p->prepare('select * from mail_inbox where id = ?');
+    $st->execute([$m[1]]);
+    $row = $st->fetch();
+    if (!$row) fail('Mail nicht gefunden.', 404);
+    if (!empty($row['customer_id'])) out(['ok' => true, 'customer_id' => $row['customer_id']]);
+    [$first, $last] = splitPersonName((string)($row['from_name'] ?: $row['from_email']));
+    $cid = uuid();
+    $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, source, created_at)
+        values (?,?,?,?,?,?,?,?)')
+      ->execute([$cid, 'privat', 'lead', $first, $last, $row['from_email'], 'postfach', now()]);
+    $p->prepare('update mail_inbox set customer_id = ? where account = ? and from_email = ?')
+      ->execute([$cid, $row['account'], $row['from_email']]);
+    out(['ok' => true, 'customer_id' => $cid], 201);
   }
   if ($path === 'backup/run' && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
