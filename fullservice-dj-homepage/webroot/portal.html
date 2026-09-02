@@ -12,20 +12,26 @@
 .ic{width:17px;height:17px;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block}
 
 :root{--bg:#0f1012;--card:#1a1c21;--card2:#212429;--line:#282b32;--acc:#ff6f5b;--acc2:#ff8d7c;
---txt:#f2f0ec;--mut:#a3a29b;--mut2:#8f8e88;--grn:#5aa05a}
+--txt:#f2f0ec;--mut:#a3a29b;--mut2:#8f8e88;--grn:#5aa05a;
+/* Ab hier: Farben, die applyPortalDesign() aus dem Website-Design ableitet - Werte hier
+   sind nur der Stand, bis das Design vom Server da ist (oder wenn es nicht laedt).
+   --acc-txt: Akzent als Textfarbe (Links, Summen), notfalls fuer Kontrast nachgedunkelt/
+   aufgehellt. --btn-txt: Schrift auf dem Akzent-Button. --line-soft: zarte Trennlinien. */
+--acc-txt:#ff6f5b;--btn-txt:#16110f;--acc-soft:rgba(255,111,91,.15);--line-soft:var(--line-soft);
+--ok-txt:#9fd49f;--err-txt:#e0a0a0;--warn-txt:#f0cf7a;--hf:'Space Grotesk',sans-serif}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
-h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;letter-spacing:-.01em}
-a{color:var(--acc);text-decoration:none}
+h1,h2,h3,h4{font-family:var(--hf);letter-spacing:-.01em}
+a{color:var(--acc-txt);text-decoration:none}
 .wrap{max-width:760px;margin:0 auto;padding:32px 20px 80px}
 .logo{display:flex;align-items:center;gap:9px;margin-bottom:36px}
 .logo svg{width:24px;height:24px}
-.logo b{font-family:'Space Grotesk',sans-serif;font-size:19px}
+.logo b{font-family:var(--hf);font-size:19px}
 .logo b i{font-style:normal;color:var(--acc)}
 /* Kundeninhalte können sehr lange Wörter/URLs enthalten - ohne Umbruchregel
    schiebt ein einziger Wert die ganze Seite in die Breite. */
 .card,.sub,.items td{overflow-wrap:anywhere}
 .card{background:var(--card);border:1px solid var(--line);border-radius:5px;padding:28px;margin-bottom:18px}
-.kicker{font-family:'Space Grotesk',sans-serif;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--mut);font-weight:600;margin-bottom:8px}
+.kicker{font-family:var(--hf);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--mut);font-weight:600;margin-bottom:8px}
 .kicker::before{content:"";display:inline-block;width:18px;height:2px;background:var(--acc);vertical-align:middle;margin-right:8px}
 h1{font-size:clamp(24px,5vw,32px);margin-bottom:6px}
 .sub{color:var(--mut);font-size:14px}
@@ -34,28 +40,28 @@ input,select,textarea{width:100%;padding:12px 14px;background:var(--bg);border:1
 ::placeholder{color:var(--mut)}
 input:focus,select:focus,textarea:focus{border-color:var(--acc)}
 textarea{min-height:100px;resize:vertical}
-.btn{display:inline-block;background:var(--acc);color:#16110f;padding:13px 26px;font-size:13px;font-weight:600;letter-spacing:.03em;border:none;border-radius:4px;cursor:pointer;font-family:'Space Grotesk',sans-serif;transition:background .2s}
+.btn{display:inline-block;background:var(--acc);color:var(--btn-txt);padding:13px 26px;font-size:13px;font-weight:600;letter-spacing:.03em;border:none;border-radius:4px;cursor:pointer;font-family:var(--hf);transition:background .2s}
 .btn:hover{background:var(--acc2)}
 .btn.g{background:transparent;color:var(--txt);border:1px solid var(--line)}
-.btn.g:hover{border-color:var(--acc);color:var(--acc)}
+.btn.g:hover{border-color:var(--acc);color:var(--acc-txt)}
 .btn.green{background:#4f9a4f;color:#0c150c}
 .btn:disabled{opacity:.5;cursor:default}
 .msg{padding:14px 16px;font-size:14px;border:1px solid;border-radius:4px;margin:14px 0;display:none}
-.msg.ok{display:block;border-color:#3d6b3d;background:rgba(60,120,60,.12);color:#9fd49f}
-.msg.err{display:block;border-color:#7a3535;background:rgba(150,60,60,.12);color:#e0a0a0}
-.msg.warn{display:block;border-color:#8a6d1f;background:rgba(200,160,40,.12);color:#f0cf7a}
+.msg.ok{display:block;border-color:#3d6b3d;background:rgba(60,120,60,.12);color:var(--ok-txt)}
+.msg.err{display:block;border-color:#7a3535;background:rgba(150,60,60,.12);color:var(--err-txt)}
+.msg.warn{display:block;border-color:#8a6d1f;background:rgba(200,160,40,.12);color:var(--warn-txt)}
 
 /* Angebots-Tabelle */
 table{width:100%;border-collapse:collapse;font-size:14px}
 th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut2);text-align:left;padding:8px;border-bottom:1px solid var(--line)}
-td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}
+td{padding:11px 8px;border-bottom:1px solid var(--line-soft);vertical-align:top}
 .subrow td{padding:1px 8px;border-bottom:none;font-size:11.5px}
 .grouphead td{padding-top:9px;padding-bottom:1px}
 .groupfoot td{padding-top:2px;padding-bottom:7px}
 .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 th.num{text-align:right}
 .pos-desc{position:relative;cursor:default}
-.pos-desc .info{display:inline-block;margin-left:6px;width:17px;height:17px;line-height:17px;text-align:center;border-radius:50%;background:rgba(255,111,91,.15);color:var(--acc);font-size:11px;font-weight:700;cursor:help}
+.pos-desc .info{display:inline-block;margin-left:6px;width:17px;height:17px;line-height:17px;text-align:center;border-radius:50%;background:var(--acc-soft);color:var(--acc-txt);font-size:11px;font-weight:700;cursor:help}
 .tip{display:none;position:absolute;left:0;top:100%;z-index:20;background:var(--card2);border:1px solid var(--acc);border-radius:4px;padding:12px 14px;font-size:13px;color:var(--txt);max-width:380px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-top:4px}
 .pos-desc:hover .tip,.pos-desc.open .tip{display:block}
 /* Auf schmalen Displays war die Sprechblase nur so breit wie die Positionsspalte und
@@ -64,7 +70,7 @@ th.num{text-align:right}
   .pos-desc .tip{position:static;max-width:none;width:100%;margin-top:8px;box-shadow:none}
 }
 .totals td{border-bottom:none;padding:5px 8px}
-.totals .grand{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--acc)}
+.totals .grand{font-family:var(--hf);font-size:18px;font-weight:700;color:var(--acc-txt)}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
 .status-b{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 12px;border-radius:4px;border:1px solid var(--grn);color:var(--grn)}
 .hint{font-size:12px;color:var(--mut2);margin-top:14px}
@@ -75,7 +81,7 @@ footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
 .up{background:var(--card2);border:1px solid var(--line);border-radius:4px;padding:18px}
 .up h4{font-size:15px;margin-bottom:5px}
 .up p{font-size:13px;color:var(--mut);margin-bottom:10px}
-.up .upp{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--acc);margin-bottom:10px}
+.up .upp{font-family:var(--hf);font-weight:700;color:var(--acc-txt);margin-bottom:10px}
 .up button{font-size:12px;padding:8px 14px}
 .up.asked{border-color:var(--grn)}
 #printArea{display:none}
@@ -122,6 +128,75 @@ fetch(API+'/public/company').then(function(r){return r.json()}).then(function(co
   var ph=document.getElementById('coPhoneHint');if(ph)ph.innerHTML=phoneHint();
 }).catch(function(){});
 function coOf(){return (DOC&&DOC.company)||CO||{}}
+/* ===== Design von der Website uebernehmen =====
+   Quelle sind dieselben site_content-Eintraege, die index.html und technik.html lesen:
+   "theme" (DJ-Seite: primary, bg, font) und "theme_technik" (Technik-Seite: primary, bg).
+   Daraus leitet applyPortalDesign() alle Portal-Farben ab - nicht nur Akzent und
+   Hintergrund, sondern auch Karte, Linien, Text und gedaempften Text, damit auch ein
+   heller Hintergrund funktioniert. Jede wichtige Farbkombination wird rechnerisch auf
+   WCAG-AA-Kontrast geprueft (4,5:1; Vordergrund wird notfalls Richtung Weiss/Schwarz
+   gezogen), egal welches Farbschema Markus im Backoffice waehlt.
+
+   Welche Palette? Standard ist die DJ-Palette (Hauptseite). Die Technik-Palette gilt nur,
+   wenn der angezeigte Vorgang eindeutig Technik ist: Mietvertrag (?mv=), ein Beleg zu
+   einer Technik-/Miet-Buchung (booking_kind bzw. event_info.kind = technik) oder im
+   Kundenkonto, wenn die neueste Buchung technik/miete ist. "dj_technik" zaehlt als DJ. */
+var DESIGN=null,DESIGN_KIND=MV?'technik':'dj';
+var FONT_HEADS={grotesk:"'Space Grotesk',sans-serif",outfit:"'Outfit',sans-serif",playfair:"'Playfair Display',serif",poppins:"'Poppins',sans-serif",montserrat:"'Montserrat',sans-serif",bebas:"'Bebas Neue',cursive",merriweather:"'Merriweather',serif",oswald:"'Oswald',sans-serif",caveat:"'Caveat',cursive",anton:"'Anton',sans-serif"};
+function hexRgb(h){h=String(h||'').trim().replace('#','');if(h.length===3)h=h.replace(/(.)/g,'$1$1');
+  if(!/^[0-9a-f]{6}$/i.test(h))return null;return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]}
+function rgbHex(c){return '#'+c.map(function(v){v=Math.max(0,Math.min(255,Math.round(v)));return (v<16?'0':'')+v.toString(16)}).join('')}
+function lum(c){var a=c.map(function(v){v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return .2126*a[0]+.7152*a[1]+.0722*a[2]}
+function ratio(a,b){var l1=lum(a),l2=lum(b);return (Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05)}
+function mix(a,b,t){return [0,1,2].map(function(i){return a[i]+(b[i]-a[i])*t})}
+var WHITE=[255,255,255],INK=[22,17,15];
+/* Weiss oder Fast-Schwarz - was auf dieser Flaeche besser lesbar ist. */
+function pickFg(bg){return ratio(INK,bg)>=ratio(WHITE,bg)?INK:WHITE}
+/* Vordergrund in kleinen Schritten Richtung Weiss (dunkle Flaeche) bzw. Schwarz (helle
+   Flaeche) ziehen, bis das Mindestverhaeltnis erreicht ist - Farbton bleibt erhalten. */
+function fitTo(fg,bg,min){var target=lum(bg)<.18?WHITE:[0,0,0],c=fg,i=0;while(ratio(c,bg)<min&&i<60){c=mix(c,target,.06);i++}return c}
+/* Flaeche, auf der weder Weiss noch Fast-Schwarz 4,5:1 erreicht (Mittelgrau): so lange
+   Richtung Schwarz bzw. Weiss schieben, bis Text darauf lesbar ist. Bei den ueblichen
+   dunklen oder hellen Hintergruenden aendert das nichts. */
+function safeSurface(c){var i=0;while(ratio(pickFg(c),c)<4.5&&i<60){c=mix(c,lum(c)<.18?[0,0,0]:WHITE,.06);i++}return c}
+function isTechnikKind(k){return k==='technik'||k==='miete'}
+function docKind(doc){
+  var e=doc&&doc.doc&&doc.doc.event_info;if(typeof e==='string'){try{e=JSON.parse(e)}catch(err){e=null}}
+  return isTechnikKind(doc&&doc.booking_kind)||(e&&isTechnikKind(e.kind))?'technik':'dj';
+}
+function setDesignKind(k){DESIGN_KIND=k==='technik'?'technik':'dj';applyPortalDesign()}
+function applyPortalDesign(){
+  if(!DESIGN)return;
+  var th=DESIGN.theme||{},tt=DESIGN.theme_technik||{};
+  var src=DESIGN_KIND==='technik'&&tt.primary?tt:th;
+  var bg=safeSurface(hexRgb(src.bg)||hexRgb('#0f1012')),acc=hexRgb(src.primary)||hexRgb('#ff6f5b');
+  var dark=pickFg(bg)===WHITE,to=dark?WHITE:[0,0,0];
+  var card=safeSurface(mix(bg,to,dark?.045:.04)),card2=safeSurface(mix(bg,to,dark?.08:.075)),line=mix(bg,to,dark?.14:.16);
+  var txt=fitTo(dark?[242,240,236]:INK,card,4.5);txt=fitTo(txt,bg,4.5);
+  var mut=fitTo(dark?[163,162,155]:[92,90,85],card,4.5);mut=fitTo(mut,bg,4.5);
+  var mut2=fitTo(dark?[143,142,136]:[107,105,100],card,4.5);mut2=fitTo(mut2,bg,4.5);
+  var accTxt=fitTo(fitTo(acc,bg,4.5),card,4.5);
+  var btnTxt=pickFg(acc),acc2=mix(acc,dark?WHITE:[0,0,0],.15);
+  var grn=fitTo(dark?[90,160,90]:[46,125,50],card,4.5);
+  var okT=fitTo(dark?[159,212,159]:[31,107,31],card,4.5),errT=fitTo(dark?[224,160,160]:[143,42,42],card,4.5),warnT=fitTo(dark?[240,207,122]:[110,82,16],card,4.5);
+  var r=document.documentElement.style,set=function(k,v){r.setProperty(k,Array.isArray(v)?rgbHex(v):v)};
+  set('--bg',bg);set('--card',card);set('--card2',card2);set('--line',line);set('--acc',acc);set('--acc2',acc2);
+  set('--txt',txt);set('--mut',mut);set('--mut2',mut2);set('--grn',grn);set('--acc-txt',accTxt);set('--btn-txt',btnTxt);
+  set('--acc-soft','rgba('+Math.round(acc[0])+','+Math.round(acc[1])+','+Math.round(acc[2])+',.15)');
+  set('--line-soft',dark?'rgba(255,255,255,.06)':'rgba(0,0,0,.08)');
+  set('--ok-txt',okT);set('--err-txt',errT);set('--warn-txt',warnT);
+  /* Schrift wie auf der Website: Ueberschriften, Kicker und Buttons in der gewaehlten
+     Schrift, Fliesstext bleibt Inter (so machen es index.html/technik.html auch). */
+  set('--hf',FONT_HEADS[th.font]||FONT_HEADS.grotesk);
+  var ico=document.querySelector('link[rel=icon]');if(ico)ico.href=ico.href.replace(/%23[0-9a-f]{6}/i,'%23'+rgbHex(acc).slice(1));
+  document.documentElement.style.colorScheme=dark?'dark':'light';
+  /* Fuer Tests/Diagnose: die gepruefte Kontrast-Tabelle. */
+  window.PORTAL_CONTRAST={kind:DESIGN_KIND,txt_bg:ratio(txt,bg),txt_card:ratio(txt,card),btn_acc:ratio(btnTxt,acc),mut_card:ratio(mut,card),acc_bg:ratio(accTxt,bg),acc_card:ratio(accTxt,card)};
+}
+fetch(API+'/rest/site_content?select=key,value').then(function(r){return r.json()}).then(function(rows){
+  var c={};(rows||[]).forEach(function(x){c[x.key]=x.value});DESIGN=c;applyPortalDesign();
+}).catch(function(){});
+
 /* "Alex prüft das" - ohne Inhaber der Firmenname, ohne beides neutral. */
 function ownerFirstPub(){var c=coOf();return c.owner_first||c.name||'der Veranstalter'}
 function phoneHint(){var p=(coOf().phone||'');return p?' Oder ruft mich einfach an: <a href="tel:'+esc(p.replace(/[^\d+]/g,''))+'">'+esc(p)+'</a>.':''}
@@ -153,7 +228,7 @@ function loadOffer(){
     .then(function(res){
       if(res.s===401){renderPlzGate();return}
       if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte prüft den Link oder meldet euch direkt bei mir.')+'</p></div>');return}
-      DOC=res.j;renderOffer();
+      DOC=res.j;setDesignKind(docKind(DOC));renderOffer();
     }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
 }
 function renderPlzGate(){
@@ -620,7 +695,7 @@ function renderForm(){
     app('<div class="card"><div class="kicker">Ein paar Fragen</div><h1>'+esc(FDEF.title)+'</h1>'+
       '<p class="sub" style="margin-top:8px">Beantwortet am '+dt(FDEF.submitted_at)+' – danke euch! Ich melde mich mit den nächsten Schritten. Hier sind eure Antworten zum Nachlesen:</p>'+
       '<div style="margin-top:14px">'+(FDEF.fields||[]).map(function(f,i){
-        return '<div class="form-answer" style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)"><div class="sub" style="font-size:12.5px">'+esc(f.label)+'</div><div style="white-space:pre-wrap">'+esc(ans[i]||'–')+'</div></div>';
+        return '<div class="form-answer" style="padding:9px 0;border-bottom:1px solid var(--line-soft)"><div class="sub" style="font-size:12.5px">'+esc(f.label)+'</div><div style="white-space:pre-wrap">'+esc(ans[i]||'–')+'</div></div>';
       }).join('')+'</div>'+
       (CTOK?'<p class="sub" style="margin-top:14px"><a href="portal.html">← Zurück zu meinen Unterlagen</a></p>':'')+'</div>');
     return;
@@ -699,7 +774,7 @@ function loadRental(){
     .then(function(res){
       if(res.s===401){renderMvGate();return}
       if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte prüft den Link oder meldet euch direkt bei mir.')+'</p></div>');return}
-      MVDATA=res.j;renderRental();
+      MVDATA=res.j;setDesignKind('technik');renderRental();
     }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
 }
 function renderMvGate(){
@@ -937,7 +1012,7 @@ function loadAccount(){
     return r.json();
   }).then(function(me){
     if(!me)return;
-    ME=me;renderAccount();
+    ME=me;setDesignKind(me.bookings&&me.bookings[0]&&isTechnikKind(me.bookings[0].kind)?'technik':'dj');renderAccount();
   }).catch(function(){renderLogin('Verbindungsfehler – bitte später erneut versuchen.')});
 }
 /* ===== Veranstaltungsplaner =====
@@ -983,16 +1058,16 @@ function planRow(bookingId,key,path,label,cfg){
   var box=cfg.multiline?('<textarea id="in_'+key+'" style="min-height:'+(cfg.rows||70)+'px"'+auto+'>'+esc(editVal)+'</textarea>')
     :('<input id="in_'+key+'" value="'+esc(editVal)+'"'+auto+'>');
   if(cfg.locked){
-    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>'+esc(label)+':</b> '+(cfg.empty?'<span class="sub">–</span>':display)+'</div>';
+    return '<div style="padding:6px 0;border-bottom:1px solid var(--line-soft)"><b>'+esc(label)+':</b> '+(cfg.empty?'<span class="sub">–</span>':display)+'</div>';
   }
   if(cfg.empty){
-    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><label style="margin:4px 0 2px" for="in_'+key+'">'+esc(label)+
-      ' <span id="ok_'+key+'" style="color:#9fd49f;text-transform:none;letter-spacing:0" hidden>· gespeichert ✓</span></label>'+box+'</div>';
+    return '<div style="padding:6px 0;border-bottom:1px solid var(--line-soft)"><label style="margin:4px 0 2px" for="in_'+key+'">'+esc(label)+
+      ' <span id="ok_'+key+'" style="color:var(--ok-txt);text-transform:none;letter-spacing:0" hidden>· gespeichert ✓</span></label>'+box+'</div>';
   }
-  return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>'+esc(label)+':</b> '+display+
+  return '<div style="padding:6px 0;border-bottom:1px solid var(--line-soft)"><b>'+esc(label)+':</b> '+display+
     ' <a onclick="planToggle(\''+key+'\')" style="cursor:pointer;font-size:13px">Änderung vorschlagen</a>'+
     '<div id="ed_'+key+'" hidden style="margin-top:4px">'+box+
-    '<div style="margin-top:4px"><button class="btn" style="padding:6px 12px" onclick="planSubmit(\''+key+'\')">Vorschlag senden</button> <span id="ok_'+key+'" style="color:#9fd49f;font-size:13px;display:none">Vorschlag gesendet ✓</span></div></div></div>';
+    '<div style="margin-top:4px"><button class="btn" style="padding:6px 12px" onclick="planSubmit(\''+key+'\')">Vorschlag senden</button> <span id="ok_'+key+'" style="color:var(--ok-txt);font-size:13px;display:none">Vorschlag gesendet ✓</span></div></div></div>';
 }
 /* Merkt sich, welche Felder in dieser Sitzung schon abgeschickt wurden - ihr Inhalt
    darf ein spaeteres Neuladen nicht mehr blockieren. */
@@ -1106,7 +1181,7 @@ function planCard(b,i){
     (locked?'<p class="msg err" style="display:block;font-size:13px">Der Ablaufplan ist jetzt final – Änderungswünsche bitte direkt mit mir klären.</p>':'')+
     rows+
     (locked?'':'<div style="margin-top:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" style="padding:8px 14px" onclick="planSaveAll('+i+')">Alles speichern</button>'+
-      '<span id="allok_'+i+'" style="color:#9fd49f;font-size:13px" hidden></span>'+
+      '<span id="allok_'+i+'" style="color:var(--ok-txt);font-size:13px" hidden></span>'+
       '<span class="sub" style="font-size:12.5px">Neue Angaben speichere ich automatisch, sobald du ein Feld verlässt.</span></div>')+
     '</div>';
 }
@@ -1116,17 +1191,17 @@ function renderAccount(){
     /* Termin dazu, wenn erkennbar: bei mehreren Buchungen sonst nicht zu sehen,
        zu welcher Veranstaltung ein Beleg gehoert. */
     var termin=d.event_date?' · Termin '+dt(d.event_date):'';
-    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap">'+
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-soft);flex-wrap:wrap">'+
     '<div><b>'+(TYPE_LABEL[d.doc_type]||d.doc_type)+' '+esc(d.number)+'</b> <span style="color:var(--mut);font-size:13px">· '+dt(d.doc_date)+termin+' · '+d.status+'</span></div>'+
     '<a href="?a='+d.token+'">Ansehen / PDF →</a></div>';
   }).join('')||(me.bookings.length||(me.rentals||[]).length
     ?'<p class="sub">Noch keine Unterlagen.</p>'
     :'<p class="sub">Hier ist noch nichts – das ist ganz normal. Sobald ich dir ein Angebot schicke, erscheint es hier, und du kannst es direkt online ansehen, Fragen dazu stellen und annehmen. Rechnungen und Verträge landen später am selben Ort.</p>');
   var rentals=(me.rentals||[]).map(function(r){
-    return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>Mietvertrag</b> <span style="color:var(--mut);font-size:13px">· Termin '+dt(r.event_date)+' · '+(r.status==='unterschrieben'?'unterschrieben ✓':'offen')+'</span> &nbsp;<a href="?mv='+r.token+'">Öffnen →</a></div>';
+    return '<div style="padding:9px 0;border-bottom:1px solid var(--line-soft)"><b>Mietvertrag</b> <span style="color:var(--mut);font-size:13px">· Termin '+dt(r.event_date)+' · '+(r.status==='unterschrieben'?'unterschrieben ✓':'offen')+'</span> &nbsp;<a href="?mv='+r.token+'">Öffnen →</a></div>';
   }).join('');
   var forms=(me.forms||[]).map(function(f){
-    return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b>'+esc(f.title)+'</b> <span style="color:var(--mut);font-size:13px">· '+(f.status==='beantwortet'?'beantwortet am '+dt(f.submitted_at):'noch offen')+'</span> &nbsp;<a href="?f='+f.token+'">'+(f.status==='beantwortet'?'Ansehen':'Jetzt ausfüllen')+' →</a></div>';
+    return '<div style="padding:9px 0;border-bottom:1px solid var(--line-soft)"><b>'+esc(f.title)+'</b> <span style="color:var(--mut);font-size:13px">· '+(f.status==='beantwortet'?'beantwortet am '+dt(f.submitted_at):'noch offen')+'</span> &nbsp;<a href="?f='+f.token+'">'+(f.status==='beantwortet'?'Ansehen':'Jetzt ausfüllen')+' →</a></div>';
   }).join('');
   var books=me.bookings.map(function(b,i){
     var n=b.notes||{};
@@ -1141,12 +1216,12 @@ function renderAccount(){
     '<label for="nS'+i+'">Programmablauf (Zeiten, Reden, Programmpunkte)</label><textarea id="nS'+i+'" style="min-height:80px" placeholder="z. B. 18:00 Empfang · 19:00 Essen · 20:30 Rede Chef · 21:00 Party …">'+esc(n.schedule||'')+'</textarea>'+
     '<label for="nM'+i+'">Musikwünsche &amp; No-Gos</label><textarea id="nM'+i+'" style="min-height:80px" placeholder="Wünsche, Lieblingslieder, was auf keinen Fall laufen darf …">'+esc(n.music||'')+'</textarea>'+
     '<label for="nA'+i+'">Vereinbarungen &amp; Sonstiges</label><textarea id="nA'+i+'" style="min-height:60px" placeholder="Was wir besprochen haben, Ansprechpartner vor Ort, Besonderheiten …">'+esc(n.agreements||'')+'</textarea>'+
-    '<div style="margin-top:12px;display:flex;gap:12px;align-items:center"><button class="btn" onclick="saveNotes('+i+')">Speichern</button><span id="nOk'+i+'" style="color:#9fd49f;font-size:13px;display:none">Gespeichert ✓</span></div></div>';
+    '<div style="margin-top:12px;display:flex;gap:12px;align-items:center"><button class="btn" onclick="saveNotes('+i+')">Speichern</button><span id="nOk'+i+'" style="color:var(--ok-txt);font-size:13px;display:none">Gespeichert ✓</span></div></div>';
   }).join('');
   var files=(me.files||[]).map(function(f){
-    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)">'+
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-soft)">'+
     '<div>'+(f.kind==='foto'?'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>')+' '+esc(f.name)+' <span style="color:var(--mut);font-size:12px">('+Math.max(1,Math.round(f.size/1024))+' KB)</span></div>'+
-    '<div><a onclick="openFile(\''+f.id+'\')" style="cursor:pointer">Öffnen</a> &nbsp;<a onclick="delFile(\''+f.id+'\')" style="cursor:pointer;color:#e0a0a0">Löschen</a></div></div>';
+    '<div><a onclick="openFile(\''+f.id+'\')" style="cursor:pointer">Öffnen</a> &nbsp;<a onclick="delFile(\''+f.id+'\')" style="cursor:pointer;color:var(--err-txt)">Löschen</a></div></div>';
   }).join('')||'<p class="sub" style="font-size:13px">Noch keine Dateien – ladet gern Fotos eurer Location oder Dokumente hoch.</p>';
   app('<div class="card"><div class="kicker">Dein Kundenkonto</div><h1>Hallo, '+esc(me.customer.name)+'!</h1>'+
     '<p class="sub">Hier findet ihr alle Unterlagen und könnt alles für eure Termine pflegen. <a onclick="logout()" style="cursor:pointer">Abmelden</a></p></div>'+
@@ -1176,7 +1251,7 @@ function profileCard(){
     '<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1 1 110px"><label for="pfZip">PLZ</label><input id="pfZip" value="'+esc(c.zip||'')+'" inputmode="numeric" autocomplete="postal-code"></div>'+
     '<div style="flex:2 1 180px"><label for="pfCity">Ort</label><input id="pfCity" value="'+esc(c.city||'')+'" autocomplete="address-level2"></div></div>'+
     '<div class="msg err" id="pfMsg" style="display:none"></div>'+
-    '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="saveProfile()">Profil speichern</button><span id="pfOk" style="color:#9fd49f;font-size:13px" hidden>Gespeichert ✓</span></div></div></div>';
+    '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="saveProfile()">Profil speichern</button><span id="pfOk" style="color:var(--ok-txt);font-size:13px" hidden>Gespeichert ✓</span></div></div></div>';
 }
 function profToggle(){var e=document.getElementById('profEdit');e.hidden=!e.hidden;if(!e.hidden)document.getElementById('pfPhone').focus()}
 function saveProfile(){

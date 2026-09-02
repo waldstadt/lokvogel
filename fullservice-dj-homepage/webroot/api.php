@@ -4612,6 +4612,14 @@ function handlePortal(string $path, string $method, $body): never {
         return $tok ? baseUrl() . '/portal.html?f=' . $tok : null;
       })(),
       'today' => date('Y-m-d'),
+      /* Art der zugehoerigen Buchung (dj / technik / miete ...): Das Portal waehlt danach
+         die DJ- oder Technik-Farbpalette der Website. */
+      'booking_kind' => (function () use ($p, $d) {
+        if (empty($d['booking_id'])) return null;
+        $st = $p->prepare('select kind from bookings where id = ?');
+        $st->execute([$d['booking_id']]);
+        return $st->fetchColumn() ?: null;
+      })(),
       'items' => $it->fetchAll(),
       'company' => publicCompany($comp) + array_intersect_key($comp, array_flip(['iban','bic','bank','tax_id'])),
       'upsells' => $ups,
