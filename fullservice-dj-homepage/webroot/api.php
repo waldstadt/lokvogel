@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 97;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 98;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -782,7 +782,7 @@ function upgrade(PDO $p): void {
       if (is_array($legal)) {
         $legal['impressum'] = str_replace(
           ['E-Mail: (bitte im Backoffice ergänzen)', "\n\nUmsatzsteuer: (Steuernummer / USt-IdNr. bitte im Backoffice ergänzen)"],
-          ['E-Mail: lauschgiftmarkus@gmail.com', ''],
+          ['E-Mail: ' . NEW_PUBLIC_EMAIL, ''],
           (string)($legal['impressum'] ?? '')
         );
         foreach (['datenschutz', 'agb'] as $lk) {
@@ -1020,9 +1020,41 @@ function upgrade(PDO $p): void {
     try { $p->exec("alter table workshop_events add column info_file text"); } catch (PDOException $e) {}
     try { $p->exec("alter table workshop_events add column info_name text"); } catch (PDOException $e) {}
   }
+  if ($v < 98) {
+    /* v98: Oeffentliche E-Mail-Adresse auf die neue Korrespondenz-Adresse umgestellt -
+       dieselbe Umstellung wie die Geschaeftsnummer in v94. Firmendaten + Kontaktkarte
+       (ueber syncContactFromCompany) und ein woertliches Vorkommen im Impressum werden
+       ersetzt, wenn dort noch die alte Adresse steht; eine andere, selbst eingetragene
+       Adresse bleibt unangetastet. */
+    try {
+      $comp = json_decode((string)$p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true) ?: [];
+      $mail = trim((string)($comp['email'] ?? ''));
+      if ($mail === '' || strcasecmp($mail, OLD_PUBLIC_EMAIL) === 0) {
+        $comp['email'] = NEW_PUBLIC_EMAIL;
+        $p->prepare("update settings set value = ?, updated_at = ? where key='company'")->execute([json_encode($comp, JSON_UNESCAPED_UNICODE), now()]);
+      }
+      syncContactFromCompany($p, $comp);
+      $row = $p->query("select value from site_content where key='legal'")->fetchColumn();
+      $legal = $row ? json_decode((string)$row, true) : null;
+      if (is_array($legal)) {
+        $chg = false;
+        foreach (['impressum', 'datenschutz', 'agb'] as $k) {
+          $t = (string)($legal[$k] ?? ''); if ($t === '' || stripos($t, OLD_PUBLIC_EMAIL) === false) continue;
+          $legal[$k] = str_ireplace(OLD_PUBLIC_EMAIL, NEW_PUBLIC_EMAIL, $t); $chg = true;
+        }
+        if ($chg) $p->prepare("update site_content set value = ? where key='legal'")->execute([json_encode($legal, JSON_UNESCAPED_UNICODE)]);
+      }
+    } catch (Throwable $e) {}
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
+/* Alte oeffentliche Adresse (bis zur Mail-Integration in Paket 19): private Gmail-Adresse,
+   die auf der Website, im Impressum und als Absender stand. Jetzt eines der beiden echten
+   Postfaecher - markus@lauschgift.net ist fuer Korrespondenz direkt mit Kunden gedacht,
+   genau das, was auf der Website und im Impressum stehen soll. */
+const OLD_PUBLIC_EMAIL = 'lauschgiftmarkus@gmail.com';
+const NEW_PUBLIC_EMAIL = 'markus@lauschgift.net';
 /* Alte private Nummer (bis Paket 17) in beliebiger Schreibweise erkennen: 01523 6439373,
    +49 1523 6439373, 0152/36439373 ... - Ziffern mit beliebigen Trennern dazwischen. */
 const NEW_BUSINESS_PHONE = '0179 1716970';
@@ -3180,7 +3212,7 @@ function seed(PDO $p): void {
     ['rental', '{"title":"Technik mieten","text":"Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung."}'],
     ['tech_hero', '{"headline":"Jedes Wort verständlich.\n*Auch in der schwierigsten Location.*","scrim":{"mode":"gleich","pct":30},"badges":[{"value": "24 h", "label": "= 1 Miettag"}, {"value": "50 %", "label": "jeder Folgetag"}, {"value": "Hemer", "label": "Lager & Abholung"}],"subtitle":"Lauschgift Veranstaltungstechnik · Hemer","text":"Große Bühnen mit viel Platz kann jeder beschallen. Die Kunst ist die kleine Location: niedrige Decke, harte Wände, Publikum direkt vor der Box. Genau darauf bin ich spezialisiert – Ton und Licht für Veranstaltungen von 30 bis 200 Gästen, mit hochwertiger Technik, die dafür gebaut ist."}'],
     ['tech_teaser', '{"title":"Lauschgift Veranstaltungstechnik","text":"Ton und Licht gehören für mich untrennbar zum DJ-Sein dazu – deshalb biete ich beides auch unabhängig voneinander an: Technik zum Mieten direkt aus meinem Lager in Hemer, oder mich als Techniker inklusive Equipment, ganz ohne Auflegen. Alle Details dazu auf der Technik-Seite."}'],
-    ['contact', '{"title":"Kontakt","phone":"0179 1716970","email":"lauschgiftmarkus@gmail.com","address":"Büttmecker Weg 35c, 58675 Hemer","instagram":"https://www.instagram.com/dj_lauschgift/","whatsapp":""}'],
+    ['contact', '{"title":"Kontakt","phone":"0179 1716970","email":"markus@lauschgift.net","address":"Büttmecker Weg 35c, 58675 Hemer","instagram":"https://www.instagram.com/dj_lauschgift/","whatsapp":""}'],
     ['theme', '{"preset":"koralle","primary":"#ff6f5b","bg":"#0f1012","font":"grotesk"}'],
     ['reviews', '{"google_url":"","djbande_url":"","tagline":""}'],
     ['loc_section', '{"title":"Orte, an denen ich besonders gerne auflege","text":"Deutschlandweit gibt es Locations, mit denen die Zusammenarbeit einfach herausragend läuft – eingespielte Teams, gute Technik-Bedingungen, tolle Räume. Diese Häuser empfehle ich aus voller Überzeugung."}'],
