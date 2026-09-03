@@ -1195,6 +1195,18 @@ function renderLocations(){
 }
 sfetch('reviews?select=*&public=eq.true&order=sort').then(function(r){
   REV_DATA=r;renderReviews();
+  /* Sterne direkt im Google-Suchtreffer: aggregateRating aus den echten, auf der Seite
+     sichtbaren Bewertungen - kein erfundener Wert, zaehlt nur was auch angezeigt wird. */
+  var bewertet=r.filter(function(x){return Number(x.rating)>0});
+  if(bewertet.length){
+    var schnitt=bewertet.reduce(function(s,x){return s+Number(x.rating)},0)/bewertet.length;
+    var ld=document.querySelector('script[type="application/ld+json"]');
+    if(ld)try{
+      var j=JSON.parse(ld.textContent);
+      j.aggregateRating={'@type':'AggregateRating','ratingValue':Math.round(schnitt*10)/10,'reviewCount':bewertet.length};
+      ld.textContent=JSON.stringify(j);
+    }catch(e){}
+  }
 }).catch(function(){});
 sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
   LOC_DATA=r;renderLocations();
