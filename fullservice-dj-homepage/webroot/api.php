@@ -4262,7 +4262,17 @@ function smtpConnectAuth(array $account, ?string &$err) {
   if ($pass === '') { $err = 'Kein Passwort für dieses Konto hinterlegt.'; return null; }
   $transport = $enc === 'starttls' ? 'tcp' : 'ssl';
   $sock = @stream_socket_client("$transport://$host:$port", $errno, $errstr, 15, STREAM_CLIENT_CONNECT, smtpTlsContext());
-  if (!$sock) { $err = "Verbindung zu $host:$port fehlgeschlagen: " . ($errstr ?: 'unbekannter Fehler') . " ($errno)."; return null; }
+  if (!$sock) {
+    /* $errstr enthaelt bei einem nicht aufloesbaren Hostnamen die rohe PHP/Netzwerk-
+       Meldung (z. B. "getaddrinfo ... Name or service not known") - das verwirrt beim
+       Ersteinrichten mehr, als es hilft. Klartext statt Systemjargon. */
+    $notFound = $errno === 0 || stripos((string)$errstr, 'getaddrinfo') !== false
+      || stripos((string)$errstr, 'known') !== false || stripos((string)$errstr, 'nodename') !== false;
+    $err = $notFound
+      ? "Der Host „{$host}“ wurde nicht gefunden – bitte den SMTP-Host in den Einstellungen prüfen."
+      : "Verbindung zu $host:$port ist fehlgeschlagen – bitte Host, Port und Internetverbindung prüfen.";
+    return null;
+  }
   stream_set_timeout($sock, 15);
   $r = smtpReadResponse($sock);
   if ($r['code'] !== 220) { $err = 'Server antwortet nicht wie erwartet (' . $r['code'] . ' ' . $r['text'] . ').'; fclose($sock); return null; }
@@ -4368,7 +4378,7 @@ function imapMailboxString(array $account): string {
   return '{' . $account['imap_host'] . ':' . $account['imap_port'] . '/imap' . $flags . '}INBOX';
 }
 function imapOpen(array $account, ?string &$err) {
-  if (!imapAvailable()) { $err = 'IMAP-Erweiterung ist auf dem Server nicht aktiv – bitte im KAS unter PHP-Einstellungen aktivieren.'; return false; }
+  if (!imapAvailable()) { $err = 'IMAP-Erweiterung ist auf dem Server nicht aktiv – bitte im KAS (der Verwaltungsoberfläche deines Hosters) unter PHP-Einstellungen aktivieren.'; return false; }
   $host = trim((string)($account['imap_host'] ?? ''));
   if ($host === '' || (int)($account['imap_port'] ?? 0) <= 0) { $err = 'IMAP-Host oder -Port fehlt.'; return false; }
   $user = trim((string)($account['username'] ?? '')) ?: trim((string)($account['email'] ?? ''));
