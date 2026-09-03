@@ -438,7 +438,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
       <div class="grp">Vertrieb</div>
       <a data-pg="inq"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Anfragen <span class="cnt-b" id="inqBadge" style="display:none">0</span></a>
       <a data-pg="cust"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Kunden</a>
-      <a data-pg="mail"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Postfach</a>
+      <a data-pg="mail"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Postfach <span class="cnt-b" id="mailBadge" style="display:none">0</span></a>
       <a data-pg="book"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Gigs</a>
       <a data-pg="tpl"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Vorlagen</a>
       <a data-pg="forms"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>Fragebögen</a>
@@ -528,13 +528,19 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
 
   <!-- POSTFACH -->
   <div class="pg" id="pg-mail">
-    <div class="phead"><div><div class="pt">Postfach</div><div class="ps">Eingehende Mails abrufen &amp; unbekannte Absender einordnen</div></div>
+    <div class="phead"><div><div class="pt">Postfach</div><div class="ps">Jede Mail von und an markus@ und backoffice@ – Posteingang und Gesendet an einem Ort</div></div>
       <div><button class="btn g sm" onclick="mailFetch('personal')">Persönlich aktualisieren</button>
-      <button class="btn sm" onclick="mailFetch('system')">System aktualisieren</button></div></div>
-    <div class="card"><h3>Postfach – unbekannter Absender</h3>
-      <div class="mut sml" style="margin-bottom:8px">Mails, deren Absenderadresse zu keinem Kunden passt. Bekannte Absender erscheinen stattdessen direkt in der Kommunikation auf der jeweiligen Kundenseite.</div>
-      <div id="mailUnknownRows">–</div>
+      <button class="btn g sm" onclick="mailFetch('system')">System aktualisieren</button>
+      <button class="btn" onclick="mailComposeNew()">+ Neue Mail</button></div></div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:2;min-width:220px"><label>Suchen</label><input type="search" autocomplete="off" data-lpignore="true" id="mailSearch" placeholder="Betreff, Absender, Empfänger …" oninput="renderMailList()"></div>
+        <div style="min-width:150px"><label>Konto</label><select id="mailFAcc" onchange="renderMailList()"><option value="">Alle</option><option value="personal">Persönlich</option><option value="system">System</option></select></div>
+        <div style="min-width:150px"><label>Richtung</label><select id="mailFDir" onchange="renderMailList()"><option value="">Alle</option><option value="in">Posteingang</option><option value="out">Gesendet</option></select></div>
+        <div style="min-width:170px"><label>Zuordnung</label><select id="mailFCust" onchange="renderMailList()"><option value="">Alle</option><option value="known">Kunde bekannt</option><option value="unknown">Unbekannt</option></select></div>
+      </div>
     </div>
+    <div class="card"><div id="mailRows">–</div></div>
   </div>
 
   <!-- BUCHUNGEN -->
@@ -1416,7 +1422,7 @@ function showPage(id){
   if(id==='einsatz')renderEinsatz();
   if(id==='workshops')loadNewsletter();
   if(id==='media')loadMediaPage();
-  if(id==='mail')loadMailUnknown();
+  if(id==='mail')renderMailList();
   window.scrollTo(0,0);
 }
 
@@ -1469,7 +1475,8 @@ function loadAll(){
     api('rental_contracts?select=*'),
     api('locations?select=*&order=sort'),
     api('tech_checks?select=*&order=created_at.desc'),
-    api('payments?select=*&order=paid_at')
+    api('payments?select=*&order=paid_at'),
+    api('mail_messages?select=*&order=date_at.desc')
   ]).then(function(r){
     S={};(r[0]||[]).forEach(function(x){S[x.key]=x.value});
     CACHE.customers=r[1]||[];CACHE.inquiries=r[2]||[];CACHE.bookings=r[3]||[];
@@ -1480,7 +1487,7 @@ function loadAll(){
     CACHE.wsEvents=r[13]||[];CACHE.wsSignups=r[14]||[];
     CACHE.equipmentSets=r[15]||[];CACHE.setItems=r[16]||[];CACHE.blocks=r[17]||[];
     CACHE.quoteTpls=r[18]||[];CACHE.planChanges=r[19]||[];CACHE.rentalContracts=r[20]||[];
-    CACHE.locations=r[21]||[];CACHE.techChecks=r[22]||[];CACHE.payments=r[23]||[];
+    CACHE.locations=r[21]||[];CACHE.techChecks=r[22]||[];CACHE.payments=r[23]||[];CACHE.mail=r[24]||[];
     applyBrand();
     renderAll();
     renderOrtDatalist2();
@@ -1835,6 +1842,9 @@ function renderDash(){
   var badge=document.getElementById('inqBadge');
   var offeneInq=CACHE.inquiries.filter(function(i){return i.status==='neu'}).length;
   badge.style.display=offeneInq?'':'none';badge.textContent=offeneInq;
+  var mailBadge=document.getElementById('mailBadge');
+  var ungelesen=(CACHE.mail||[]).filter(function(m){return m.direction==='in'&&!m.seen}).length;
+  mailBadge.style.display=ungelesen?'':'none';mailBadge.textContent=ungelesen;
   document.getElementById('dashNext').innerHTML=(upcoming.slice(0,6).map(function(b){
     return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)"><a onclick="openBookDetail(\''+b.id+'\')">'+dt(b.event_date)+' · '+esc(b.title||b.event_type||'Gig')+'</a> <span class="mut">'+esc(custName(custOf(b)))+'</span></div>';
   }).join('')||'Keine festen Gigs in Sicht.')+
@@ -2266,7 +2276,6 @@ function openCustDetail(id){
   }).join(''):'Sobald es einen Gig gibt, kannst du hier Location, Ablaufplan und Musikwünsche pflegen.';
   document.getElementById('cdDocs').innerHTML=renderDocList(function(d){return d.customer_id===id})||'Keine Dokumente.';
   renderComms();
-  if(!CACHE.mailInbox)reloadMailInbox();
   showPage('custd');
 }
 function markReferred(){
@@ -2284,7 +2293,10 @@ var CH_NAME={email:'E-Mail',whatsapp:'WhatsApp',phone:'Telefonat',meeting:'Treff
 function renderComms(){
   var list=CACHE.comms.filter(function(c){return c.customer_id===curCust.id})
     .map(function(c){return {kind:'comm',at:c.occurred_at,c:c}});
-  var inbox=(CACHE.mailInbox||[]).filter(function(m){return m.customer_id===curCust.id})
+  /* Nur eingehende Postfach-Mails hier zusaetzlich einblenden - ausgehende stehen fuer
+     den Kunden bereits als 'communications'-Eintrag (channel:'email') in der Liste oben,
+     doppelt wuerden sie zweimal auftauchen. */
+  var inbox=(CACHE.mail||[]).filter(function(m){return m.customer_id===curCust.id&&m.direction==='in'})
     .map(function(m){return {kind:'mail',at:m.date_at,m:m}});
   var all=list.concat(inbox).sort(function(a,b){return (b.at||'').localeCompare(a.at||'')});
   document.getElementById('cdComms').innerHTML=all.map(function(x){
@@ -2307,43 +2319,69 @@ function renderComms(){
 /* Auf eine eingegangene Mail antworten: Compose mit "Re: …" und In-Reply-To fuers
    Threading vorbelegt. */
 function mailReplyFromInbox(id){
-  var m=(CACHE.mailInbox||[]).find(function(x){return x.id===id});if(!m)return;
+  var m=(CACHE.mail||[]).find(function(x){return x.id===id});if(!m)return;
   var subj=/^re:/i.test(m.subject||'')?m.subject:'Re: '+(m.subject||'');
   openCompose({name:m.from_name||m.from_email,email:m.from_email,customer_id:m.customer_id||null,
     in_reply_to:m.message_id||'',_title:'Antwort an '+esc(m.from_name||m.from_email),_doc:true},
-    {subject:subj,body:'Hallo,\n\n\n\nViele Grüße\n{inhaber}'},null,null);
+    {subject:subj,body:'Hallo,\n\n\n\nViele Grüße\n{inhaber}'},null,function(){reloadMail()});
+}
+/* Freie neue Mail aus dem Postfach heraus - Empfaenger wird erst im Dialog eingetippt
+   (openCompose zeigt dafuer ein "An"-Feld, wenn kein i.email mitgegeben ist). */
+function mailComposeNew(){
+  openCompose({name:'',email:'',customer_id:null,_title:'Neue Mail',_doc:true,_freeTo:true},
+    {subject:'',body:'Hallo,\n\n\n\nViele Grüße\n{inhaber}'},null,function(){reloadMail()});
 }
 /* IMAP-Abruf auf Knopfdruck ("Postfach aktualisieren") - kein Dauer-Polling. Laedt
-   danach den Zwischenspeicher neu, damit Kundenseite und unbekannte-Absender-Liste
-   den frischen Stand zeigen. */
+   danach das Postfach neu, damit Kundenseite und Postfach-Liste den frischen Stand
+   zeigen. */
 function mailFetch(account){
   toast('Postfach wird abgerufen …');
   fetch('api.php/mail/fetch',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify({account:account})})
     .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Abruf fehlgeschlagen');return j})})
-    .then(function(j){toast('Postfach aktualisiert ✓ ('+j.count+' Mail'+(j.count===1?'':'s')+')');reloadMailInbox()})
+    .then(function(j){toast('Postfach aktualisiert ✓ ('+j.inbox+' Posteingang, '+j.sent+' Gesendet)');reloadMail()})
     .catch(function(e){toast(e.message,1)});
 }
-function reloadMailInbox(){
-  return api('mail_inbox?select=*&order=date_at.desc').then(function(r){CACHE.mailInbox=r||[];
+function reloadMail(){
+  return api('mail_messages?select=*&order=date_at.desc').then(function(r){CACHE.mail=r||[];
     if(curCust&&document.getElementById('pg-custd').classList.contains('a'))renderComms();
-    if(document.getElementById('pg-mail').classList.contains('a'))loadMailUnknown();
+    if(document.getElementById('pg-mail').classList.contains('a'))renderMailList();
+    renderDash();
   });
 }
-function loadMailUnknown(){
-  reloadMailInbox().then(function(){
-    var rows=(CACHE.mailInbox||[]).filter(function(m){return !m.customer_id});
-    document.getElementById('mailUnknownRows').innerHTML=rows.map(function(m){
-      return '<div class="tl-item"><div class="tl-ico">'+CH_ICON.email+'</div><div class="tl-body">'+
-        '<div class="tl-meta">'+esc(m.from_name?m.from_name+' <'+m.from_email+'>':m.from_email)+' · '+dtt(m.date_at)+'</div>'+
-        '<div class="tl-sub">'+esc(m.subject||'(kein Betreff)')+'</div>'+
-        '<button class="btn g sm" style="margin-top:6px" onclick="mailInboxToCustomer(\''+m.id+'\')">Als Kunde anlegen</button></div></div>';
-    }).join('')||'<div class="mut sml">Keine Mails unbekannter Absender.</div>';
+function mailPartyName(m){
+  return m.direction==='out'?(m.to_name||m.to_email||'(unbekannt)'):(m.from_name||m.from_email||'(unbekannt)');
+}
+function mailCustName(id){var c=(CACHE.customers||[]).find(function(x){return x.id===id});return c?custName(c):null}
+function mailRowHtml(m){
+  var known=m.customer_id?mailCustName(m.customer_id):null;
+  var accLabel=m.account==='system'?'System':'Persönlich';
+  return '<div class="tl-item"><div class="tl-ico">'+CH_ICON.email+'</div><div class="tl-body">'+
+    '<div class="tl-meta">'+(m.direction==='out'?'Gesendet an ':'Von ')+esc(mailPartyName(m))+' · '+accLabel+' · '+dtt(m.date_at)+
+      (m.direction==='in'&&!m.seen?' · <span style="color:var(--yel)">ungelesen</span>':'')+
+      (known?' · <a onclick="openCustDetail(\''+m.customer_id+'\')">'+esc(known)+'</a>'
+        :(m.direction==='in'?' · <a onclick="mailInboxToCustomer(\''+m.id+'\')">Als Kunde anlegen</a>':''))+
+      '</div>'+
+    '<div class="tl-sub">'+esc(m.subject||'(kein Betreff)')+'</div>'+
+    (m.body_text?'<div class="tl-txt">'+esc(m.body_text.slice(0,600))+(m.body_text.length>600?' …':'')+'</div>':'')+
+    (m.direction==='in'?'<button class="btn g sm" style="margin-top:6px" onclick="mailReplyFromInbox(\''+m.id+'\')">Antworten</button>':'')+
+    '</div></div>';
+}
+function renderMailList(){
+  var q=(v('mailSearch')||'').toLowerCase(),acc=v('mailFAcc'),dir=v('mailFDir'),cust=v('mailFCust');
+  var rows=(CACHE.mail||[]).filter(function(m){
+    if(acc&&m.account!==acc)return false;
+    if(dir&&m.direction!==dir)return false;
+    if(cust==='known'&&!m.customer_id)return false;
+    if(cust==='unknown'&&m.customer_id)return false;
+    if(q&&['subject','from_email','from_name','to_email','to_name'].every(function(f){return (m[f]||'').toLowerCase().indexOf(q)===-1}))return false;
+    return true;
   });
+  document.getElementById('mailRows').innerHTML=rows.map(mailRowHtml).join('')||'<div class="mut sml">Keine Mails gefunden.</div>';
 }
 function mailInboxToCustomer(id){
   fetch('api.php/mail/inbox/'+id+'/to-customer',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:'{}'})
     .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Anlegen fehlgeschlagen');return j})})
-    .then(function(){toast('Kunde angelegt ✓');loadAll();loadMailUnknown()})
+    .then(function(){toast('Kunde angelegt ✓');loadAll();reloadMail()})
     .catch(function(e){toast(e.message,1)});
 }
 function openCommModal(){
@@ -9018,12 +9056,14 @@ function openCompose(i,t,formLink,onSent){
   var accRow=(mailAcc.personal&&mailAcc.personal.has_password)||(mailAcc.system&&mailAcc.system.has_password)?
     '<label>Absender-Konto</label><select id="rAccount">'+accOpts+'</select>':'';
   var attachRow=i.customer_id?'<label>Anhang <span class="mut sml" style="text-transform:none;letter-spacing:0">(aus den Kundendateien)</span></label><select id="rAttach"><option value="">– kein Anhang –</option></select>':'';
+  var toRow=(!i.email&&i._freeTo)?'<label>An</label><input id="rTo" type="email" placeholder="empfänger@domain.de">':'';
   openModal((i._title||'Antwort an '+esc(i.name))+(i.email?' <span class="mut sml">('+esc(i.email)+')</span>':''),
-    hinweis+picker+accRow+attachRow+
+    hinweis+toRow+picker+accRow+attachRow+
     '<label>Betreff</label><input id="rSubject" value="'+esc(fillTpl(t.subject,i))+'">'+
     '<label>Text</label><textarea id="rBody" style="min-height:300px">'+esc(body)+'</textarea>'+edBtn('rBody')+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+
-    (i.email?'<button class="btn" onclick="adminSendMail(\''+jsq(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+jsq(i.customer_id||i.id||'')+'\',function(){composeSent();closeModal()},\''+jsq(i.booking_id||'')+'\',\''+jsq(i.in_reply_to||'')+'\')">Direkt senden</button>':'')+
+    (i.email?'<button class="btn" onclick="adminSendMail(\''+jsq(i.email)+'\',v(\'rSubject\'),document.getElementById(\'rBody\').value,\''+jsq(i.customer_id||i.id||'')+'\',function(){composeSent();closeModal()},\''+jsq(i.booking_id||'')+'\',\''+jsq(i.in_reply_to||'')+'\')">Direkt senden</button>'
+      :(i._freeTo?'<button class="btn" onclick="adminSendMailFree()">Direkt senden</button>':''))+
     '<button class="btn g" onclick="copyReply()">Text kopieren</button>'+
     (i.email?'<button class="btn g" onclick="mailReply(\''+jsq(i.email)+'\')">Im Mail-Programm öffnen</button>':'')+
     '</div>'+(konflikt.length||i._doc?'':'<div class="sml mut" style="margin-top:8px">Am '+(i.event_date?dt(i.event_date):'angefragten Termin')+' ist bei dir nichts eingetragen – die Vorlage passt.</div>'));

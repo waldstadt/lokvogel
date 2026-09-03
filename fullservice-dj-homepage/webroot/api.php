@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 98;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 99;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -199,7 +199,7 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks','payments','mail_inbox'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks','payments','mail_messages'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -1011,7 +1011,7 @@ function upgrade(PDO $p): void {
     /* v96: eigener SMTP/IMAP-Versand ueber die beiden Postfaecher (persoenlich/system) -
        Zwischenspeicher fuer abgerufene Mails (mail_inbox) kommt neu hinzu, die Konten
        selbst liegen wie "ai"/"notify" nur in settings (kein Schema-Bedarf dafuer). */
-    try { $p->exec(mailInboxDdl()); } catch (Throwable $e) {}
+    try { $p->exec(mailMessagesDdl()); } catch (Throwable $e) {}
   }
   if ($v < 97) {
     /* v97: Workshop-Infoblatt (optionales PDF am Termin, wird der automatischen Rechnung
@@ -1045,6 +1045,23 @@ function upgrade(PDO $p): void {
         if ($chg) $p->prepare("update site_content set value = ? where key='legal'")->execute([json_encode($legal, JSON_UNESCAPED_UNICODE)]);
       }
     } catch (Throwable $e) {}
+  }
+  if ($v < 99) {
+    /* v99: aus dem reinen Posteingangs-Zwischenspeicher (mail_inbox) wird ein echtes
+       Postfach - Gesendet kommt dazu, ebenso jede aus dem Backoffice verschickte Mail,
+       unabhaengig davon, ob ihr ein Kunde zugeordnet ist. Die Tabelle bekommt dafuer den
+       ehrlicheren Namen mail_messages plus die neuen Spalten; bestehende (bisher immer
+       eingehende) Zeilen bekommen direction/folder nachgetragen, damit sie in der neuen
+       Ansicht weiter als Posteingang auftauchen. */
+    try {
+      $has = $p->query("select name from sqlite_master where type='table' and name='mail_inbox'")->fetchColumn();
+      if ($has) $p->exec('alter table mail_inbox rename to mail_messages');
+    } catch (Throwable $e) {}
+    try { $p->exec(mailMessagesDdl()); } catch (Throwable $e) {}
+    foreach (['direction' => "text not null default 'in'", 'folder' => 'text', 'to_email' => 'text', 'to_name' => 'text'] as $col => $def) {
+      try { $p->exec("alter table mail_messages add column $col $def"); } catch (PDOException $e) {}
+    }
+    try { $p->exec("update mail_messages set folder = 'INBOX' where folder is null and direction = 'in'"); } catch (Throwable $e) {}
   }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -1355,15 +1372,20 @@ function paymentsDdl(): string {
     document_id text not null references documents(id) on delete cascade,
     amount real not null default 0, paid_at text, method text, note text, created_at text)';
 }
-/* Zwischenspeicher fuer per IMAP abgerufene Mails (Knopf "Postfach aktualisieren") - kein
-   Dauer-Polling. account = 'personal'|'system'. customer_id gesetzt, sobald die
-   Absenderadresse zu einem Kunden passt (E-Mail-Abgleich) oder manuell zugeordnet wurde;
-   sonst taucht die Mail in "Postfach – unbekannter Absender" auf. */
-function mailInboxDdl(): string {
-  return "create table if not exists mail_inbox (id text primary key, account text not null,
-    uid text, message_id text, in_reply_to text, from_email text, from_name text, subject text,
+/* Das Postfach: eingehende Mails (per IMAP abgerufen, Knopf "Postfach aktualisieren")
+   UND jede ausgehende Mail (automatisch beim Versand protokolliert, siehe logOutgoingMail()
+   und der Sent-Ordner-Abruf in imapFetchList()). direction = 'in'|'out', folder = der
+   Ordnername (IMAP-Posteingang/-Gesendet oder einfach 'Sent' bei direkt protokollierten
+   Sends ohne IMAP-Bezug). account = 'personal'|'system'. customer_id gesetzt, sobald die
+   Gegenseite (Absender bei 'in', Empfaenger bei 'out') zu einem Kunden passt (E-Mail-
+   Abgleich) oder manuell zugeordnet wurde; sonst taucht die Mail im Postfach als
+   "unbekannt" auf. */
+function mailMessagesDdl(): string {
+  return "create table if not exists mail_messages (id text primary key, account text not null,
+    direction text not null default 'in', folder text, uid text, message_id text, in_reply_to text,
+    from_email text, from_name text, to_email text, to_name text, subject text,
     date_at text, seen integer default 0, customer_id text, body_text text, created_at text);
-    create unique index if not exists ux_mail_inbox on mail_inbox(account, message_id)";
+    create unique index if not exists ux_mail_messages on mail_messages(account, message_id)";
 }
 function docPaidSum(PDO $p, string $docId): float {
   try {
@@ -3167,7 +3189,7 @@ SQL);
   $p->exec(docAuditDdl());
   foreach (portalAccountDdl() as $sql) $p->exec($sql);
   foreach (statsNewsletterDdl() as $sql) $p->exec($sql);
-  $p->exec(mailInboxDdl());
+  $p->exec(mailMessagesDdl());
   $p->exec(campaignPagesDdl());
   seedCampaignPages($p);
   seed($p);
@@ -4404,23 +4426,42 @@ function smtpSend(array $account, string $to, string $subject, string $textBody,
    Kein selbstgebauter IMAP-Parser (zu fehleranfaellig ohne echten Server zum Testen) -
    stattdessen die eingebaute PHP-IMAP-Erweiterung, wenn vorhanden. */
 function imapAvailable(): bool { return function_exists('imap_open'); }
-function imapMailboxString(array $account): string {
+function imapServerPrefix(array $account): string {
   $enc = (string)($account['imap_enc'] ?? 'ssl');
   $flags = ($enc === 'none' ? '/notls' : '/ssl') . '/novalidate-cert';
-  return '{' . $account['imap_host'] . ':' . $account['imap_port'] . '/imap' . $flags . '}INBOX';
+  return '{' . $account['imap_host'] . ':' . $account['imap_port'] . '/imap' . $flags . '}';
 }
-function imapOpen(array $account, ?string &$err) {
+function imapMailboxString(array $account, string $folder = 'INBOX'): string {
+  return imapServerPrefix($account) . $folder;
+}
+function imapOpen(array $account, ?string &$err, string $folder = 'INBOX') {
   if (!imapAvailable()) { $err = 'IMAP-Erweiterung ist auf dem Server nicht aktiv – bitte im KAS (der Verwaltungsoberfläche deines Hosters) unter PHP-Einstellungen aktivieren.'; return false; }
   $host = trim((string)($account['imap_host'] ?? ''));
   if ($host === '' || (int)($account['imap_port'] ?? 0) <= 0) { $err = 'IMAP-Host oder -Port fehlt.'; return false; }
   $user = trim((string)($account['username'] ?? '')) ?: trim((string)($account['email'] ?? ''));
   $pass = (string)($account['password'] ?? '');
   if ($pass === '') { $err = 'Kein Passwort für dieses Konto hinterlegt.'; return false; }
-  $mbx = imapMailboxString($account);
+  $mbx = imapMailboxString($account, $folder);
   $conn = @imap_open($mbx, $user, $pass, 0, 1);
   if (!$conn) { $e = imap_last_error(); $err = 'Anmeldung fehlgeschlagen' . ($e ? ": $e" : '.'); return false; }
   $err = null;
   return $conn;
+}
+/* Sucht unter den Ordnern des Kontos den Gesendet-Ordner - Anbieter nennen ihn
+   unterschiedlich ("Sent", "Sent Items", "Gesendet", oft unter INBOX.*). Nimmt den ersten
+   Treffer; kein Treffer ist kein Fehler - dann bleibt der Sent-Abruf einfach leer (viele
+   Mailprogramme legen ohnehin nur beim Senden ueber IMAP/das eigene Programm eine Kopie
+   dort ab, nicht bei einem reinen SMTP-Versand wie dem des Backoffice - das gleicht die
+   direkte Protokollierung in logOutgoingMail() aus). */
+function imapSentFolder($conn, array $account): ?string {
+  $prefix = imapServerPrefix($account);
+  $list = @imap_list($conn, $prefix, '*');
+  if (!$list) return null;
+  foreach ($list as $mbx) {
+    $name = substr($mbx, strlen($prefix));
+    if (preg_match('/sent|gesendet/i', $name)) return $mbx;
+  }
+  return null;
 }
 function imapTest(array $account): array {
   $conn = imapOpen($account, $err);
@@ -4462,36 +4503,56 @@ function imapPlainBody($conn, int $msgno, $struct): string {
   if ($html !== null) return trim(preg_replace('/[ \t]+/', ' ', strip_tags(preg_replace('#<(br|/p|/div|/li)[^>]*>#i', "\n", $html))));
   return '';
 }
-/* Letzte $limit Mails (neueste zuerst). Rueckgabe hat immer 'ok' + 'error' - der Aufrufer
-   zeigt den genauen Grund, falls IMAP fehlt oder die Anmeldung scheitert. */
-function imapFetchList(array $account, int $limit = 30): array {
-  $conn = imapOpen($account, $err);
-  if (!$conn) return ['ok' => false, 'error' => $err, 'messages' => []];
+/* Liest die letzten $limit Mails des GERADE GEOEFFNETEN Ordners aus (neueste zuerst) -
+   gemeinsame Schleife fuer Posteingang und Gesendet, damit beide exakt gleich geparst
+   werden. Adressfelder ('from'/'to') werden immer beide mitgelesen: fuer den Posteingang
+   zaehlt 'from' (der Kunde), fuer Gesendet 'to' (an wen es ging) - der Aufrufer entscheidet,
+   welches Feld fuer den Kunden-Abgleich benutzt wird. */
+function imapFetchAddr($h, string $field): array {
+  $addr = ''; $name = '';
+  if (!empty($h->$field) && !empty($h->$field[0])) {
+    $addr = strtolower(trim(($h->$field[0]->mailbox ?? '') . '@' . ($h->$field[0]->host ?? '')));
+    $name = imapDecodeHeader((string)($h->$field[0]->personal ?? ''));
+  }
+  return [$addr, $name];
+}
+function imapFetchMessages($conn, int $limit): array {
   $total = imap_num_msg($conn);
   $from = max(1, $total - $limit + 1);
   $out = [];
   for ($i = $total; $i >= $from; $i--) {
     $h = @imap_headerinfo($conn, $i);
     if (!$h) continue;
-    $fromAddr = ''; $fromName = '';
-    if (!empty($h->from) && !empty($h->from[0])) {
-      $fromAddr = strtolower(trim(($h->from[0]->mailbox ?? '') . '@' . ($h->from[0]->host ?? '')));
-      $fromName = imapDecodeHeader((string)($h->from[0]->personal ?? ''));
-    }
+    [$fromAddr, $fromName] = imapFetchAddr($h, 'from');
+    [$toAddr, $toName] = imapFetchAddr($h, 'to');
     $struct = @imap_fetchstructure($conn, $i);
     $out[] = [
       'uid' => (string)imap_uid($conn, $i),
       'message_id' => trim((string)($h->message_id ?? '')),
       'in_reply_to' => trim((string)($h->in_reply_to ?? '')),
       'from_email' => $fromAddr, 'from_name' => $fromName,
+      'to_email' => $toAddr, 'to_name' => $toName,
       'subject' => imapDecodeHeader((string)($h->subject ?? '(kein Betreff)')),
       'date_at' => date('c', (int)($h->udate ?? time())),
       'seen' => (($h->Unseen ?? '') === 'U') ? 0 : 1,
       'body_text' => mb_substr(imapPlainBody($conn, $i, $struct), 0, 20000),
     ];
   }
+  return $out;
+}
+/* Ruft Posteingang UND (wenn vorhanden) den Gesendet-Ordner ab. Rueckgabe hat immer
+   'ok' + 'error' - der Aufrufer zeigt den genauen Grund, falls IMAP fehlt oder die
+   Anmeldung scheitert; kein gefundener Gesendet-Ordner ist dagegen kein Fehler, 'sent'
+   bleibt dann einfach leer. */
+function imapFetchList(array $account, int $limit = 30): array {
+  $conn = imapOpen($account, $err);
+  if (!$conn) return ['ok' => false, 'error' => $err, 'inbox' => [], 'sent' => []];
+  $inbox = imapFetchMessages($conn, $limit);
+  $sent = [];
+  $sentMbx = imapSentFolder($conn, $account);
+  if ($sentMbx && @imap_reopen($conn, $sentMbx)) $sent = imapFetchMessages($conn, $limit);
   imap_close($conn);
-  return ['ok' => true, 'error' => null, 'messages' => $out];
+  return ['ok' => true, 'error' => null, 'inbox' => $inbox, 'sent' => $sent];
 }
 
 /* Merkt sich Zustand des automatischen Versands (letzter Fehler/Erfolg) - gleiches
@@ -4529,6 +4590,34 @@ function legacyMailSend(string $to, string $subject, string $bodyText): array {
   $ok = @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $bodyText, $headers);
   return $ok ? ['ok' => true] : ['ok' => false, 'error' => 'Der Server konnte die Mail nicht annehmen (PHP mail()) – kein E-Mail-Konto eingerichtet.'];
 }
+/* Protokolliert eine erfolgreich verschickte Mail im Postfach - egal ob automatisch
+   (sendMailSafe) oder von Hand aus dem Compose-Fenster (mailSendManual/sendmail-Endpunkt).
+   Ohne Kundenzuordnung wird die Empfaengeradresse gegen die Kunden-Tabelle abgeglichen
+   (gleiches Muster wie beim Posteingang) - so landet auch eine Mail ohne explizit
+   mitgegebene customer_id beim richtigen Kunden. on conflict passiert nur, wenn spaeter
+   derselbe Message-ID-Wert nochmal ankommt (z. B. weil der Gesendet-Ordner per IMAP
+   dieselbe Mail zusaetzlich findet) - dann bleibt die zuerst geloggte Zeile bestehen. */
+function logOutgoingMail(string $account, string $to, string $subject, string $bodyText, ?string $messageId, ?string $customerId = null): void {
+  try {
+    $p = db();
+    if ($customerId === null && $to !== '') {
+      $cst = $p->prepare('select id from customers where lower(email) = ? order by coalesce(created_at, "") asc limit 1');
+      $cst->execute([strtolower($to)]);
+      $customerId = $cst->fetchColumn() ?: null;
+    }
+    $accCfg = mailAccountsRaw()[$account] ?? [];
+    $fromEmail = trim((string)($accCfg['email'] ?? ''));
+    if ($fromEmail === '') {
+      $comp = json_decode((string)$p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
+      $fromEmail = trim((string)($comp['email'] ?? ''));
+    }
+    $mid = $messageId ?: ('legacy-' . uuid());
+    $p->prepare("insert into mail_messages (id, account, direction, folder, message_id, from_email, to_email, subject, date_at, seen, customer_id, body_text, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        on conflict(account, message_id) do nothing")
+      ->execute([uuid(), $account, 'out', 'Sent', $mid, $fromEmail, $to, $subject, now(), 1, $customerId, $bodyText, now()]);
+  } catch (Throwable $e) {}
+}
 /* $attachments: optionale Liste [['name'=>...,'mime'=>...,'data'=>Binaerinhalt], ...] -
    geht nur raus, wenn ein SMTP-Konto eingerichtet ist (smtpSend baut echtes MIME). Der
    alte mail()-Fallback ohne Konto kennt keine Anhaenge (siehe legacyMailSend) - dort
@@ -4539,11 +4628,13 @@ function sendMailSafe(string $to, string $subject, string $bodyText, array $atta
     $personal = mailAccount('personal');
     $replyTo = $personal['email'] ?? null;
     $r = smtpSend($sys, $to, $subject, $bodyText, null, $attachments, $replyTo, null, null);
-    if ($r['ok']) mailState(['last_ok_at' => now(), 'last_error' => null, 'last_error_at' => null]);
+    if ($r['ok']) { mailState(['last_ok_at' => now(), 'last_error' => null, 'last_error_at' => null]); logOutgoingMail('system', $to, $subject, $bodyText, $r['message_id'] ?? null); }
     else mailState(['last_error' => $r['error'], 'last_error_at' => now()]);
     return $r['ok'];
   }
-  return legacyMailSend($to, $subject, $bodyText)['ok'];
+  $r = legacyMailSend($to, $subject, $bodyText);
+  if ($r['ok']) logOutgoingMail('system', $to, $subject, $bodyText, null);
+  return $r['ok'];
 }
 /* Fuer Compose/manuellen Versand aus dem Backoffice: liefert Erfolg + genauen Fehlertext
    statt nur bool. $account 'personal' oder 'system' (Vorgabe fuer Freitext: persoenlich). */
@@ -7053,11 +7144,17 @@ try {
     $references = trim((string)($body['references'] ?? '')) ?: null;
     $r = mailSendManual($account, $to, $subject, $text, $attachments, $inReplyTo, $references);
     $mailed = !empty($r['ok']);
-    if ($mailed && !empty($body['customer_id'])) {
-      db()->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, ref_doc_id, ref_kind, created_at)
-          values (?,?,?,?,?,?,?,?,?,?,?)')
-        ->execute([uuid(), (string)$body['customer_id'], !empty($body['booking_id']) ? (string)$body['booking_id'] : null,
-          'email', 'out', $subject, $text, now(), $r['message_id'] ?? null, 'email', now()]);
+    if ($mailed) {
+      /* Ins Postfach kommt jede verschickte Mail, auch ohne Kundenzuordnung (logOutgoingMail
+         gleicht die Adresse selbst ab) - die Kunden-Timeline (communications) bleibt daneben
+         bestehen, weil sie zusaetzlich Terminbezug (booking_id) und Nachfass-Logik traegt. */
+      logOutgoingMail($account, $to, $subject, $text, $r['message_id'] ?? null, !empty($body['customer_id']) ? (string)$body['customer_id'] : null);
+      if (!empty($body['customer_id'])) {
+        db()->prepare('insert into communications (id, customer_id, booking_id, channel, direction, subject, content, occurred_at, ref_doc_id, ref_kind, created_at)
+            values (?,?,?,?,?,?,?,?,?,?,?)')
+          ->execute([uuid(), (string)$body['customer_id'], !empty($body['booking_id']) ? (string)$body['booking_id'] : null,
+            'email', 'out', $subject, $text, now(), $r['message_id'] ?? null, 'email', now()]);
+      }
     }
     out(['mailed' => $mailed, 'error' => $r['error'] ?? null]);
   }
@@ -7105,8 +7202,12 @@ try {
     if (trim((string)($a['password'] ?? '')) === '') fail('Bitte zuerst ein Passwort eingeben (zum Testen reicht es unten im Formular, ohne zu speichern).', 400);
     out(['smtp' => smtpTestAuth($a), 'imap' => imapTest($a)]);
   }
-  /* IMAP-Abruf auf Knopfdruck ("Postfach aktualisieren") - kein Dauer-Polling. Speichert
-     die letzten Mails im Zwischenspeicher (mail_inbox), gleicht Absender gegen Kunden ab. */
+  /* IMAP-Abruf auf Knopfdruck ("Postfach aktualisieren") - kein Dauer-Polling. Holt
+     Posteingang UND (wenn vorhanden) den Gesendet-Ordner, gleicht die jeweilige
+     Gegenseite (Absender bei Posteingang, Empfaenger bei Gesendet) gegen Kunden ab.
+     Eine direkt aus dem Backoffice verschickte Mail steht durch logOutgoingMail() meist
+     schon im Postfach - trifft der Gesendet-Abruf per IMAP auf dieselbe Message-ID, wird
+     nur der IMAP-Stand (uid/seen/body_text) nachgetragen, die Kundenzuordnung bleibt. */
   if ($path === 'mail/fetch' && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
     $which = (string)($body['account'] ?? '');
@@ -7116,28 +7217,36 @@ try {
     $r = imapFetchList($acc, 40);
     if (!$r['ok']) fail((string)$r['error'], 502);
     $p = db();
-    $ins = $p->prepare("insert into mail_inbox (id, account, uid, message_id, in_reply_to, from_email, from_name, subject, date_at, seen, customer_id, body_text, created_at)
-        values (?,?,?,?,?,?,?,?,?,?,?,?,?)
+    $ins = $p->prepare("insert into mail_messages (id, account, direction, folder, uid, message_id, in_reply_to, from_email, from_name, to_email, to_name, subject, date_at, seen, customer_id, body_text, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         on conflict(account, message_id) do update set uid=excluded.uid, seen=excluded.seen, body_text=excluded.body_text");
-    foreach ($r['messages'] as $m) {
-      $mid = $m['message_id'] !== '' ? $m['message_id'] : ('noid-' . $which . '-' . $m['uid']);
-      $custId = null;
-      if ($m['from_email'] !== '') {
-        $cst = $p->prepare('select id from customers where lower(email) = ? order by coalesce(created_at, "") asc limit 1');
-        $cst->execute([$m['from_email']]);
-        $custId = $cst->fetchColumn() ?: null;
+    $count = 0;
+    foreach (['in' => ['INBOX', $r['inbox']], 'out' => ['Sent', $r['sent']]] as $dir => $bucket) {
+      [$folderLabel, $msgs] = $bucket;
+      foreach ($msgs as $mm) {
+        $mid = $mm['message_id'] !== '' ? $mm['message_id'] : ('noid-' . $which . '-' . $dir . '-' . $mm['uid']);
+        $matchEmail = $dir === 'in' ? $mm['from_email'] : $mm['to_email'];
+        $custId = null;
+        if ($matchEmail !== '') {
+          $cst = $p->prepare('select id from customers where lower(email) = ? order by coalesce(created_at, "") asc limit 1');
+          $cst->execute([$matchEmail]);
+          $custId = $cst->fetchColumn() ?: null;
+        }
+        $ins->execute([uuid(), $which, $dir, $folderLabel, $mm['uid'], $mid, $mm['in_reply_to'], $mm['from_email'], $mm['from_name'],
+          $mm['to_email'], $mm['to_name'], $mm['subject'], $mm['date_at'], $mm['seen'], $custId, $mm['body_text'], now()]);
+        $count++;
       }
-      $ins->execute([uuid(), $which, $m['uid'], $mid, $m['in_reply_to'], $m['from_email'], $m['from_name'],
-        $m['subject'], $m['date_at'], $m['seen'], $custId, $m['body_text'], now()]);
     }
-    out(['ok' => true, 'count' => count($r['messages'])]);
+    out(['ok' => true, 'count' => $count, 'inbox' => count($r['inbox']), 'sent' => count($r['sent'])]);
   }
   /* Aus einer Mail unbekannten Absenders einen Kunden anlegen - gleiches Muster wie
-     "Als Kunde anlegen" bei Anfragen. */
+     "Als Kunde anlegen" bei Anfragen. Nur fuer Posteingang sinnvoll (bei Gesendet ist
+     der Empfaenger evtl. noch gar kein Kunde, aber "anlegen" gehoert dort ins Compose-
+     Fenster, nicht hierher). */
   if (preg_match('#^mail/inbox/([a-f0-9-]{30,40})/to-customer$#', $path, $m) && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
     $p = db();
-    $st = $p->prepare('select * from mail_inbox where id = ?');
+    $st = $p->prepare("select * from mail_messages where id = ? and direction = 'in'");
     $st->execute([$m[1]]);
     $row = $st->fetch();
     if (!$row) fail('Mail nicht gefunden.', 404);
@@ -7147,7 +7256,7 @@ try {
     $p->prepare('insert into customers (id, kind, status, first_name, last_name, email, source, created_at)
         values (?,?,?,?,?,?,?,?)')
       ->execute([$cid, 'privat', 'lead', $first, $last, $row['from_email'], 'postfach', now()]);
-    $p->prepare('update mail_inbox set customer_id = ? where account = ? and from_email = ?')
+    $p->prepare("update mail_messages set customer_id = ? where account = ? and direction = 'in' and from_email = ?")
       ->execute([$cid, $row['account'], $row['from_email']]);
     out(['ok' => true, 'customer_id' => $cid], 201);
   }
