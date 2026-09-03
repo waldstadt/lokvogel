@@ -48,7 +48,7 @@ function mount(el,o){
     '<div class="kw-title">'+esc(o.title||'So erreichst du mich')+'</div>'+
     '<p class="kw-lead">'+esc(o.lead||'Am schnellsten per WhatsApp. Oder ihr sagt mir, wann ich anrufen soll.')+'</p>'+
     '<div class="kw-btns">'+
-      '<a class="btn kw-wa" id="cWa" href="#" target="_blank" rel="noopener">'+WA+'<span>Per WhatsApp schreiben</span></a>'+
+      '<a class="btn kw-wa" id="cWa" href="#" target="_blank" rel="noopener" data-stat="whatsapp">'+WA+'<span>Per WhatsApp schreiben</span></a>'+
       '<button type="button" class="btn ghost kw-cb" id="cCallback">'+PH+'<span>Rückruf anfordern</span></button>'+
     '</div>'+
     '<div class="kw-phone" id="cPhoneWrap" style="display:none">Oder direkt anrufen: <a id="cPhone" href="#"></a></div>'+
@@ -94,6 +94,7 @@ function mount(el,o){
     fetch(api+'/public/callback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
       .then(function(r){return r.json().catch(function(){return{}}).then(function(j){if(!r.ok)throw new Error(j.error||'HTTP '+r.status);return j})})
       .then(function(){
+        if(window.Stat)Stat.click('rueckruf');
         var WHEN={egal:'',nachmittag:' heute Nachmittag',abend:' heute Abend',morgen:' morgen'};
         form.innerHTML='<div class="kw-ok"><b>Danke, ich rufe zurück.</b>'+(WHEN[data.when]||'')+' Ihr hört von mir.</div>';
         form.style.marginBottom='0';form.style.padding='0';form.style.border='0';form.style.background='transparent';

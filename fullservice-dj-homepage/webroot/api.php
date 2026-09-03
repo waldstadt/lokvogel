@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 103;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 104;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1097,6 +1097,12 @@ function upgrade(PDO $p): void {
        einer eigenen Rechnungsposition. */
     try { $p->exec("alter table documents add column discount_label text"); } catch (PDOException $e) {}
   }
+  if ($v < 104) {
+    /* v104: Website-Statistik um eindeutige Besucher/Tag, Verweildauer/Scrolltiefe je Seite
+       und Klicks auf wichtige Buttons erweitert - weiterhin komplett anonym (siehe
+       statsEngageDdl()). */
+    foreach (statsEngageDdl() as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1196,6 +1202,39 @@ function statsNewsletterDdl(): array {
     "create table if not exists newsletter (id text primary key, email text unique not null, name text,
       token text unique, source text, confirmed_at text, unsubscribed_at text, created_at text)",
   ];
+}
+
+/* Erweiterte Website-Statistik (v104): eindeutige Besucher/Tag, Verweildauer + Scrolltiefe je
+   Seite, Klicks auf wichtige Buttons - alles ohne Cookie und ohne gespeicherte IP (siehe
+   statsVisitorHash()). */
+function statsEngageDdl(): array {
+  return [
+    "create table if not exists stats_uniques (day text not null, hash text not null, primary key (day, hash))",
+    "create table if not exists stats_engage (day text not null, page text not null,
+      sum_seconds integer not null default 0, sum_scroll integer not null default 0,
+      samples integer not null default 0, primary key (day, page))",
+    "create table if not exists stats_clicks (day text not null, k text not null,
+      n integer not null default 0, primary key (day, k))",
+  ];
+}
+/* Taeglich wechselnder anonymer Besucher-Hash: IP + User-Agent + Tagesdatum + ein einmalig
+   erzeugtes Pfeffer-Geheimnis (nie mit der IP zusammen gespeichert) ergeben einen Hash, der
+   sich am naechsten Tag automatisch aendert - eine Wiedererkennung ueber den Tag hinaus ist
+   damit technisch nicht moeglich, ganz bewusst (kein Cookie, kein Banner noetig). */
+function statsPepper(PDO $p): string {
+  static $pep = null;
+  if ($pep !== null) return $pep;
+  $row = $p->query("select value from settings where key='stats_pepper'")->fetchColumn();
+  if ($row) return $pep = (string)json_decode($row, true);
+  $pep = bin2hex(random_bytes(32));
+  try { $p->prepare("insert into settings (key, value) values ('stats_pepper', ?)")->execute([json_encode($pep)]); }
+  catch (PDOException $e) { $pep = (string)json_decode((string)$p->query("select value from settings where key='stats_pepper'")->fetchColumn(), true); }
+  return $pep;
+}
+function statsVisitorHash(PDO $p, string $day): string {
+  $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+  $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+  return hash('sha256', $day . '|' . $ip . '|' . $ua . '|' . statsPepper($p));
 }
 
 /* Vermittlungs-Mail „Termin belegt" – eine Quelle für Seed und Migration */
@@ -3293,7 +3332,7 @@ function campaignTechCheckBruttoUpdate(PDO $p): void {
 
 /* Datenschutzerklärung – eine Quelle für Seed und Migration (v25) */
 function datenschutzText(): string {
-  return "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Cookies und lokale Speicherung\nDiese Website verwendet keine Cookies zu Werbe- oder Tracking-Zwecken und bindet keine Dienste ein, die solche Cookies setzen. Ein Cookie-Banner ist deshalb nicht erforderlich. Nur im Kundenportal und im Partner-Bereich wird nach eurer aktiven Anmeldung ein technisch notwendiges Sitzungsmerkmal im Browser gespeichert (Local/Session Storage), damit ihr angemeldet bleibt (§ 25 Abs. 2 TDDDG).\n\n4. Schriftarten\nAlle Schriftarten liegen lokal auf dem Server dieser Website. Beim Seitenaufruf wird keine Verbindung zu Google Fonts oder anderen Drittanbietern aufgebaut.\n\n5. Reichweitenmessung\nZur Verbesserung des Angebots wird anonym gezählt, wie oft die einzelnen Seiten aufgerufen werden (nur Datum, Seitenname und ggf. die Domain der verweisenden Website). Dabei werden weder IP-Adressen noch Cookies oder sonstige Kennungen gespeichert – ein Bezug zu einzelnen Personen ist nicht möglich (Art. 6 Abs. 1 lit. f DSGVO).\n\n6. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n7. Newsletter\nFür den Workshop-Newsletter speichere ich eure E-Mail-Adresse erst nach Bestätigung über den zugesandten Link (Double-Opt-in) auf Grundlage eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Jede Mail enthält einen Abmeldelink; nach der Abmeldung erhaltet ihr keine weiteren Mails. Es wird kein Versanddienstleister eingesetzt – der Versand erfolgt über den eigenen Server.\n\n8. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n9. Digitaler Mietvertrag und Ausweiskopie\nBei der Vermietung von Veranstaltungstechnik könnt ihr den Mietvertrag digital abschließen. Dabei werden eure Unterschrift sowie – mit eurer ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 20 PAuswG) – Fotos der Vorder- und Rückseite eures Personalausweises verarbeitet und in einem zugriffsgeschützten Bereich des eigenen Servers gespeichert. Nicht benötigte Angaben dürft ihr vor dem Fotografieren schwärzen. Die Ausweiskopien dienen ausschließlich der Absicherung des Mietverhältnisses und werden nach vollständiger Rückgabe der Mietsachen gelöscht.\n\n10. Kundenportal\nIm Kundenportal könnt ihr euch mit E-Mail-Adresse und Passwort anmelden, um eure Unterlagen einzusehen und Angaben zu eurer Feier zu pflegen. Das Passwort wird ausschließlich verschlüsselt (als Hash) gespeichert; alle Inhalte liegen auf dem eigenen Server dieser Website (Art. 6 Abs. 1 lit. b DSGVO).\n\n11. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: August 2026.";
+  return "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Cookies und lokale Speicherung\nDiese Website verwendet keine Cookies zu Werbe- oder Tracking-Zwecken und bindet keine Dienste ein, die solche Cookies setzen. Ein Cookie-Banner ist deshalb nicht erforderlich. Nur im Kundenportal und im Partner-Bereich wird nach eurer aktiven Anmeldung ein technisch notwendiges Sitzungsmerkmal im Browser gespeichert (Local/Session Storage), damit ihr angemeldet bleibt (§ 25 Abs. 2 TDDDG).\n\n4. Schriftarten\nAlle Schriftarten liegen lokal auf dem Server dieser Website. Beim Seitenaufruf wird keine Verbindung zu Google Fonts oder anderen Drittanbietern aufgebaut.\n\n5. Reichweitenmessung\nZur Verbesserung des Angebots messe ich anonym, wie die Seiten genutzt werden: Datum, Seitenname, ggf. die Domain der verweisenden Website, ob am selben Tag schon einmal derselbe Browser da war (dafür wird aus IP-Adresse und Browserkennung ein täglich neuer, nicht rückverfolgbarer Rechenwert gebildet und sofort wieder verworfen – nicht die IP-Adresse selbst), außerdem grob die Verweildauer und Scrolltiefe je Seite sowie ob bestimmte Buttons (z. B. WhatsApp, Anfrageformular) angeklickt wurden. Es werden weder IP-Adressen noch Cookies oder sonstige dauerhafte Kennungen gespeichert – ein Bezug zu einzelnen Personen ist nicht möglich (Art. 6 Abs. 1 lit. f DSGVO).\n\n6. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n7. Newsletter\nFür den Workshop-Newsletter speichere ich eure E-Mail-Adresse erst nach Bestätigung über den zugesandten Link (Double-Opt-in) auf Grundlage eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Jede Mail enthält einen Abmeldelink; nach der Abmeldung erhaltet ihr keine weiteren Mails. Es wird kein Versanddienstleister eingesetzt – der Versand erfolgt über den eigenen Server.\n\n8. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n9. Digitaler Mietvertrag und Ausweiskopie\nBei der Vermietung von Veranstaltungstechnik könnt ihr den Mietvertrag digital abschließen. Dabei werden eure Unterschrift sowie – mit eurer ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 20 PAuswG) – Fotos der Vorder- und Rückseite eures Personalausweises verarbeitet und in einem zugriffsgeschützten Bereich des eigenen Servers gespeichert. Nicht benötigte Angaben dürft ihr vor dem Fotografieren schwärzen. Die Ausweiskopien dienen ausschließlich der Absicherung des Mietverhältnisses und werden nach vollständiger Rückgabe der Mietsachen gelöscht.\n\n10. Kundenportal\nIm Kundenportal könnt ihr euch mit E-Mail-Adresse und Passwort anmelden, um eure Unterlagen einzusehen und Angaben zu eurer Feier zu pflegen. Das Passwort wird ausschließlich verschlüsselt (als Hash) gespeichert; alle Inhalte liegen auf dem eigenen Server dieser Website (Art. 6 Abs. 1 lit. b DSGVO).\n\n11. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: August 2026.";
 }
 
 function migrate(PDO $p): void {
@@ -3423,6 +3462,7 @@ SQL);
     ->execute([uuid(), 'start', 'galerie', 0, 'instagram', 'Frisch aus Instagram', '', '[]', '4', 0, now()]);
   foreach (workshopsDdl() as $sql) $p->exec($sql);
   $p->exec(discountCodesDdl());
+  foreach (statsEngageDdl() as $sql) $p->exec($sql);
   $p->exec(paymentsDdl());
   foreach (docIndexDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
@@ -7382,21 +7422,50 @@ try {
      sendBeacon schickt text/plain, daher wird der Body hier selbst gelesen. */
   if ($path === 'track' && $method === 'POST') {
     $b = json_decode(file_get_contents('php://input'), true) ?: [];
+    $day = gmdate('Y-m-d');
+    $p = db();
+    /* Drei Signale ueber denselben Endpunkt, unterschieden am Feld: 'k' = Klick auf ein
+       benanntes Element, 't' = Verweildauer+Scrolltiefe beim Verlassen der Seite, sonst
+       der urspruengliche Seitenaufruf. Alle drei bleiben rein anonym (siehe statsVisitorHash). */
+    if (isset($b['k'])) {
+      $k = mb_substr(preg_replace('/[^a-z0-9_-]/', '', strtolower((string)$b['k'])), 0, 40);
+      if ($k === '') out(['ok' => true]);
+      $u = $p->prepare('update stats_clicks set n = n + 1 where day=? and k=?');
+      $u->execute([$day, $k]);
+      if (!$u->rowCount()) {
+        try { $p->prepare('insert into stats_clicks (day, k, n) values (?,?,1)')->execute([$day, $k]); }
+        catch (PDOException $e) { $u->execute([$day, $k]); }
+      }
+      out(['ok' => true]);
+    }
     $page = strtolower((string)($b['p'] ?? ''));
     if (!preg_match('/^[a-z0-9_.-]{1,60}$/', $page)) $page = 'index.html';
+    if (isset($b['t'])) {
+      $secs = max(0, min(1800, (int)$b['t']));
+      $scroll = max(0, min(100, (int)($b['s'] ?? 0)));
+      $u = $p->prepare('update stats_engage set sum_seconds = sum_seconds + ?, sum_scroll = sum_scroll + ?, samples = samples + 1 where day=? and page=?');
+      $u->execute([$secs, $scroll, $day, $page]);
+      if (!$u->rowCount()) {
+        try { $p->prepare('insert into stats_engage (day, page, sum_seconds, sum_scroll, samples) values (?,?,?,?,1)')->execute([$day, $page, $secs, $scroll]); }
+        catch (PDOException $e) { $u->execute([$secs, $scroll, $day, $page]); }
+      }
+      out(['ok' => true]);
+    }
     $ref = '';
     $host = strtolower((string)(parse_url((string)($b['r'] ?? ''), PHP_URL_HOST) ?: ''));
     $own = strtolower((string)(parse_url(baseUrl(), PHP_URL_HOST) ?: ''));
     if ($host !== '' && $host !== $own && $host !== ($_SERVER['HTTP_HOST'] ?? ''))
       $ref = mb_substr(preg_replace('/^www\./', '', $host), 0, 80);
-    $day = gmdate('Y-m-d');
-    $p = db();
     $u = $p->prepare('update stats_daily set views = views + 1 where day=? and page=? and ref=?');
     $u->execute([$day, $page, $ref]);
     if (!$u->rowCount()) {
       try { $p->prepare('insert into stats_daily (day, page, ref, views) values (?,?,?,1)')->execute([$day, $page, $ref]); }
       catch (PDOException $e) { $u->execute([$day, $page, $ref]); }
     }
+    try {
+      $h = statsVisitorHash($p, $day);
+      $p->prepare('insert or ignore into stats_uniques (day, hash) values (?,?)')->execute([$day, $h]);
+    } catch (Throwable $e) {}
     out(['ok' => true]);
   }
   /* Statistik-Übersicht fürs Backoffice */
@@ -7408,13 +7477,30 @@ try {
     $q = function (string $sql) use ($p, $from) { $st = $p->prepare($sql); $st->execute([$from]); return $st->fetchAll(); };
     $daily = $q("select day, sum(views) as views from stats_daily where day >= ? group by day order by day");
     $inqDaily = $q("select substr(created_at,1,10) as day, count(*) as n from inquiries where created_at >= ? group by 1 order by 1");
+    $uniqDaily = $q("select day, count(*) as n from stats_uniques where day >= ? group by day order by day");
+    /* Verweildauer/Scrolltiefe je Seite: Durchschnitt aus allen "Verlassen"-Meldungen dieser
+       Seite im Zeitraum - eine Seite mit wenig Aufrufen aber vielen Sekunden zeigt eher ein
+       einzelnes sehr interessiertes Publikum als einen verlaesslichen Schnitt. */
+    $engage = $q("select page, sum_seconds, sum_scroll, samples from stats_engage where day >= ?
+      group by page having samples > 0 order by samples desc limit 12");
+    foreach ($engage as &$e) {
+      $e = ['page' => $e['page'], 'samples' => (int)$e['samples'],
+        'avg_seconds' => (int)round($e['sum_seconds'] / max(1, $e['samples'])),
+        'avg_scroll' => (int)round($e['sum_scroll'] / max(1, $e['samples']))];
+    }
+    unset($e);
+    $clicks = $q("select k, sum(n) as n from stats_clicks where day >= ? group by k order by n desc limit 12");
     out([
       'days' => $days,
       'daily' => $daily,
       'pages' => $q("select page, sum(views) as views from stats_daily where day >= ? group by page order by views desc limit 12"),
       'refs' => $q("select ref, sum(views) as views from stats_daily where day >= ? and ref != '' group by ref order by views desc limit 12"),
       'inq_daily' => $inqDaily,
+      'uniq_daily' => $uniqDaily,
+      'engage' => $engage,
+      'clicks' => $clicks,
       'views_total' => array_sum(array_column($daily, 'views')),
+      'uniques_total' => array_sum(array_column($uniqDaily, 'n')),
       'inquiries_total' => array_sum(array_column($inqDaily, 'n')),
       'signups_total' => (int)$p->query("select count(*) from workshop_signups where created_at >= '$from'")->fetchColumn(),
       'newsletter_total' => (int)$p->query("select count(*) from newsletter where confirmed_at is not null and unsubscribed_at is null")->fetchColumn(),

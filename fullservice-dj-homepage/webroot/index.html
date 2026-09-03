@@ -1281,9 +1281,6 @@ Promise.all([
   renderBadges(rows,cfg,IS_TECH_PAGE);
 }).catch(function(){});
 
-/* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */
-try{var _tp=JSON.stringify({p:location.pathname.split('/').pop()||'index.html',r:document.referrer||''});
-navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 
 /* Firmenfeiern brauchen fürs spätere Angebot oft Firmenname/Rechnungsadresse - dafür gibt es
    kein eigenes Feld (kein Schema-Wechsel nötig), aber der Nachrichten-Platzhalter leitet
@@ -1317,6 +1314,7 @@ document.getElementById('inqForm').addEventListener('submit',function(ev){
     if(!r.ok)throw new Error('HTTP '+r.status);
     var urgentDays=data.event_date?Math.round((new Date(data.event_date)-new Date())/86400000):null;
     var urgent=urgentDays!=null&&urgentDays>=0&&urgentDays<=10;
+    if(window.Stat)Stat.click('anfrage');
     msg.className='form-msg ok';
     msg.textContent=urgent
       ?'Danke! Euer Termin ist ja bald – ich melde mich so schnell wie möglich, meist noch am selben Tag. Wenn es eilig ist, schreibt mir gern zusätzlich per WhatsApp (Kontakt oben).'
@@ -1353,5 +1351,6 @@ function showRegHint(data){
     <div class="rep-fotos" id="repFotos"></div>
   </div>
 </div>
+<script src="stats.js"></script>
 </body>
 </html>

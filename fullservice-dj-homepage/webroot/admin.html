@@ -740,6 +740,10 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
       <div class="card"><h3>Meistbesuchte Seiten</h3><div id="webPages" class="sml mut">–</div></div>
       <div class="card"><h3>Woher die Besucher kommen <span class="mut sml" style="font-weight:400">(Referrer-Domains, direkte Aufrufe zählen nicht mit)</span></h3><div id="webRefs" class="sml mut">–</div></div>
     </div>
+    <div class="grid2" style="gap:16px">
+      <div class="card"><h3>Verweildauer &amp; Scrolltiefe je Seite <span class="mut sml" style="font-weight:400">(Durchschnitt aus den „Verlassen"-Meldungen)</span></h3><div id="webEngage" class="sml mut">–</div></div>
+      <div class="card"><h3>Klicks auf wichtige Buttons</h3><div id="webClicks" class="sml mut">–</div></div>
+    </div>
   </div>
 
   <!-- TECHNIK -->
@@ -7562,7 +7566,8 @@ function loadWebStats(){
       if(!j||j.error)return;
       var conv=j.views_total?((j.inquiries_total/j.views_total)*100).toFixed(1).replace('.',','):'–';
       document.getElementById('webTiles').innerHTML=
-        tile(j.views_total,'Seitenaufrufe')+tile(j.inquiries_total,'Anfragen')+
+        tile(j.views_total,'Seitenaufrufe')+tile(j.uniques_total,'Eindeutige Besucher (Summe je Tag)')+
+        tile(j.inquiries_total,'Anfragen')+
         tile(conv+' %','Anfragen je Aufruf')+tile(j.signups_total,'Workshop-Anmeldungen')+
         tile(j.newsletter_total,'Newsletter-Abos');
       /* Tagesbalken über den kompletten Zeitraum, fehlende Tage = 0 */
@@ -7587,8 +7592,18 @@ function loadWebStats(){
       document.getElementById('webRefs').innerHTML=(j.refs||[]).map(function(rf){
         return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(rf.ref)+'<span style="float:right">'+rf.views+'</span></div>';
       }).join('')||'Noch keine Referrer erfasst – z. B. Google-Treffer oder Links von anderen Seiten tauchen hier auf.';
+      document.getElementById('webEngage').innerHTML=(j.engage||[]).map(function(e){
+        var m=Math.floor(e.avg_seconds/60),s=e.avg_seconds%60,zeit=(m?m+' Min. ':'')+s+' Sek.';
+        return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(e.page)+
+          '<span style="float:right">'+zeit+' &nbsp;·&nbsp; '+e.avg_scroll+' % gescrollt</span></div>';
+      }).join('')||'Noch keine Daten – die Zählung startet, sobald Besucher die Seite wieder verlassen.';
+      document.getElementById('webClicks').innerHTML=(j.clicks||[]).map(function(c){
+        return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(CLICK_LABELS[c.k]||c.k)+'<span style="float:right">'+c.n+'</span></div>';
+      }).join('')||'Noch keine Klicks erfasst.';
     }).catch(function(){});
 }
+var CLICK_LABELS={whatsapp:'WhatsApp-Button',rueckruf:'Rückruf angefordert',anfrage:'Kontaktformular abgeschickt',
+  mietanfrage:'Mietanfrage abgeschickt','workshop-anmeldung':'Workshop-Anmeldung','workshop-warteliste':'Workshop-Warteliste'};
 
 /* ===== Newsletter-Verwaltung ===== */
 function loadNewsletter(){

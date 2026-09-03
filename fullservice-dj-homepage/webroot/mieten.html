@@ -347,8 +347,6 @@ function applyCompany(co){
 }
 fetch(API+'/public/company').then(function(r){return r.json()}).then(applyCompany).catch(function(){});
 
-try{var _tp=JSON.stringify({p:location.pathname.split('/').pop()||'mieten.html',r:document.referrer||''});
-navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 
 /* maximumFractionDigits muss mit: Ohne die Angabe rundet der Browser auf 3 Stellen,
    und die Netto-Umrechnung ergab Beträge wie "294,118 €". */
@@ -1017,6 +1015,7 @@ function submitCart(){
         document.getElementById('cartSubmitBtn').disabled=false;
         m.style.display='block';
         if(res.s>=400){m.className='msg err';m.textContent=res.j.error||'Anfrage fehlgeschlagen – bitte später erneut versuchen.';return}
+        if(window.Stat)Stat.click('mietanfrage');
         /* Die angefragten Positionen bleiben in der Erfolgsmeldung sichtbar - der Tourcase
            wird danach geleert, sonst stuende die Anfrage beim naechsten Besuch nochmal drin. */
         var dtDe=function(x){var p=String(x||'').split('-');return p.length===3?p[2]+'.'+p[1]+'.'+p[0]:x};
@@ -1056,5 +1055,6 @@ document.addEventListener('keydown',function(ev){
   if(ev.key==='Escape'&&document.getElementById('prodBg').style.display==='block')closeProductModal();
 });
 </script>
+<script src="stats.js"></script>
 </body>
 </html>

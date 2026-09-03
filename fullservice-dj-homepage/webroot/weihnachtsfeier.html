@@ -183,9 +183,6 @@ fetch(API+'/rest/site_content?select=key,value').then(function(r){return r.json(
     }
   });
 }).catch(function(){});
-/* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */
-try{var _tp=JSON.stringify({p:'weihnachtsfeier.html',r:document.referrer||''});
-navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 document.getElementById('inqForm').addEventListener('submit',function(ev){
   ev.preventDefault();
   var f=ev.target,msg=document.getElementById('formMsg'),btn=document.getElementById('sendBtn');
@@ -204,6 +201,7 @@ document.getElementById('inqForm').addEventListener('submit',function(ev){
     method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)
   }).then(function(r){
     if(!r.ok)throw new Error('HTTP '+r.status);
+    if(window.Stat)Stat.click('anfrage');
     msg.className='form-msg ok';msg.textContent='Danke! Eure Anfrage ist angekommen – ich melde mich in der Regel innerhalb von 24 Stunden mit Verfügbarkeit und Preisrahmen.';
     f.reset();
   }).catch(function(){
@@ -211,5 +209,6 @@ document.getElementById('inqForm').addEventListener('submit',function(ev){
   }).finally(function(){btn.disabled=false;btn.textContent='Anfrage senden'});
 });
 </script>
+<script src="stats.js"></script>
 </body>
 </html>

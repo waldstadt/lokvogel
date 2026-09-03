@@ -173,6 +173,7 @@ function render(pg,site){
     .then(function(antwort){
       /* Kurzfristige Termine bekommen dieselbe ehrliche Ansage wie auf der Startseite */
       var tage=data.event_date?Math.round((new Date(data.event_date)-new Date())/86400000):null;
+      if(window.Stat)Stat.click('anfrage');
       msg.className='form-msg ok';
       var text=(tage!=null&&tage>=0&&tage<=10)
         ?'Danke! Euer Termin ist ja bald – ich melde mich so schnell wie möglich, meist noch am selben Tag. Wenn es eilig ist, schreibt mir gern zusätzlich per WhatsApp.'
@@ -219,9 +220,7 @@ function showRegHint(data){
   msg.parentNode.insertBefore(box,msg.nextSibling);
 }
 
-/* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */
-try{var _tp=JSON.stringify({p:SLUG+'.html',r:document.referrer||''});
-navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
+var stSc=document.createElement('script');stSc.src='stats.js';document.head.appendChild(stSc);
 
 Promise.all([
   fetch(API+'/rest/campaign_pages?slug=eq.'+encodeURIComponent(SLUG)).then(function(r){return r.json()}),

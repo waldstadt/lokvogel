@@ -607,9 +607,6 @@ window.addEventListener('scroll',function(){
 });
 var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)e.target.classList.add('vis')})},{threshold:.12});
 document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
-/* Anonyme Reichweiten-Zählung: nur Seitenname + Referrer-Domain, keine Cookies, keine IDs */
-try{var _tp=JSON.stringify({p:location.pathname.split('/').pop()||'technik.html',r:document.referrer||''});
-navigator.sendBeacon?navigator.sendBeacon(API+'/track',_tp):fetch(API+'/track',{method:'POST',body:_tp,keepalive:true});}catch(e){}
 
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:0})+' €'}
 /* Bildpfade und Positionsangaben landen in CSS-Deklarationen. Anfuehrungszeichen,
@@ -883,6 +880,7 @@ function sendWs(){
         return;
       }
       if(res.s>=400)throw new Error(res.j.error||'Anmeldung fehlgeschlagen.');
+      if(window.Stat)Stat.click(res.j.status==='warteliste'?'workshop-warteliste':'workshop-anmeldung');
       /* Nach dem Erfolg nur noch die Bestaetigung zeigen - ein weiter ausgefuelltes Formular
          darunter laedt zum zweiten Absenden ein. */
       document.getElementById('wsFields').style.display='none';
@@ -955,6 +953,7 @@ document.getElementById('inqForm').addEventListener('submit',function(ev){
     if(!r.ok)throw new Error('HTTP '+r.status);
     var urgentDays=data.event_date?Math.round((new Date(data.event_date)-new Date())/86400000):null;
     var urgent=urgentDays!=null&&urgentDays>=0&&urgentDays<=10;
+    if(window.Stat)Stat.click('anfrage');
     msg.className='form-msg ok';
     msg.textContent=urgent
       ?'Danke! Euer Termin ist ja bald – ich melde mich so schnell wie möglich, meist noch am selben Tag. Wenn es eilig ist, schreibt mir gern zusätzlich per WhatsApp (Kontakt oben).'
@@ -1118,5 +1117,6 @@ function setHeroVideo(url){
     </div>
   </div>
 </div>
+<script src="stats.js"></script>
 </body>
 </html>
