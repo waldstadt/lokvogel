@@ -9179,6 +9179,14 @@ function adminSendMail(to,subject,body,custId,cb,bookingId,inReplyTo){
       else toast(j.error||'Direktversand fehlgeschlagen – E-Mail-Konten in den Einstellungen prüfen oder „Im Mail-Programm öffnen" nutzen.',1);
     }).catch(function(e){toast(e.message,1)});
 }
+/* "Direkt senden" bei einer freien neuen Mail (kein bekannter Empfänger vorausgewählt,
+   siehe mailComposeNew/mailForwardFromInbox) - liest die im Dialog eingetippte Adresse
+   aus dem "An"-Feld statt aus einem vorab bekannten i.email. */
+function adminSendMailFree(){
+  var to=v('rTo');
+  if(!to){toast('Bitte eine Empfänger-Adresse eingeben.',1);return}
+  adminSendMail(to,v('rSubject'),document.getElementById('rBody').value,'',function(){composeSent();closeModal()},'','');
+}
 function copyReply(){
   var txt='Betreff: '+v('rSubject')+'\n\n'+document.getElementById('rBody').value;
   navigator.clipboard.writeText(txt).then(function(){toast('Kopiert ✓ – jetzt ins Mail-Programm einfügen.')})
