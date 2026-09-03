@@ -460,6 +460,7 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
           <label for="wsQ2">Wo liegt deine größte Herausforderung?</label><input id="wsQ2" placeholder="z. B. Es pfeift, sobald ich das Mikro aufdrehe / mein Bass matscht …">
           <label for="wsQ3">Was willst du aus dem Workshop mitnehmen?</label><input id="wsQ3" placeholder="z. B. Meine Anlage endlich selbst sauber einstellen können …">
         </div>
+        <label for="wsCode">Rabattcode <span style="text-transform:none;letter-spacing:0;font-weight:400">(falls vorhanden)</span></label><input id="wsCode" placeholder="z. B. FRUEH20" style="text-transform:uppercase;max-width:220px">
         <label for="wsNote">Nachricht (optional)</label><input id="wsNote" placeholder="Sonst noch etwas?">
         <label style="display:flex;gap:8px;align-items:flex-start;margin-top:16px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--mut)">
           <input type="checkbox" id="wsConsent" style="width:auto;margin-top:3px;flex:none">
@@ -785,6 +786,7 @@ function loadWorkshops(){
           availability:w.free>0?'https://schema.org/InStock':'https://schema.org/SoldOut'}};
     }));
     document.head.appendChild(ld);
+    wsApplyDeepLink();
   }).catch(function(){});
 }
 function openWsDetail(i){
@@ -808,6 +810,21 @@ function openWsDetail(i){
   document.body.style.overflow='hidden';
 }
 function closeWsDetail(){document.getElementById('wsDetailBg').style.display='none';document.body.style.overflow=''}
+/* Direktlink auf einen Termin, optional mit vorausgefülltem Rabattcode (siehe "Link
+   kopieren" im Backoffice bei Rabattcodes) - z. B. technik.html?workshop=<id>&code=<code>#workshops.
+   Oeffnet die Buchungsmaske sofort, damit Interessent:innen aus einem geteilten Link
+   nicht erst selbst den richtigen Termin und den Code raussuchen muessen. */
+var WS_DEEPLINK_DONE=false;
+function wsApplyDeepLink(){
+  if(WS_DEEPLINK_DONE)return;WS_DEEPLINK_DONE=true;
+  var m=/[?&]workshop=([^&]+)/.exec(location.search);if(!m)return;
+  var wid=decodeURIComponent(m[1]),idx=-1;
+  for(var i=0;i<WS.length;i++)if(WS[i].id===wid){idx=i;break}
+  if(idx<0)return;
+  openWsForm(idx);
+  var cm=/[?&]code=([^&]+)/.exec(location.search);
+  if(cm)document.getElementById('wsCode').value=decodeURIComponent(cm[1]).toUpperCase();
+}
 var wsWl=false;
 function openWsForm(i,wl){
   wsSel=WS[i];wsWl=!!wl;
@@ -857,7 +874,7 @@ function sendWs(){
   fetch(API+'/portal/workshops/'+wsSel.id+'/signup',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({name:name,email:mail,phone:document.getElementById('wsPhone').value.trim(),
       seats:Number(document.getElementById('wsSeats').value)||1,message:document.getElementById('wsNote').value.trim(),
-      street:street,zip:zip,city:city,
+      street:street,zip:zip,city:city,discount_code:document.getElementById('wsCode').value.trim(),
       q_music:q1,q_challenge:q2,q_goal:q3,waitlist:wsWl,consent:true})})
     .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
     .then(function(res){

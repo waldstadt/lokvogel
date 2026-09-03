@@ -791,6 +791,8 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
     <div class="pt">Workshops</div><div class="ps">Termine, Anmeldungen &amp; Newsletter</div>
     <div class="card"><h3>Workshop-Termine <span class="mut sml" style="font-weight:400">– buchbar auf der Technik-Seite, Rechnung geht automatisch per E-Mail raus</span> <button class="btn sm" style="float:right" onclick="openWsModal()">+ Termin</button></h3>
       <div id="wsAdminList" class="sml"></div></div>
+    <div class="card"><h3>Rabattcodes <span class="mut sml" style="font-weight:400">– Frühbucherpreis ist einfach ein Code mit Frist, an einen Termin gebunden</span> <button class="btn sm" style="float:right" onclick="openDiscModal()">+ Neuer Code</button></h3>
+      <div id="discList" class="sml"></div></div>
     <div class="card"><h3>Workshop-Newsletter <span class="mut sml" style="font-weight:400">– Anmeldung über die Technik-Seite, Double-Opt-in</span></h3>
       <div id="nlAdminList" class="sml mut">–</div>
       <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px">
@@ -1444,7 +1446,7 @@ function showPage(id){
   if(REST_PAGES[id])ensureRest();
   if(id==='stats')loadWebStats();
   if(id==='einsatz')renderEinsatz();
-  if(id==='workshops')loadNewsletter();
+  if(id==='workshops'){loadNewsletter();loadDiscountCodes()}
   if(id==='media')loadMediaPage();
   if(id==='mail')renderMailList();
   window.scrollTo(0,0);
@@ -1643,6 +1645,62 @@ function saveWs(id){
   if(!id)body.created_at=new Date().toISOString();
   (id?api('workshop_events?id=eq.'+id,{method:'PATCH',body:body}):api('workshop_events',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');reloadWs()}).catch(function(e){toast(e.message,1)});
+}
+/* Rabattcodes: deckt Fruehbucherpreise (an einen Termin gebunden, mit Frist) und
+   klassische Codes (fuer alle Termine, x-mal einloesbar) mit demselben Mechanismus ab. */
+function loadDiscountCodes(){
+  api('discount_codes?select=*&order=created_at.desc').then(function(r){CACHE.discountCodes=r||[];renderDiscList()});
+}
+function discWsTitle(id){var w=(CACHE.wsEvents||[]).find(function(x){return x.id===id});return w?w.title+' · '+dt(w.event_date):'(gelöschter Termin)'}
+function discValueStr(d){return d.kind==='percent'?(d.value+' %'):euro(d.value)}
+function renderDiscList(){
+  var list=CACHE.discountCodes||[];
+  document.getElementById('discList').innerHTML=list.length?('<div class="tbl-wrap"><table><thead><tr><th>Code</th><th>Gilt für</th><th class="num">Rabatt</th><th>Gültig bis</th><th class="num">Genutzt</th><th></th><th></th></tr></thead><tbody>'+
+    list.map(function(d){
+      var abgelaufen=d.valid_until&&d.valid_until<new Date().toISOString();
+      var ausgeschoepft=d.max_uses!=null&&d.used_count>=d.max_uses;
+      var status=!d.active?'<span class="b grey">aus</span>':(abgelaufen?'<span class="b red">abgelaufen</span>':(ausgeschoepft?'<span class="b red">ausgeschöpft</span>':'<span class="b green">aktiv</span>'));
+      return '<tr><td><b>'+esc(d.code)+'</b></td>'+
+        '<td>'+(d.workshop_id?esc(discWsTitle(d.workshop_id)):'<span class="mut">alle Termine</span>')+'</td>'+
+        '<td class="num">'+discValueStr(d)+'</td>'+
+        '<td>'+(d.valid_until?dt(d.valid_until.slice(0,10)):'<span class="mut">unbegrenzt</span>')+'</td>'+
+        '<td class="num">'+d.used_count+(d.max_uses!=null?' / '+d.max_uses:'')+'</td>'+
+        '<td>'+status+'</td>'+
+        '<td>'+(d.workshop_id?'<a onclick="discCopyLink(\''+d.id+'\')">Link kopieren</a> · ':'')+
+        '<a onclick="openDiscModal(\''+d.id+'\')">Bearbeiten</a> · '+
+        '<a onclick="delRow(\'discount_codes\',\''+d.id+'\',loadDiscountCodes)">Löschen</a></td></tr>';
+    }).join('')+'</tbody></table></div>'):'<span class="mut">Noch keine Rabattcodes – z. B. für einen Frühbucherpreis: Code anlegen, an einen Termin binden und eine Frist setzen.</span>';
+}
+function discCopyLink(id){
+  var d=(CACHE.discountCodes||[]).find(function(x){return x.id===id});if(!d||!d.workshop_id)return;
+  var link=location.origin+'/technik.html?workshop='+d.workshop_id+'&code='+encodeURIComponent(d.code)+'#workshops';
+  navigator.clipboard.writeText(link).then(function(){toast('Link kopiert ✓ – öffnet den Termin direkt mit dem Code vorausgefüllt.')})
+    .catch(function(){toast('Kopieren nicht möglich: '+link,1)});
+}
+function openDiscModal(id){
+  var d=id?(CACHE.discountCodes||[]).find(function(x){return x.id===id}):{};d=d||{};
+  openModal(id?'Rabattcode bearbeiten':'Neuer Rabattcode',
+    '<div class="grid2"><div><label>Code *</label><input id="dCode" value="'+esc(d.code||'')+'" placeholder="z. B. FRUEH20" style="text-transform:uppercase"></div>'+
+    '<div><label>Gilt für</label><select id="dWs"><option value="">Alle Termine</option>'+
+    (CACHE.wsEvents||[]).map(function(w){return '<option value="'+w.id+'"'+(d.workshop_id===w.id?' selected':'')+'>'+esc(w.title)+' · '+dt(w.event_date)+'</option>'}).join('')+'</select></div></div>'+
+    '<div class="grid3"><div><label>Art</label><select id="dKind"><option value="percent"'+(d.kind!=='fixed'?' selected':'')+'>Prozent</option><option value="fixed"'+(d.kind==='fixed'?' selected':'')+'>Fester Betrag (€)</option></select></div>'+
+    '<div><label>Wert</label><input type="number" step="0.01" id="dValue" value="'+(d.value!=null?d.value:'')+'" placeholder="z. B. 20"></div>'+
+    '<div><label>Maximal x-mal einlösbar</label><input type="number" id="dMax" value="'+(d.max_uses!=null?d.max_uses:'')+'" placeholder="leer = unbegrenzt"></div></div>'+
+    '<label>Gültig bis <span class="mut sml" style="text-transform:none;letter-spacing:0">(einschließlich dieses Tages, leer = unbegrenzt)</span></label><input type="date" id="dUntil" value="'+(d.valid_until?d.valid_until.slice(0,10):'')+'">'+
+    '<label style="margin-top:10px"><input type="checkbox" id="dActive" style="width:auto;margin-right:6px" '+(id&&!d.active?'':'checked')+'>Aktiv</label>'+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveDisc(\''+(id||'')+'\')">Speichern</button></div>');
+}
+function saveDisc(id){
+  var code=v('dCode').toUpperCase();
+  if(!code){toast('Bitte einen Code eintragen.',1);return}
+  if(!v('dValue')){toast('Bitte den Rabattwert eintragen.',1);return}
+  var body={code:code,kind:v('dKind'),value:Number(v('dValue')),workshop_id:v('dWs')||null,
+    max_uses:v('dMax')?Number(v('dMax')):null,valid_until:v('dUntil')?v('dUntil')+'T23:59:59Z':null,
+    active:document.getElementById('dActive').checked};
+  if(!id){body.used_count=0;body.created_at=new Date().toISOString()}
+  (id?api('discount_codes?id=eq.'+id,{method:'PATCH',body:body}):api('discount_codes',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Gespeichert ✓');loadDiscountCodes()})
+    .catch(function(e){toast(/UNIQUE|unique/.test(e.message)?'Diesen Code gibt es schon – bitte einen anderen wählen.':e.message,1)});
 }
 /* Reservierungsfrist einer Anmeldung (5 Tage ab Anmeldung, siehe wsExpireStale() im
    Server) - rein zur Anzeige, damit im Backoffice sichtbar ist, bis wann eine offene

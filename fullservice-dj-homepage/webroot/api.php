@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 101;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 102;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -199,7 +199,7 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks','payments','mail_messages'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks','payments','mail_messages','discount_codes'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -1078,6 +1078,17 @@ function upgrade(PDO $p): void {
        naechsten Abruf nicht doppelt rausgeht. */
     try { $p->exec("alter table mail_messages add column forwarded integer default 0"); } catch (PDOException $e) {}
   }
+  if ($v < 102) {
+    /* v102: Rabattcodes fuer Workshops - Fruehbucherpreis ist einfach ein Code, der an
+       einen Termin gebunden ist und eine Frist hat (kein eigenes Feld dafuer noetig).
+       workshop_signups merkt sich Art+Wert des eingeloesten Codes (nicht nur den Betrag),
+       damit eine spaeter erstellte Rechnung (z. B. nach Nachruecken von der Warteliste)
+       ihn korrekt anwendet. */
+    try { $p->exec(discountCodesDdl()); } catch (Throwable $e) {}
+    foreach (['discount_code' => 'text', 'discount_kind' => 'text', 'discount_value' => 'real'] as $col => $def) {
+      try { $p->exec("alter table workshop_signups add column $col $def"); } catch (PDOException $e) {}
+    }
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1926,8 +1937,44 @@ function workshopsDdl(): array {
       name text not null, email text, phone text, seats integer default 1, message text,
       q_music text, q_challenge text, q_goal text,
       street text, zip text, city text, invoice_id text,
+      discount_code text, discount_kind text, discount_value real,
       status text default 'angemeldet', created_at text)",
   ];
+}
+/* Rabattcodes fuer Workshops - deckt sowohl "Fruehbucherpreis" (workshop_id gesetzt,
+   valid_until = die Frist, max_uses meist leer) als auch klassische Rabattcodes ab
+   (workshop_id leer = fuer alle Termine, max_uses gesetzt = nur x-mal einloesbar).
+   used_count zaehlt hoch, sobald jemand den Code bei der Anmeldung einloest (siehe
+   portal/workshops/.../signup) - nicht erst bei Zahlungseingang, "eingeloest" heisst
+   "beansprucht". */
+function discountCodesDdl(): string {
+  return "create table if not exists discount_codes (id text primary key, code text not null,
+    kind text not null default 'percent', value real not null default 0,
+    workshop_id text references workshop_events(id) on delete cascade,
+    valid_until text, max_uses integer, used_count integer default 0,
+    active integer default 1, created_at text);
+    create unique index if not exists ux_discount_codes_code on discount_codes(code)";
+}
+/* Prueft einen eingegebenen Code fuer einen konkreten Workshop-Termin: aktiv, passt der
+   Termin (workshop_id leer = gilt ueberall), noch nicht abgelaufen, noch nicht ausgeschoepft.
+   null = ungueltig, egal aus welchem Grund - der Aufrufer gibt eine einheitliche Fehlermeldung
+   aus, damit niemand durch unterschiedliche Fehlertexte erraten kann, welcher Grund zutrifft. */
+function discountCodeLookup(PDO $p, string $code, string $workshopId): ?array {
+  $code = strtoupper(trim($code));
+  if ($code === '') return null;
+  $st = $p->prepare('select * from discount_codes where upper(code) = ? and active = 1');
+  $st->execute([$code]);
+  $d = $st->fetch();
+  if (!$d) return null;
+  if (!empty($d['workshop_id']) && $d['workshop_id'] !== $workshopId) return null;
+  if (!empty($d['valid_until']) && $d['valid_until'] < now()) return null;
+  if ($d['max_uses'] !== null && (int)$d['used_count'] >= (int)$d['max_uses']) return null;
+  return $d;
+}
+function discountAmountFor(string $kind, float $value, float $grossFull): float {
+  if ($grossFull <= 0) return 0.0;
+  if ($kind === 'percent') return round($grossFull * max(0, min(100, $value)) / 100, 2);
+  return min($grossFull, round(max(0, $value), 2));
 }
 
 function quoteTemplatesDdl(): string {
@@ -3367,6 +3414,7 @@ SQL);
     values (?,?,?,?,?,?,?,?,?,?,?)')
     ->execute([uuid(), 'start', 'galerie', 0, 'instagram', 'Frisch aus Instagram', '', '[]', '4', 0, now()]);
   foreach (workshopsDdl() as $sql) $p->exec($sql);
+  $p->exec(discountCodesDdl());
   $p->exec(paymentsDdl());
   foreach (docIndexDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
@@ -5008,7 +5056,9 @@ function workshopInvoice(PDO $p, string $signupId, bool $quiet = false): array {
     $small = !empty($comp['small_business']);
     $rate = $small ? 0.0 : (float)($defs['tax_rate'] ?? 19);
     /* w_price ist brutto (inkl. USt.) hinterlegt - netto wird heruntergerechnet, nicht draufgeschlagen. */
-    $gross = round($price * $seats, 2);
+    $grossFull = round($price * $seats, 2);
+    $discount = !empty($s['discount_kind']) ? discountAmountFor((string)$s['discount_kind'], (float)$s['discount_value'], $grossFull) : 0.0;
+    $gross = max(0, round($grossFull - $discount, 2));
     $net = $rate ? round($gross / (1 + $rate / 100), 2) : $gross;
     $tax = round($gross - $net, 2);
     $payDays = (int)($defs['payment_days'] ?? 14);
@@ -5036,6 +5086,13 @@ function workshopInvoice(PDO $p, string $signupId, bool $quiet = false): array {
     $p->prepare('insert into document_items (id, document_id, pos, description, qty, unit, unit_price)
         values (?,?,?,?,?,?,?)')
       ->execute([uuid(), $docId, 1, 'Workshop: ' . $dTitle . ($wZeit ? ', ' . $wZeit : '') . ' – Teilnahme', $seats, $seats > 1 ? 'Plätze' : 'Platz', $price]);
+    if ($discount > 0) {
+      $discLabel = 'Rabatt' . (!empty($s['discount_code']) ? ' (Code ' . $s['discount_code'] . ')' : '') .
+        ($s['discount_kind'] === 'percent' ? ' – ' . rtrim(rtrim(number_format((float)$s['discount_value'], 1, ',', '.'), '0'), ',') . ' %' : '');
+      $p->prepare('insert into document_items (id, document_id, pos, description, qty, unit, unit_price)
+          values (?,?,?,?,?,?,?)')
+        ->execute([uuid(), $docId, 2, $discLabel, 1, 'Stk.', -$discount]);
+    }
     $p->prepare('update workshop_signups set invoice_id = ? where id = ?')->execute([$docId, $signupId]);
     docAudit($p, $docId, 'erstellt', $number . ' (rechnung, automatisch aus Workshop-Buchung)');
     $p->commit();
@@ -6440,16 +6497,29 @@ function handlePortal(string $path, string $method, $body): never {
        einen Platz hast") - die Anschrift wird deshalb erst beim Nachrücken gebraucht. */
     if ($status === 'angemeldet' && (float)($w['price_net'] ?? 0) > 0 && ($street === '' || $zip === '' || $city === ''))
       fail('Bitte Anschrift angeben (Straße, PLZ, Ort) – sie wird für die Rechnung benötigt.');
+    /* Rabattcode (optional, z. B. Fruehbucherpreis): geprueft und - wenn gueltig - sofort
+       als "beansprucht" gezaehlt, noch bevor die Anmeldung selbst steht. Ein leeres Feld
+       ist kein Fehler, ein ausgefuelltes, aber ungueltiges Feld schon - sonst denkt der
+       Interessent, der Rabatt sei angekommen, obwohl er es nicht ist. */
+    $discKind = null; $discValue = null; $discCodeStored = null;
+    $codeInput = trim((string)($body['discount_code'] ?? ''));
+    if ($codeInput !== '') {
+      $dc = discountCodeLookup($p, $codeInput, $w['id']);
+      if (!$dc) fail('Dieser Rabattcode ist ungültig, abgelaufen oder schon ausgeschöpft.', 400);
+      $discKind = $dc['kind']; $discValue = (float)$dc['value']; $discCodeStored = strtoupper($codeInput);
+      $p->prepare('update discount_codes set used_count = used_count + 1 where id = ?')->execute([$dc['id']]);
+    }
     $sid = uuid();
     $p->prepare('insert into workshop_signups (id, workshop_id, name, email, phone, seats, message,
-        q_music, q_challenge, q_goal, street, zip, city, status, created_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        q_music, q_challenge, q_goal, street, zip, city, discount_code, discount_kind, discount_value, status, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
       ->execute([$sid, $w['id'], $name, $email,
         mb_substr(trim((string)($body['phone'] ?? '')), 0, 60), $seats,
         mb_substr(trim((string)($body['message'] ?? '')), 0, 2000),
         mb_substr(trim((string)($body['q_music'] ?? '')), 0, 1000),
         mb_substr(trim((string)($body['q_challenge'] ?? '')), 0, 1000),
         mb_substr(trim((string)($body['q_goal'] ?? '')), 0, 1000),
-        $street, $zip, $city, $status, now()]);
+        $street, $zip, $city, $discCodeStored, $discKind, $discValue, $status, now()]);
     $inv = null;
     if ($status === 'angemeldet') {
       $r = workshopInvoice($p, $sid);
