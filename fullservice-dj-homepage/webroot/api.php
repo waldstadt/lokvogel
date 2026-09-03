@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 100;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 101;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1071,6 +1071,13 @@ function upgrade(PDO $p): void {
        bewusst einschaltet. */
     try { $p->exec(mailAutoDdl()); } catch (Throwable $e) {}
   }
+  if ($v < 101) {
+    /* v101: Weiterleitung auf ein externes Postfach, je Konto ein/ausschaltbar (liegt bei
+       den anderen Kontodaten in settings.mail_accounts, kein Schema-Bedarf dafuer) - nur
+       die Markierung "schon weitergeleitet" braucht eine Spalte, damit eine Mail beim
+       naechsten Abruf nicht doppelt rausgeht. */
+    try { $p->exec("alter table mail_messages add column forwarded integer default 0"); } catch (PDOException $e) {}
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1392,7 +1399,7 @@ function mailMessagesDdl(): string {
   return "create table if not exists mail_messages (id text primary key, account text not null,
     direction text not null default 'in', folder text, uid text, message_id text, in_reply_to text,
     from_email text, from_name text, to_email text, to_name text, subject text,
-    date_at text, seen integer default 0, customer_id text, body_text text, created_at text);
+    date_at text, seen integer default 0, customer_id text, body_text text, forwarded integer default 0, created_at text);
     create unique index if not exists ux_mail_messages on mail_messages(account, message_id)";
 }
 function docPaidSum(PDO $p, string $docId): float {
@@ -2439,6 +2446,15 @@ function mailAutomationTick(PDO $p): void {
   if ($cfg['nachfass']['enabled']) { try { mailAutoNachfass($p, $cfg['nachfass']); } catch (Throwable $e) {} }
   if ($cfg['form_reminder']['enabled']) { try { mailAutoFormReminder($p, $cfg['form_reminder']); } catch (Throwable $e) {} }
   if ($cfg['mahnung']['enabled']) { try { mailAutoMahnung($p, $cfg['mahnung']); } catch (Throwable $e) {} }
+  /* Weiterleitung: nur Konten mit eingerichtetem IMAP-Zugang UND eingeschalteter
+     Weiterleitung abrufen - ohne echten Cronjob ist "automatisch" hier "spaetestens beim
+     naechsten angemeldeten Zugriff, gedrosselt auf 10 Minuten", nicht sofort bei Eingang. */
+  foreach (MAIL_ACCOUNT_KEYS as $which) {
+    $acc = mailAccount($which);
+    if ($acc !== null && !empty($acc['forward_enabled']) && trim((string)($acc['forward_to'] ?? '')) !== '') {
+      try { mailFetchAndForward($p, $which); } catch (Throwable $e) {}
+    }
+  }
 }
 /* Automatische Wiedervorlage, sobald ein Angebot/eine AB versendet ist: Ohne sie ging
    ein Angebot, auf das der Kunde nicht reagiert, schlicht unter. Termin = das Fruehere
@@ -4436,7 +4452,8 @@ function mailAccountPublic(string $which): array {
     'smtp_host' => (string)($a['smtp_host'] ?? ''), 'smtp_port' => (int)($a['smtp_port'] ?? 0),
     'smtp_enc' => (string)($a['smtp_enc'] ?? 'ssl'), 'imap_host' => (string)($a['imap_host'] ?? ''),
     'imap_port' => (int)($a['imap_port'] ?? 0), 'username' => (string)($a['username'] ?? ''),
-    'has_password' => trim((string)($a['password'] ?? '')) !== ''];
+    'has_password' => trim((string)($a['password'] ?? '')) !== '',
+    'forward_to' => (string)($a['forward_to'] ?? ''), 'forward_enabled' => !empty($a['forward_enabled'])];
 }
 
 /* ==================== SMTP-Client (Rohsocket, ohne Bibliothek) ====================
@@ -4786,6 +4803,61 @@ function logOutgoingMail(string $account, string $to, string $subject, string $b
         on conflict(account, message_id) do nothing")
       ->execute([uuid(), $account, 'out', 'Sent', $mid, $fromEmail, $to, $subject, now(), 1, $customerId, $bodyText, now()]);
   } catch (Throwable $e) {}
+}
+/* Weiterleitung einer einzelnen eingegangenen Mail an eine externe Adresse - reiner Text,
+   keine Anhaenge (dafuer muesste der verschachtelte MIME-Baum erneut abgerufen werden;
+   bewusst einfach gehalten). Geht ueber das Konto, bei dem die Mail ankam, damit klar
+   bleibt, woher sie stammt. */
+function mailForwardOne(string $account, string $to, array $mm): void {
+  $subject = 'Fwd: ' . ($mm['subject'] !== '' ? $mm['subject'] : '(kein Betreff)');
+  $bodyText = "---------- Weitergeleitete Mail ----------\n" .
+    'Von: ' . ($mm['from_name'] !== '' ? $mm['from_name'] . ' <' . $mm['from_email'] . '>' : $mm['from_email']) . "\n" .
+    'Betreff: ' . ($mm['subject'] !== '' ? $mm['subject'] : '(kein Betreff)') . "\n\n" . $mm['body_text'];
+  try { mailSendManual($account, $to, $subject, $bodyText); } catch (Throwable $e) {}
+}
+/* Holt Posteingang + Gesendet per IMAP und schreibt alles ins Postfach (mail_messages) -
+   gemeinsame Funktion fuer den Knopf "Postfach aktualisieren" UND den automatischen
+   Hintergrund-Tick (mailAutomationTick). Ist fuer das Konto eine Weiterleitung
+   eingerichtet, geht jede WIRKLICH NEUE eingehende Mail (stand vor diesem Abruf noch
+   nicht im Postfach) automatisch zusaetzlich an die hinterlegte Adresse raus - eine Mail,
+   die schon vorher im Postfach stand (z. B. weil die Weiterleitung erst danach
+   eingeschaltet wurde), wird NICHT nachtraeglich weitergeleitet, nur alles ab jetzt. */
+function mailFetchAndForward(PDO $p, string $which): array {
+  $acc = mailAccount($which);
+  if ($acc === null) return ['ok' => false, 'error' => 'Für dieses Konto ist noch kein IMAP-Zugang hinterlegt.'];
+  $r = imapFetchList($acc, 40);
+  if (!$r['ok']) return ['ok' => false, 'error' => $r['error']];
+  $fwdTo = trim((string)($acc['forward_to'] ?? ''));
+  $fwdOn = !empty($acc['forward_enabled']) && $fwdTo !== '' && filter_var($fwdTo, FILTER_VALIDATE_EMAIL);
+  $exists = $p->prepare('select 1 from mail_messages where account = ? and message_id = ? limit 1');
+  $ins = $p->prepare("insert into mail_messages (id, account, direction, folder, uid, message_id, in_reply_to, from_email, from_name, to_email, to_name, subject, date_at, seen, customer_id, body_text, forwarded, created_at)
+      values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      on conflict(account, message_id) do update set uid=excluded.uid, seen=excluded.seen, body_text=excluded.body_text");
+  $count = 0;
+  foreach (['in' => ['INBOX', $r['inbox']], 'out' => ['Sent', $r['sent']]] as $dir => $bucket) {
+    [$folderLabel, $msgs] = $bucket;
+    foreach ($msgs as $mm) {
+      $mid = $mm['message_id'] !== '' ? $mm['message_id'] : ('noid-' . $which . '-' . $dir . '-' . $mm['uid']);
+      $matchEmail = $dir === 'in' ? $mm['from_email'] : $mm['to_email'];
+      $custId = null;
+      if ($matchEmail !== '') {
+        $cst = $p->prepare('select id from customers where lower(email) = ? order by coalesce(created_at, "") asc limit 1');
+        $cst->execute([$matchEmail]);
+        $custId = $cst->fetchColumn() ?: null;
+      }
+      $isNew = true;
+      if ($dir === 'in' && $fwdOn) {
+        $exists->execute([$which, $mid]);
+        $isNew = !$exists->fetchColumn();
+      }
+      $doForward = $dir === 'in' && $fwdOn && $isNew;
+      $ins->execute([uuid(), $which, $dir, $folderLabel, $mm['uid'], $mid, $mm['in_reply_to'], $mm['from_email'], $mm['from_name'],
+        $mm['to_email'], $mm['to_name'], $mm['subject'], $mm['date_at'], $mm['seen'], $custId, $mm['body_text'], $doForward ? 1 : 0, now()]);
+      $count++;
+      if ($doForward) mailForwardOne($which, $fwdTo, $mm);
+    }
+  }
+  return ['ok' => true, 'count' => $count, 'inbox' => count($r['inbox']), 'sent' => count($r['sent'])];
 }
 /* $attachments: optionale Liste [['name'=>...,'mime'=>...,'data'=>Binaerinhalt], ...] -
    geht nur raus, wenn ein SMTP-Konto eingerichtet ist (smtpSend baut echtes MIME). Der
@@ -7351,6 +7423,12 @@ try {
       if (isset($body['imap_port'])) $a['imap_port'] = max(0, (int)$body['imap_port']);
       if (isset($body['smtp_enc']) && in_array($body['smtp_enc'], ['ssl', 'starttls'], true)) $a['smtp_enc'] = $body['smtp_enc'];
       if (!empty($body['email']) && !filter_var(trim((string)$body['email']), FILTER_VALIDATE_EMAIL)) fail('Bitte eine gültige E-Mail-Adresse angeben.', 400);
+      if (isset($body['forward_to'])) {
+        $fwdTo = trim((string)$body['forward_to']);
+        if ($fwdTo !== '' && !filter_var($fwdTo, FILTER_VALIDATE_EMAIL)) fail('Bitte eine gültige Weiterleitungsadresse angeben.', 400);
+        $a['forward_to'] = mb_substr($fwdTo, 0, 200);
+      }
+      if (isset($body['forward_enabled'])) $a['forward_enabled'] = !empty($body['forward_enabled']);
       /* Wie ai/config: Passwort wird nur bei nicht-leerem Wert ueberschrieben - ein leeres
          Feld beim Speichern loescht kein zuvor gesetztes Passwort versehentlich. */
       if (!empty($body['password'])) $a['password'] = (string)$body['password'];
@@ -7382,40 +7460,19 @@ try {
   }
   /* IMAP-Abruf auf Knopfdruck ("Postfach aktualisieren") - kein Dauer-Polling. Holt
      Posteingang UND (wenn vorhanden) den Gesendet-Ordner, gleicht die jeweilige
-     Gegenseite (Absender bei Posteingang, Empfaenger bei Gesendet) gegen Kunden ab.
-     Eine direkt aus dem Backoffice verschickte Mail steht durch logOutgoingMail() meist
-     schon im Postfach - trifft der Gesendet-Abruf per IMAP auf dieselbe Message-ID, wird
-     nur der IMAP-Stand (uid/seen/body_text) nachgetragen, die Kundenzuordnung bleibt. */
+     Gegenseite (Absender bei Posteingang, Empfaenger bei Gesendet) gegen Kunden ab und
+     leitet neue eingehende Mails weiter, falls fuer das Konto eingerichtet (siehe
+     mailFetchAndForward). Eine direkt aus dem Backoffice verschickte Mail steht durch
+     logOutgoingMail() meist schon im Postfach - trifft der Gesendet-Abruf per IMAP auf
+     dieselbe Message-ID, wird nur der IMAP-Stand (uid/seen/body_text) nachgetragen, die
+     Kundenzuordnung bleibt. */
   if ($path === 'mail/fetch' && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
     $which = (string)($body['account'] ?? '');
     if (!in_array($which, MAIL_ACCOUNT_KEYS, true)) fail('Unbekanntes Konto.', 400);
-    $acc = mailAccount($which);
-    if ($acc === null) fail('Für dieses Konto ist noch kein IMAP-Zugang hinterlegt.', 400);
-    $r = imapFetchList($acc, 40);
+    $r = mailFetchAndForward(db(), $which);
     if (!$r['ok']) fail((string)$r['error'], 502);
-    $p = db();
-    $ins = $p->prepare("insert into mail_messages (id, account, direction, folder, uid, message_id, in_reply_to, from_email, from_name, to_email, to_name, subject, date_at, seen, customer_id, body_text, created_at)
-        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        on conflict(account, message_id) do update set uid=excluded.uid, seen=excluded.seen, body_text=excluded.body_text");
-    $count = 0;
-    foreach (['in' => ['INBOX', $r['inbox']], 'out' => ['Sent', $r['sent']]] as $dir => $bucket) {
-      [$folderLabel, $msgs] = $bucket;
-      foreach ($msgs as $mm) {
-        $mid = $mm['message_id'] !== '' ? $mm['message_id'] : ('noid-' . $which . '-' . $dir . '-' . $mm['uid']);
-        $matchEmail = $dir === 'in' ? $mm['from_email'] : $mm['to_email'];
-        $custId = null;
-        if ($matchEmail !== '') {
-          $cst = $p->prepare('select id from customers where lower(email) = ? order by coalesce(created_at, "") asc limit 1');
-          $cst->execute([$matchEmail]);
-          $custId = $cst->fetchColumn() ?: null;
-        }
-        $ins->execute([uuid(), $which, $dir, $folderLabel, $mm['uid'], $mid, $mm['in_reply_to'], $mm['from_email'], $mm['from_name'],
-          $mm['to_email'], $mm['to_name'], $mm['subject'], $mm['date_at'], $mm['seen'], $custId, $mm['body_text'], now()]);
-        $count++;
-      }
-    }
-    out(['ok' => true, 'count' => $count, 'inbox' => count($r['inbox']), 'sent' => count($r['sent'])]);
+    out($r);
   }
   /* Aus einer Mail unbekannten Absenders einen Kunden anlegen - gleiches Muster wie
      "Als Kunde anlegen" bei Anfragen. Nur fuer Posteingang sinnvoll (bei Gesendet ist

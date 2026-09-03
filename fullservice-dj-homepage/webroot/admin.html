@@ -7854,6 +7854,9 @@ function renderMailAccounts(){
         '<div style="display:flex;align-items:flex-end;gap:8px">'+
         '<button class="btn sm" onclick="saveMailAccount(\''+k+'\')">Speichern</button>'+
         '<button class="btn g sm" onclick="testMailAccount(\''+k+'\')">Verbindung testen</button></div></div>'+
+        '<div style="margin-top:6px"><label><input type="checkbox" id="ma_'+k+'_fwdon" style="width:auto;margin-right:6px"'+(a.forward_enabled?' checked':'')+'>Neue eingehende Mails zusätzlich weiterleiten an</label>'+
+        '<input id="ma_'+k+'_fwdto" type="email" value="'+esc(a.forward_to||'')+'" placeholder="andere-adresse@beispiel.de" style="margin-top:4px">'+
+        '<div class="sml mut" style="margin-top:4px">Gilt nur für Mails ab dem Einschalten, nicht rückwirkend, und nur für Posteingang (nicht für Gesendet). Braucht „Postfach aktualisieren“ oder etwas Backoffice-Aktivität – kein sofortiges Weiterleiten wie eine echte Postfach-Regel beim Hoster.</div></div>'+
         '<div class="sml" style="margin-top:8px" id="ma_'+k+'_status">'+(!j.imap_available?'<span class="mut">IMAP-Erweiterung ist auf diesem Server nicht aktiv – Postfach-Abruf geht dann nicht, Versand funktioniert unabhängig davon.</span>':'')+'</div>'+
         '</fieldset>';
     }).join('')+(j.state&&j.state.last_error?'<div class="msg err sml">Letzter automatischer Versand fehlgeschlagen ('+esc(dtt(j.state.last_error_at))+'): '+esc(j.state.last_error)+'</div>':'');
@@ -7863,10 +7866,13 @@ function mailAccBody(k){
   return {account:k,name:v('ma_'+k+'_name'),email:v('ma_'+k+'_email'),
     smtp_host:v('ma_'+k+'_shost'),smtp_port:parseInt(v('ma_'+k+'_sport'))||0,smtp_enc:v('ma_'+k+'_senc'),
     imap_host:v('ma_'+k+'_ihost'),imap_port:parseInt(v('ma_'+k+'_iport'))||0,username:v('ma_'+k+'_user'),
-    password:v('ma_'+k+'_pass')||undefined};
+    password:v('ma_'+k+'_pass')||undefined,
+    forward_enabled:document.getElementById('ma_'+k+'_fwdon').checked,forward_to:v('ma_'+k+'_fwdto')};
 }
 function saveMailAccount(k){
-  fetch('api.php/mail/accounts',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(mailAccBody(k))})
+  var b=mailAccBody(k);
+  if(b.forward_enabled&&!b.forward_to){toast('Zum Einschalten der Weiterleitung bitte eine Zieladresse eintragen.',1);return}
+  fetch('api.php/mail/accounts',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(b)})
     .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'Speichern fehlgeschlagen');return j})})
     .then(function(){toast(MAIL_ACC_LABEL[k]+' gespeichert ✓');renderMailAccounts();loadMailAccountsStatus()})
     .catch(function(e){toast(e.message,1)});
