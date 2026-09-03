@@ -1118,6 +1118,12 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
           <div id="tgStatus" class="sml" style="margin-top:8px"></div>
           <div class="sml mut" style="margin-top:6px">Datenschutz: Die Nachrichten bleiben kurz (Betreff plus ein paar Zeilen) – die Details stehen weiterhin nur im Backoffice.</div>
         </div>
+        <div class="card" id="set-mailauto"><h3>Automatische Mails</h3>
+          <div class="sml mut" style="margin-bottom:10px">Standardmäßig schickt das Backoffice diese drei Mail-Arten NICHT von allein – sie stehen nur als Kandidat im Dashboard unter „Nachfassen", du entscheidest jedes Mal selbst. Schaltest du eine Art hier ein, verschickt sie das Backoffice automatisch, sobald die Frist plus die zusätzliche Wartezeit unten abgelaufen ist – mit genau dem Text aus der jeweiligen Vorlage (unter „Vorlagen" jederzeit änderbar). Absage-Mails gehören bewusst nicht hierher: eine Absage ist immer deine Entscheidung.</div>
+          <div id="mailAutoRows"></div>
+          <button class="btn sm" onclick="saveMailAuto()" style="margin-top:8px">Speichern</button>
+          <div id="mailAutoStatus" class="sml" style="margin-top:8px"></div>
+        </div>
         <div class="card" id="set-mail"><h3>E-Mail-Konten</h3>
           <div class="sml mut" style="margin-bottom:10px">Zwei Postfächer: <b>Persönlich</b> ist deine eigene Adresse für Korrespondenz, auf die Kunden antworten sollen. <b>System</b> verschickt automatische Mails (Bestätigungen, Rechnungen, Einladungen, Newsletter) – Antworten landen trotzdem in „Persönlich", weil das System-Konto als Reply-To eingetragen wird. Ohne echten SMTP-Versand über ein Postfach kommen Mails auf Shared Hosting manchmal einfach nicht an, ohne dass du es merkst – deshalb hier eintragen statt dem eingebauten PHP-Versand zu vertrauen.</div>
           <div id="mailAccBoxes"></div>
@@ -7761,6 +7767,37 @@ function tgTest(){
   }).catch(function(e){toast(e.message,1)});
 }
 
+/* ===== Automatische Mails (Nachfassen/Fragebogen-Erinnerung/Zahlungserinnerung) =====
+   Je Art: an/aus (Vorgabe aus) plus eine Wartezeit (Zahl + Einheit), die zusaetzlich zur
+   jeweils schon bestehenden Frist (Nachfassen-Frist, Erinnerungsfrist, Faelligkeit) laeuft,
+   bevor das Backoffice von selbst verschickt. Absage bewusst nicht dabei - siehe Karte. */
+var MAIL_AUTO_LABEL={nachfass:'Nachfassen bei Angeboten ohne Reaktion',
+  form_reminder:'Erinnerung bei offenen Fragebögen',mahnung:'Zahlungserinnerung bei überfälligen Rechnungen'};
+function renderMailAuto(){
+  var cfg=S.mail_auto||{};
+  document.getElementById('mailAutoRows').innerHTML=Object.keys(MAIL_AUTO_LABEL).map(function(k){
+    var c=cfg[k]||{};
+    return '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)">'+
+      '<label style="flex:1;min-width:220px;margin:0"><input type="checkbox" id="ma_'+k+'_on" style="width:auto;margin-right:6px"'+(c.enabled?' checked':'')+'>'+MAIL_AUTO_LABEL[k]+'</label>'+
+      '<span class="sml mut">zusätzlich warten:</span>'+
+      '<input id="ma_'+k+'_n" type="number" min="0" value="'+(c.delay!=null?c.delay:3)+'" style="width:70px">'+
+      '<select id="ma_'+k+'_u" style="width:110px">'+['minutes','hours','days'].map(function(u){
+        var lbl={minutes:'Minuten',hours:'Stunden',days:'Tage'}[u];
+        return '<option value="'+u+'"'+((c.unit||'days')===u?' selected':'')+'>'+lbl+'</option>';
+      }).join('')+'</select>'+
+      '</div>';
+  }).join('');
+}
+function saveMailAuto(){
+  var val={};
+  Object.keys(MAIL_AUTO_LABEL).forEach(function(k){
+    val[k]={enabled:document.getElementById('ma_'+k+'_on').checked,
+      delay:Math.max(0,parseInt(v('ma_'+k+'_n'),10)||0),unit:v('ma_'+k+'_u')};
+  });
+  api('settings',{method:'POST',prefer:'resolution=merge-duplicates',body:{key:'mail_auto',value:val}})
+    .then(function(){S.mail_auto=val;document.getElementById('mailAutoStatus').textContent='Gespeichert ✓';toast('Automatische Mails gespeichert ✓')})
+    .catch(function(e){toast(e.message,1)});
+}
 /* ===== E-Mail-Konten (SMTP/IMAP) =====
    Zwei feste Karten (persoenlich/system) - Passwort wird nie vom Server zurueckgegeben,
    nur has_password. Ein leeres Passwortfeld beim Speichern ueberschreibt ein zuvor
@@ -7817,7 +7854,7 @@ function testMailAccount(k){
 
 /* ===== Einstellungen ===== */
 function renderSet(){
-  loadBackups();loadDeploy();loadIcal();loadAiConfig();loadRoutingConfig();renderTelegram();renderPacking();renderMailAccounts();
+  loadBackups();loadDeploy();loadIcal();loadAiConfig();loadRoutingConfig();renderTelegram();renderPacking();renderMailAccounts();renderMailAuto();
   var c=S.company||{},n=S.numbering||{},d=S.defaults||{};
   document.getElementById('sName').value=c.name||'';
   document.getElementById('sOwner').value=c.owner||'';

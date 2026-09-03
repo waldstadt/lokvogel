@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 99;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 100;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1062,6 +1062,14 @@ function upgrade(PDO $p): void {
       try { $p->exec("alter table mail_messages add column $col $def"); } catch (PDOException $e) {}
     }
     try { $p->exec("update mail_messages set folder = 'INBOX' where folder is null and direction = 'in'"); } catch (Throwable $e) {}
+  }
+  if ($v < 100) {
+    /* v100: Mail-Automatisierung (Nachfassen/Fragebogen-Erinnerung/Zahlungserinnerung) -
+       Protokoll, damit jeder Kandidat hoechstens einmal automatisch angeschrieben wird.
+       Die Einstellung selbst (an/aus je Art, Wartezeit) liegt wie ueblich nur in settings,
+       kein Schema-Bedarf dafuer - und steht standardmaessig auf "aus", bis Markus sie
+       bewusst einschaltet. */
+    try { $p->exec(mailAutoDdl()); } catch (Throwable $e) {}
   }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -2274,6 +2282,164 @@ function formReminderDays(PDO $p): int {
 function docFollowupSubject(array $doc): string {
   return 'Nachfassen: ' . (($doc['doc_type'] ?? '') === 'bestaetigung' ? 'Auftragsbestätigung' : 'Angebot') . ' ' . ($doc['number'] ?? '');
 }
+/* ==================== Mail-Automatisierung (Nachfassen/Fragebogen-Erinnerung/Zahlungserinnerung) ====================
+   Standardmaessig fuer ALLE drei Arten AUS - Markus entscheidet bewusst pro Art, ob
+   und nach welcher zusaetzlichen Wartezeit (obendrauf auf die jeweils schon bestehende
+   Frist) automatisch verschickt wird. Absage-Mails gehoeren bewusst NICHT hierher: eine
+   Absage braucht eine menschliche Entscheidung (Grund, ob vermittelt wird) - dafuer gibt
+   es keinen sicheren automatischen Ausloeser, deshalb bleibt Absage ausschliesslich
+   manuell aus dem Compose-Fenster.
+   Jede automatische Mail nutzt den WORTLAUT AUS DEN VORLAGEN (email_templates) - genau
+   den Text, den Markus im Backoffice sieht und jederzeit selbst anpassen kann, keinen
+   eigenen, separat gepflegten Text. Aendert er die Vorlage, aendert sich auch die
+   automatische Mail. Ein Kandidat wird hoechstens einmal automatisch angeschrieben
+   (mail_auto_log), und nur, wenn die Bedingung (versendet/offen/unbezahlt) im Moment
+   des Versands noch zutrifft - reagiert der Kunde inzwischen doch noch, faellt er beim
+   naechsten Tick automatisch aus der Kandidatenliste. */
+const MAIL_AUTO_KINDS = ['nachfass', 'form_reminder', 'mahnung'];
+function mailAutoDdl(): string {
+  return "create table if not exists mail_auto_log (id text primary key, kind text not null,
+    ref_id text not null, sent_at text);
+    create unique index if not exists ux_mail_auto_log on mail_auto_log(kind, ref_id)";
+}
+function mailAutoConfig(): array {
+  $j = json_decode((string)db()->query("select value from settings where key='mail_auto'")->fetchColumn() ?: '{}', true);
+  $cfg = is_array($j) ? $j : [];
+  $out = [];
+  foreach (MAIL_AUTO_KINDS as $k) {
+    $row = is_array($cfg[$k] ?? null) ? $cfg[$k] : [];
+    $unit = (string)($row['unit'] ?? 'days');
+    $out[$k] = ['enabled' => !empty($row['enabled']), 'delay' => max(0, (int)($row['delay'] ?? 3)),
+      'unit' => in_array($unit, ['minutes', 'hours', 'days'], true) ? $unit : 'days'];
+  }
+  return $out;
+}
+function mailAutoDelaySeconds(array $c): int {
+  $mult = ['minutes' => 60, 'hours' => 3600, 'days' => 86400][$c['unit'] ?? 'days'] ?? 86400;
+  return (int)($c['delay'] ?? 0) * $mult;
+}
+function mailAutoAlreadySent(PDO $p, string $kind, string $refId): bool {
+  $st = $p->prepare('select 1 from mail_auto_log where kind = ? and ref_id = ? limit 1');
+  $st->execute([$kind, $refId]);
+  return (bool)$st->fetchColumn();
+}
+function mailAutoMarkSent(PDO $p, string $kind, string $refId): void {
+  try {
+    $p->prepare('insert into mail_auto_log (id, kind, ref_id, sent_at) values (?,?,?,?) on conflict(kind, ref_id) do nothing')
+      ->execute([uuid(), $kind, $refId, now()]);
+  } catch (Throwable $e) {}
+}
+function fillPlaceholders(string $tpl, array $vars): string {
+  $keys = array_map(fn($k) => '{' . $k . '}', array_keys($vars));
+  return str_replace($keys, array_values($vars), $tpl);
+}
+/* Liefert Betreff+Text der Vorlage per Name - faellt auf den eingebauten Text zurueck,
+   falls die Vorlage geloescht wurde (siehe seedExtraTemplates fuer den Original-Wortlaut). */
+function mailAutoTemplate(PDO $p, string $name, string $fallbackSubject, string $fallbackBody): array {
+  $st = $p->prepare('select subject, body from email_templates where name = ? limit 1');
+  $st->execute([$name]);
+  $row = $st->fetch();
+  return $row ? ['subject' => (string)$row['subject'], 'body' => (string)$row['body']]
+    : ['subject' => $fallbackSubject, 'body' => $fallbackBody];
+}
+/* Timeline-Notiz + Markierung "schon automatisch verschickt" - gemeinsamer Abschluss
+   fuer alle drei Automatik-Arten nach erfolgreichem Versand. */
+function mailAutoFinish(PDO $p, string $kind, string $refId, ?string $customerId, string $subject, string $body): void {
+  mailAutoMarkSent($p, $kind, $refId);
+  if (!$customerId) return;
+  try {
+    $p->prepare('insert into communications (id, customer_id, channel, direction, subject, content, occurred_at, created_at)
+        values (?,?,?,?,?,?,?,?)')
+      ->execute([uuid(), $customerId, 'email', 'out', $subject, $body . "\n\n(automatisch verschickt)", now(), now()]);
+  } catch (Throwable $e) {}
+}
+/* Nachfassen: gleiche Bedingung wie im Tages-Digest (Angebot/AB versendet, aelter als die
+   Nachfassen-Frist), zusaetzlich die konfigurierte Wartezeit obendrauf. */
+function mailAutoNachfass(PDO $p, array $cfg): void {
+  $grenze = gmdate('Y-m-d\TH:i:s\Z', time() - followupDays($p) * 86400 - mailAutoDelaySeconds($cfg));
+  $st = $p->prepare("select d.id, d.number, d.valid_until, d.share_token, d.customer_id, c.first_name, c.email
+      from documents d left join customers c on c.id = d.customer_id
+      where d.doc_type in ('angebot','bestaetigung') and d.status = 'versendet'
+        and coalesce(d.sent_at, d.doc_date, d.created_at, '') <= ?");
+  $st->execute([$grenze]);
+  foreach ($st->fetchAll() as $d) {
+    if (mailAutoAlreadySent($p, 'nachfass', $d['id'])) continue;
+    if (empty($d['email']) || !filter_var($d['email'], FILTER_VALIDATE_EMAIL)) continue;
+    $tpl = mailAutoTemplate($p, 'Nachfassen zum Angebot', 'Kurze Frage zu eurem Angebot {nummer}',
+      "Hallo {vorname},\n\nich wollte einmal kurz nachhören: Ist mein Angebot {nummer} bei euch angekommen und passt es soweit? Falls etwas unklar ist oder ihr euch etwas anders vorstellt, sagt einfach Bescheid – das lässt sich meistens mit einem kurzen Telefonat klären.\n\nDas Angebot findet ihr weiterhin hier (Login ist eure Postleitzahl):\n{link}\n\nGültig ist es bis {gueltig}, ich halte euch den Termin bis dahin frei. Und falls ihr euch anders entschieden habt: auch kein Problem, dann freue ich mich über eine kurze Nachricht.\n\nViele Grüße\n{inhaber}");
+    $vars = ['vorname' => $d['first_name'] ?: 'zusammen', 'nummer' => $d['number'],
+      'link' => baseUrl() . '/portal.html?a=' . $d['share_token'],
+      'gueltig' => $d['valid_until'] ? deDate($d['valid_until']) : '–',
+      'inhaber' => ownerFirst(), 'telefon' => NEW_BUSINESS_PHONE];
+    $subject = fillPlaceholders($tpl['subject'], $vars);
+    $bodyText = fillPlaceholders($tpl['body'], $vars);
+    if (sendMailSafe($d['email'], $subject, $bodyText)) mailAutoFinish($p, 'nachfass', $d['id'], $d['customer_id'], $subject, $bodyText);
+  }
+}
+/* Fragebogen-Erinnerung: gleiche Bedingung wie im Tages-Digest (offen, aelter als die
+   Erinnerungsfrist), zusaetzlich die konfigurierte Wartezeit obendrauf. */
+function mailAutoFormReminder(PDO $p, array $cfg): void {
+  $grenze = gmdate('Y-m-d\TH:i:s\Z', time() - formReminderDays($p) * 86400 - mailAutoDelaySeconds($cfg));
+  $rows = $p->prepare("select f.id, f.title, f.token, f.customer_id, c.first_name, c.email
+      from forms f left join customers c on c.id = f.customer_id
+      where f.status = 'offen' and f.created_at <= ?");
+  $rows->execute([$grenze]);
+  foreach ($rows->fetchAll() as $f) {
+    if (mailAutoAlreadySent($p, 'form_reminder', $f['id'])) continue;
+    if (empty($f['email']) || !filter_var($f['email'], FILTER_VALIDATE_EMAIL)) continue;
+    $tpl = mailAutoTemplate($p, 'Erinnerung Fragebogen', 'Kurze Erinnerung: {titel}',
+      "Hallo {vorname},\n\nvor ein paar Tagen habe ich euch den Bogen „{titel}“ geschickt – bisher ist noch nichts angekommen, deshalb erinnere ich einmal kurz. Je früher ich eure Antworten habe, desto besser kann ich planen:\n{link}\n\nFalls ihr den Bogen gerade nicht braucht oder Fragen dazu habt: kurze Nachricht reicht, dann klären wir das am Telefon ({telefon}).\n\nViele Grüße\n{inhaber}");
+    $vars = ['vorname' => $f['first_name'] ?: 'zusammen', 'titel' => $f['title'],
+      'link' => baseUrl() . '/portal.html?f=' . $f['token'], 'inhaber' => ownerFirst(), 'telefon' => NEW_BUSINESS_PHONE];
+    $subject = fillPlaceholders($tpl['subject'], $vars);
+    $bodyText = fillPlaceholders($tpl['body'], $vars);
+    if (sendMailSafe($f['email'], $subject, $bodyText)) mailAutoFinish($p, 'form_reminder', $f['id'], $f['customer_id'], $subject, $bodyText);
+  }
+}
+/* Zahlungserinnerung: gleiche Bedingung wie im Tages-Digest (Rechnung versendet und
+   ueberfaellig), zusaetzlich die konfigurierte Wartezeit obendrauf. Betrag wird bei
+   jedem Tick frisch berechnet (docOpenAmount) - ist inzwischen (teilweise) bezahlt oder
+   per Gutschrift verrechnet, gilt das als erledigt und es geht keine Mail raus. */
+function mailAutoMahnung(PDO $p, array $cfg): void {
+  $grenze = gmdate('Y-m-d', time() - mailAutoDelaySeconds($cfg));
+  $rows = $p->prepare("select d.*, c.first_name, c.email from documents d
+      left join customers c on c.id = d.customer_id
+      where d.doc_type not in ('angebot','bestaetigung','lieferschein') and d.status = 'versendet'
+        and d.due_date is not null and d.due_date < ?");
+  $rows->execute([$grenze]);
+  foreach ($rows->fetchAll() as $d) {
+    if (mailAutoAlreadySent($p, 'mahnung', $d['id'])) continue;
+    if (empty($d['email']) || !filter_var($d['email'], FILTER_VALIDATE_EMAIL)) continue;
+    $open = docOpenAmount($p, $d);
+    if ($open <= 0) { mailAutoMarkSent($p, 'mahnung', $d['id']); continue; }
+    $tpl = mailAutoTemplate($p, 'Zahlungserinnerung (freundlich)', 'Kleine Erinnerung: Rechnung {nr}',
+      "Hallo {vorname},\n\nich hoffe, es ist alles gut angekommen! Mir ist aufgefallen, dass die Rechnung {nr} über {betrag} (fällig am {faellig}) noch offen ist.\n\nBestimmt ist sie nur untergegangen – hier ist der Link zum Ansehen und als PDF:\n{link}\n\nFalls die Zahlung schon unterwegs ist: einfach ignorieren, dann hat sich das überschnitten.\n\nViele Grüße\n{inhaber}");
+    $vars = ['vorname' => $d['first_name'] ?: 'zusammen', 'nr' => $d['number'],
+      'betrag' => number_format($open, 2, ',', '.') . ' €', 'faellig' => deDate($d['due_date']),
+      'link' => baseUrl() . '/portal.html?a=' . $d['share_token'], 'inhaber' => ownerFirst(), 'telefon' => NEW_BUSINESS_PHONE];
+    $subject = fillPlaceholders($tpl['subject'], $vars);
+    $bodyText = fillPlaceholders($tpl['body'], $vars);
+    if (sendMailSafe($d['email'], $subject, $bodyText)) mailAutoFinish($p, 'mahnung', $d['id'], $d['customer_id'], $subject, $bodyText);
+  }
+}
+/* Zustand nur fuers Drosseln - kein Cronjob auf All-Inkl vorhanden, deshalb wird bei
+   jedem angemeldeten Zugriff kurz geprueft, ob der letzte Lauf laenger als 10 Minuten
+   her ist; wenn ja, laeuft ein neuer Durchgang. */
+function mailAutomationState(?array $set = null): array {
+  $file = DATA_DIR . '/mail_auto_state.json';
+  $st = is_file($file) ? (json_decode((string)@file_get_contents($file), true) ?: []) : [];
+  if ($set !== null) { $st = array_merge($st, $set); @file_put_contents($file, json_encode($st, JSON_UNESCAPED_UNICODE), LOCK_EX); }
+  return $st;
+}
+function mailAutomationTick(PDO $p): void {
+  $last = strtotime((string)(mailAutomationState()['last_tick_at'] ?? '')) ?: 0;
+  if (time() - $last < 600) return;
+  mailAutomationState(['last_tick_at' => now()]);
+  $cfg = mailAutoConfig();
+  if ($cfg['nachfass']['enabled']) { try { mailAutoNachfass($p, $cfg['nachfass']); } catch (Throwable $e) {} }
+  if ($cfg['form_reminder']['enabled']) { try { mailAutoFormReminder($p, $cfg['form_reminder']); } catch (Throwable $e) {} }
+  if ($cfg['mahnung']['enabled']) { try { mailAutoMahnung($p, $cfg['mahnung']); } catch (Throwable $e) {} }
+}
 /* Automatische Wiedervorlage, sobald ein Angebot/eine AB versendet ist: Ohne sie ging
    ein Angebot, auf das der Kunde nicht reagiert, schlicht unter. Termin = das Fruehere
    aus "sent_at + Nachfassen-Frist" und "gueltig bis minus 3 Tage", nie in der
@@ -3190,6 +3356,7 @@ SQL);
   foreach (portalAccountDdl() as $sql) $p->exec($sql);
   foreach (statsNewsletterDdl() as $sql) $p->exec($sql);
   $p->exec(mailMessagesDdl());
+  $p->exec(mailAutoDdl());
   $p->exec(campaignPagesDdl());
   seedCampaignPages($p);
   seed($p);
@@ -6689,6 +6856,10 @@ if (in_array($method, ['POST','PATCH']) &&
 }
 
 try {
+  /* Kein Cronjob auf All-Inkl - deshalb hier mitlaufen lassen, gedrosselt auf hoechstens
+     einen Durchgang alle 10 Minuten (siehe mailAutomationTick). Nur fuer angemeldete
+     Backoffice-Zugriffe, nicht fuer die oeffentlichen/Portal-Endpunkte. */
+  if (!str_starts_with($path, 'portal/') && currentUser()) { try { mailAutomationTick(db()); } catch (Throwable $e) {} }
   if ($path === 'auth/login' && $method === 'POST') handleLogin($body ?? []);
   if (str_starts_with($path, 'portal/')) handlePortal($path, $method, $body ?? []);
   if (preg_match('#^rest/(\w+)$#', $path, $m)) {
