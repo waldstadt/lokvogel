@@ -2535,9 +2535,10 @@ function maybeAutoTechCheck(PDO $p, string $documentId): void {
     }
   }
   if (!$match) return;
+  $checkId = uuid();
   $p->prepare('insert into tech_checks (id, customer_id, document_id, data, created_at, updated_at) values (?,?,?,?,?,?)')
-    ->execute([uuid(), $d['customer_id'], $documentId, '{}', now(), now()]);
-  notifyOwner('Neuer Technik-Check angelegt', 'Ausgelöst durch Angebot ' . $d['number'] . ' – Protokoll jetzt unter „Technik-Checks" ausfüllen.');
+    ->execute([$checkId, $d['customer_id'], $documentId, '{}', now(), now()]);
+  notifyOwner('Neuer Technik-Check angelegt', 'Ausgelöst durch Angebot ' . $d['number'] . ' – Protokoll jetzt unter „Technik-Checks" ausfüllen.', 'techcheck:' . $checkId);
 }
 
 /* Verschickt bei einer Technik-Check-Anfrage automatisch den Vorab-Fragebogen als
@@ -3782,7 +3783,8 @@ function publicCallback(PDO $p, array $body): never {
   }
   notifyOwner('Rückruf gewünscht – ' . $name . ', ' . $phone . ', ' . $whenText,
     "Name: $name" . ($custName !== '' ? " (Kunde: $custName)" : '') . "\nTelefon: $phone\nWunschzeit: $whenText" .
-    ($note !== '' ? "\nAnlass: $note" : '') . ($page !== '' ? "\nSeite: $page" : ''));
+    ($note !== '' ? "\nAnlass: $note" : '') . ($page !== '' ? "\nSeite: $page" : ''),
+    $custId ? 'customer:' . $custId : 'inq');
   out(['ok' => true], 201);
 }
 
@@ -3875,7 +3877,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
       notifyOwner('Neue Anfrage: ' . $row['name'] . (($row['event_type'] ?? '') ? ' – ' . $row['event_type'] : ''),
         "Name: {$row['name']}\nE-Mail: " . ($row['email'] ?? '–') . "\nTelefon: " . ($row['phone'] ?? '–') .
         "\nAnlass: " . ($row['event_type'] ?? '–') . "\nDatum: " . ($row['event_date'] ?? '–') .
-        "\nOrt: " . ($row['location'] ?? '–') . "\n\n" . ($row['message'] ?? ''));
+        "\nOrt: " . ($row['location'] ?? '–') . "\n\n" . ($row['message'] ?? ''), 'inq');
       /* Warme Eingangsbestätigung an den Interessenten – jeder soll sich sofort gut aufgehoben fühlen */
       if (!empty($row['email'])) {
         $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
@@ -5113,11 +5115,16 @@ function sendTelegram(string $text): bool {
    zusaetzlich (wenn eingeschaltet) eine kurze Telegram-Nachricht aufs Handy. Rueckgabe
    bleibt das Mail-Ergebnis - Telegram aendert daran nichts und blockiert nichts.
    Fuers Handy nur Betreff plus die ersten Zeilen: Kundendaten in voller Laenge gehoeren
-   ins Backoffice, nicht in einen Messenger. */
-function notifyOwner(string $subject, string $body): bool {
+   ins Backoffice, nicht in einen Messenger.
+   $openTarget verlinkt direkt zur passenden Stelle im Backoffice statt nur zur Startseite
+   (Format 'art:id', z. B. 'customer:xyz' oder 'doc:xyz' - admin.html liest das per
+   ?open=... aus und springt dorthin, siehe handleDeepLink() dort). null/leer = nur der
+   allgemeine Link zur Startseite, wenn es kein sinnvolles Sprungziel gibt. */
+function notifyOwner(string $subject, string $body, ?string $openTarget = null): bool {
   $comp = json_decode(db()->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
   $to = trim((string)($comp['email'] ?? ''));
-  $mailed = $to !== '' && sendMailSafe($to, $subject, $body . "\n\n– automatische Benachrichtigung deines Backoffice\n" . baseUrl() . "/admin.html");
+  $link = baseUrl() . '/admin.html' . ($openTarget ? '?open=' . rawurlencode($openTarget) : '');
+  $mailed = $to !== '' && sendMailSafe($to, $subject, $body . "\n\n– automatische Benachrichtigung deines Backoffice\n" . $link);
   try {
     $tg = telegramConfig();
     if ($tg['enabled'] && $tg['token'] !== '' && $tg['chat_id'] !== '') {
@@ -5125,7 +5132,7 @@ function notifyOwner(string $subject, string $body): bool {
       $short = rtrim(implode("\n", array_slice($lines, 0, 6)));
       $cut = count($lines) > 6 || mb_strlen($short) > 600;
       if (mb_strlen($short) > 600) $short = rtrim(mb_substr($short, 0, 600));
-      sendTelegram($subject . "\n\n" . $short . ($cut ? "\n… Details im Backoffice" : ''));
+      sendTelegram($subject . "\n\n" . $short . ($cut ? "\n…" : '') . "\n" . $link);
     }
   } catch (\Throwable) { /* nie die eigentliche Aktion scheitern lassen */ }
   return $mailed;
@@ -5651,7 +5658,7 @@ function handlePortal(string $path, string $method, $body): never {
       /* Kommt die Mail nicht raus, wartet der Kunde sonst vergeblich - Markus soll das sehen. */
       if (!$mailed)
         notifyOwner('Bestätigungsmail fürs Kundenkonto konnte nicht versendet werden',
-          "Adresse: $email\nBitte den Zugang manuell klären.");
+          "Adresse: $email\nBitte den Zugang manuell klären.", 'customer:' . $existing['id']);
       out(['pending' => true,
         'message' => $mailed
           ? 'Fast geschafft: Zu deiner Adresse gibt es schon einen Vorgang bei mir. Ich habe dir gerade einen Bestätigungslink geschickt – damit legst du dein Passwort fest und kommst direkt rein.'
@@ -6151,7 +6158,7 @@ function handlePortal(string $path, string $method, $body): never {
       "\nDokument: " . $d['number'] . ' über ' . number_format((float)$d['total_gross'], 2, ',', '.') . ' €' .
       ($msg !== '' ? "\n\nNachricht:\n$msg" : '') . ($phone !== '' ? "\nTelefon: $phone" : '') . $ownerExtra .
       ($bestMail === false ? "\n\nACHTUNG: Die Bestätigungsmail an den Kunden konnte nicht versendet werden – bitte selbst bestätigen (Timeline-Notiz vorhanden)." : '') .
-      ($bestMail === true ? "\n\nBestätigungsmail an den Kunden ist raus." : ''));
+      ($bestMail === true ? "\n\nBestätigungsmail an den Kunden ist raus." : ''), 'doc:' . $d['id']);
     out($resp, 201);
   }
   if (preg_match('#^portal/form/([a-f0-9]+)$#', $path, $m)) {
@@ -6246,7 +6253,7 @@ function handlePortal(string $path, string $method, $body): never {
       notifyOwner($bande ? 'DJ-Vermittlung: Bogen ausgefüllt – ' . ($wer !== '' ? $wer : $f['title'])
                          : 'Fragebogen beantwortet: ' . $f['title'] . ($wer !== '' ? ' – ' . $wer : ''),
         ($bande ? "Der Kunde hat den Vorauswahl-Bogen ausgefüllt und der Weitergabe an " . (agencyName() ?: 'die Partner-Agentur') . " zugestimmt. Zusammenfassung:\n\n" : "Die Antworten:\n\n") . $sum .
-        "\n\nDie Antworten stehen auch in der Kunden-Timeline im Backoffice.");
+        "\n\nDie Antworten stehen auch in der Kunden-Timeline im Backoffice.", $f['customer_id'] ? 'customer:' . $f['customer_id'] : null);
       out(['ok' => true, 'bande' => $bande, 'agentur' => $bande ? agencyName() : null], 201);
     }
   }
@@ -6304,7 +6311,7 @@ function handlePortal(string $path, string $method, $body): never {
       ->execute([uuid(), $r['cust_id'], $r['booking_id'], 'note', 'in', 'Mietvertrag digital unterschrieben',
         'Mietvertrag zur Buchung am '.$r['event_date'].' wurde online unterschrieben von: '.$name.'. Ausweiskopien (Vorder-/Rückseite) liegen geschützt im System.', now(), now()]);
     notifyOwner('Mietvertrag unterschrieben: ' . ($r['title'] ?: $r['event_date']),
-      "Unterschrieben von: $name\nTermin: " . $r['event_date'] . "\nAusweiskopien liegen geschützt im System.");
+      "Unterschrieben von: $name\nTermin: " . $r['event_date'] . "\nAusweiskopien liegen geschützt im System.", 'customer:' . $r['cust_id']);
     out(['ok' => true], 201);
   }
   /* Workshops: öffentliche Termine mit freien Plätzen, Anmeldung mit Kapazitätsprüfung */
@@ -6385,7 +6392,7 @@ function handlePortal(string $path, string $method, $body): never {
     }
     notifyOwner(($status === 'warteliste' ? 'Warteliste' : 'Workshop-Buchung') . ': ' . $w['title'],
       "Name: $name ($seats Platz/Plätze)\nE-Mail: $email\nTermin: " . $w['event_date'] .
-      ($inv ? "\nRechnung: " . $inv['number'] . ($inv['mailed'] ? ' (automatisch gemailt)' : ' (Mail NICHT zugestellt – im Dokument per E-Mail nachsenden)') : ''));
+      ($inv ? "\nRechnung: " . $inv['number'] . ($inv['mailed'] ? ' (automatisch gemailt)' : ' (Mail NICHT zugestellt – im Dokument per E-Mail nachsenden)') : ''), 'workshop:' . $w['id']);
     out(['ok' => true, 'status' => $status, 'invoice' => $inv,
       'free' => max(0, $free - ($status === 'angemeldet' ? $seats : 0))], 201);
   }
@@ -6500,7 +6507,7 @@ function handlePortal(string $path, string $method, $body): never {
     notifyOwner('Neue Miet-Anfrage: ' . $custName,
       "Zeitraum: $from" . ($to !== $from ? " bis $to" : '') . "\n\n" .
       implode("\n", array_map(fn($l) => '- ' . $l['name'] . ' × ' . $l['qty'] . ' = ' . number_format($l['price'], 2, ',', '.') . ' €', $lines)) .
-      "\n\nGesamt (inkl. MwSt.): " . number_format($total, 2, ',', '.') . " €" . ($isPartner ? "\n(Partnerpreis angewendet" . (($partnerInfo['provisional'] ?? false) ? ', Partner noch nicht final freigeschaltet' : '') . ')' : ''));
+      "\n\nGesamt (inkl. MwSt.): " . number_format($total, 2, ',', '.') . " €" . ($isPartner ? "\n(Partnerpreis angewendet" . (($partnerInfo['provisional'] ?? false) ? ', Partner noch nicht final freigeschaltet' : '') . ')' : ''), 'book:' . $bookingId);
     /* Eingangsbestaetigung an den Kunden mit seinen Positionen - bisher bekam nur Markus
        eine Mail, der Kunde hatte nach dem Absenden nichts in der Hand. */
     try { rentalRequestMail($p, $me, $bookingId, $from, $to, $lines); } catch (Throwable $e) {}
