@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 102;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 103;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1089,6 +1089,14 @@ function upgrade(PDO $p): void {
       try { $p->exec("alter table workshop_signups add column $col $def"); } catch (PDOException $e) {}
     }
   }
+  if ($v < 103) {
+    /* v103: Rabatt aufs Gesamtdokument (documents.discount_value/discount_type) bekommt
+       eine eigene, frei editierbare Bezeichnung statt immer nur "Rabatt" - Markus konnte
+       einen manuellen Rabatt schon immer begruenden, das Feld selbst konnte das bisher
+       nicht abbilden. Automatische Workshop-Rabatte nutzen ab jetzt dasselbe Feld statt
+       einer eigenen Rechnungsposition. */
+    try { $p->exec("alter table documents add column discount_label text"); } catch (PDOException $e) {}
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1558,7 +1566,7 @@ function docFieldSame(string $t, string $c, $old, $new): bool {
    eine neue Version, auch wenn Markus nur den Beleg angeschaut hat. Alle Aenderungen
    eines Speichervorgangs (mehrere Requests kurz hintereinander) sind EINE Version. */
 const DOC_VERSION_FIELDS = ['customer_id','doc_date','valid_until','due_date','tax_rate','is_small_business',
-  'price_mode','discount_value','discount_type','intro_text','outro_text','rental_from','rental_to',
+  'price_mode','discount_value','discount_type','discount_label','intro_text','outro_text','rental_from','rental_to',
   'total_net','total_tax','total_gross','total_override','deposit_deducted','event_info'];
 function docContentHash(PDO $p, string $docId): string {
   $st = $p->prepare('select * from documents where id = ?'); $st->execute([$docId]);
@@ -3355,7 +3363,7 @@ create table booking_equipment (id text primary key,
   qty integer default 1, price_override real, out_done integer default 0,
   back_done integer default 0, notes text);
 create table documents (id text primary key, share_token text, doc_type text not null, number text unique not null,
-  price_mode text default 'brutto', discount_value real default 0, discount_type text default 'pct',
+  price_mode text default 'brutto', discount_value real default 0, discount_type text default 'pct', discount_label text,
   customer_id text not null references customers(id) on delete restrict,
   booking_id text references bookings(id) on delete set null,
   parent_id text, status text default 'entwurf', storno_at text, doc_date text, valid_until text, due_date text,
@@ -5074,25 +5082,26 @@ function workshopInvoice(PDO $p, string $signupId, bool $quiet = false): array {
     $docId = uuid(); $token = bin2hex(random_bytes(24));
     /* price_mode ausdruecklich mitgeben: ohne den Wert greift der alte Spalten-Standard
        'netto', und die Workshop-Rechnung stuende als einzige netto da, obwohl alle Preise
-       brutto gepflegt und ausgewiesen werden. */
+       brutto gepflegt und ausgewiesen werden. Der Rabatt nutzt das ganz normale
+       "Rabatt aufs Gesamtdokument"-Feld (discount_value/discount_type/discount_label) -
+       dasselbe Feld, das auch bei einem manuell eingetragenen Rabatt zum Einsatz kommt,
+       nicht eine eigene Rechnungsposition. */
+    $discLabel = null;
+    if ($discount > 0) {
+      $discLabel = 'Rabatt' . (!empty($s['discount_code']) ? ' (Code ' . $s['discount_code'] . ')' : '');
+    }
     $p->prepare('insert into documents (id, share_token, doc_type, number, customer_id, status, doc_date, due_date,
-        tax_rate, is_small_business, price_mode, intro_text, outro_text, total_net, total_tax, total_gross, created_at)
-        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        tax_rate, is_small_business, price_mode, discount_value, discount_type, discount_label, intro_text, outro_text, total_net, total_tax, total_gross, created_at)
+        values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
       ->execute([$docId, $token, 'rechnung', $number, $cid, 'entwurf', gmdate('Y-m-d'), $due,
         $rate, $small ? 1 : 0, 'brutto',
+        $discount > 0 ? (float)$s['discount_value'] : 0, $s['discount_kind'] === 'fixed' ? 'eur' : 'pct', $discLabel,
         'vielen Dank für deine Anmeldung zum Workshop „' . $s['w_title'] . '“. Mit Zahlungseingang ist dein Platz verbindlich reserviert.' .
         "\n" . $terminZeile,
         (string)($defs['invoice_outro'] ?? ''), $net, $tax, $gross, now()]);
     $p->prepare('insert into document_items (id, document_id, pos, description, qty, unit, unit_price)
         values (?,?,?,?,?,?,?)')
       ->execute([uuid(), $docId, 1, 'Workshop: ' . $dTitle . ($wZeit ? ', ' . $wZeit : '') . ' – Teilnahme', $seats, $seats > 1 ? 'Plätze' : 'Platz', $price]);
-    if ($discount > 0) {
-      $discLabel = 'Rabatt' . (!empty($s['discount_code']) ? ' (Code ' . $s['discount_code'] . ')' : '') .
-        ($s['discount_kind'] === 'percent' ? ' – ' . rtrim(rtrim(number_format((float)$s['discount_value'], 1, ',', '.'), '0'), ',') . ' %' : '');
-      $p->prepare('insert into document_items (id, document_id, pos, description, qty, unit, unit_price)
-          values (?,?,?,?,?,?,?)')
-        ->execute([uuid(), $docId, 2, $discLabel, 1, 'Stk.', -$discount]);
-    }
     $p->prepare('update workshop_signups set invoice_id = ? where id = ?')->execute([$docId, $signupId]);
     docAudit($p, $docId, 'erstellt', $number . ' (rechnung, automatisch aus Workshop-Buchung)');
     $p->commit();
@@ -6101,7 +6110,7 @@ function handlePortal(string $path, string $method, $body): never {
         'tax_rate','is_small_business','intro_text','outro_text','total_net','total_tax','total_gross','deposit_deducted',
         /* rental_from/rental_to standen bisher nicht in der Liste - die Mietzeitraum-Zeile
            im Portal blieb deshalb immer leer. */
-        'price_mode','discount_value','discount_type','event_info','rental_from','rental_to',
+        'price_mode','discount_value','discount_type','discount_label','event_info','rental_from','rental_to',
         /* Versionsstand: Der Kunde soll sehen, wenn sich das Angebot seit seinem letzten
            Besuch geaendert hat (bisher stillschweigend derselbe Link, neuer Inhalt). */
         'version','version_at','accepted_version','parent_id','storno_at','paid_at','settled_by'])),

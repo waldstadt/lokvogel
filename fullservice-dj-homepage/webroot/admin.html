@@ -708,7 +708,7 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
         <div><label>Rabatt aufs Gesamtdokument</label><input type="number" step="0.01" id="docDiscVal" value="0"></div>
         <div><label>Rabatt-Art</label><select id="docDiscType"><option value="pct">%</option><option value="eur">€ (brutto)</option></select></div>
         <div><label>Pauschal-Gesamtpreis (brutto €) <span class="mut sml" style="text-transform:none;letter-spacing:0">– überschreibt die Positionssumme</span></label><input type="number" step="0.01" id="docTotalOverride" placeholder="leer = aus Positionen berechnet"></div>
-        <div></div>
+        <div><label>Bezeichnung <span class="mut sml" style="text-transform:none;letter-spacing:0">– steht so auf dem Beleg</span></label><input id="docDiscLabel" placeholder="Rabatt"></div>
       </div></div></div>
       <div class="totals" id="docTotals"></div>
     </div>
@@ -3865,6 +3865,7 @@ function fillDocForm(){
   document.getElementById('docNetto').checked=(d.price_mode==='netto');
   document.getElementById('docDiscVal').value=d.discount_value||0;
   document.getElementById('docDiscType').value=d.discount_type||'pct';
+  document.getElementById('docDiscLabel').value=d.discount_label||'';
   document.getElementById('docDep').value=d.deposit_deducted||0;
   document.getElementById('docTotalOverride').value=d.total_override!=null?d.total_override:'';
   document.getElementById('docIntro').value=d.intro_text||'';
@@ -3915,7 +3916,7 @@ function applyDocLock(){
   document.getElementById('docLockNote').innerHTML=docAcceptedJs(curDoc)
     ?' <b>Angenommenes Angebot:</b> Der Kunde hat genau diesen Stand angenommen – Inhalte lassen sich deshalb nicht mehr ändern. Für Änderungen <a onclick="copyAsNewOffer()">als neues Angebot kopieren</a>. <a onclick="openAuditModal()" style="float:right">Änderungsprotokoll</a>'
     :' <b>Festgeschrieben (GoBD):</b>'+gobdHint('lock')+'Diese Rechnung wurde versendet – Inhalte lassen sich nicht mehr ändern. Für Änderungen eine <a onclick="korrekturDoc()">Korrekturrechnung erstellen</a>'+gobdHint('korrektur')+'oder die Rechnung <a onclick="askStorno()">stornieren</a>'+gobdHint('storno')+(curDoc.status==='bezahlt'?' – bei einer bezahlten Rechnung per <a onclick="docToInvoice(\'gutschrift\')">Gutschrift</a>'+gobdHint('gutschrift'):'')+'. <a onclick="openAuditModal()" style="float:right">Änderungsprotokoll</a>';
-  ['docType','docCust','docBook','docDate','docDate2','docTax','docNetto','docRentFrom','docRentTo','docDiscVal','docDiscType','docDep','docTotalOverride','docIntro','docOutro']
+  ['docType','docCust','docBook','docDate','docDate2','docTax','docNetto','docRentFrom','docRentTo','docDiscVal','docDiscType','docDiscLabel','docDep','docTotalOverride','docIntro','docOutro']
     .forEach(function(i){var el=document.getElementById(i);if(el)el.disabled=locked});
   document.querySelectorAll('#docItems input, #docItems select').forEach(function(el){el.disabled=locked});
   document.getElementById('docSaveBtn').style.display=locked?'none':'';
@@ -3935,7 +3936,7 @@ function korrekturDoc(){
   curDoc.total_override=src.total_override;
   curDoc.deposit_deducted=src.deposit_deducted;
   curDoc.is_small_business=src.is_small_business;
-  curDoc.discount_value=src.discount_value;curDoc.discount_type=src.discount_type;
+  curDoc.discount_value=src.discount_value;curDoc.discount_type=src.discount_type;curDoc.discount_label=src.discount_label;
   curDoc.intro_text='Korrektur zur Rechnung '+src.number+'. '+(src.intro_text||'');
   curDoc.outro_text=src.outro_text;
   curDoc.event_info=evOf(src);
@@ -3952,7 +3953,7 @@ function copyAsNewOffer(){
   curDoc.customer_id=src.customer_id;curDoc.booking_id=src.booking_id;
   curDoc.tax_rate=src.tax_rate;curDoc.price_mode=src.price_mode;
   curDoc.total_override=src.total_override;curDoc.is_small_business=src.is_small_business;
-  curDoc.discount_value=src.discount_value;curDoc.discount_type=src.discount_type;
+  curDoc.discount_value=src.discount_value;curDoc.discount_type=src.discount_type;curDoc.discount_label=src.discount_label;
   curDoc.intro_text=src.intro_text;curDoc.outro_text=src.outro_text;
   curDoc.rental_from=src.rental_from;curDoc.rental_to=src.rental_to;
   curDoc.event_info=evOf(src);
@@ -4473,7 +4474,7 @@ function docCalc(){
      Summe aus denen gebildet, liefe sie am gedruckten Beleg vorbei und die Differenz tauchte
      als Phantom-Rabattzeile wieder auf. */
   var sub=r2(curItems.reduce(function(s,it){return s+printedLineTotal(it,1)},0));
-  var dv=Number(v('docDiscVal'))||0,dtp=v('docDiscType')||'pct';
+  var dv=Number(v('docDiscVal'))||0,dtp=v('docDiscType')||'pct',dl=v('docDiscLabel')||'Rabatt';
   var disc=dv?(dtp==='eur'?Math.min(sub,r2(dv)):r2(sub*Math.min(100,dv)/100)):0;
   var gross=r2(sub-disc);
   var rate=Number(document.getElementById('docTax').value)||0;
@@ -4483,7 +4484,7 @@ function docCalc(){
      Werte zusammen exakt den Gesamtbetrag statt krummer Zahlen wie 2153,6890756303. */
   var net=rate?r2(gross/(1+rate/100)):gross,tax=r2(gross-net);
   var dep=Number(document.getElementById('docDep').value)||0;
-  return {sub:sub,disc:disc,discVal:dv,discType:dtp,net:net,tax:tax,gross:gross,rate:rate,dep:dep,override:override};
+  return {sub:sub,disc:disc,discVal:dv,discType:dtp,discLabel:dl,net:net,tax:tax,gross:gross,rate:rate,dep:dep,override:override};
 }
 function renderTotals(){
   var c=docCalc(),t=document.getElementById('docType').value;
@@ -4491,7 +4492,7 @@ function renderTotals(){
   if(c.override!=null){
     html+='Pauschal-Gesamtpreis: <b>'+euro(c.gross)+'</b> brutto (Positionssumme wäre '+euro(c.sub)+' brutto) &nbsp;·&nbsp; enthaltene USt. '+c.rate+' %: '+euro(c.tax)+'<br>';
   } else {
-    if(c.disc)html+='Zwischensumme: '+euro(c.sub)+' &nbsp;·&nbsp; Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+': −'+euro(c.disc)+'<br>';
+    if(c.disc)html+='Zwischensumme: '+euro(c.sub)+' &nbsp;·&nbsp; '+esc(c.discLabel)+(c.discType==='pct'?' ('+c.discVal+' %)':'')+': −'+euro(c.disc)+'<br>';
     html+='Netto: '+euro(c.net)+' &nbsp;·&nbsp; USt. '+c.rate+' %: '+euro(c.tax)+' &nbsp;·&nbsp; Brutto: <b>'+euro(c.gross)+'</b>';
   }
   html+=docModeVal()==='brutto'?'<br><span class="mut sml">Kundenansicht: Preise werden brutto (inkl. USt.) angezeigt – Standard für Privatkunden</span>':
@@ -4504,6 +4505,7 @@ document.getElementById('docTax').addEventListener('input',renderTotals);
 document.getElementById('docDep').addEventListener('input',renderTotals);
 document.getElementById('docDiscVal').addEventListener('input',renderTotals);
 document.getElementById('docDiscType').addEventListener('change',renderTotals);
+document.getElementById('docDiscLabel').addEventListener('input',renderTotals);
 document.getElementById('docTotalOverride').addEventListener('input',renderTotals);
 
 var DOC_SAVING=false;
@@ -4527,7 +4529,7 @@ function saveDoc(){
       ? !!Number(curDoc.is_small_business) : !!(S.company&&S.company.small_business)),
     intro_text:v('docIntro'),outro_text:v('docOutro'),
     rental_from:v('docRentFrom')||null,rental_to:v('docRentTo')||null,
-    price_mode:docModeVal(),discount_value:c.discVal,discount_type:c.discType,parent_id:curDoc.parent_id||null,
+    price_mode:docModeVal(),discount_value:c.discVal,discount_type:c.discType,discount_label:c.disc?(v('docDiscLabel')||null):null,parent_id:curDoc.parent_id||null,
     event_info:evVal(),
     total_net:c.net,total_tax:c.tax,total_gross:c.gross,total_override:c.override,deposit_deducted:type==='schluss'?c.dep:0};
   body[istZahlbeleg(type)?'due_date':'valid_until']=v('docDate2')||null;
@@ -5082,6 +5084,7 @@ function docToInvoice(type){
         curItems=copyItems(list);
         document.getElementById('docDiscVal').value=doc.discount_value||0;
         if(doc.discount_type)document.getElementById('docDiscType').value=doc.discount_type;
+        document.getElementById('docDiscLabel').value=doc.discount_label||'';
         document.getElementById('docTotalOverride').value=doc.total_override||'';
         /* ALLE erhaltenen Zahlungen der Kette abziehen: bezahlte Abschläge und
            Teilzahlungen auf Rechnungen/Abschlägen derselben Buchung bzw. Herkunftskette
@@ -5124,12 +5127,14 @@ function docToInvoice(type){
          uebernehmen, die passen als relative Groessen nicht automatisch zur Korrektur. */
       curItems=copyItems(items.map(function(it){return Object.assign({},it,{unit_price:-Number(it.unit_price)||0,discount_value:0})}));
       document.getElementById('docDiscVal').value=0;
+      document.getElementById('docDiscLabel').value='';
       document.getElementById('docTotalOverride').value='';
     }else{
       curItems=copyItems(items);
       /* Gesamtrabatt und Pauschalpreis mit übernehmen */
       document.getElementById('docDiscVal').value=src.discount_value||0;
       if(src.discount_type)document.getElementById('docDiscType').value=src.discount_type;
+      document.getElementById('docDiscLabel').value=src.discount_label||'';
       document.getElementById('docTotalOverride').value=src.total_override||'';
     }
     renderItems();
@@ -5411,7 +5416,7 @@ function buildDocHtml(){
       totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Positionssumme</td><td style="text-align:right;padding:6px">'+euro(dSub)+'</td></tr>'+
       '<tr><td colspan="4" style="text-align:right;padding:6px">'+(dAbzug>0?'Nachlass':'Zuschlag')+' auf den vereinbarten Festpreis</td><td style="text-align:right;padding:6px">'+(dAbzug>0?'−':'+')+euro(Math.abs(dAbzug))+'</td></tr>';
   }else if(dAbzug)totals+='<tr><td colspan="4" style="text-align:right;padding:6px">Zwischensumme</td><td style="text-align:right;padding:6px">'+euro(dSub)+'</td></tr>'+
-    '<tr><td colspan="4" style="text-align:right;padding:6px">Rabatt'+(c.discType==='pct'?' ('+c.discVal+' %)':'')+'</td><td style="text-align:right;padding:6px">−'+euro(dAbzug)+'</td></tr>';
+    '<tr><td colspan="4" style="text-align:right;padding:6px">'+esc(c.discLabel||'Rabatt')+(c.discType==='pct'?' ('+c.discVal+' %)':'')+'</td><td style="text-align:right;padding:6px">−'+euro(dAbzug)+'</td></tr>';
   if(brutto){
     totals+='<tr><td colspan="4" style="text-align:right;padding:6px;font-weight:700">Gesamtbetrag</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(dGross)+'</td></tr>'+
       '<tr><td colspan="4" style="text-align:right;padding:6px;color:#666">darin enthaltene USt. '+c.rate+' %</td><td style="text-align:right;padding:6px;color:#666">'+euro(dTax)+'</td></tr>';
