@@ -95,7 +95,7 @@ function mount(el,o){
       .then(function(r){return r.json().catch(function(){return{}}).then(function(j){if(!r.ok)throw new Error(j.error||'HTTP '+r.status);return j})})
       .then(function(){
         var WHEN={egal:'',nachmittag:' heute Nachmittag',abend:' heute Abend',morgen:' morgen'};
-        form.innerHTML='<div class="kw-ok"><b>Danke, ich rufe zurück.</b>'+(WHEN[data.when]||'')+(data.when_note?' ('+esc(data.when_note)+')':'')+' Ihr hört von mir.</div>';
+        form.innerHTML='<div class="kw-ok"><b>Danke, ich rufe zurück.</b>'+(WHEN[data.when]||'')+' Ihr hört von mir.</div>';
         form.style.marginBottom='0';form.style.padding='0';form.style.border='0';form.style.background='transparent';
         cb.style.display='none';
       })
