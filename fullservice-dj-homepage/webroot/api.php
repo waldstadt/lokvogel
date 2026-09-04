@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 112;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 113;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -218,7 +218,7 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
-const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items','campaign_pages','badges','blocks','event_reports'];
+const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items','campaign_pages','badges','blocks','event_reports','guides'];
 const INQUIRY_FIELDS = ['name','email','phone','event_type','event_date','location','guests','message'];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -1231,6 +1231,24 @@ function upgrade(PDO $p): void {
     try { $p->exec('alter table products add column use_count integer default 0'); } catch (PDOException $e) {}
     try { $p->exec('alter table equipment add column favorite integer default 0'); } catch (PDOException $e) {}
     try { $p->exec('alter table equipment add column use_count integer default 0'); } catch (PDOException $e) {}
+  }
+  if ($v < 113) {
+    /* v113: "Ratgeber" wird zu "Backstage" (persönliche Einblicke statt reiner
+       Ratgeber-Artikel) - Titelbild pro Beitrag, siehe backstage.php. */
+    try { $p->exec("alter table guides add column image text"); } catch (PDOException $e) {}
+    try { seedGuides($p); } catch (PDOException $e) {}
+    /* Datenschutztext um Spotify-Hinweis ergaenzen - nur solange er den neuen Absatz noch
+       nicht enthaelt, damit eigene Anpassungen von Markus nicht ueberschrieben werden. */
+    try {
+      $st = $p->query("select value from site_content where key='legal'");
+      $legal = json_decode((string)$st->fetchColumn(), true);
+      if (is_array($legal) && !str_contains((string)($legal['datenschutz'] ?? ''), 'Spotify')) {
+        $legal['datenschutz'] = rtrim((string)$legal['datenschutz'])
+          . "\n\n11. Eingebettete Spotify-Playlists\nIm Backstage-Bereich binde ich an einzelnen Stellen Playlists von Spotify (Spotify AB, Schweden) ein, um euch einen Einblick in meinen Musikgeschmack zu geben. Sobald eine solche Seite aufgerufen wird, baut euer Browser eine Verbindung zu Servern von Spotify auf; dabei kann Spotify technische Daten (z. B. eure IP-Adresse) verarbeiten und eigene Cookies setzen, worauf ich keinen Einfluss habe. Rechtsgrundlage ist eure Einwilligung durch den Aufruf der jeweiligen Seite (Art. 6 Abs. 1 lit. a DSGVO). Weitere Informationen: Datenschutzerklärung von Spotify (spotify.com/de/legal/privacy-policy).";
+        $p->prepare("update site_content set value=?, updated_at=? where key='legal'")
+          ->execute([json_encode($legal, JSON_UNESCAPED_UNICODE), now()]);
+      }
+    } catch (PDOException $e) {}
   }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -3506,16 +3524,18 @@ function campaignPageRows(): array {
   ];
 }
 
-/* ==================== Ratgeber (SEO-Inhaltsartikel) ====================
-   Frei anlegbare Artikel (anders als die 14 Aktionsseiten mit fester Datei je Slug) -
-   ein neuer Artikel braucht keine neue Datei, ratgeber.php rendert jeden Slug aus
-   dieser Tabelle direkt. Sections sind ein einfaches Array aus {heading, text, items}
-   (items optional, fuer Aufzaehlungen), faq ein Array aus {q, a} (liefert zusaetzlich
-   FAQPage-Markup fuer Google, siehe ratgeber.php). */
+/* ==================== Backstage (persoenliche Einblicke, ex-"Ratgeber") ====================
+   Frei anlegbare Beitraege (anders als die 14 Aktionsseiten mit fester Datei je Slug) -
+   ein neuer Beitrag braucht keine neue Datei, backstage.php rendert jeden Slug aus
+   dieser Tabelle direkt (Tabellenname "guides" ist historisch, siehe Umbenennung v113).
+   Sections sind ein einfaches Array aus {heading, text, items, embed} (items optional,
+   fuer Aufzaehlungen; embed optional, eine Spotify-Embed-URL fuer Playlist-Einblicke),
+   faq ein Array aus {q, a} (liefert zusaetzlich FAQPage-Markup fuer Google, siehe
+   backstage.php). */
 function guidesDdl(): string {
   return "create table if not exists guides (id text primary key,
     slug text unique not null, published integer default 0, sort integer default 0,
-    title text, meta_desc text, kicker text, h1 text, intro text,
+    title text, meta_desc text, kicker text, h1 text, intro text, image text,
     sections text default '[]', faq text default '[]',
     cta_label text, cta_href text, footer_target text default 'index',
     created_at text, updated_at text)";
@@ -3523,14 +3543,14 @@ function guidesDdl(): string {
 /* Nur einfügen, was noch fehlt (Slug-Abgleich) - eigene Änderungen an bestehenden
    Artikeln bleiben bei Migrationen unberührt, wie bei seedCampaignPages(). */
 function seedGuides(PDO $p): void {
-  $ins = $p->prepare('insert into guides (id, slug, published, sort, title, meta_desc, kicker, h1, intro,
+  $ins = $p->prepare('insert into guides (id, slug, published, sort, title, meta_desc, kicker, h1, intro, image,
       sections, faq, cta_label, cta_href, footer_target, created_at, updated_at)
-    values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
   $has = $p->prepare('select count(*) from guides where slug = ?');
   foreach (guideRows() as $r) {
     $has->execute([$r['slug']]);
     if ((int)$has->fetchColumn()) continue;
-    $ins->execute([uuid(), $r['slug'], 1, $r['sort'], $r['title'], $r['meta_desc'], $r['kicker'], $r['h1'], $r['intro'],
+    $ins->execute([uuid(), $r['slug'], 1, $r['sort'], $r['title'], $r['meta_desc'], $r['kicker'], $r['h1'], $r['intro'], $r['image'] ?? null,
       json_encode($r['sections'], JSON_UNESCAPED_UNICODE), json_encode($r['faq'], JSON_UNESCAPED_UNICODE),
       $r['cta_label'], $r['cta_href'], $r['footer_target'], now(), now()]);
   }
@@ -3628,6 +3648,37 @@ function guideRows(): array {
    ],
    'cta_label' => 'Termin anfragen', 'cta_href' => 'hochzeit.html#anfrage', 'footer_target' => 'index'],
 
+  ['slug' => 'meine-musikwelten', 'sort' => 40,
+   'title' => 'Meine Musikwelten – von 90er-Hits bis Wunschliste | DJ Lauschgift, Hemer',
+   'meta_desc' => 'Welche Musik lege ich eigentlich auf? Ein Blick in meine Playlists, meine Lieblingshits aus den 90ern und 2000ern und wie ich Musikwünsche einbaue.',
+   'kicker' => 'Backstage', 'h1' => 'Meine Musikwelten',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Musik ist der Grund, warum ich diesen Job mache. Hier bekommt ihr einen echten Einblick, was bei mir läuft – nicht nur auf Auftritten, sondern auch privat.',
+   'sections' => [
+     ['heading' => 'Meine Lieblingshits aus den 90ern und 2000ern',
+      'text' => '[Platzhaltertext] Das sind die Tracks, die bei mir garantiert für Stimmung sorgen – und die ich privat genauso gerne höre wie auf der Tanzfläche.',
+      'embed' => 'https://open.spotify.com/embed/playlist/37i9dQZF1EIUyJRqPTrkHe?utm_source=generator'],
+     ['heading' => 'Wie ich Musikwünsche einbaue',
+      'text' => '[Platzhaltertext] Ihr schickt mir vorab eure Wünsche und No-Gos, und ich baue sie so ein, dass sie zur Stimmung des Abends passen – keine stumpfe Playlist von der Stange.'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
+
+  ['slug' => 'warum-ich-lieber-weit-fahre', 'sort' => 50,
+   'title' => 'Warum ich lieber 500 km fahre als nebenan aufzulegen | DJ Lauschgift, Hemer',
+   'meta_desc' => 'Warum ich lieber weit zu einem Kunden fahre, der zu mir passt, statt nebenan auf irgendeiner Party zu stehen – ein Einblick, was mich als DJ auszeichnet.',
+   'kicker' => 'Backstage', 'h1' => 'Warum ich lieber 500 km fahre als 10 km nebenan aufzulegen',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Eine ehrliche Geschichte darüber, was mich als DJ auszeichnet und warum mir die Chemie mit euch wichtiger ist als die Entfernung.',
+   'sections' => [
+     ['heading' => 'Warum ich welche Technik nehme',
+      'text' => '[Platzhaltertext] Hier erkläre ich, nach welchen Kriterien ich Technik auswähle und warum mir Zuverlässigkeit wichtiger ist als das neueste Gerät.'],
+     ['heading' => 'Was mich auszeichnet',
+      'text' => '[Platzhaltertext] Insider-Einblick in meine Arbeitsweise – was ich anders mache als andere DJs.'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
+
   ];
 }
 
@@ -3644,15 +3695,17 @@ function suggestGuideTopics(int $n = 5): array {
   $existing = array_map(fn($g) => (string)($g['h1'] ?: $g['title']),
     $p->query("select h1, title from guides order by sort")->fetchAll());
   $campaigns = $p->query("select h1_line1 from campaign_pages where h1_line1 is not null")->fetchAll(PDO::FETCH_COLUMN);
-  $system = 'Du hilfst, den "Ratgeber"-Bereich einer Website für einen DJ- und Veranstaltungstechnik-'
-    . 'Verleih-Betrieb (Hochzeiten, Firmenevents, Technikverleih, Workshops) mit neuen Artikelideen zu '
-    . 'füllen. Du bekommst eine Liste bereits vorhandener Artikel und Aktionsseiten-Themen. Schlage GENAU '
-    . $n . ' neue, klar unterschiedliche Artikel-Ideen vor, nach Themen zu Fragen, die potenzielle Kunden '
-    . 'vor einer Anfrage googeln könnten - sie sollen sich von den vorhandenen Themen unterscheiden. '
-    . 'Antworte AUSSCHLIESSLICH als kompaktes JSON-Array ohne Markdown-Codeblock, jedes Element exakt in '
-    . 'der Form {"title":"...","reason":"..."} - title eine konkrete Artikelüberschrift, reason ein Satz, '
-    . 'warum das Thema für Suchende relevant ist.';
-  $userText = "Vorhandene Ratgeber-Artikel:\n" . ($existing ? implode("\n", $existing) : '(keine)')
+  $system = 'Du hilfst, den "Backstage"-Bereich einer Website für einen DJ- und Veranstaltungstechnik-'
+    . 'Verleih-Betrieb (Hochzeiten, Firmenevents, Technikverleih, Workshops) mit neuen Beitragsideen zu '
+    . 'füllen. Backstage sind persönliche Einblicke des Betreibers in seine Arbeit, seinen Musikgeschmack '
+    . 'und seine Arbeitsweise - kein trockener Ratgeber, sondern seine eigene Stimme, teils aber auch '
+    . 'praktische Themen zu Fragen, die potenzielle Kunden vor einer Anfrage googeln. Du bekommst eine '
+    . 'Liste bereits vorhandener Beiträge und Aktionsseiten-Themen. Schlage GENAU ' . $n . ' neue, klar '
+    . 'unterschiedliche Beitragsideen vor, die sich von den vorhandenen Themen unterscheiden. Antworte '
+    . 'AUSSCHLIESSLICH als kompaktes JSON-Array ohne Markdown-Codeblock, jedes Element exakt in der Form '
+    . '{"title":"...","reason":"..."} - title eine konkrete Überschrift, reason ein Satz, warum das Thema '
+    . 'relevant ist.';
+  $userText = "Vorhandene Backstage-Beiträge:\n" . ($existing ? implode("\n", $existing) : '(keine)')
     . "\n\nAktionsseiten-Themen (nicht wiederholen):\n" . ($campaigns ? implode("\n", $campaigns) : '(keine)');
   try {
     $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 700);
@@ -3666,8 +3719,8 @@ function suggestGuideTopics(int $n = 5): array {
   return $out;
 }
 /* Einmal im Monat (angehaengt an den taeglichen Backup-Cron-Ping, siehe cron/backup -
-   genau wie dailyDigest() fuer den taeglichen Hinweis) ein paar KI-Themenideen fuer den
-   Ratgeber an Markus schicken. Ohne eingerichteten KI-Zugang oder ohne Vorschlaege bleibt
+   genau wie dailyDigest() fuer den taeglichen Hinweis) ein paar KI-Themenideen fuer
+   Backstage an Markus schicken. Ohne eingerichteten KI-Zugang oder ohne Vorschlaege bleibt
    sie einfach still - das darf nie den Backup-Cron-Aufruf selbst stoeren. */
 function monthlyGuideSuggestions(): array {
   $p = db();
@@ -3681,9 +3734,9 @@ function monthlyGuideSuggestions(): array {
     ->execute([json_encode($cfg), now()]);
   $suggestions = suggestGuideTopics(3);
   if (!$suggestions) return ['skipped' => 'kein KI-Zugang eingerichtet oder keine Vorschläge erhalten'];
-  $body = "Neue Ideen für deinen Ratgeber-Bereich:\n\n" . implode("\n\n", array_map(
+  $body = "Neue Ideen für deinen Backstage-Bereich:\n\n" . implode("\n\n", array_map(
     fn($s) => '– ' . $s['title'] . ($s['reason'] !== '' ? "\n  " . $s['reason'] : ''), $suggestions));
-  $ok = notifyOwner('Neue Ratgeber-Themenideen', $body, 'guides');
+  $ok = notifyOwner('Neue Backstage-Themenideen', $body, 'guides');
   return ['sent' => $ok, 'count' => count($suggestions)];
 }
 
@@ -3772,7 +3825,7 @@ function campaignTechCheckBruttoUpdate(PDO $p): void {
 
 /* Datenschutzerklärung – eine Quelle für Seed und Migration (v25) */
 function datenschutzText(): string {
-  return "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Cookies und lokale Speicherung\nDiese Website verwendet keine Cookies zu Werbe- oder Tracking-Zwecken und bindet keine Dienste ein, die solche Cookies setzen. Ein Cookie-Banner ist deshalb nicht erforderlich. Nur im Kundenportal und im Partner-Bereich wird nach eurer aktiven Anmeldung ein technisch notwendiges Sitzungsmerkmal im Browser gespeichert (Local/Session Storage), damit ihr angemeldet bleibt (§ 25 Abs. 2 TDDDG).\n\n4. Schriftarten\nAlle Schriftarten liegen lokal auf dem Server dieser Website. Beim Seitenaufruf wird keine Verbindung zu Google Fonts oder anderen Drittanbietern aufgebaut.\n\n5. Reichweitenmessung\nZur Verbesserung des Angebots messe ich anonym, wie die Seiten genutzt werden: Datum, Seitenname, ggf. die Domain der verweisenden Website, ob am selben Tag schon einmal derselbe Browser da war (dafür wird aus IP-Adresse und Browserkennung ein täglich neuer, nicht rückverfolgbarer Rechenwert gebildet und sofort wieder verworfen – nicht die IP-Adresse selbst), außerdem grob die Verweildauer und Scrolltiefe je Seite sowie ob bestimmte Buttons (z. B. WhatsApp, Anfrageformular) angeklickt wurden. Es werden weder IP-Adressen noch Cookies oder sonstige dauerhafte Kennungen gespeichert – ein Bezug zu einzelnen Personen ist nicht möglich (Art. 6 Abs. 1 lit. f DSGVO).\n\n6. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n7. Newsletter\nFür den Workshop-Newsletter speichere ich eure E-Mail-Adresse erst nach Bestätigung über den zugesandten Link (Double-Opt-in) auf Grundlage eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Jede Mail enthält einen Abmeldelink; nach der Abmeldung erhaltet ihr keine weiteren Mails. Es wird kein Versanddienstleister eingesetzt – der Versand erfolgt über den eigenen Server.\n\n8. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n9. Digitaler Mietvertrag und Ausweiskopie\nBei der Vermietung von Veranstaltungstechnik könnt ihr den Mietvertrag digital abschließen. Dabei werden eure Unterschrift sowie – mit eurer ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 20 PAuswG) – Fotos der Vorder- und Rückseite eures Personalausweises verarbeitet und in einem zugriffsgeschützten Bereich des eigenen Servers gespeichert. Nicht benötigte Angaben dürft ihr vor dem Fotografieren schwärzen. Die Ausweiskopien dienen ausschließlich der Absicherung des Mietverhältnisses und werden nach vollständiger Rückgabe der Mietsachen gelöscht.\n\n10. Kundenportal\nIm Kundenportal könnt ihr euch mit E-Mail-Adresse und Passwort anmelden, um eure Unterlagen einzusehen und Angaben zu eurer Feier zu pflegen. Das Passwort wird ausschließlich verschlüsselt (als Hash) gespeichert; alle Inhalte liegen auf dem eigenen Server dieser Website (Art. 6 Abs. 1 lit. b DSGVO).\n\n11. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: August 2026.";
+  return "Datenschutzerklärung\n\n1. Verantwortlicher\nMarkus Jankowski, Büttmecker Weg 35c, 58675 Hemer.\n\n2. Hosting\nDiese Website wird bei der ALL-INKL.COM – Neue Medien Münnich (Deutschland) gehostet. Beim Aufruf der Seiten verarbeitet der Hoster technisch notwendige Daten (z. B. IP-Adresse, Zeitpunkt des Abrufs) in Server-Logfiles auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Website).\n\n3. Cookies und lokale Speicherung\nDiese Website verwendet keine Cookies zu Werbe- oder Tracking-Zwecken und bindet keine Dienste ein, die solche Cookies setzen. Ein Cookie-Banner ist deshalb nicht erforderlich. Nur im Kundenportal und im Partner-Bereich wird nach eurer aktiven Anmeldung ein technisch notwendiges Sitzungsmerkmal im Browser gespeichert (Local/Session Storage), damit ihr angemeldet bleibt (§ 25 Abs. 2 TDDDG).\n\n4. Schriftarten\nAlle Schriftarten liegen lokal auf dem Server dieser Website. Beim Seitenaufruf wird keine Verbindung zu Google Fonts oder anderen Drittanbietern aufgebaut.\n\n5. Reichweitenmessung\nZur Verbesserung des Angebots messe ich anonym, wie die Seiten genutzt werden: Datum, Seitenname, ggf. die Domain der verweisenden Website, ob am selben Tag schon einmal derselbe Browser da war (dafür wird aus IP-Adresse und Browserkennung ein täglich neuer, nicht rückverfolgbarer Rechenwert gebildet und sofort wieder verworfen – nicht die IP-Adresse selbst), außerdem grob die Verweildauer und Scrolltiefe je Seite sowie ob bestimmte Buttons (z. B. WhatsApp, Anfrageformular) angeklickt wurden. Es werden weder IP-Adressen noch Cookies oder sonstige dauerhafte Kennungen gespeichert – ein Bezug zu einzelnen Personen ist nicht möglich (Art. 6 Abs. 1 lit. f DSGVO).\n\n6. Anfrageformular\nWenn ihr das Anfrageformular nutzt, verarbeite ich die dort eingegebenen Daten (Name, E-Mail, Telefon, Angaben zur Feier, Nachricht) zur Bearbeitung eurer Anfrage und für die Vertragsanbahnung (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden auf dem eigenen Server dieser Website gespeichert und nicht an Dritte weitergegeben, sofern ihr nicht ausdrücklich eine Vermittlung an Partner-DJs wünscht.\n\n7. Newsletter\nFür den Workshop-Newsletter speichere ich eure E-Mail-Adresse erst nach Bestätigung über den zugesandten Link (Double-Opt-in) auf Grundlage eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Jede Mail enthält einen Abmeldelink; nach der Abmeldung erhaltet ihr keine weiteren Mails. Es wird kein Versanddienstleister eingesetzt – der Versand erfolgt über den eigenen Server.\n\n8. DJ-Vermittlung\nWünscht ihr eine Vermittlung an andere DJs, gebe ich die dafür erforderlichen Kontakt- und Veranstaltungsdaten an meine Partner-Agentur DJ Bande (Münster) weiter – ausschließlich mit eurer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).\n\n9. Digitaler Mietvertrag und Ausweiskopie\nBei der Vermietung von Veranstaltungstechnik könnt ihr den Mietvertrag digital abschließen. Dabei werden eure Unterschrift sowie – mit eurer ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 20 PAuswG) – Fotos der Vorder- und Rückseite eures Personalausweises verarbeitet und in einem zugriffsgeschützten Bereich des eigenen Servers gespeichert. Nicht benötigte Angaben dürft ihr vor dem Fotografieren schwärzen. Die Ausweiskopien dienen ausschließlich der Absicherung des Mietverhältnisses und werden nach vollständiger Rückgabe der Mietsachen gelöscht.\n\n10. Kundenportal\nIm Kundenportal könnt ihr euch mit E-Mail-Adresse und Passwort anmelden, um eure Unterlagen einzusehen und Angaben zu eurer Feier zu pflegen. Das Passwort wird ausschließlich verschlüsselt (als Hash) gespeichert; alle Inhalte liegen auf dem eigenen Server dieser Website (Art. 6 Abs. 1 lit. b DSGVO).\n\n11. Eingebettete Spotify-Playlists\nIm Backstage-Bereich binde ich an einzelnen Stellen Playlists von Spotify (Spotify AB, Schweden) ein, um euch einen Einblick in meinen Musikgeschmack zu geben. Sobald eine solche Seite aufgerufen wird, baut euer Browser eine Verbindung zu Servern von Spotify auf; dabei kann Spotify technische Daten (z. B. eure IP-Adresse) verarbeiten und eigene Cookies setzen, worauf ich keinen Einfluss habe. Rechtsgrundlage ist eure Einwilligung durch den Aufruf der jeweiligen Seite (Art. 6 Abs. 1 lit. a DSGVO). Weitere Informationen: Datenschutzerklärung von Spotify (spotify.com/de/legal/privacy-policy).\n\n12. Eure Rechte\nIhr habt das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie Beschwerde bei einer Aufsichtsbehörde. Meldet euch dafür einfach unter den oben genannten Kontaktdaten.\n\nStand: September 2026.";
 }
 
 function migrate(PDO $p): void {
@@ -4422,6 +4475,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
   if (!$auth) {
     if ($method === 'GET' && in_array($t, PUBLIC_READ)) {
       if ($t === 'campaign_pages') { $q['enabled'] = 'eq.true'; }   // Aktionsseiten: Entwürfe bleiben privat
+      elseif ($t === 'guides') { $q['published'] = 'eq.true'; }   // Backstage: Entwürfe bleiben privat
       elseif ($t === 'site_content') { /* Website-Texte sind vollständig öffentlich */ }
       elseif ($t === 'equipment_set_items') { /* reine Zuordnungstabelle, Sichtbarkeit steuert das Set */ }
       else { $q['public'] = 'eq.true'; }

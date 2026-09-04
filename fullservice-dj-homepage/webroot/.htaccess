@@ -11,7 +11,10 @@
   # anderer Stelle versehentlich welche eingebaut wuerden (CLAUDE.md verbietet ohnehin
   # externe CDNs). 'unsafe-inline' fuer Skript/Stil ist noetig, weil die Seiten mit
   # Inline-onclick-Handlern und Inline-<style> arbeiten - kein Nonce-System vorhanden.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+  # frame-src erlaubt zusaetzlich open.spotify.com: bewusste, mit Markus abgestimmte
+  # Ausnahme von "keine externen Dienste" fuer eingebettete Playlists im Backstage-Bereich
+  # (siehe backstage.php) - alles andere bleibt 'self'.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self' https://open.spotify.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
   # Nur wirksam, wenn ueber HTTPS ausgeliefert (Browser ignorieren HSTS ueber HTTP ohnehin).
   Header always set Strict-Transport-Security "max-age=15552000; includeSubDomains"
 </IfModule>
@@ -25,11 +28,11 @@
   SetHandler application/x-httpd-php
 </FilesMatch>
 
-# Ratgeber (SEO-Artikel): huebsche URLs ohne Dateiendung, damit im Backoffice frei
-# angelegte Artikel keine eigene Datei brauchen (siehe ratgeber.php). Greift nur mit
-# aktivem mod_rewrite; ratgeber.php?slug=... funktioniert notfalls auch direkt.
+# Backstage (persoenliche Einblicke): huebsche URLs ohne Dateiendung, damit im Backoffice
+# frei angelegte Beitraege keine eigene Datei brauchen (siehe backstage.php). Greift nur mit
+# aktivem mod_rewrite; backstage.php?slug=... funktioniert notfalls auch direkt.
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteRule ^ratgeber/([a-z0-9-]+)/?$ ratgeber.php?slug=$1 [L,QSA]
-  RewriteRule ^ratgeber/?$ ratgeber.php [L,QSA]
+  RewriteRule ^backstage/([a-z0-9-]+)/?$ backstage.php?slug=$1 [L,QSA]
+  RewriteRule ^backstage/?$ backstage.php [L,QSA]
 </IfModule>

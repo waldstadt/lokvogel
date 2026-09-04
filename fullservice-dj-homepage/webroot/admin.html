@@ -488,7 +488,7 @@ tr.neu td{background:rgba(255,111,91,.14)}
       <div class="grp">Website</div>
       <a data-pg="cms"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Inhalte</a>
       <a data-pg="camp"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>Aktionsseiten</a>
-      <a data-pg="guides"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Ratgeber</a>
+      <a data-pg="guides"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Backstage</a>
       <a data-pg="media"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Medien-Pool</a>
       <div class="grp">System</div>
       <a data-pg="set"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Einstellungen</a>
@@ -884,10 +884,10 @@ tr.neu td{background:rgba(255,111,91,.14)}
 
   <!-- RATGEBER -->
   <div class="pg" id="pg-guides">
-    <div class="pt">Ratgeber</div><div class="ps">Artikel zu Fragen, die potenzielle Kunden vor einer Anfrage googeln (Preise, Ablauf, Checklisten) – jeder Artikel eine eigene Seite unter /ratgeber/… Anders als bei Aktionsseiten braucht ein neuer Artikel keine neue Datei, nur „+ Artikel".</div>
-    <div style="margin-bottom:12px"><button class="btn sm" onclick="openGuideModal()">+ Artikel</button> <button class="btn g sm" id="guideAiBtn" onclick="suggestGuideTopics()">Themenvorschläge</button> <a class="btn g sm" href="ratgeber" target="_blank">Ratgeber ansehen</a></div>
+    <div class="pt">Backstage</div><div class="ps">Persönliche Einblicke in deine Arbeit, deinen Musikgeschmack und deine Erfahrungen – jeder Beitrag eine eigene Seite unter /backstage/… Anders als bei Aktionsseiten braucht ein neuer Beitrag keine neue Datei, nur „+ Beitrag".</div>
+    <div style="margin-bottom:12px"><button class="btn sm" onclick="openGuideModal()">+ Beitrag</button> <button class="btn g sm" id="guideAiBtn" onclick="suggestGuideTopics()">Themenvorschläge</button> <a class="btn g sm" href="backstage" target="_blank">Backstage ansehen</a></div>
     <div class="mut sml" style="margin-bottom:12px">Einmal im Monat schickt dir das Backoffice außerdem automatisch ein paar neue Themenideen per Mail/Telegram, sobald der tägliche Backup-Cronjob läuft.</div>
-    <div class="tbl-wrap card"><table><thead><tr><th>Artikel</th><th>Adresse</th><th>Status</th><th></th></tr></thead><tbody id="guideRows"></tbody></table></div>
+    <div class="tbl-wrap card"><table><thead><tr><th>Beitrag</th><th>Adresse</th><th>Status</th><th></th></tr></thead><tbody id="guideRows"></tbody></table></div>
   </div>
 
   <!-- CMS -->
@@ -9176,25 +9176,26 @@ function saveCamp(){
   }).catch(function(e){toast(e.message,1)});
 }
 
-/* ===== Ratgeber (SEO-Artikel) ===== - anders als Aktionsseiten braucht ein neuer
-   Artikel keine eigene Datei: ratgeber.php rendert jeden Slug aus der guides-Tabelle. */
+/* ===== Backstage (persönliche Einblicke, ex-"Ratgeber") ===== - anders als Aktionsseiten
+   braucht ein neuer Beitrag keine eigene Datei: backstage.php rendert jeden Slug aus der
+   guides-Tabelle (Tabellenname historisch). */
 function renderGuides(){
   var el=document.getElementById('guideRows');if(!el)return;
   el.innerHTML=(CACHE.guides||[]).map(function(g){
     return '<tr><td><b>'+esc(g.h1||g.title||g.slug)+'</b><br><span class="mut sml">'+esc(g.title||'')+'</span></td>'+
-    '<td><a href="ratgeber/'+esc(g.slug)+'" target="_blank">/ratgeber/'+esc(g.slug)+'</a>'+(Number(g.published)?' ↗':
+    '<td><a href="backstage/'+esc(g.slug)+'" target="_blank">/backstage/'+esc(g.slug)+'</a>'+(Number(g.published)?' ↗':
       '<br><span class="mut sml">Vorschau nur nach Veröffentlichen</span>')+'</td>'+
     '<td>'+(Number(g.published)?'<span class="b green">online</span>':'<span class="b grey">Entwurf</span>')+'</td>'+
     '<td style="white-space:nowrap"><button class="btn g sm" onclick="toggleGuide(\''+g.id+'\')">'+(Number(g.published)?'Zurückziehen':'Veröffentlichen')+'</button> '+
     '<button class="btn sm" onclick="openGuideModal(\''+g.id+'\')">Bearbeiten</button></td></tr>';
-  }).join('')||'<tr><td colspan="4" class="mut">Noch keine Artikel angelegt.</td></tr>';
+  }).join('')||'<tr><td colspan="4" class="mut">Noch keine Beiträge angelegt.</td></tr>';
 }
 function toggleGuide(id){
   var g=(CACHE.guides||[]).find(function(x){return x.id===id});if(!g)return;
   var on=!Number(g.published);
   api('guides?id=eq.'+id,{method:'PATCH',body:{published:on?1:0,updated_at:new Date().toISOString()}})
     .then(function(){g.published=on?1:0;renderGuides();
-      toast(on?'Artikel ist jetzt online ✓ – auch in der Sitemap gelistet.':'Artikel zurückgezogen – nicht mehr öffentlich erreichbar.')})
+      toast(on?'Beitrag ist jetzt online ✓ – auch in der Sitemap gelistet.':'Beitrag zurückgezogen – nicht mehr öffentlich erreichbar.')})
     .catch(function(e){toast(e.message,1)});
 }
 function guideSlugify(s){
@@ -9208,6 +9209,7 @@ function guideSectionRow(s){
     '<label>Zwischenüberschrift</label><input data-sh value="'+esc(s.heading||'')+'">'+
     '<label>Text (optional, leer lassen für reine Liste)</label><textarea data-st rows="3">'+esc(s.text||'')+'</textarea>'+
     '<label>Aufzählungspunkte (einer pro Zeile, optional)</label><textarea data-si rows="4">'+esc((s.items||[]).join('\n'))+'</textarea>'+
+    '<label>Spotify-Playlist einbetten (optional) – Embed-Link aus Spotify: „Teilen" → „Einbetten" → src-Adresse kopieren</label><input data-se value="'+esc(s.embed||'')+'" placeholder="https://open.spotify.com/embed/playlist/…">'+
     '<a onclick="this.parentNode.remove()" style="color:var(--redl);font-size:12px">Abschnitt entfernen</a></div>';
 }
 function guideAddSection(){document.getElementById('gSections').insertAdjacentHTML('beforeend',guideSectionRow())}
@@ -9222,14 +9224,17 @@ function guideAddFaq(){document.getElementById('gFaq').insertAdjacentHTML('befor
 function openGuideModal(id){
   var g=id?(CACHE.guides||[]).find(function(x){return x.id===id}):{};g=g||{};
   window._guideId=id||'';
-  openModal(id?'Artikel bearbeiten':'Neuer Ratgeber-Artikel',
+  openModal(id?'Beitrag bearbeiten':'Neuer Backstage-Beitrag',
     '<div class="grid3"><div style="grid-column:span 2"><label>Browser-Titel</label><input id="gTitle" value="'+esc(g.title||'')+'" oninput="if(!document.getElementById(\'gSlugTouched\').checked)document.getElementById(\'gSlug\').value=guideSlugify(this.value)"></div>'+
     '<div><label>Kicker</label><input id="gKicker" value="'+esc(g.kicker||'')+'"></div></div>'+
-    '<div class="grid2"><div><label>Adresse (/ratgeber/…)</label><input id="gSlug" value="'+esc(g.slug||'')+'"></div>'+
+    '<div class="grid2"><div><label>Adresse (/backstage/…)</label><input id="gSlug" value="'+esc(g.slug||'')+'"></div>'+
     '<div><label style="text-transform:none;letter-spacing:0"><input type="checkbox" id="gSlugTouched" style="width:auto;margin-right:6px" '+(id?'checked':'')+'>Adresse manuell festlegen</label></div></div>'+
     '<label>Beschreibung für Google (150–160 Zeichen)</label><textarea id="gMeta" rows="2">'+esc(g.meta_desc||'')+'</textarea>'+
     '<label>Überschrift (H1)</label><input id="gH1" value="'+esc(g.h1||'')+'">'+
     '<label>Einleitung</label><textarea id="gIntro" rows="3">'+esc(g.intro||'')+'</textarea>'+
+    '<label>Titelbild (optional)</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+    '<input id="gImage" value="'+esc(g.image||'')+'" style="flex:1;min-width:200px" placeholder="Aus Medien-Pool wählen…">'+
+    '<button type="button" class="btn g sm" onclick="guideImgFromPool()">Aus Medien-Pool wählen</button></div>'+
     '<div class="sec-label" style="margin-top:14px">Abschnitte</div>'+
     '<div id="gSections">'+(g.sections||[]).map(guideSectionRow).join('')+'</div>'+
     '<button class="btn g sm" onclick="guideAddSection()">+ Abschnitt</button>'+
@@ -9242,8 +9247,11 @@ function openGuideModal(id){
     '<label>Link-Ziel des Buttons (z. B. hochzeit.html#anfrage)</label><input id="gCtaHref" value="'+esc(g.cta_href||'')+'">'+
     '<label style="margin-top:12px"><input type="checkbox" id="gPub" style="width:auto;margin-right:6px" '+(g.published?'checked':'')+'>Veröffentlicht</label>'+
     '<div style="margin-top:14px;display:flex;gap:8px"><button class="btn" onclick="saveGuide()">Speichern</button>'+
-    (id?' <a class="btn g" href="ratgeber/'+esc(g.slug)+'" target="_blank" style="text-decoration:none">Artikel ansehen</a> <button class="btn r" onclick="delRow(\'guides\',\''+id+'\',reloadGuides)">Löschen</button>':'')+'</div>');
+    (id?' <a class="btn g" href="backstage/'+esc(g.slug)+'" target="_blank" style="text-decoration:none">Beitrag ansehen</a> <button class="btn r" onclick="delRow(\'guides\',\''+id+'\',reloadGuides)">Löschen</button>':'')+'</div>');
   if(g.footer_target)document.getElementById('gTarget').value=g.footer_target;
+}
+function guideImgFromPool(){
+  openMediaPicker(function(url){if(url)document.getElementById('gImage').value=url});
 }
 function saveGuide(){
   var val=function(id){return document.getElementById(id).value.trim()};
@@ -9252,12 +9260,13 @@ function saveGuide(){
   var sections=[].map.call(document.querySelectorAll('#gSections [data-gsec]'),function(div){
     return {heading:div.querySelector('[data-sh]').value.trim(),
       text:div.querySelector('[data-st]').value.trim(),
-      items:div.querySelector('[data-si]').value.split('\n').map(function(s){return s.trim()}).filter(Boolean)};
-  }).filter(function(s){return s.heading||s.text||s.items.length});
+      items:div.querySelector('[data-si]').value.split('\n').map(function(s){return s.trim()}).filter(Boolean),
+      embed:div.querySelector('[data-se]').value.trim()};
+  }).filter(function(s){return s.heading||s.text||s.items.length||s.embed});
   var faq=[].map.call(document.querySelectorAll('#gFaq [data-gfaq]'),function(div){
     return {q:div.querySelector('[data-fq]').value.trim(),a:div.querySelector('[data-fa]').value.trim()};
   }).filter(function(f){return f.q&&f.a});
-  var body={slug:slug,title:val('gTitle'),meta_desc:val('gMeta'),kicker:val('gKicker'),h1:val('gH1'),intro:val('gIntro'),
+  var body={slug:slug,title:val('gTitle'),meta_desc:val('gMeta'),kicker:val('gKicker'),h1:val('gH1'),intro:val('gIntro'),image:val('gImage'),
     sections:sections,faq:faq,cta_label:val('gCtaLabel'),cta_href:val('gCtaHref'),
     footer_target:document.getElementById('gTarget').value,
     published:document.getElementById('gPub').checked,
@@ -9276,12 +9285,12 @@ function suggestGuideTopics(){
     .then(function(res){
       btn.disabled=false;btn.textContent='Themenvorschläge';
       if(!res.ok||res.j.error){toast((res.j&&res.j.error)||'KI-Anfrage fehlgeschlagen.',1);return}
-      openModal('Themenvorschläge für den Ratgeber',
-        '<div class="mut sml" style="margin-bottom:12px">Ein Klick auf „Artikel anlegen" öffnet den Editor mit vorausgefülltem Titel – Abschnitte und Text trägst du (oder ich) danach ein.</div>'+
+      openModal('Themenvorschläge für Backstage',
+        '<div class="mut sml" style="margin-bottom:12px">Ein Klick auf „Beitrag anlegen" öffnet den Editor mit vorausgefülltem Titel – Abschnitte und Text trägst du (oder ich) danach ein.</div>'+
         res.j.map(function(s){
           return '<div class="card" style="margin:8px 0;padding:12px">'+
             '<b>'+esc(s.title)+'</b>'+(s.reason?'<div class="mut sml" style="margin-top:4px">'+esc(s.reason)+'</div>':'')+
-            '<div style="margin-top:8px"><button class="btn sm" onclick=\'guideFromSuggestion(JSON.parse(this.dataset.s))\' data-s=\''+JSON.stringify(s).replace(/'/g,'&#39;')+'\'>Artikel anlegen</button></div>'+
+            '<div style="margin-top:8px"><button class="btn sm" onclick=\'guideFromSuggestion(JSON.parse(this.dataset.s))\' data-s=\''+JSON.stringify(s).replace(/'/g,'&#39;')+'\'>Beitrag anlegen</button></div>'+
           '</div>';
         }).join(''));
     }).catch(function(e){btn.disabled=false;btn.textContent='Themenvorschläge';toast(e.message,1)});

@@ -130,6 +130,16 @@ nav.scrolled{border-bottom-color:var(--line)}
 .rev-links a{display:inline-flex;align-items:center;gap:6px;font-size:13px;border:1px solid var(--line);border-radius:3px;padding:8px 16px;color:var(--mut);transition:border-color .2s,color .2s}
 .rev-links a:hover{border-color:var(--acc-txt);color:var(--acc-txt)}
 
+/* Backstage */
+.bs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.bs-card{background:var(--card);border:1px solid var(--line);border-radius:5px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .2s}
+.bs-card:hover{border-color:var(--acc-txt)}
+.bs-card .bs-img{aspect-ratio:16/10;background:var(--bg2) center/cover no-repeat}
+.bs-card .bs-body{padding:20px}
+.bs-card .kicker{font-size:11px;margin-bottom:6px}
+.bs-card h4{font-size:16px;margin-bottom:6px}
+.bs-card p{font-size:13px;color:var(--mut)}
+
 /* Preisbeispiele */
 .ex-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;margin-top:22px}
 .ex{background:var(--card);border:1px solid var(--line);border-radius:5px;padding:26px 24px}
@@ -279,6 +289,8 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
       <a href="#ueber">Über mich</a>
       <a href="#leistungen">Leistungen</a>
       <a href="#ablauf">So läuft's</a>
+      <a href="#backstage">Backstage</a>
+      <a href="#bewertungen">Bewertungen</a>
       <a href="#faq">FAQ</a>
       <a href="technik.html" class="switch"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg> Veranstaltungstechnik</a>
       <a href="#anfrage" class="btn small">Anfragen</a>
@@ -353,6 +365,20 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
   </div>
 </section>
 <div id="blkslot-ablauf"></div>
+
+
+<section id="backstage" style="background:var(--bg2)">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="kicker">Hinter den Kulissen</div>
+      <h2 style="font-size:clamp(32px,6vw,52px)">Backstage</h2>
+      <p class="lead">Auf meiner Backstage-Seite erfahrt ihr, warum ich welche Technik nehme, was mich auszeichnet, meine Lieblingshits aus den 90ern und 2000ern – und ein paar Insider-Infos, mit denen ihr mich und meine Arbeit noch besser kennenlernt. Unter anderem erzähle ich, warum ich lieber 500 km zu einem Kunden fahre, der zu mir passt, als 10 km weiter auf irgendeiner Party zu stehen. Jedes Thema kurz zusammengefasst hier – und als ausführlicher Beitrag für alle, die genauer hinschauen wollen.</p>
+    </div>
+    <div class="bs-grid" id="bsGrid" style="margin-top:36px"></div>
+    <div class="reveal" style="margin-top:28px"><a href="backstage" class="btn ghost">Alle Backstage-Beiträge ansehen</a></div>
+  </div>
+</section>
+<div id="blkslot-backstage"></div>
 
 
 <section id="galerie" style="display:none">
@@ -1160,6 +1186,17 @@ sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){
   PACK_ROWS=r;if(r.length&&CONTENT_FERTIG)renderPacks(r);
 }).catch(function(){});
 sfetch('faq?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderFaq(r)}).catch(function(){});
+sfetch('guides?select=*&published=eq.true&order=sort').then(function(r){
+  var el=document.getElementById('bsGrid');if(!el)return;
+  var sel=(r||[]).slice(0,3);
+  if(!sel.length){document.getElementById('backstage').style.display='none';return}
+  el.innerHTML=sel.map(function(g){
+    return '<a class="bs-card reveal vis" href="backstage/'+encodeURIComponent(g.slug)+'">'+
+      (g.image?'<div class="bs-img" style="background-image:url(\''+cssUrl(g.image)+'\')"></div>':'')+
+      '<div class="bs-body">'+(g.kicker?'<div class="kicker">'+esc(g.kicker)+'</div>':'')+
+      '<h4>'+esc(g.h1||g.title)+'</h4><p>'+esc(g.meta_desc||'')+'</p></div></a>';
+  }).join('');
+}).catch(function(){var s=document.getElementById('backstage');if(s)s.style.display='none'});
 var SRC_NAME={google:'Google-Bewertung','dj-bande':'Bewertung über die Partner-Agentur',direkt:'Kundenstimme'};
 /* Daten und CMS-Konfiguration können in beliebiger Reihenfolge eintreffen –
    deshalb werden beide gemerkt und die Render-Funktionen aus beiden Callbacks aufgerufen. */
