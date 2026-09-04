@@ -16,6 +16,22 @@
 declare(strict_types=1);
 
 function rgEsc($s): string { return htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8'); }
+/* Leichtgewichtige Auszeichnung fuer Fliesstext: **fett**, *kursiv*, [Text](https://...) -
+   gleiches Muster wie mdRender() in index.html/technik.html, damit Texte aus dem
+   "Gross bearbeiten"-Editor im Backoffice (admin.html, edLink()/edWrap()) hier genauso
+   aussehen wie auf den anderen Seiten. Escaping zuerst, Markup wird erst danach auf den
+   bereits sicheren Text angewendet - kein XSS ueber eingegebene Links moeglich, da nur
+   http(s)-URLs erlaubt sind. */
+function rgMd(string $s): string {
+  $s = rgEsc($s);
+  $s = preg_replace_callback('/\[([^\]]+)\]\(([^()\s]+)\)/', function ($m) {
+    if (!preg_match('#^https?://#i', $m[2])) return $m[0];
+    return '<a href="' . htmlspecialchars($m[2], ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . $m[1] . '</a>';
+  }, $s);
+  $s = preg_replace('/\*\*([^*]+)\*\*/', '<b>$1</b>', $s);
+  $s = preg_replace('/\*([^*\s][^*]*)\*/', '<i>$1</i>', $s);
+  return nl2br($s);
+}
 
 $slug = trim((string)($_GET['slug'] ?? ''), '/');
 
@@ -68,7 +84,8 @@ if ($slug !== '') {
 <link href="kampagne.css" rel="stylesheet">
 <style>.rg-wrap{max-width:720px}.rg-art section{padding:0 0 40px}.rg-art .lead{font-size:18px;margin-bottom:8px}
 .rg-art ul{margin:0 0 16px 20px}.rg-art li{margin-bottom:8px;color:var(--txt)}
-.rg-hero-img{width:100%;max-height:420px;object-fit:cover;border-radius:12px;margin:20px 0}
+.rg-hero-img{width:100%;max-height:420px;object-fit:cover;border-radius:12px}
+.rg-cap{font-size:12px;font-style:italic;color:var(--mut);margin-top:6px}
 .rg-embed{position:relative;border-radius:12px;overflow:hidden;margin:16px 0}
 .rg-faq h3{font-size:17px;margin:20px 0 6px}.rg-faq p{color:var(--mut)}
 .rg-back{display:inline-block;margin-bottom:28px;color:var(--mut);font-size:14px}</style>
@@ -87,22 +104,37 @@ if ($slug !== '') {
   <a class="rg-back" href="backstage">&larr; Alle Backstage-Beiträge</a>
   <?php if (!empty($g['kicker'])): ?><div class="kicker"><?= rgEsc($g['kicker']) ?></div><?php endif; ?>
   <h1 style="font-size:clamp(28px,5vw,44px)"><?= rgEsc($g['h1'] ?? '') ?></h1>
-  <?php if (!empty($g['intro'])): ?><p class="sub lead"><?= rgEsc($g['intro']) ?></p><?php endif; ?>
-  <?php if (!empty($g['image'])): ?><img class="rg-hero-img" src="<?= rgEsc($g['image']) ?>" alt="<?= rgEsc($g['h1'] ?? '') ?>"><?php endif; ?>
+  <?php if (!empty($g['intro'])): ?><p class="sub lead"><?= rgMd($g['intro']) ?></p><?php endif; ?>
+  <?php if (!empty($g['image'])): ?>
+    <figure style="margin:20px 0 0">
+      <img class="rg-hero-img" src="<?= rgEsc($g['image']) ?>" alt="<?= rgEsc($g['image_caption'] ?: ($g['h1'] ?? '')) ?>" style="margin:0">
+      <?php if (!empty($g['image_caption'])): ?><figcaption class="rg-cap"><?= rgEsc($g['image_caption']) ?></figcaption><?php endif; ?>
+    </figure>
+  <?php endif; ?>
 </div></header>
 
 <div class="wrap rg-wrap rg-art">
 <?php foreach ($sections as $s): ?>
   <section>
     <?php if (!empty($s['heading'])): ?><h2 style="font-size:22px"><?= rgEsc($s['heading']) ?></h2><?php endif; ?>
-    <?php if (!empty($s['text'])): ?><p class="lead" style="font-size:16px"><?= nl2br(rgEsc($s['text'])) ?></p><?php endif; ?>
+    <?php if (!empty($s['subtitle'])): ?><p class="sub" style="font-size:15px;margin-bottom:12px"><?= rgEsc($s['subtitle']) ?></p><?php endif; ?>
+    <?php if (!empty($s['text'])): ?><p class="lead" style="font-size:16px"><?= rgMd($s['text']) ?></p><?php endif; ?>
     <?php if (!empty($s['items']) && is_array($s['items'])): ?>
       <ul><?php foreach ($s['items'] as $it): ?><li><?= rgEsc($it) ?></li><?php endforeach; ?></ul>
+    <?php endif; ?>
+    <?php if (!empty($s['image'])): ?>
+      <figure style="margin:16px 0">
+        <img src="<?= rgEsc($s['image']) ?>" alt="<?= rgEsc($s['image_caption'] ?: ($s['heading'] ?? '')) ?>" style="width:100%;border-radius:10px;display:block">
+        <?php if (!empty($s['image_caption'])): ?><figcaption class="rg-cap"><?= rgEsc($s['image_caption']) ?></figcaption><?php endif; ?>
+      </figure>
     <?php endif; ?>
     <?php if (!empty($s['embed'])): ?>
       <div class="rg-embed"><iframe src="<?= rgEsc($s['embed']) ?>" width="100%" height="352" frameborder="0"
         allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"
         title="Spotify-Playlist"></iframe></div>
+    <?php endif; ?>
+    <?php if (!empty($s['cta_label'])): ?>
+      <p style="margin-top:18px"><a class="btn" href="<?= rgEsc($g['cta_href'] ?: ($homeHref . '#anfrage')) ?>"><?= rgEsc($s['cta_label']) ?></a></p>
     <?php endif; ?>
   </section>
 <?php endforeach; ?>

@@ -9203,16 +9203,29 @@ function guideSlugify(s){
   return String(s||'').toLowerCase().replace(/[äöüß]/g,function(c){return map[c]})
     .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
 }
+var GSEC_SEQ=0;
 function guideSectionRow(s){
   s=s||{};
+  var tid='gSecText'+(GSEC_SEQ++);
   return '<div class="card" style="margin:8px 0;padding:12px" data-gsec>'+
     '<label>Zwischenüberschrift</label><input data-sh value="'+esc(s.heading||'')+'">'+
-    '<label>Text (optional, leer lassen für reine Liste)</label><textarea data-st rows="3">'+esc(s.text||'')+'</textarea>'+
+    '<label>Untertitel (optional)</label><input data-ssub value="'+esc(s.subtitle||'')+'">'+
+    '<label>Text (optional, leer lassen für reine Liste)</label><textarea id="'+tid+'" data-st rows="3">'+esc(s.text||'')+'</textarea>'+
+    edBtn(tid)+
     '<label>Aufzählungspunkte (einer pro Zeile, optional)</label><textarea data-si rows="4">'+esc((s.items||[]).join('\n'))+'</textarea>'+
+    '<label>Bild zu diesem Abschnitt (optional)</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+    '<input data-simg value="'+esc(s.image||'')+'" style="flex:1;min-width:160px" placeholder="Aus Medien-Pool wählen…">'+
+    '<button type="button" class="btn g sm" onclick="guideSecImgFromPool(this)">Aus Medien-Pool wählen</button></div>'+
+    '<label>Bildbeschreibung (klein, kursiv unter dem Bild)</label><input data-scap value="'+esc(s.image_caption||'')+'">'+
+    '<label>Button nach diesem Abschnitt (optional, z. B. „Lass uns über Musik sprechen")</label><input data-scta value="'+esc(s.cta_label||'')+'" placeholder="z. B. Kontaktiere mich">'+
     '<label>Spotify-Playlist einbetten (optional) – Embed-Link aus Spotify: „Teilen" → „Einbetten" → src-Adresse kopieren</label><input data-se value="'+esc(s.embed||'')+'" placeholder="https://open.spotify.com/embed/playlist/…">'+
     '<a onclick="this.parentNode.remove()" style="color:var(--redl);font-size:12px">Abschnitt entfernen</a></div>';
 }
 function guideAddSection(){document.getElementById('gSections').insertAdjacentHTML('beforeend',guideSectionRow())}
+function guideSecImgFromPool(btn){
+  var card=btn.closest('[data-gsec]');if(!card)return;
+  openMediaPicker(function(url){if(url)card.querySelector('[data-simg]').value=url});
+}
 function guideFaqRow(f){
   f=f||{};
   return '<div class="card" style="margin:8px 0;padding:12px" data-gfaq>'+
@@ -9224,17 +9237,19 @@ function guideAddFaq(){document.getElementById('gFaq').insertAdjacentHTML('befor
 function openGuideModal(id){
   var g=id?(CACHE.guides||[]).find(function(x){return x.id===id}):{};g=g||{};
   window._guideId=id||'';
+  GSEC_SEQ=0;
   openModal(id?'Beitrag bearbeiten':'Neuer Backstage-Beitrag',
     '<div class="grid3"><div style="grid-column:span 2"><label>Browser-Titel</label><input id="gTitle" value="'+esc(g.title||'')+'" oninput="if(!document.getElementById(\'gSlugTouched\').checked)document.getElementById(\'gSlug\').value=guideSlugify(this.value)"></div>'+
     '<div><label>Kicker</label><input id="gKicker" value="'+esc(g.kicker||'')+'"></div></div>'+
     '<div class="grid2"><div><label>Adresse (/backstage/…)</label><input id="gSlug" value="'+esc(g.slug||'')+'"></div>'+
     '<div><label style="text-transform:none;letter-spacing:0"><input type="checkbox" id="gSlugTouched" style="width:auto;margin-right:6px" '+(id?'checked':'')+'>Adresse manuell festlegen</label></div></div>'+
-    '<label>Beschreibung für Google (150–160 Zeichen)</label><textarea id="gMeta" rows="2">'+esc(g.meta_desc||'')+'</textarea>'+
+    '<label>Beschreibung für Google (150–160 Zeichen)</label><textarea id="gMeta" rows="2">'+esc(g.meta_desc||'')+'</textarea>'+edBtn('gMeta')+
     '<label>Überschrift (H1)</label><input id="gH1" value="'+esc(g.h1||'')+'">'+
-    '<label>Einleitung</label><textarea id="gIntro" rows="3">'+esc(g.intro||'')+'</textarea>'+
+    '<label>Untertitel / Einleitung</label><textarea id="gIntro" rows="3">'+esc(g.intro||'')+'</textarea>'+edBtn('gIntro')+
     '<label>Titelbild (optional)</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
     '<input id="gImage" value="'+esc(g.image||'')+'" style="flex:1;min-width:200px" placeholder="Aus Medien-Pool wählen…">'+
     '<button type="button" class="btn g sm" onclick="guideImgFromPool()">Aus Medien-Pool wählen</button></div>'+
+    '<label>Bildbeschreibung (klein, kursiv unter dem Titelbild)</label><input id="gImgCap" value="'+esc(g.image_caption||'')+'" placeholder="Beschreibt, was auf dem Bild zu sehen ist">'+
     '<div class="sec-label" style="margin-top:14px">Abschnitte</div>'+
     '<div id="gSections">'+(g.sections||[]).map(guideSectionRow).join('')+'</div>'+
     '<button class="btn g sm" onclick="guideAddSection()">+ Abschnitt</button>'+
@@ -9259,14 +9274,18 @@ function saveGuide(){
   if(!val('gTitle')||!val('gH1')||!slug){toast('Titel, Überschrift und Adresse werden gebraucht.',1);return}
   var sections=[].map.call(document.querySelectorAll('#gSections [data-gsec]'),function(div){
     return {heading:div.querySelector('[data-sh]').value.trim(),
+      subtitle:div.querySelector('[data-ssub]').value.trim(),
       text:div.querySelector('[data-st]').value.trim(),
       items:div.querySelector('[data-si]').value.split('\n').map(function(s){return s.trim()}).filter(Boolean),
+      image:div.querySelector('[data-simg]').value.trim(),
+      image_caption:div.querySelector('[data-scap]').value.trim(),
+      cta_label:div.querySelector('[data-scta]').value.trim(),
       embed:div.querySelector('[data-se]').value.trim()};
-  }).filter(function(s){return s.heading||s.text||s.items.length||s.embed});
+  }).filter(function(s){return s.heading||s.text||s.items.length||s.embed||s.image});
   var faq=[].map.call(document.querySelectorAll('#gFaq [data-gfaq]'),function(div){
     return {q:div.querySelector('[data-fq]').value.trim(),a:div.querySelector('[data-fa]').value.trim()};
   }).filter(function(f){return f.q&&f.a});
-  var body={slug:slug,title:val('gTitle'),meta_desc:val('gMeta'),kicker:val('gKicker'),h1:val('gH1'),intro:val('gIntro'),image:val('gImage'),
+  var body={slug:slug,title:val('gTitle'),meta_desc:val('gMeta'),kicker:val('gKicker'),h1:val('gH1'),intro:val('gIntro'),image:val('gImage'),image_caption:val('gImgCap'),
     sections:sections,faq:faq,cta_label:val('gCtaLabel'),cta_href:val('gCtaHref'),
     footer_target:document.getElementById('gTarget').value,
     published:document.getElementById('gPub').checked,

@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 113;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 114;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1249,6 +1249,10 @@ function upgrade(PDO $p): void {
           ->execute([json_encode($legal, JSON_UNESCAPED_UNICODE), now()]);
       }
     } catch (PDOException $e) {}
+  }
+  if ($v < 114) {
+    /* v114: Backstage - Bildbeschreibung (kursive Bildunterschrift) zum Titelbild. */
+    try { $p->exec("alter table guides add column image_caption text"); } catch (PDOException $e) {}
   }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -3535,7 +3539,7 @@ function campaignPageRows(): array {
 function guidesDdl(): string {
   return "create table if not exists guides (id text primary key,
     slug text unique not null, published integer default 0, sort integer default 0,
-    title text, meta_desc text, kicker text, h1 text, intro text, image text,
+    title text, meta_desc text, kicker text, h1 text, intro text, image text, image_caption text,
     sections text default '[]', faq text default '[]',
     cta_label text, cta_href text, footer_target text default 'index',
     created_at text, updated_at text)";
@@ -3543,14 +3547,14 @@ function guidesDdl(): string {
 /* Nur einfügen, was noch fehlt (Slug-Abgleich) - eigene Änderungen an bestehenden
    Artikeln bleiben bei Migrationen unberührt, wie bei seedCampaignPages(). */
 function seedGuides(PDO $p): void {
-  $ins = $p->prepare('insert into guides (id, slug, published, sort, title, meta_desc, kicker, h1, intro, image,
+  $ins = $p->prepare('insert into guides (id, slug, published, sort, title, meta_desc, kicker, h1, intro, image, image_caption,
       sections, faq, cta_label, cta_href, footer_target, created_at, updated_at)
-    values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
   $has = $p->prepare('select count(*) from guides where slug = ?');
   foreach (guideRows() as $r) {
     $has->execute([$r['slug']]);
     if ((int)$has->fetchColumn()) continue;
-    $ins->execute([uuid(), $r['slug'], 1, $r['sort'], $r['title'], $r['meta_desc'], $r['kicker'], $r['h1'], $r['intro'], $r['image'] ?? null,
+    $ins->execute([uuid(), $r['slug'], 1, $r['sort'], $r['title'], $r['meta_desc'], $r['kicker'], $r['h1'], $r['intro'], $r['image'] ?? null, $r['image_caption'] ?? null,
       json_encode($r['sections'], JSON_UNESCAPED_UNICODE), json_encode($r['faq'], JSON_UNESCAPED_UNICODE),
       $r['cta_label'], $r['cta_href'], $r['footer_target'], now(), now()]);
   }
