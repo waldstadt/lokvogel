@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 114;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 115;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1253,6 +1253,11 @@ function upgrade(PDO $p): void {
   if ($v < 114) {
     /* v114: Backstage - Bildbeschreibung (kursive Bildunterschrift) zum Titelbild. */
     try { $p->exec("alter table guides add column image_caption text"); } catch (PDOException $e) {}
+  }
+  if ($v < 115) {
+    /* v115: 10 neue Backstage-Beitrags-Entwuerfe (unveroeffentlicht) - Grundgeruest mit
+       Themenvorschlaegen zu persoenlichen Geschichten, Technik und Musik-Playlists. */
+    try { seedGuides($p); } catch (PDOException $e) {}
   }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -3554,7 +3559,7 @@ function seedGuides(PDO $p): void {
   foreach (guideRows() as $r) {
     $has->execute([$r['slug']]);
     if ((int)$has->fetchColumn()) continue;
-    $ins->execute([uuid(), $r['slug'], 1, $r['sort'], $r['title'], $r['meta_desc'], $r['kicker'], $r['h1'], $r['intro'], $r['image'] ?? null, $r['image_caption'] ?? null,
+    $ins->execute([uuid(), $r['slug'], ($r['published'] ?? true) ? 1 : 0, $r['sort'], $r['title'], $r['meta_desc'], $r['kicker'], $r['h1'], $r['intro'], $r['image'] ?? null, $r['image_caption'] ?? null,
       json_encode($r['sections'], JSON_UNESCAPED_UNICODE), json_encode($r['faq'], JSON_UNESCAPED_UNICODE),
       $r['cta_label'], $r['cta_href'], $r['footer_target'], now(), now()]);
   }
@@ -3679,6 +3684,139 @@ function guideRows(): array {
       'text' => '[Platzhaltertext] Hier erkläre ich, nach welchen Kriterien ich Technik auswähle und warum mir Zuverlässigkeit wichtiger ist als das neueste Gerät.'],
      ['heading' => 'Was mich auszeichnet',
       'text' => '[Platzhaltertext] Insider-Einblick in meine Arbeitsweise – was ich anders mache als andere DJs.'],
+     ['heading' => 'Warum ich selten in meiner Heimatstadt auflege',
+      'text' => '[Platzhaltertext] Hier erkläre ich, warum es fast schon Zufall ist, wenn ich mal vor der eigenen Haustür spiele – und was das über meine Arbeitsweise sagt.'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
+
+  ['slug' => 'hochzeit-die-anders-lief', 'sort' => 60, 'published' => false,
+   'title' => 'Eine Hochzeit, die komplett anders lief als geplant | DJ Lauschgift, Hemer',
+   'meta_desc' => '[Platzhalter] Was passiert, wenn auf einer Hochzeit nichts nach Plan läuft? Eine ehrliche Geschichte aus meinem Berufsalltag als DJ.',
+   'kicker' => 'Backstage', 'h1' => 'Eine Hochzeit, die komplett anders lief als geplant',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Nicht jede Feier läuft nach Drehbuch. Hier erzähle ich, wie ich reagiert habe, als der Ablauf plötzlich über den Haufen geworfen wurde.',
+   'sections' => [
+     ['heading' => 'Was schiefging', 'text' => '[Platzhaltertext – Stichpunkte] – Was genau anders lief als geplant\n– Wann im Ablauf das passiert ist'],
+     ['heading' => 'Wie ich reagiert habe', 'text' => '[Platzhaltertext – Stichpunkte] – Deine Entscheidung im Moment\n– Warum genau diese Reaktion'],
+     ['heading' => 'Was ich daraus mitgenommen habe', 'text' => '[Platzhaltertext – Stichpunkte] – Lehre für zukünftige Auftritte\n– Was das über deine Arbeitsweise zeigt'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
+
+  ['slug' => 'warum-playlists-aus-dem-internet-selten-funktionieren', 'sort' => 70, 'published' => false,
+   'title' => 'Warum Playlists aus dem Internet auf Hochzeiten selten funktionieren | DJ Lauschgift, Hemer',
+   'meta_desc' => '[Platzhalter] Fertige Playlists aus dem Netz klingen gut, funktionieren live aber selten. Meine ehrliche Meinung dazu – und was stattdessen wirklich hilft.',
+   'kicker' => 'Backstage', 'h1' => 'Warum Playlists aus dem Internet auf Hochzeiten selten funktionieren',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Eine ehrliche Meinung zu den Standard-Playlists, die man überall im Netz findet.',
+   'sections' => [
+     ['heading' => 'Warum diese Playlists auf dem Papier gut aussehen', 'text' => '[Platzhaltertext – Stichpunkte] – Was diese Listen versprechen'],
+     ['heading' => 'Warum sie live oft nicht funktionieren', 'text' => '[Platzhaltertext – Stichpunkte] – Fehlender Bezug zum Publikum\n– Kein Gespür für den Moment'],
+     ['heading' => 'Was ich stattdessen mache', 'text' => '[Platzhaltertext – Stichpunkte] – Wie du live liest und reagierst'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
+
+  ['slug' => 'warum-ich-ohrstoepsel-trage', 'sort' => 80, 'published' => false,
+   'title' => 'Warum ich bei jedem Gig Ohrstöpsel trage | DJ Lauschgift, Hemer',
+   'meta_desc' => '[Platzhalter] Ein unscheinbares, aber ehrliches Detail aus meinem Berufsalltag: warum Gehörschutz für mich als DJ selbstverständlich ist.',
+   'kicker' => 'Backstage', 'h1' => 'Warum ich bei jedem Gig Ohrstöpsel trage',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Ein kleines, aber persönliches Detail aus meinem Alltag – und warum es mehr über meine Arbeitsweise sagt, als man denkt.',
+   'sections' => [
+     ['heading' => 'Warum Gehörschutz für mich selbstverständlich ist', 'text' => '[Platzhaltertext – Stichpunkte] – Seit wann du das machst\n– Was ohne Schutz passieren würde'],
+     ['heading' => 'Wie ich trotzdem den Sound im Blick behalte', 'text' => '[Platzhaltertext – Stichpunkte] – Welche Art Gehörschutz\n– Wie das die Qualität nicht beeinträchtigt'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
+
+  ['slug' => 'akku-statt-kabel-lichttechnik', 'sort' => 90, 'published' => false,
+   'title' => 'Akku statt Kabel – und warum ein paar wenige Strippen trotzdem den Unterschied machen | Lauschgift Veranstaltungstechnik, Hemer',
+   'meta_desc' => '[Platzhalter] Fast meine gesamte Tanzflächen- und Raumbeleuchtung läuft heute mit Akku statt Kabel. Wo trotzdem Kabel im Spiel sind – und warum das Absicht ist.',
+   'kicker' => 'Backstage', 'h1' => 'Akku statt Kabel – und warum ein paar wenige Strippen trotzdem den Unterschied machen',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Ein Blick hinter die Kulissen meiner Lichttechnik: was heute kabellos läuft, und wo ich bewusst noch auf Kabel setze.',
+   'sections' => [
+     ['heading' => 'Warum fast alles akkubetrieben läuft', 'text' => '[Platzhaltertext – Stichpunkte] – Vorteile für Aufbau und Location\n– Welche Geräte betroffen sind'],
+     ['heading' => 'Wo ich trotzdem auf Kabel setze', 'text' => '[Platzhaltertext – Stichpunkte] – Welche Situation das erfordert\n– Warum Zuverlässigkeit hier wichtiger ist als Bequemlichkeit'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'technik.html#anfrage', 'footer_target' => 'technik'],
+
+  ['slug' => '80er-90er-2000er-playlist', 'sort' => 100, 'published' => false,
+   'title' => '80er, 90er, 2000er – meine liebsten Jahrzehnte | DJ Lauschgift, Hemer',
+   'meta_desc' => '[Platzhalter] Meine liebsten Songs aus drei Jahrzehnten – ein Einblick in meinen Musikgeschmack als DJ, mit Playlists zum Reinhören.',
+   'kicker' => 'Backstage', 'h1' => '80er, 90er, 2000er – meine liebsten Jahrzehnte',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Drei Jahrzehnte, drei ganz unterschiedliche Stimmungen – hier bekommt ihr einen Einblick, was bei mir aus jeder Zeit hängen geblieben ist.',
+   'sections' => [
+     ['heading' => '80er', 'text' => '[Platzhaltertext] Kurzer Text zum 80er-Gefühl, dann Spotify-Playlist unten ergänzen.'],
+     ['heading' => '90er', 'text' => '[Platzhaltertext] Kurzer Text zum 90er-Gefühl, dann Spotify-Playlist unten ergänzen.'],
+     ['heading' => '2000er', 'text' => '[Platzhaltertext] Kurzer Text zum 2000er-Gefühl, dann Spotify-Playlist unten ergänzen.'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
+
+  ['slug' => 'hip-hop-rnb-deutscher-hip-hop', 'sort' => 110, 'published' => false,
+   'title' => 'Hip-Hop, R&B und deutscher Hip-Hop – meine Playlists | DJ Lauschgift, Hemer',
+   'meta_desc' => '[Platzhalter] Meine Lieblingssongs aus Hip-Hop, R&B und deutschem Hip-Hop – ein Einblick in einen wichtigen Teil meines Musikgeschmacks.',
+   'kicker' => 'Backstage', 'h1' => 'Hip-Hop, R&B und deutscher Hip-Hop',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Drei eng verwandte Welten, die bei mir regelmäßig laufen – auf der Tanzfläche und privat.',
+   'sections' => [
+     ['heading' => 'Hip-Hop', 'text' => '[Platzhaltertext] Kurzer Text, dann Spotify-Playlist unten ergänzen.'],
+     ['heading' => 'R&B', 'text' => '[Platzhaltertext] Kurzer Text, dann Spotify-Playlist unten ergänzen.'],
+     ['heading' => 'Deutscher Hip-Hop', 'text' => '[Platzhaltertext] Kurzer Text, dann Spotify-Playlist unten ergänzen.'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
+
+  ['slug' => 'partyklassiker-playlist', 'sort' => 120, 'published' => false,
+   'title' => 'Partyklassiker – Songs, die auf keiner Feier fehlen dürfen | DJ Lauschgift, Hemer',
+   'meta_desc' => '[Platzhalter] Die Songs, die auf so gut wie jeder Feier funktionieren – ein Einblick in meine bewährte Partyklassiker-Playlist.',
+   'kicker' => 'Backstage', 'h1' => 'Partyklassiker – Songs, die auf keiner Feier fehlen dürfen',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Es gibt Songs, die einfach immer funktionieren – hier ein Einblick in meine bewährtesten Partyklassiker.',
+   'sections' => [
+     ['heading' => 'Warum diese Songs immer funktionieren', 'text' => '[Platzhaltertext – Stichpunkte] – Was sie gemeinsam haben'],
+     ['heading' => 'Meine Partyklassiker-Playlist', 'text' => '[Platzhaltertext] Kurzer Text, dann Spotify-Playlist unten ergänzen.'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
+
+  ['slug' => 'rock-metal-playlist', 'sort' => 130, 'published' => false,
+   'title' => 'Rock & Metal – meine Gitarrenmusik-Playlist | DJ Lauschgift, Hemer',
+   'meta_desc' => '[Platzhalter] Rock und Metal sind ein fester Teil meines Musikgeschmacks – ein Einblick in meine liebsten Gitarrenmusik-Songs.',
+   'kicker' => 'Backstage', 'h1' => 'Rock & Metal – meine Gitarrenmusik-Playlist',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Nicht jeder erwartet das von einem DJ – aber Gitarrenmusik ist ein fester Teil von mir.',
+   'sections' => [
+     ['heading' => 'Meine Rock- & Metal-Playlist', 'text' => '[Platzhaltertext] Kurzer Text, dann Spotify-Playlist unten ergänzen.'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
+
+  ['slug' => 'electronic-classics-playlist', 'sort' => 140, 'published' => false,
+   'title' => 'Electronic Classics – meine elektronische Musikwelt | DJ Lauschgift, Hemer',
+   'meta_desc' => '[Platzhalter] Ein Einblick in meine elektronische Musikwelt – von den Klassikern, die bis heute nachwirken.',
+   'kicker' => 'Backstage', 'h1' => 'Electronic Classics – meine elektronische Musikwelt',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Elektronische Musik ist bei mir ein großes Feld – hier bewusst breit gehalten, damit ihr einen ersten Einblick bekommt.',
+   'sections' => [
+     ['heading' => 'Electronic Classics', 'text' => '[Platzhaltertext] Kurzer Text, dann Spotify-Playlist unten ergänzen.'],
+   ],
+   'faq' => [],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
+
+  ['slug' => 'hifi-favoriten-playlist', 'sort' => 150, 'published' => false,
+   'title' => 'Hi-Fi-Favoriten – Musik, die ich privat höre | DJ Lauschgift, Hemer',
+   'meta_desc' => '[Platzhalter] Abseits der Tanzfläche: die Musik, die ich privat und in bester Klangqualität höre – ein persönlicherer Einblick.',
+   'kicker' => 'Backstage', 'h1' => 'Hi-Fi-Favoriten – Musik, die ich privat höre',
+   'image' => null,
+   'intro' => '[Platzhaltertext – bitte im Backoffice anpassen] Nicht jede Playlist ist für die Tanzfläche gedacht – das hier ist meine private, audiophile Seite.',
+   'sections' => [
+     ['heading' => 'Meine Hi-Fi-Favoriten', 'text' => '[Platzhaltertext] Kurzer Text, dann Spotify-Playlist unten ergänzen.'],
    ],
    'faq' => [],
    'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'index.html#anfrage', 'footer_target' => 'index'],
