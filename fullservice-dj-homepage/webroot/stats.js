@@ -10,7 +10,19 @@
     }catch(e){}
   }
   var page=location.pathname.split('/').pop()||'index.html';
-  send(JSON.stringify({p:page,r:document.referrer||''}));
+  /* Kampagnen-Zuordnung (z. B. Instagram-Anzeigen): utm_source/utm_campaign aus dem Link,
+     fuer die Dauer des Besuchs im sessionStorage gemerkt (kein Cookie, nichts dauerhaftes -
+     verschwindet mit dem Tab), damit ein spaeterer Klick auf "Anfrage senden" derselben
+     Kampagne zugerechnet wird wie der Seitenaufruf, der den Besuch ausgeloest hat. */
+  var utm=(function(){
+    try{
+      var q=new URLSearchParams(location.search);
+      var src=q.get('utm_source'),camp=q.get('utm_campaign');
+      if(src||camp){var u=(src||'')+(camp?'/'+camp:'');sessionStorage.setItem('lg_utm',u);return u}
+      return sessionStorage.getItem('lg_utm')||'';
+    }catch(e){return ''}
+  })();
+  send(JSON.stringify({p:page,r:document.referrer||'',u:utm}));
 
   var start=Date.now(),maxScroll=0,sent=false;
   function scrollPct(){
@@ -29,7 +41,7 @@
 
   document.addEventListener('click',function(ev){
     var el=ev.target.closest&&ev.target.closest('[data-stat]');
-    if(el)send(JSON.stringify({k:el.getAttribute('data-stat')}));
+    if(el)send(JSON.stringify({k:el.getAttribute('data-stat'),u:utm}));
   },true);
-  window.Stat={click:function(key){send(JSON.stringify({k:key}))}};
+  window.Stat={click:function(key){send(JSON.stringify({k:key,u:utm}))}};
 })();

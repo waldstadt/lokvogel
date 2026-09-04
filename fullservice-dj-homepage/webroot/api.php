@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 104;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 105;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1103,6 +1103,11 @@ function upgrade(PDO $p): void {
        statsEngageDdl()). */
     foreach (statsEngageDdl() as $sql) { try { $p->exec($sql); } catch (PDOException $e) {} }
   }
+  if ($v < 105) {
+    /* v105: Kampagnen-Zuordnung (utm_source/utm_campaign, z. B. aus Instagram-Anzeigen) -
+       zeigt, wie viele Seitenaufrufe und Klicks auf wichtige Buttons je Kampagne kamen. */
+    try { $p->exec(statsUtmDdl()); } catch (PDOException $e) {}
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1217,6 +1222,13 @@ function statsEngageDdl(): array {
       n integer not null default 0, primary key (day, k))",
   ];
 }
+/* Kampagnen-Zuordnung (v105): pro Tag und Kampagne, wie viele Seitenaufrufe ('_view') und
+   wie viele Klicks auf wichtige Buttons (k als "kind") dazu kamen - reicht, um z. B. eine
+   Instagram-Anzeige gegen eine andere zu vergleichen. */
+function statsUtmDdl(): string {
+  return "create table if not exists stats_utm (day text not null, campaign text not null,
+    kind text not null, n integer not null default 0, primary key (day, campaign, kind))";
+}
 /* Taeglich wechselnder anonymer Besucher-Hash: IP + User-Agent + Tagesdatum + ein einmalig
    erzeugtes Pfeffer-Geheimnis (nie mit der IP zusammen gespeichert) ergeben einen Hash, der
    sich am naechsten Tag automatisch aendert - eine Wiedererkennung ueber den Tag hinaus ist
@@ -1235,6 +1247,14 @@ function statsVisitorHash(PDO $p, string $day): string {
   $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
   $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
   return hash('sha256', $day . '|' . $ip . '|' . $ua . '|' . statsPepper($p));
+}
+function statsUtmBump(PDO $p, string $day, string $campaign, string $kind): void {
+  $u = $p->prepare('update stats_utm set n = n + 1 where day=? and campaign=? and kind=?');
+  $u->execute([$day, $campaign, $kind]);
+  if (!$u->rowCount()) {
+    try { $p->prepare('insert into stats_utm (day, campaign, kind, n) values (?,?,?,1)')->execute([$day, $campaign, $kind]); }
+    catch (PDOException $e) { $u->execute([$day, $campaign, $kind]); }
+  }
 }
 
 /* Vermittlungs-Mail „Termin belegt" – eine Quelle für Seed und Migration */
@@ -3463,6 +3483,7 @@ SQL);
   foreach (workshopsDdl() as $sql) $p->exec($sql);
   $p->exec(discountCodesDdl());
   foreach (statsEngageDdl() as $sql) $p->exec($sql);
+  $p->exec(statsUtmDdl());
   $p->exec(paymentsDdl());
   foreach (docIndexDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
@@ -7427,6 +7448,7 @@ try {
     /* Drei Signale ueber denselben Endpunkt, unterschieden am Feld: 'k' = Klick auf ein
        benanntes Element, 't' = Verweildauer+Scrolltiefe beim Verlassen der Seite, sonst
        der urspruengliche Seitenaufruf. Alle drei bleiben rein anonym (siehe statsVisitorHash). */
+    $campaign = mb_substr(preg_replace('/[^a-zA-Z0-9_\/-]/', '', (string)($b['u'] ?? '')), 0, 60);
     if (isset($b['k'])) {
       $k = mb_substr(preg_replace('/[^a-z0-9_-]/', '', strtolower((string)$b['k'])), 0, 40);
       if ($k === '') out(['ok' => true]);
@@ -7436,6 +7458,7 @@ try {
         try { $p->prepare('insert into stats_clicks (day, k, n) values (?,?,1)')->execute([$day, $k]); }
         catch (PDOException $e) { $u->execute([$day, $k]); }
       }
+      if ($campaign !== '') statsUtmBump($p, $day, $campaign, $k);
       out(['ok' => true]);
     }
     $page = strtolower((string)($b['p'] ?? ''));
@@ -7466,6 +7489,7 @@ try {
       $h = statsVisitorHash($p, $day);
       $p->prepare('insert or ignore into stats_uniques (day, hash) values (?,?)')->execute([$day, $h]);
     } catch (Throwable $e) {}
+    if ($campaign !== '') statsUtmBump($p, $day, $campaign, '_view');
     out(['ok' => true]);
   }
   /* Statistik-Übersicht fürs Backoffice */
@@ -7490,6 +7514,21 @@ try {
     }
     unset($e);
     $clicks = $q("select k, sum(n) as n from stats_clicks where day >= ? group by k order by n desc limit 12");
+    /* Kampagnen (utm_source/utm_campaign, z. B. Instagram-Anzeigen): Aufrufe ('_view') und
+       Klicks auf wichtige Buttons je Kampagne, damit sich Anzeigen gegeneinander vergleichen
+       lassen statt nur "Aufrufe von instagram.com" zu sehen (Instagrams In-App-Browser
+       schickt oft gar keinen Referrer mehr mit - UTM ist hier die verlaessliche Angabe). */
+    $utmRows = $q("select campaign, kind, sum(n) as n from stats_utm where day >= ? group by campaign, kind");
+    $utm = [];
+    foreach ($utmRows as $row) {
+      $c = $row['campaign'];
+      if (!isset($utm[$c])) $utm[$c] = ['campaign' => $c, 'views' => 0, 'conversions' => 0];
+      if ($row['kind'] === '_view') $utm[$c]['views'] += (int)$row['n'];
+      else $utm[$c]['conversions'] += (int)$row['n'];
+    }
+    $utm = array_values($utm);
+    usort($utm, fn($a, $b) => $b['views'] <=> $a['views']);
+    $utm = array_slice($utm, 0, 12);
     out([
       'days' => $days,
       'daily' => $daily,
@@ -7499,6 +7538,7 @@ try {
       'uniq_daily' => $uniqDaily,
       'engage' => $engage,
       'clicks' => $clicks,
+      'utm' => $utm,
       'views_total' => array_sum(array_column($daily, 'views')),
       'uniques_total' => array_sum(array_column($uniqDaily, 'n')),
       'inquiries_total' => array_sum(array_column($inqDaily, 'n')),

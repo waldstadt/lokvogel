@@ -744,6 +744,9 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
       <div class="card"><h3>Verweildauer &amp; Scrolltiefe je Seite <span class="mut sml" style="font-weight:400">(Durchschnitt aus den „Verlassen"-Meldungen)</span></h3><div id="webEngage" class="sml mut">–</div></div>
       <div class="card"><h3>Klicks auf wichtige Buttons</h3><div id="webClicks" class="sml mut">–</div></div>
     </div>
+    <div class="card"><h3>Kampagnen <span class="mut sml" style="font-weight:400">(Links mit ?utm_source=…&amp;utm_campaign=…, z. B. aus Instagram-Anzeigen)</span></h3>
+      <div class="tbl-wrap"><table><thead><tr><th>Kampagne</th><th class="num">Aufrufe</th><th class="num">Klicks auf wichtige Buttons</th></tr></thead><tbody id="webUtm"></tbody></table></div>
+      <div class="mut sml" style="margin-top:8px">Ohne utm-Parameter im Link taucht ein Besuch hier nicht auf – normale Seitenaufrufe zählen wie gehabt oben mit.</div></div>
   </div>
 
   <!-- TECHNIK -->
@@ -7600,6 +7603,9 @@ function loadWebStats(){
       document.getElementById('webClicks').innerHTML=(j.clicks||[]).map(function(c){
         return '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+esc(CLICK_LABELS[c.k]||c.k)+'<span style="float:right">'+c.n+'</span></div>';
       }).join('')||'Noch keine Klicks erfasst.';
+      document.getElementById('webUtm').innerHTML=(j.utm||[]).map(function(u){
+        return '<tr><td>'+esc(u.campaign)+'</td><td class="num">'+u.views+'</td><td class="num">'+u.conversions+'</td></tr>';
+      }).join('')||'<tr><td colspan="3" class="mut">Noch keine Kampagnen-Aufrufe – Link mit ?utm_source=instagram&utm_campaign=name teilen.</td></tr>';
     }).catch(function(){});
 }
 var CLICK_LABELS={whatsapp:'WhatsApp-Button',rueckruf:'Rückruf angefordert',anfrage:'Kontaktformular abgeschickt',
