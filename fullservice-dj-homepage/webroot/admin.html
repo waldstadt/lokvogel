@@ -10365,11 +10365,12 @@ function edApply(){
 /* ===== Aufbau der Startseite: Bereiche und Module in EINER Liste
    (site_content.sections = {hidden:[…], order:[…]}) ===== */
 /* Muss zu DEFAULT_SECTION_ORDER in index.html passen - Hero und Anfrage sind fest. */
-var HOME_SECTION_ORDER_DEFAULT=['ueber','leistungen','ablauf','galerie','bewertungen','garantie','technik','locations','freunde','partner','faq'];
-var HOME_SECTIONS=[['ueber','Über mich'],['leistungen','Leistungen'],['ablauf','Ablauf'],['galerie','Galerie'],
+var HOME_SECTION_ORDER_DEFAULT=['ueber','leistungen','ablauf','backstage','galerie','bewertungen','garantie','technik','locations','freunde','partner','faq'];
+var HOME_SECTIONS=[['ueber','Über mich'],['leistungen','Leistungen'],['ablauf','Ablauf'],['backstage','Backstage'],['galerie','Galerie'],
   ['bewertungen','Bewertungen'],['garantie','Garantie'],['technik','Technik-Teaser'],['locations','Locations'],
   ['freunde','Freunde'],['partner','Logo-Leisten'],['faq','FAQ']];
-/* Welche Karte weiter unten die Texte pflegt - "Ablauf" hat feste Texte, darum keine. */
+/* Welche Karte weiter unten die Texte pflegt - "Ablauf" hat feste Texte, darum keine; "Backstage"
+   pflegt sich nicht ueber eine CMS-Karte, sondern ueber die eigene Backstage-Seite (Beitraege). */
 var HOME_SECTION_CARDS={hero:'cms-hero',ueber:'cms-ueber',leistungen:'cms-leistungen',galerie:'cms-galerie',
   bewertungen:'cms-bewertungen',garantie:'cms-garantie',technik:'cms-technik',locations:'cms-locations',
   freunde:'cms-freunde',partner:'cms-partner',faq:'cms-faq',anfrage:'cms-kontakt'};
@@ -10513,7 +10514,8 @@ function renderSectionsCard(){
     var g=groups.find(function(x){return x.anchor===id});
     html+='<div class="aufb-sec'+(on?'':' off')+'"'+abDdAttrs('sec',id)+'>'+ddGrip()+
       '<span class="aufb-name">'+esc(homeSectionName(id))+(on?'':' <span class="mut sml" style="font-weight:400">ausgeblendet</span>')+'</span>'+
-      (card?'<a class="sml" style="font-weight:400" onclick="gotoSetting(\''+card+'\')">Bearbeiten</a>':'<span class="mut sml" style="font-weight:400">feste Texte</span>')+
+      (id==='backstage'?'<a class="sml" style="font-weight:400" onclick="showPage(\'guides\')">Beiträge verwalten</a>'
+        :card?'<a class="sml" style="font-weight:400" onclick="gotoSetting(\''+card+'\')">Bearbeiten</a>':'<span class="mut sml" style="font-weight:400">feste Texte</span>')+
       aufbMv('moveSection',id)+
       '<span class="b '+(on?'green':'grey')+'" style="cursor:pointer" title="Klicken zum Ein-/Ausschalten" onclick="toggleSection(\''+id+'\')">'+(on?'an':'aus')+'</span></div>';
     html+='<div class="aufb-grp"'+abDropAttrs('grp',id)+'>'+g.list.map(modulZeile).join('')+
