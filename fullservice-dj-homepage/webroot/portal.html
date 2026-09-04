@@ -1237,8 +1237,8 @@ function planCard(b,i){
     planRow(b.id,k('vphone'),'basics.venue_contact_phone','Telefon Location',{val:bas.venue_contact_phone,empty:!bas.venue_contact_phone,locked:locked})+
     planRow(b.id,k('setup'),'basics.setup_from','Aufbau ab',{val:bas.setup_from,empty:!bas.setup_from,locked:locked})+
     planRow(b.id,k('teardown'),'basics.teardown_until','Abbau bis',{val:bas.teardown_until,empty:!bas.teardown_until,locked:locked})+
-    planRow(b.id,k('invcompany'),'invoice.company','Firma (Rechnung)',{val:inv.company,empty:!invRaw.company,locked:locked})+
-    planRow(b.id,k('invname'),'invoice.name','Name (Rechnung)',{val:inv.name,empty:!invRaw.name,locked:locked})+
+    planRow(b.id,k('invcompany'),'invoice.company','Firma (Rechnung/Angebot)',{val:inv.company,empty:!invRaw.company,locked:locked})+
+    planRow(b.id,k('invname'),'invoice.name','Name (Rechnung/Angebot)',{val:inv.name,empty:!invRaw.name,locked:locked})+
     planRow(b.id,k('invstreet'),'invoice.street','Straße',{val:inv.street,empty:!invRaw.street,locked:locked})+
     planRow(b.id,k('invzip'),'invoice.zip_city','PLZ Ort',{val:inv.zip_city,empty:!invRaw.zip_city,locked:locked})+
     planRow(b.id,k('musts'),'music.musts','Musik-Musts',{val:mus.musts,empty:!mus.musts,locked:locked})+

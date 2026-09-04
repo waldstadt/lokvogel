@@ -251,6 +251,8 @@ table.ep tr.hl td.ep-name{box-shadow:inset 3px 0 0 var(--acc);padding-left:8px}
 
 /* Timeline */
 .tl-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+tr.neu td{background:rgba(255,111,91,.14)}
+.tl-item.unread{background:rgba(255,111,91,.14);box-shadow:inset 3px 0 0 var(--acc);padding-left:9px}
 .tl-ico{width:30px;height:30px;border-radius:50%;background:var(--cd2);border:1px solid var(--bdr);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
 .tl-body{flex:1;min-width:0}
 .tl-meta{font-size:10px;color:var(--gl)}
@@ -2170,7 +2172,7 @@ function renderInq(){
     var rueckruf=i.source==='rueckruf';
     if(rueckruf){
       var wz=(String(i.message||'').match(/Wunschzeit:\s*(.+)/)||[])[1]||'';
-      return '<tr><td>'+dtt(i.created_at)+'</td><td><b>'+esc(i.name)+'</b> <span class="b blue">Rückruf</span><br>'+
+      return '<tr'+(i.status==='neu'?' class="neu"':'')+'><td>'+dtt(i.created_at)+'</td><td><b>'+esc(i.name)+'</b> <span class="b blue">Rückruf</span><br>'+
         '<a href="tel:'+esc(String(i.phone||'').replace(/[^\d+]/g,''))+'" style="font-size:19px;font-weight:700;letter-spacing:.02em">'+esc(i.phone||'–')+'</a></td>'+
         '<td>Wunschzeit: '+esc(wz||'egal')+'</td><td>–</td>'+
         '<td><span class="b '+(INQ_BADGE[i.status]||'grey')+'">'+i.status.replace('_',' ')+'</span></td>'+
@@ -2178,7 +2180,7 @@ function renderInq(){
         (i.status==='erledigt'||i.status==='archiviert'?'':'<button class="btn sm" onclick="setInqStatus(\''+i.id+'\',\'erledigt\')">Erledigt</button> ')+
         (i.customer_id?'<button class="btn g sm" onclick="openCustDetail(\''+i.customer_id+'\')">Zum Kunden</button>':'')+'</td></tr>';
     }
-    return '<tr><td>'+dtt(i.created_at)+'</td><td><b>'+esc(i.name)+'</b><br><span class="mut sml">'+esc(i.email||'')+' '+esc(i.phone||'')+'</span></td>'+
+    return '<tr'+(i.status==='neu'?' class="neu"':'')+'><td>'+dtt(i.created_at)+'</td><td><b>'+esc(i.name)+'</b><br><span class="mut sml">'+esc(i.email||'')+' '+esc(i.phone||'')+'</span></td>'+
     '<td>'+esc(i.event_type||'–')+'</td>'+
     '<td>'+dt(i.event_date)+
       (eilig?' <span class="b red" title="Termin steht kurz bevor">bald</span>':'')+
@@ -2391,7 +2393,7 @@ function renderComms(){
   var all=list.concat(inbox).sort(function(a,b){return (b.at||'').localeCompare(a.at||'')});
   document.getElementById('cdComms').innerHTML=all.map(function(x){
     if(x.kind==='mail'){var m=x.m;
-      return '<div class="tl-item"><div class="tl-ico">'+CH_ICON.email+'</div><div class="tl-body">'+
+      return '<div class="tl-item'+(m.seen?'':' unread')+'"><div class="tl-ico">'+CH_ICON.email+'</div><div class="tl-body">'+
         '<div class="tl-meta">E-Mail eingehend · '+dtt(m.date_at)+(m.seen?'':' · <span style="color:var(--yel)">ungelesen</span>')+'</div>'+
         '<div class="tl-sub">'+esc(m.subject||'(kein Betreff)')+'</div>'+
         (m.body_text?'<div class="tl-txt">'+esc(m.body_text.slice(0,600))+(m.body_text.length>600?' …':'')+'</div>':'')+
@@ -2457,7 +2459,8 @@ function mailCustName(id){var c=(CACHE.customers||[]).find(function(x){return x.
 function mailRowHtml(m){
   var known=m.customer_id?mailCustName(m.customer_id):null;
   var accLabel=m.account==='system'?'System':'Persönlich';
-  return '<div class="tl-item"><div class="tl-ico">'+CH_ICON.email+'</div><div class="tl-body">'+
+  var unread=m.direction==='in'&&!m.seen;
+  return '<div class="tl-item'+(unread?' unread':'')+'"><div class="tl-ico">'+CH_ICON.email+'</div><div class="tl-body">'+
     '<div class="tl-meta">'+(m.direction==='out'?'Gesendet an ':'Von ')+esc(mailPartyName(m))+' · '+accLabel+' · '+dtt(m.date_at)+
       (m.direction==='in'&&!m.seen?' · <span style="color:var(--yel)">ungelesen</span>':'')+
       (known?' · <a onclick="openCustDetail(\''+m.customer_id+'\')">'+esc(known)+'</a>'
@@ -3497,8 +3500,8 @@ function openPlanModal(){
     '<div><label>Abbau bis</label><input type="time" id="pTeardown" value="'+(bas.teardown_until||'')+'" style="max-width:160px"></div>'+
     '<h4 style="margin:14px 0 6px">Rechnungsadresse</h4>'+
     '<div class="mut sml" style="margin-bottom:6px">Leere Felder sind mit den Kundendaten vorbefüllt – beim Speichern wird das direkt übernommen.</div>'+
-    '<div class="grid2"><div><label>Firma</label><input id="pInvCompany" value="'+esc(inv.company||'')+'"></div>'+
-    '<div><label>Name</label><input id="pInvName" value="'+esc(inv.name||'')+'"></div></div>'+
+    '<div class="grid2"><div><label>Firma (Rechnung/Angebot)</label><input id="pInvCompany" value="'+esc(inv.company||'')+'"></div>'+
+    '<div><label>Name (Rechnung/Angebot)</label><input id="pInvName" value="'+esc(inv.name||'')+'"></div></div>'+
     '<div class="grid2"><div><label>Straße</label><input id="pInvStreet" value="'+esc(inv.street||'')+'"></div>'+
     '<div><label>PLZ Ort</label><input id="pInvZip" value="'+esc(inv.zip_city||'')+'"></div></div>'+
     '<h4 style="margin:14px 0 6px">Musik &amp; Playlist</h4>'+
@@ -8267,15 +8270,43 @@ function formSendMail(formId,reminder){
   openCompose({name:custName(c),email:c.email,customer_id:c.id,booking_id:b.id||null,event_date:b.event_date||null,location:b.venue_name||'',event_type:b.event_type||b.title||'',
     _link:link,_titel:f.title,_title:(reminder?'Erinnerung: ':'')+'Fragebogen „'+esc(f.title)+'“ per E-Mail',_doc:true},tpl,link,null);
 }
-/* Kundenseite: Vorlage waehlen, Bogen fuer diesen Kunden anlegen, Compose oeffnen. */
+/* Kundenseite: Vorlage waehlen, aber direkt hier fuer diesen einen Kunden anpassen koennen
+   (Titel, Einleitung, einzelne Fragen) - die Vorlage selbst bleibt unangetastet, es wird nur
+   der Bogen dieses Kunden veraendert. Nutzt denselben Zeileneditor wie die Vorlagenpflege
+   (FT_ROWS/ftRender/parseFtFields), nur mit einer Vorlagen-Auswahl obendrauf. */
 function custFormSend(){
   var c=curCust;if(!c)return;
   if(!(CACHE.formTpls||[]).length){toast('Noch keine Bogen-Vorlage – unter Fragebögen anlegen.',1);return}
   openModal('Fragebogen senden – '+esc(custName(c)),
-    '<label>Vorlage</label><select id="cfTpl">'+(CACHE.formTpls||[]).map(function(t){return '<option value="'+t.id+'">'+esc(t.name)+' ('+(t.fields||[]).length+' Fragen)</option>'}).join('')+'</select>'+
+    '<label>Vorlage als Ausgangspunkt</label><select id="cfTpl" onchange="cfLoadTpl()">'+(CACHE.formTpls||[]).map(function(t){return '<option value="'+t.id+'">'+esc(t.name)+' ('+(t.fields||[]).length+' Fragen)</option>'}).join('')+'</select>'+
+    '<label>Titel</label><input id="ftName">'+
+    '<label>Einleitung</label><textarea id="ftIntro" style="min-height:56px"></textarea>'+edBtn('ftIntro')+
+    '<label>Fragen</label><div id="ftRows"></div>'+
+    '<div style="margin-top:8px"><button class="btn g sm" onclick="ftAdd()">+ Frage</button> <span class="mut sml">Änderungen hier gelten nur für den Bogen von '+esc(custName(c))+' – die Vorlage bleibt unverändert.</span></div>'+
     (c.email?'':'<div class="msg err" style="margin-top:10px">Der Kunde hat keine E-Mail-Adresse – der Link wird stattdessen kopiert.</div>')+
-    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="createForm(v(\'cfTpl\'),null,\''+c.id+'\',function(f){formSendMail(f.id)})">Bogen anlegen &amp; per E-Mail senden</button>'+
-    '<button class="btn g" onclick="createForm(v(\'cfTpl\'),null,\''+c.id+'\',function(f){closeModal();copyFormLink(f.token)})">Nur Link kopieren</button></div>');
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="cfSend(\''+c.id+'\',true)">Anlegen &amp; per E-Mail senden</button>'+
+    '<button class="btn g" onclick="cfSend(\''+c.id+'\',false)">Nur Link kopieren</button></div>');
+  cfLoadTpl();
+}
+function cfLoadTpl(){
+  var t=(CACHE.formTpls||[]).find(function(x){return x.id===v('cfTpl')})||(CACHE.formTpls||[])[0];
+  if(!t)return;
+  document.getElementById('ftName').value=t.name||'';
+  document.getElementById('ftIntro').value=t.intro||'';
+  FT_ROWS=(t.fields||[]).map(function(f){return {label:f.label||'',type:f.type||'text',options:(f.options||[]).join(', '),required:!!f.required,key:f.key||''}});
+  if(!FT_ROWS.length)FT_ROWS.push({label:'',type:'text',options:'',required:false,key:''});
+  ftRender();
+}
+function cfSend(custId,sendMail){
+  if(!v('ftName')){toast('Titel fehlt.',1);return}
+  var token=hexToken();
+  api('forms',{method:'POST',prefer:'return=representation',body:{
+    token:token,title:v('ftName'),intro:document.getElementById('ftIntro').value,fields:parseFtFields(),
+    customer_id:custId
+  }}).then(function(rows){
+    CACHE.forms.unshift(rows[0]);renderForms();
+    if(sendMail)formSendMail(rows[0].id);else{closeModal();copyFormLink(token)}
+  }).catch(function(e){toast(e.message,1)});
 }
 function createForm(tplId,inqId,custId,cb){
   tplId=tplId||v('nfTpl');
