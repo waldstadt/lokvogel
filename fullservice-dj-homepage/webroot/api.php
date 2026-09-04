@@ -1109,10 +1109,15 @@ function upgrade(PDO $p): void {
     try { $p->exec(statsUtmDdl()); } catch (PDOException $e) {}
   }
   if ($v < 106) {
-    /* v106: neue Aktionsseite "bars-kneipen" (DJ-Abende, Technik/Techniker fuer Locations,
-       Sound-Support fuer Singer-Songwriter) - seedCampaignPages() ueberspringt per
-       Slug-Abgleich alle bereits vorhandenen Seiten, legt also nur die neue an. */
+    /* v106: neue Aktionsseite "technik-vor-ort" (Technik & Techniker fuer Bars/Kneipen/
+       Locations, Sound-Support fuer Singer-Songwriter - bewusst ohne eigenen DJ-Auftritt,
+       siehe Markus' Feedback) - seedCampaignPages() ueberspringt per Slug-Abgleich alle
+       bereits vorhandenen Seiten, legt also nur die neue an. */
     try { seedCampaignPages($p); } catch (PDOException $e) {}
+    /* Bundesweite Reichweite (Partner-DJ-Netzwerk) als zusaetzlicher Punkt auf den
+       Firmen-Aktionsseiten - nur angehaengt, falls noch nicht vorhanden, damit eigene
+       Aenderungen von Markus an diesen Seiten erhalten bleiben. */
+    try { addFilialistenPitch($p); } catch (PDOException $e) {}
   }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -2830,6 +2835,29 @@ function seedCampaignPages(PDO $p): void {
   }
 }
 
+/* Haengt den Filialisten-Punkt ("bundesweit unterwegs, Partner-Netzwerk") an die Firmen-
+   Aktionsseiten an - nur wenn er noch nicht drinsteht, damit Markus' eigene Aenderungen an
+   diesen laengst live laufenden Seiten unangetastet bleiben. */
+function addFilialistenPitch(PDO $p): void {
+  $bullets = [
+    'messe' => 'Auch für mehrere Stände oder Standorte gleichzeitig – über mein Partner-Netzwerk ein fester Ansprechpartner für alle Filialen',
+    'produktpraesentation' => 'Auch bei mehreren Standorten gleichzeitig – über mein Partner-Netzwerk ein fester Ansprechpartner für alle Filialen',
+    'firmensommerfest' => 'Auch bundesweit an mehreren Standorten – über mein Partner-Netzwerk ein fester Ansprechpartner für alle Filialen',
+    'betriebsversammlung' => 'Auch bei mehreren Standorten – über mein Partner-Netzwerk ein fester Ansprechpartner für alle Filialen',
+  ];
+  $sel = $p->prepare('select id, features from campaign_pages where slug = ?');
+  $upd = $p->prepare('update campaign_pages set features = ?, updated_at = ? where id = ?');
+  foreach ($bullets as $slug => $bullet) {
+    $sel->execute([$slug]);
+    $row = $sel->fetch();
+    if (!$row) continue;
+    $features = json_decode((string)$row['features'], true) ?: [];
+    if (in_array($bullet, $features, true)) continue;
+    $features[] = $bullet;
+    $upd->execute([json_encode($features, JSON_UNESCAPED_UNICODE), now(), $row['id']]);
+  }
+}
+
 function campaignPageRows(): array {
   return [
 
@@ -2957,6 +2985,7 @@ function campaignPageRows(): array {
      'Strom- und Stellplatz-Planung vorab',
      'Absprache zu Lautstärke und Ruhezeiten',
      'Auf- und Abbau passend zu eurem Ablauf',
+     'Auch bundesweit an mehreren Standorten – über mein Partner-Netzwerk ein fester Ansprechpartner für alle Filialen',
    ],
    'pricenote' => 'Sommerfeste liegen oft auf einem Donnerstag oder Freitagnachmittag – genau die Termine, die ich günstiger anbieten kann als einen Samstagabend in der Hochsaison. Nennt mir euren Wunschtermin, ich rechne es ehrlich durch.',
    'form_kicker' => 'Termin sichern', 'form_h2' => 'Wann feiert ihr?',
@@ -2990,6 +3019,7 @@ function campaignPageRows(): array {
      'Laptop-Anschluss für Präsentationston',
      'Auf- und Abbau im Zeitfenster eures Betriebs',
      'Auf Wunsch bleibe ich da und fahre den Ton',
+     'Auch bei mehreren Standorten – über mein Partner-Netzwerk ein fester Ansprechpartner für alle Filialen',
    ],
    'pricenote' => 'Termine unter der Woche und tagsüber sind mein Alltag, kein Zuschlag-Fall – genau solche Einsätze sind bei mir günstiger als jede Samstagnacht. Ihr bekommt vorher einen Festpreis.',
    'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist eure Versammlung?',
@@ -3058,6 +3088,7 @@ function campaignPageRows(): array {
      'Ton für Monitore und Produktvideos',
      'Auf- und Abbau nach den Zeitfenstern des Veranstalters',
      'Betreut während der Messe oder mit Einweisung fürs Standpersonal',
+     'Auch für mehrere Stände oder Standorte gleichzeitig – über mein Partner-Netzwerk ein fester Ansprechpartner für alle Filialen',
    ],
    'pricenote' => 'Messen laufen werktags – für mich die besten Termine im Kalender, und das merkt ihr am Preis. Sagt mir Messe, Standgröße und was ihr vorhabt, ihr bekommt einen Festpreis.',
    'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist eure Messe?',
@@ -3157,6 +3188,7 @@ function campaignPageRows(): array {
      'Ablauf-Abstimmung mit Marketing oder Agentur',
      'Diskretes Auftreten vor euren Kunden',
      'Ein fester Ansprechpartner von Planung bis Abbau',
+     'Auch bei mehreren Standorten gleichzeitig – über mein Partner-Netzwerk ein fester Ansprechpartner für alle Filialen',
    ],
    'pricenote' => 'Solche Termine liegen fast immer unter der Woche – für mich die besten Termine im Kalender, und das rechnet sich für euch. Nennt mir Anlass und Rahmen, ihr bekommt einen Festpreis.',
    'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist euer Termin?',
@@ -3270,40 +3302,40 @@ function campaignPageRows(): array {
      'wa_text' => 'Hallo {inhaber}, es geht um einen Tontechnik-Workshop: '],
    'footer_target' => 'technik'],
 
-  ['slug' => 'bars-kneipen', 'sort' => 140, 'accent' => '#c9506f', 'accent2' => '#dc7f96', 'btn_txt' => '#2b0d15',
-   'page_title' => 'DJ-Abende & Technik für Bars, Kneipen und Live-Musik | DJ Lauschgift, Hemer',
-   'meta_desc' => 'Fester DJ-Abend für eure Bar oder Kneipe, Technik & Techniker für eure Location, sauberer Sound für Singer-Songwriter – aus der Praxis, u. a. im Ufer 39, im Neuhaus und in der Speisekammer Dortmund.',
-   'badge' => 'Aus der Praxis: u. a. im Ufer 39, im Neuhaus und in der Speisekammer Dortmund',
-   'h1_line1' => 'Eure Location soll klingen.', 'h1_line2' => 'Als DJ oder mit der passenden Technik.',
-   'sub' => 'Ich bin Markus – seit 23 Jahren DJ, dazu Technik-Verleih und Techniker-Einsätze für Bars, Kneipen und Locations mit Live-Musik. Ob ihr einen festen DJ-Abend sucht, eure Anlage gewartet oder verliehen haben wollt, oder als Singer-Songwriter einen sauberen Sound braucht: Ich kenne den Alltag hinterm Tresen, unter anderem aus Abenden im Ufer 39, im Neuhaus und in der Speisekammer Dortmund.',
-   'kicker1' => 'Drei Wege', 'h2_1' => 'Was ich für eure Location mache',
+  ['slug' => 'technik-vor-ort', 'sort' => 140, 'accent' => '#c9506f', 'accent2' => '#dc7f96', 'btn_txt' => '#2b0d15',
+   'page_title' => 'Technik für Bars, Kneipen & Live-Musik | Lauschgift Veranstaltungstechnik, Hemer',
+   'meta_desc' => 'Hochwertige, kompakte Technik für Bars, Kneipen, Restaurants und Locations mit Live-Musik: ich baue auf, ein anderer DJ oder Musiker spielt darüber, ich baue ab. Aus Hemer, deutschlandweit unterwegs.',
+   'badge' => 'Für Bars, Kneipen, Restaurants und Firmen – die Technik steht, wer auflegt oder spielt entscheidet ihr',
+   'h1_line1' => 'Guter Sound braucht keinen DJ von mir.', 'h1_line2' => 'Nur die richtige Technik.',
+   'sub' => 'Ich bin Markus von Lauschgift Veranstaltungstechnik. Als DJ bin ich für die meisten Bars und Kneipen zu hochpreisig – deshalb gibt es hier etwas anderes: Ich komme mit hochwertiger, aber kompakter Technik, baue sie auf und stelle sie ein. Wer danach auflegt oder spielt, entscheidet ihr – euer eigener DJ, eine Live-Band oder ein Booking über euch. Nach dem Abend baue ich wieder ab.',
+   'kicker1' => 'So läuft das', 'h2_1' => 'Guter Sound, ohne dass ich selbst auflege',
    'cards' => [
-     ['icon' => 'music', 'title' => 'Fester DJ-Abend für eure Bar oder Kneipe',
-      'text' => 'Ein Abend im Monat oder jede Woche, mit Musik, die zu eurem Publikum passt – ich lese den Raum statt eine Playlist durchzuziehen. Am Anfang machen wir einen Testtermin, damit ihr wisst, ob es passt, bevor ihr euch festlegt.'],
-     ['icon' => 'gear', 'title' => 'Technik & Techniker für eure Location',
-      'text' => 'Anlage mieten oder als Festinstallation mit Wartung, dazu ein Techniker für einzelne Abende, wenn bei euch gerade niemand da ist, der sich auskennt. Genau das mache ich auch für Locations wie Ufer 39 und Neuhaus.'],
+     ['icon' => 'gear', 'title' => 'Hochwertige Technik, die kaum Platz braucht',
+      'text' => 'Kompakte Lautsprecher und Pulte, die trotzdem nach großer Anlage klingen – gebaut, damit sie in einer Bar oder Kneipe nicht im Weg stehen. Egal ob DJ-Pult oder Gitarre und Gesang: Der Sound stimmt, bevor der erste Gast reinkommt.'],
      ['icon' => 'mic', 'title' => 'Sound-Support für Singer-Songwriter & Live-Musik',
-      'text' => 'Kompakte PA, die auch im kleinen Rahmen gut klingt – Gesang und Gitarre sauber abgemischt, ohne dass eine ganze Bühnenanlage im Weg steht. Für einzelne Abende oder als feste Größe eurer Location.'],
+      'text' => 'Gesang und Gitarre sauber abgemischt, ohne dass eine ganze Bühnenanlage im Weg steht. Für einzelne Abende oder als feste Größe eurer Location.'],
+     ['icon' => 'clock', 'title' => 'Ich baue auf, ich baue ab',
+      'text' => 'Ich bringe die Technik, richte sie ein und mache Soundcheck mit eurem Act. Während des Abends bin ich erreichbar, falls etwas justiert werden muss – danach baue ich alles wieder ab, ihr müsst euch um nichts kümmern.'],
    ],
    'kicker2' => 'Im Detail', 'h2_2' => 'Womit ihr rechnen könnt',
    'features' => [
-     'Kennenlern-Termin bei euch vor Ort, bevor ihr euch entscheidet',
-     'Testabend oder gleich ein fester Termin im Monat',
-     'Technik passend zur Größe eurer Location – mieten oder Festinstallation mit Wartung',
-     'Techniker-Einsatz für einzelne Abende, wenn ihr selbst niemanden habt',
-     'Kompakte PA-Lösungen für Singer-Songwriter und kleine Live-Besetzungen',
+     'Kompakte Technik, die trotzdem nach großer Anlage klingt',
+     'Aufbau, Soundcheck und Einweisung, bevor euer Act loslegt',
+     'Abbau direkt im Anschluss – ihr müsst euch um nichts kümmern',
+     'Passt für DJ-Pulte genauso wie für Gitarre und Gesang',
+     'Auch als feste Anlage für eure Location, mit Wartung',
      'Digitales Angebot mit allen Preisen einzeln aufgeschlüsselt',
    ],
-   'pricenote' => 'Was das kostet, hängt davon ab, ob ihr einen DJ-Abend, Technik oder beides braucht. Nach einem kurzen Termin bei euch vor Ort bekommt ihr ein Angebot mit allen Posten einzeln – und das gilt dann auch.',
-   'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Was braucht eure Location?',
+   'pricenote' => 'Was das kostet, hängt von Größe und Häufigkeit ab. Nach einem kurzen Termin bei euch vor Ort bekommt ihr ein Angebot mit allen Posten einzeln – einmalig oder als feste Größe für mehrere Abende.',
+   'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Was braucht euer Abend?',
    'form_lead' => 'Schreibt mir kurz, worum es geht – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort.',
-   'form_cfg' => ['event_types' => ['DJ-Abend / Residenz', 'Technik für meine Location', 'Techniker für einen Termin', 'Sound-Support für Live-Musik', 'Sonstiges'],
+   'form_cfg' => ['event_types' => ['Technik für einen Abend', 'Technik als feste Anlage', 'Sound-Support für Live-Musik', 'Sonstiges'],
      'type_label' => 'Worum geht es?', 'company_label' => 'Bar / Location',
-     'location_label' => 'Adresse der Location', 'location_ph' => 'z. B. Ufer 39, Hemer',
+     'location_label' => 'Adresse der Location', 'location_ph' => 'z. B. eure Bar, Kneipe oder Location',
      'show_date' => false,
-     'msg_label' => 'Erzählt kurz von eurer Location', 'msg_ph' => 'z. B. Kneipe mit Live-Musik am Wochenende, ca. 80 Gäste, sucht festen DJ-Abend …',
-     'wa_text' => 'Hallo {inhaber}, es geht um meine Bar/Location: '],
-   'footer_target' => 'index'],
+     'msg_label' => 'Erzählt kurz von eurem Abend', 'msg_ph' => 'z. B. Kneipe mit Live-Musik am Wochenende, DJ-Pult vorhanden, braucht bessere PA …',
+     'wa_text' => 'Hallo {inhaber}, es geht um Technik für unsere Location: '],
+   'footer_target' => 'technik'],
 
   ];
 }
