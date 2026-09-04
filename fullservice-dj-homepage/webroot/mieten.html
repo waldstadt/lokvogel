@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Technik mieten – Mietpark | Lauschgift Veranstaltungstechnik Hemer</title>
+<link rel="canonical" href="https://lauschgift.net/mieten.html">
 <meta name="description" content="Ton- und Lichttechnik mieten in Hemer: Mischpulte, Lautsprecher, Mikrofone, Licht und mehr – nach Kategorie durchsuchen, in den Tourcase legen, Anfrage abschicken.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%233cc8b4'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
 
@@ -541,11 +542,11 @@ function renderProductModal(){
   if(GAL_IDX>=imgs.length)GAL_IDX=0;
   var fallback='<span class="pm-fallback">'+itemIcon(e)+'</span>';
   var main='<div class="pm-main">'+fallback+
-    (imgs.length?'<img src="'+esc(imgs[GAL_IDX])+'" alt="'+esc(e.name)+'" onerror="this.remove()">':'')+'</div>';
+    (imgs.length?'<img src="'+esc(imgs[GAL_IDX])+'" alt="'+esc(e.name)+'" loading="lazy" onerror="this.remove()">':'')+'</div>';
   var thumbs='';
   if(imgs.length>1){
     thumbs='<div class="pm-thumbs">'+imgs.map(function(u,i){
-      return '<button type="button" class="pm-thumb'+(i===GAL_IDX?' active':'')+'" onclick="galSet('+i+')"><img src="'+esc(u)+'" alt="" onerror="this.style.visibility=\'hidden\'"></button>';
+      return '<button type="button" class="pm-thumb'+(i===GAL_IDX?' active':'')+'" onclick="galSet('+i+')"><img src="'+esc(u)+'" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'"></button>';
     }).join('')+'</div>';
   }
   var st=availState(e);
@@ -699,7 +700,7 @@ function setItemsOf(s){
 /* Set-Hauptbild fürs Produktfenster - eigene Auszeichnung unabhängig von .rent (Kachel). */
 function setImageAreaModal(s){
   if(s.image_url)
-    return '<div class="pm-main"><img src="'+esc(s.image_url)+'" alt="'+esc(s.name)+'" style="object-position:'+cssUrl(s.image_focal||'50% 50%')+'" onerror="this.remove()"></div>';
+    return '<div class="pm-main"><img src="'+esc(s.image_url)+'" alt="'+esc(s.name)+'" loading="lazy" style="object-position:'+cssUrl(s.image_focal||'50% 50%')+'" onerror="this.remove()"></div>';
   var imgs=setItemImages(s).slice(0,4);
   if(!imgs.length)return '<div class="pm-main"><span class="pm-fallback">'+catIcon('')+'</span></div>';
   return '<div class="pm-main pm-collage n'+imgs.length+'">'+imgs.map(function(u){
