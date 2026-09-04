@@ -15,3 +15,12 @@
   # Nur wirksam, wenn ueber HTTPS ausgeliefert (Browser ignorieren HSTS ueber HTTP ohnehin).
   Header always set Strict-Transport-Security "max-age=15552000; includeSubDomains"
 </IfModule>
+
+# Aktionsseiten (Kampagnen-Minipages): serverseitig gerendert statt reiner JS-Huelle,
+# damit Suchmaschinen-Crawler ohne JavaScript-Ausfuehrung H1/Text/Aufzaehlungen sehen
+# (siehe campaign-render.php). Die URL bleibt .html, nur die Ausfuehrung wechselt auf
+# PHP - alle anderen .html-Dateien (admin.html, portal.html, index.html usw.) bleiben
+# normales statisches HTML.
+<FilesMatch "^(hochzeit|vereinsfest-technik|abiball|firmensommerfest|betriebsversammlung|seminartechnik|messe|objektbeleuchtung|instore-dj|produktpraesentation|tagesparty|technik-check|workshops|technik-vor-ort)\.html$">
+  SetHandler application/x-httpd-php
+</FilesMatch>
