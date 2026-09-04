@@ -66,6 +66,12 @@ function partnerInfoForEmail(PDO $p, string $email): ?array {
    Chat-Completions) und liefert den reinen generierten Text zurück. Bricht bei Fehlern
    über fail() mit einer möglichst konkreten Meldung ab (HTTP-Status + Antwort-Ausschnitt),
    statt nur "unerwartete Antwort" zu zeigen. */
+/* Wirft RuntimeException statt fail() aufzurufen - fail() beendet das Skript sofort per
+   exit() und wuerde damit auch einen unbeaufsichtigten Aufrufer (den taeglichen Cron-Ping,
+   siehe monthlyGuideSuggestions()) abwuergen, noch bevor dessen eigentliche Antwort
+   (Backup-Ergebnis) rausgeht. Die beiden echten HTTP-Endpunkte faengt die Exception direkt
+   am Aufrufort ab und wandeln sie dort weiterhin in fail() um - fuer den Browser aendert
+   sich nichts. */
 function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $model,
                     string $workspaceId, string $system, string $userText, int $maxTokens): string {
   $baseUrl = rtrim($baseUrl, '/');
@@ -78,7 +84,7 @@ function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $mo
     if ($workspaceId !== '') $header .= "anthropic-workspace-id: $workspaceId\r\n";
     $ctx = stream_context_create(['http' => ['method' => 'POST', 'header' => $header, 'content' => $reqBody, 'timeout' => 40, 'ignore_errors' => true]]);
     $resp = @file_get_contents($baseUrl . '/messages', false, $ctx);
-    if ($resp === false) fail('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.', 502);
+    if ($resp === false) throw new RuntimeException('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.');
     $j = json_decode($resp, true);
     if (!is_array($j) || isset($j['error']) || ($j['type'] ?? '') === 'error') {
       $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
@@ -88,7 +94,7 @@ function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $mo
         $msg = 'unerwartete Antwort vom KI-Dienst' . ($status !== '' ? " (HTTP $status)" : '')
           . (trim((string)$resp) !== '' ? ': ' . mb_substr(trim(strip_tags((string)$resp)), 0, 200) : '.');
       }
-      fail('KI-Anfrage fehlgeschlagen: ' . $msg, 502);
+      throw new RuntimeException('KI-Anfrage fehlgeschlagen: ' . $msg);
     }
     $generated = '';
     foreach ((array)($j['content'] ?? []) as $block) { if (($block['type'] ?? '') === 'text') $generated .= (string)($block['text'] ?? ''); }
@@ -105,7 +111,7 @@ function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $mo
     'content' => $reqBody, 'timeout' => 40, 'ignore_errors' => true,
   ]]);
   $resp = @file_get_contents($baseUrl . '/chat/completions', false, $ctx);
-  if ($resp === false) fail('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.', 502);
+  if ($resp === false) throw new RuntimeException('Der KI-Dienst ist gerade nicht erreichbar – bitte später erneut versuchen.');
   $j = json_decode($resp, true);
   if (!is_array($j) || isset($j['error'])) {
     $msg = is_array($j) ? (string)($j['error']['message'] ?? '') : '';
@@ -115,17 +121,18 @@ function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $mo
       $msg = 'unerwartete Antwort vom KI-Dienst' . ($status !== '' ? " (HTTP $status)" : '')
         . (trim((string)$resp) !== '' ? ': ' . mb_substr(trim(strip_tags((string)$resp)), 0, 200) : '.');
     }
-    fail('KI-Anfrage fehlgeschlagen: ' . $msg, 502);
+    throw new RuntimeException('KI-Anfrage fehlgeschlagen: ' . $msg);
   }
   return trim((string)($j['choices'][0]['message']['content'] ?? ''));
 }
-/* Liefert {provider,apiKey,baseUrl,model,workspaceId} aus settings.ai oder bricht mit
-   verständlicher Meldung ab, wenn kein Zugang eingerichtet ist. */
-function aiConfigOrFail(): array {
+/* Liefert {provider,apiKey,baseUrl,model,workspaceId} aus settings.ai oder null, wenn kein
+   Zugang eingerichtet ist - fuer Aufrufer, die selbst unbeaufsichtigt laufen (Cron) und
+   nicht per fail() abbrechen duerfen (siehe monthlyGuideSuggestions()). */
+function aiConfigOrNull(): ?array {
   $p = db();
   $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
   $apiKey = secretDecrypt((string)($cfg['api_key'] ?? ''));
-  if ($apiKey === '') fail('Kein KI-Zugang eingerichtet – bitte in den Einstellungen unter „KI-Textassistent" einen API-Schlüssel hinterlegen.', 400);
+  if ($apiKey === '') return null;
   $provider = (string)($cfg['provider'] ?? 'openai');
   $defaults = AI_PROVIDER_DEFAULTS[$provider] ?? AI_PROVIDER_DEFAULTS['openai'];
   return [
@@ -134,6 +141,13 @@ function aiConfigOrFail(): array {
     'model' => (string)($cfg['model'] ?: $defaults['model']),
     'workspaceId' => trim((string)($cfg['workspace_id'] ?? '')),
   ];
+}
+/* Wie aiConfigOrNull(), bricht aber mit verstaendlicher Meldung ab, wenn kein Zugang
+   eingerichtet ist - fuer die normalen, vom Browser aus aufgerufenen KI-Endpunkte. */
+function aiConfigOrFail(): array {
+  $ai = aiConfigOrNull();
+  if ($ai === null) fail('Kein KI-Zugang eingerichtet – bitte in den Einstellungen unter „KI-Textassistent" einen API-Schlüssel hinterlegen.', 400);
+  return $ai;
 }
 
 /* Automatische Fahrtstrecke Lager -> Location über OpenRouteService (EU-Anbieter, freier
@@ -3592,6 +3606,62 @@ function guideRows(): array {
    'cta_label' => 'Termin anfragen', 'cta_href' => 'hochzeit.html#anfrage', 'footer_target' => 'index'],
 
   ];
+}
+
+/* Fragt die KI nach neuen Ratgeber-Themenideen - genutzt sowohl vom "Themenvorschläge"-
+   Knopf im Backoffice (dort darf ein Fehler ruhig als Meldung im Browser landen) als auch
+   vom unbeaufsichtigten monatlichen Cron-Hinweis (dort darf NICHTS die Antwort abbrechen,
+   siehe monthlyGuideSuggestions() - deshalb wirft diese Funktion nie fail(), sondern gibt
+   im Fehlerfall einfach ein leeres Array zurueck; wer eine Meldung im Browser braucht,
+   prueft das leere Ergebnis selbst). */
+function suggestGuideTopics(int $n = 5): array {
+  $ai = aiConfigOrNull();
+  if ($ai === null) return [];
+  $p = db();
+  $existing = array_map(fn($g) => (string)($g['h1'] ?: $g['title']),
+    $p->query("select h1, title from guides order by sort")->fetchAll());
+  $campaigns = $p->query("select h1_line1 from campaign_pages where h1_line1 is not null")->fetchAll(PDO::FETCH_COLUMN);
+  $system = 'Du hilfst, den "Ratgeber"-Bereich einer Website für einen DJ- und Veranstaltungstechnik-'
+    . 'Verleih-Betrieb (Hochzeiten, Firmenevents, Technikverleih, Workshops) mit neuen Artikelideen zu '
+    . 'füllen. Du bekommst eine Liste bereits vorhandener Artikel und Aktionsseiten-Themen. Schlage GENAU '
+    . $n . ' neue, klar unterschiedliche Artikel-Ideen vor, nach Themen zu Fragen, die potenzielle Kunden '
+    . 'vor einer Anfrage googeln könnten - sie sollen sich von den vorhandenen Themen unterscheiden. '
+    . 'Antworte AUSSCHLIESSLICH als kompaktes JSON-Array ohne Markdown-Codeblock, jedes Element exakt in '
+    . 'der Form {"title":"...","reason":"..."} - title eine konkrete Artikelüberschrift, reason ein Satz, '
+    . 'warum das Thema für Suchende relevant ist.';
+  $userText = "Vorhandene Ratgeber-Artikel:\n" . ($existing ? implode("\n", $existing) : '(keine)')
+    . "\n\nAktionsseiten-Themen (nicht wiederholen):\n" . ($campaigns ? implode("\n", $campaigns) : '(keine)');
+  try {
+    $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 700);
+  } catch (RuntimeException $e) { return []; }
+  $raw = trim(preg_replace('#^```(?:json)?|```$#m', '', $raw));
+  $j = json_decode($raw, true);
+  if (!is_array($j)) return [];
+  $out = [];
+  foreach ($j as $item) if (!empty($item['title']))
+    $out[] = ['title' => trim((string)$item['title']), 'reason' => trim((string)($item['reason'] ?? ''))];
+  return $out;
+}
+/* Einmal im Monat (angehaengt an den taeglichen Backup-Cron-Ping, siehe cron/backup -
+   genau wie dailyDigest() fuer den taeglichen Hinweis) ein paar KI-Themenideen fuer den
+   Ratgeber an Markus schicken. Ohne eingerichteten KI-Zugang oder ohne Vorschlaege bleibt
+   sie einfach still - das darf nie den Backup-Cron-Aufruf selbst stoeren. */
+function monthlyGuideSuggestions(): array {
+  $p = db();
+  $row = $p->query("select value from settings where key='guide_digest'")->fetchColumn();
+  $cfg = $row ? (json_decode($row, true) ?: []) : [];
+  $thisMonth = gmdate('Y-m');
+  if (($cfg['last'] ?? '') === $thisMonth) return ['skipped' => 'diesen Monat schon gelaufen'];
+  $cfg['last'] = $thisMonth;
+  $p->prepare("insert into settings (key, value, updated_at) values ('guide_digest', ?, ?)
+      on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
+    ->execute([json_encode($cfg), now()]);
+  $suggestions = suggestGuideTopics(3);
+  if (!$suggestions) return ['skipped' => 'kein KI-Zugang eingerichtet oder keine Vorschläge erhalten'];
+  $body = "Neue Ideen für deinen Ratgeber-Bereich:\n\n" . implode("\n\n", array_map(
+    fn($s) => '– ' . $s['title'] . ($s['reason'] !== '' ? "\n  " . $s['reason'] : ''), $suggestions));
+  $ok = notifyOwner('Neue Ratgeber-Themenideen', $body, 'guides');
+  return ['sent' => $ok, 'count' => count($suggestions)];
 }
 
 /* v65: Markus' Bandbreite bei Hintergrundmusik (Dire Straits, Motown, Funk bis House)
@@ -7806,6 +7876,7 @@ try {
     try { wsExpireStale(db()); } catch (Throwable $e) {}
     $r = runBackup();
     $r['digest'] = dailyDigest();
+    $r['guide_digest'] = monthlyGuideSuggestions();
     out($r);
   }
   /* Kalender-Abos (iCal): drei Feeds – Anfragen, feste DJ-Buchungen, Technikvermietung */
@@ -8327,7 +8398,9 @@ try {
       $style .= sprintf(' Ziel-Länge des Textes: etwa %d bis %d Zeichen (nicht strikt, aber orientiere dich daran).',
         (int)$targetLen[0], (int)$targetLen[1]);
     }
-    $generated = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $style, $text, 800);
+    try {
+      $generated = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $style, $text, 800);
+    } catch (RuntimeException $e) { fail($e->getMessage(), 502); }
     if ($generated === '') fail('KI-Anfrage fehlgeschlagen: keine Antwort erhalten.', 502);
     out(['text' => $generated]);
   }
@@ -8359,13 +8432,25 @@ try {
       . 'keine Floskeln, kein Bindestrich statt Halbgeviertstrich, ca. 1–3 Sätze.';
     $userText = "Website-Inhalte:\n" . mb_substr($siteText, 0, 3000)
       . "\n\nBereits vorhandene FAQ-Fragen (nicht wiederholen):\n" . ($existing ? implode("\n", $existing) : '(noch keine)');
-    $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 400);
+    try {
+      $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 400);
+    } catch (RuntimeException $e) { fail($e->getMessage(), 502); }
     $raw = trim(preg_replace('#^```(?:json)?|```$#m', '', $raw));
     $j = json_decode($raw, true);
     if (!is_array($j) || empty($j['question']) || empty($j['answer'])) {
       fail('KI-Anfrage fehlgeschlagen: konnte keinen gültigen FAQ-Vorschlag erzeugen.', 502);
     }
     out(['question' => trim((string)$j['question']), 'answer' => trim((string)$j['answer'])]);
+  }
+  /* Ratgeber: Themenvorschläge per KI (Knopf im Backoffice, siehe auch der monatliche
+     automatische Hinweis in monthlyGuideSuggestions()). */
+  if ($path === 'ai/suggest-guide-topics' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    if (aiConfigOrNull() === null) fail('Kein KI-Zugang eingerichtet – bitte in den Einstellungen unter „KI-Textassistent" einen API-Schlüssel hinterlegen.', 400);
+    $n = max(1, min(8, (int)($body['count'] ?? 5)));
+    $suggestions = suggestGuideTopics($n);
+    if (!$suggestions) fail('KI-Anfrage fehlgeschlagen: konnte keine Themenvorschläge erzeugen.', 502);
+    out($suggestions);
   }
   /* Technik-Check-Fotos: geschützt in data/checkpics, Zugriff nur angemeldet */
   if (preg_match('#^checkpic/([a-f0-9-]{30,40})$#', $path, $m) && $method === 'POST') {

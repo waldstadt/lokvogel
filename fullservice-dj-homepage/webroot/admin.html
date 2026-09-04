@@ -860,7 +860,8 @@ tr.neu td{background:rgba(255,111,91,.14)}
   <!-- RATGEBER -->
   <div class="pg" id="pg-guides">
     <div class="pt">Ratgeber</div><div class="ps">Artikel zu Fragen, die potenzielle Kunden vor einer Anfrage googeln (Preise, Ablauf, Checklisten) – jeder Artikel eine eigene Seite unter /ratgeber/… Anders als bei Aktionsseiten braucht ein neuer Artikel keine neue Datei, nur „+ Artikel".</div>
-    <div style="margin-bottom:12px"><button class="btn sm" onclick="openGuideModal()">+ Artikel</button> <a class="btn g sm" href="ratgeber" target="_blank">Ratgeber ansehen</a></div>
+    <div style="margin-bottom:12px"><button class="btn sm" onclick="openGuideModal()">+ Artikel</button> <button class="btn g sm" id="guideAiBtn" onclick="suggestGuideTopics()">Themenvorschläge</button> <a class="btn g sm" href="ratgeber" target="_blank">Ratgeber ansehen</a></div>
+    <div class="mut sml" style="margin-bottom:12px">Einmal im Monat schickt dir das Backoffice außerdem automatisch ein paar neue Themenideen per Mail/Telegram, sobald der tägliche Backup-Cronjob läuft.</div>
     <div class="tbl-wrap card"><table><thead><tr><th>Artikel</th><th>Adresse</th><th>Status</th><th></th></tr></thead><tbody id="guideRows"></tbody></table></div>
   </div>
 
@@ -1456,6 +1457,7 @@ function handleDeepLink(){
     else if(kind==='techcheck'&&id)openTechCheckModal(id);
     else if(kind==='workshop'&&id){showPage('workshops');openWsDetail(id)}
     else if(kind==='inq')showPage('inq');
+    else if(kind==='guides')showPage('guides');
   }catch(e){}
 }
 function showPage(id){
@@ -9217,6 +9219,31 @@ function saveGuide(){
     .then(function(){closeModal();toast('Gespeichert ✓');reloadGuides()}).catch(function(e){toast(e.message,1)});
 }
 function reloadGuides(){api('guides?select=*&order=sort').then(function(r){CACHE.guides=r||[];renderGuides()})}
+function suggestGuideTopics(){
+  var btn=document.getElementById('guideAiBtn');
+  btn.disabled=true;btn.textContent='Wird generiert …';
+  fetch('api.php/ai/suggest-guide-topics',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify({count:5})})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
+    .then(function(res){
+      btn.disabled=false;btn.textContent='Themenvorschläge';
+      if(!res.ok||res.j.error){toast((res.j&&res.j.error)||'KI-Anfrage fehlgeschlagen.',1);return}
+      openModal('Themenvorschläge für den Ratgeber',
+        '<div class="mut sml" style="margin-bottom:12px">Ein Klick auf „Artikel anlegen" öffnet den Editor mit vorausgefülltem Titel – Abschnitte und Text trägst du (oder ich) danach ein.</div>'+
+        res.j.map(function(s){
+          return '<div class="card" style="margin:8px 0;padding:12px">'+
+            '<b>'+esc(s.title)+'</b>'+(s.reason?'<div class="mut sml" style="margin-top:4px">'+esc(s.reason)+'</div>':'')+
+            '<div style="margin-top:8px"><button class="btn sm" onclick=\'guideFromSuggestion(JSON.parse(this.dataset.s))\' data-s=\''+JSON.stringify(s).replace(/'/g,'&#39;')+'\'>Artikel anlegen</button></div>'+
+          '</div>';
+        }).join(''));
+    }).catch(function(e){btn.disabled=false;btn.textContent='Themenvorschläge';toast(e.message,1)});
+}
+function guideFromSuggestion(s){
+  openGuideModal();
+  document.getElementById('gTitle').value=s.title;
+  document.getElementById('gH1').value=s.title;
+  document.getElementById('gSlug').value=guideSlugify(s.title);
+  if(s.reason)document.getElementById('gIntro').value=s.reason;
+}
 
 /* ===== Bewertungen ===== */
 function renderRevAdmin(){
