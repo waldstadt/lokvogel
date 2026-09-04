@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 105;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 106;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1107,6 +1107,12 @@ function upgrade(PDO $p): void {
     /* v105: Kampagnen-Zuordnung (utm_source/utm_campaign, z. B. aus Instagram-Anzeigen) -
        zeigt, wie viele Seitenaufrufe und Klicks auf wichtige Buttons je Kampagne kamen. */
     try { $p->exec(statsUtmDdl()); } catch (PDOException $e) {}
+  }
+  if ($v < 106) {
+    /* v106: neue Aktionsseite "bars-kneipen" (DJ-Abende, Technik/Techniker fuer Locations,
+       Sound-Support fuer Singer-Songwriter) - seedCampaignPages() ueberspringt per
+       Slug-Abgleich alle bereits vorhandenen Seiten, legt also nur die neue an. */
+    try { seedCampaignPages($p); } catch (PDOException $e) {}
   }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -3263,6 +3269,41 @@ function campaignPageRows(): array {
      'msg_label' => 'Was wollt ihr lernen?', 'msg_ph' => 'z. B. 5 Leute aus dem Verein, Grundlagen Mischpult und Funkmikros, gern an unserer Anlage …',
      'wa_text' => 'Hallo {inhaber}, es geht um einen Tontechnik-Workshop: '],
    'footer_target' => 'technik'],
+
+  ['slug' => 'bars-kneipen', 'sort' => 140, 'accent' => '#c9506f', 'accent2' => '#dc7f96', 'btn_txt' => '#2b0d15',
+   'page_title' => 'DJ-Abende & Technik für Bars, Kneipen und Live-Musik | DJ Lauschgift, Hemer',
+   'meta_desc' => 'Fester DJ-Abend für eure Bar oder Kneipe, Technik & Techniker für eure Location, sauberer Sound für Singer-Songwriter – aus der Praxis, u. a. im Ufer 39, im Neuhaus und in der Speisekammer Dortmund.',
+   'badge' => 'Aus der Praxis: u. a. im Ufer 39, im Neuhaus und in der Speisekammer Dortmund',
+   'h1_line1' => 'Eure Location soll klingen.', 'h1_line2' => 'Als DJ oder mit der passenden Technik.',
+   'sub' => 'Ich bin Markus – seit 23 Jahren DJ, dazu Technik-Verleih und Techniker-Einsätze für Bars, Kneipen und Locations mit Live-Musik. Ob ihr einen festen DJ-Abend sucht, eure Anlage gewartet oder verliehen haben wollt, oder als Singer-Songwriter einen sauberen Sound braucht: Ich kenne den Alltag hinterm Tresen, unter anderem aus Abenden im Ufer 39, im Neuhaus und in der Speisekammer Dortmund.',
+   'kicker1' => 'Drei Wege', 'h2_1' => 'Was ich für eure Location mache',
+   'cards' => [
+     ['icon' => 'music', 'title' => 'Fester DJ-Abend für eure Bar oder Kneipe',
+      'text' => 'Ein Abend im Monat oder jede Woche, mit Musik, die zu eurem Publikum passt – ich lese den Raum statt eine Playlist durchzuziehen. Am Anfang machen wir einen Testtermin, damit ihr wisst, ob es passt, bevor ihr euch festlegt.'],
+     ['icon' => 'gear', 'title' => 'Technik & Techniker für eure Location',
+      'text' => 'Anlage mieten oder als Festinstallation mit Wartung, dazu ein Techniker für einzelne Abende, wenn bei euch gerade niemand da ist, der sich auskennt. Genau das mache ich auch für Locations wie Ufer 39 und Neuhaus.'],
+     ['icon' => 'mic', 'title' => 'Sound-Support für Singer-Songwriter & Live-Musik',
+      'text' => 'Kompakte PA, die auch im kleinen Rahmen gut klingt – Gesang und Gitarre sauber abgemischt, ohne dass eine ganze Bühnenanlage im Weg steht. Für einzelne Abende oder als feste Größe eurer Location.'],
+   ],
+   'kicker2' => 'Im Detail', 'h2_2' => 'Womit ihr rechnen könnt',
+   'features' => [
+     'Kennenlern-Termin bei euch vor Ort, bevor ihr euch entscheidet',
+     'Testabend oder gleich ein fester Termin im Monat',
+     'Technik passend zur Größe eurer Location – mieten oder Festinstallation mit Wartung',
+     'Techniker-Einsatz für einzelne Abende, wenn ihr selbst niemanden habt',
+     'Kompakte PA-Lösungen für Singer-Songwriter und kleine Live-Besetzungen',
+     'Digitales Angebot mit allen Preisen einzeln aufgeschlüsselt',
+   ],
+   'pricenote' => 'Was das kostet, hängt davon ab, ob ihr einen DJ-Abend, Technik oder beides braucht. Nach einem kurzen Termin bei euch vor Ort bekommt ihr ein Angebot mit allen Posten einzeln – und das gilt dann auch.',
+   'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Was braucht eure Location?',
+   'form_lead' => 'Schreibt mir kurz, worum es geht – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort.',
+   'form_cfg' => ['event_types' => ['DJ-Abend / Residenz', 'Technik für meine Location', 'Techniker für einen Termin', 'Sound-Support für Live-Musik', 'Sonstiges'],
+     'type_label' => 'Worum geht es?', 'company_label' => 'Bar / Location',
+     'location_label' => 'Adresse der Location', 'location_ph' => 'z. B. Ufer 39, Hemer',
+     'show_date' => false,
+     'msg_label' => 'Erzählt kurz von eurer Location', 'msg_ph' => 'z. B. Kneipe mit Live-Musik am Wochenende, ca. 80 Gäste, sucht festen DJ-Abend …',
+     'wa_text' => 'Hallo {inhaber}, es geht um meine Bar/Location: '],
+   'footer_target' => 'index'],
 
   ];
 }
