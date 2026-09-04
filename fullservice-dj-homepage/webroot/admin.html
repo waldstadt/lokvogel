@@ -346,6 +346,27 @@ tr.neu td{background:rgba(255,111,91,.14)}
 .it-mv button:disabled{opacity:.35;cursor:default}
 .it-mv .ic{width:14px;height:14px;margin:0;opacity:1}
 #docSaveBottom{display:none;margin-top:4px}
+/* Artikel-Picker (openProductPicker) - Suchzeile und Trefferliste. Auf dem Handy
+   quetschten sich Suchfeld und Kategorie-Auswahl bisher nebeneinander bis zur
+   Unlesbarkeit, und jede Trefferzeile drängte Name, Preis, Badge, Beschreibung und den
+   Einfügen-Knopf in eine einzige schmale Zeile zusammen. */
+.pp-filters{display:flex;gap:8px;margin-bottom:10px}
+.pp-filters input{flex:2;min-width:0}
+.pp-filters select{flex:1;min-width:0}
+.pp-item{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;gap:10px;align-items:flex-start}
+.pp-check{display:flex;padding-top:3px;cursor:pointer}
+.pp-check input{width:auto;margin:0}
+.pp-info{flex:1;min-width:0}
+.pp-meta{font-size:12px;margin-top:2px}
+.pp-add{flex:none}
+@media(max-width:560px){
+  .pp-filters{flex-direction:column}
+  .pp-filters input,.pp-filters select{flex:none;width:100%}
+  .pp-item{flex-wrap:wrap;padding:12px 0}
+  .pp-item .pp-info{flex-basis:100%}
+  .pp-item .pp-add{flex:1 1 100%;margin-top:8px;padding:10px 16px}
+  .pp-check input{width:22px;height:22px}
+}
 @media(max-width:560px){
   .it-row,.it-row.sml{grid-template-columns:28px 1fr;gap:5px;row-gap:4px;
     padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
@@ -8749,9 +8770,9 @@ function openProductPicker(){
   (CACHE.equipment||[]).forEach(function(e){if(e.status==='aktiv'&&e.category&&cats.indexOf(e.category)<0)cats.push(e.category)});
   cats.sort(byNameDe);
   openModal('Artikel einfügen',
-    '<div style="display:flex;gap:8px;margin-bottom:10px">'+
-    '<input type="search" autocomplete="off" data-lpignore="true" id="ppSearch" placeholder="Suchen (auch im Technikkatalog) …" oninput="renderPicker()" style="flex:2">'+
-    '<select id="ppCat" onchange="renderPicker()" style="flex:1"><option value="">Alle Kategorien</option>'+
+    '<div class="pp-filters">'+
+    '<input type="search" autocomplete="off" data-lpignore="true" id="ppSearch" placeholder="Suchen (auch im Technikkatalog) …" oninput="renderPicker()">'+
+    '<select id="ppCat" onchange="renderPicker()"><option value="">Alle Kategorien</option>'+
     cats.map(function(c){return '<option value="'+esc(c)+'">'+esc(c)+'</option>'}).join('')+'</select></div>'+
     '<div id="ppList" style="max-height:380px;overflow-y:auto"></div>'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">'+
@@ -8785,13 +8806,12 @@ function renderPicker(){
   });
   var list=prods.concat(eq).sort(byNameDe);
   document.getElementById('ppList').innerHTML=list.map(function(p){
-    return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:10px;align-items:center">'+
-    '<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;flex:1;font-weight:400;text-transform:none;letter-spacing:normal">'+
-    '<input type="checkbox" style="width:auto;margin-top:3px"'+(PP_SEL[p.key]?' checked':'')+' onchange="ppToggle(\''+p.key+'\',this.checked)">'+
-    '<div><b>'+esc(p.name)+'</b> <span class="mut sml">'+esc(p.sku)+'</span> <span class="mut">'+euro(p.price)+' / '+esc(p.unit)+'</span>'+
-    (p.badge?' '+p.badge:'')+
-    '<div class="mut sml">'+esc(p.desc.slice(0,90))+'</div></div></label>'+
-    '<button class="btn sm" onclick="insertProduct(\''+p.key+'\')">Einfügen</button></div>';
+    return '<div class="pp-item">'+
+    '<label class="pp-check"><input type="checkbox"'+(PP_SEL[p.key]?' checked':'')+' onchange="ppToggle(\''+p.key+'\',this.checked)"></label>'+
+    '<div class="pp-info"><div><b>'+esc(p.name)+'</b> <span class="mut sml">'+esc(p.sku)+'</span></div>'+
+    '<div class="pp-meta mut">'+euro(p.price)+' / '+esc(p.unit)+(p.badge?' '+p.badge:'')+'</div>'+
+    (p.desc?'<div class="mut sml">'+esc(p.desc.slice(0,90))+'</div>':'')+'</div>'+
+    '<button class="btn sm pp-add" onclick="insertProduct(\''+p.key+'\')">Einfügen</button></div>';
   }).join('')||'<span class="mut sml">Nichts gefunden.</span>';
 }
 function insertSelectedProducts(){
