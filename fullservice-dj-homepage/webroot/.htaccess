@@ -1,0 +1,17 @@
+# Sicherheits-Header fuer die gesamte Seite (Backoffice, Portal, oeffentliche Seiten,
+# API). Greift nur auf Apache mit aktivem mod_headers (All-Inkl-Produktion) - im
+# Entwicklungs-Server (php -S) werden .htaccess-Dateien ignoriert, siehe UPLOAD_HTACCESS
+# in api.php fuer denselben Sachverhalt an anderer Stelle im Projekt.
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+  # Nur eigene Ressourcen: keine Fremd-Skripte/-Schriften/-Frames moeglich, selbst wenn an
+  # anderer Stelle versehentlich welche eingebaut wuerden (CLAUDE.md verbietet ohnehin
+  # externe CDNs). 'unsafe-inline' fuer Skript/Stil ist noetig, weil die Seiten mit
+  # Inline-onclick-Handlern und Inline-<style> arbeiten - kein Nonce-System vorhanden.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+  # Nur wirksam, wenn ueber HTTPS ausgeliefert (Browser ignorieren HSTS ueber HTTP ohnehin).
+  Header always set Strict-Transport-Security "max-age=15552000; includeSubDomains"
+</IfModule>

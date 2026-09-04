@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 109;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 110;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -124,7 +124,7 @@ function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $mo
 function aiConfigOrFail(): array {
   $p = db();
   $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
-  $apiKey = trim((string)($cfg['api_key'] ?? ''));
+  $apiKey = secretDecrypt((string)($cfg['api_key'] ?? ''));
   if ($apiKey === '') fail('Kein KI-Zugang eingerichtet – bitte in den Einstellungen unter „KI-Textassistent" einen API-Schlüssel hinterlegen.', 400);
   $provider = (string)($cfg['provider'] ?? 'openai');
   $defaults = AI_PROVIDER_DEFAULTS[$provider] ?? AI_PROVIDER_DEFAULTS['openai'];
@@ -207,6 +207,13 @@ const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','
 const INQUIRY_FIELDS = ['name','email','phone','event_type','event_date','location','guests','message'];
 
 header('Content-Type: application/json; charset=utf-8');
+/* Sicherheits-Header fuer die API selbst (Defense-in-Depth zusaetzlich zur .htaccess,
+   die auf php -S in der Entwicklung ohnehin nicht greift - siehe UPLOAD_HTACCESS-Kommentar
+   weiter unten fuer denselben Sachverhalt). */
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+if (!empty($_SERVER['HTTPS'])) header('Strict-Transport-Security: max-age=15552000; includeSubDomains');
 
 function out($data, int $code = 200): never {
   http_response_code($code);
@@ -220,6 +227,49 @@ function uuid(): string {
   return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($b), 4));
 }
 function now(): string { return gmdate('Y-m-d\TH:i:s\Z'); }
+
+/* ---------- Verschlüsselung ruhender Zugangsdaten/Ausweisfotos ----------
+   Schützt Postfach-Passwörter, KI-/Routendienst-API-Schlüssel und Ausweisfotos auf der
+   Festplatte: liegt die SQLite-Datei oder eine Backup-Kopie jemand Unbefugtem vor, sind
+   diese Werte ohne den separaten Schlüssel (data/secret.key, außerhalb des Webroots,
+   per .htaccess gesperrt wie die Datenbank selbst) unlesbar. Schützt NICHT gegen eine
+   kompromittierte laufende Anwendung selbst - die entschlüsselt beim Gebrauch
+   zwangsläufig wieder (siehe TOM-Dokument). */
+function secretKey(): string {
+  static $key = null;
+  if ($key !== null) return $key;
+  if (!is_dir(DATA_DIR)) mkdir(DATA_DIR, 0755, true);
+  $f = DATA_DIR . '/secret.key';
+  if (!file_exists($f)) {
+    file_put_contents($f, random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES));
+    @chmod($f, 0600);
+  }
+  return $key = (string)file_get_contents($f);
+}
+function secretEncryptBytes(string $plain): string {
+  $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+  return $nonce . sodium_crypto_secretbox($plain, $nonce, secretKey());
+}
+function secretDecryptBytes(string $enc): ?string {
+  if (strlen($enc) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) return null;
+  $nonce = substr($enc, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+  $box = substr($enc, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+  $plain = sodium_crypto_secretbox_open($box, $nonce, secretKey());
+  return $plain === false ? null : $plain;
+}
+/* Fürs Speichern kurzer Zugangsdaten (Passwörter/API-Schlüssel) in einer JSON-Spalte -
+   "enc:"-Präfix erkennt eigene Werte wieder, alter Klartext-Bestand bleibt lesbar (kein
+   Datenverlust bei bereits gespeicherten, noch unverschlüsselten Werten). */
+function secretEncrypt(string $plain): string {
+  return $plain === '' ? '' : 'enc:' . base64_encode(secretEncryptBytes($plain));
+}
+function secretDecrypt(?string $val): string {
+  $val = (string)$val;
+  if ($val === '' || !str_starts_with($val, 'enc:')) return $val;
+  $raw = base64_decode(substr($val, 4));
+  if ($raw === false) return '';
+  return secretDecryptBytes($raw) ?? '';
+}
 
 /* ---------- DB & Migration ---------- */
 function db(): PDO {
@@ -1134,6 +1184,10 @@ function upgrade(PDO $p): void {
        openholidaysapi.org), deshalb einfach neu angelegt statt kompliziert migriert. */
     try { $p->exec('drop table if exists calendar_feed_cache'); } catch (PDOException $e) {}
     try { $p->exec(calendarFeedDdl()); } catch (PDOException $e) {}
+  }
+  if ($v < 110) {
+    /* v110: Bruteforce-Bremse fuer Admin-/Kundenkonto-Login (siehe loginDdl/checkLoginThrottle). */
+    try { $p->exec(loginDdl()); } catch (PDOException $e) {}
   }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -3628,6 +3682,7 @@ SQL);
   foreach (statsEngageDdl() as $sql) $p->exec($sql);
   $p->exec(statsUtmDdl());
   $p->exec(calendarFeedDdl());
+  $p->exec(loginDdl());
   $p->exec(paymentsDdl());
   foreach (docIndexDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
@@ -3905,6 +3960,33 @@ function seedUpsells(PDO $p): void {
 }
 
 /* ---------- Auth ---------- */
+/* Bruteforce-Bremse fuers Admin- und Kundenkonto-Login: zaehlt Fehlversuche je (E-Mail
+   ODER IP-Adresse) in einem 15-Minuten-Fenster, unabhaengig vom bestehenden usleep()
+   gegen Timing-Angriffe. Ab 10 Fehlversuchen wird geblockt, bis das Fenster verstreicht -
+   das haelt gezieltes Durchprobieren auf, ohne einen legitimen Nutzer bei ein paar
+   Tippfehlern gleich auszusperren. */
+function loginDdl(): string {
+  return "create table if not exists login_attempts (id integer primary key autoincrement,
+    scope text not null, ident text not null, ip text not null, ts integer not null)";
+}
+const LOGIN_THROTTLE_MAX = 10;
+const LOGIN_THROTTLE_WINDOW = 900; // 15 Minuten
+function checkLoginThrottle(PDO $p, string $scope, string $ident): void {
+  $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+  $p->prepare('delete from login_attempts where ts < ?')->execute([time() - 3600]);
+  $st = $p->prepare('select count(*) from login_attempts where scope = ? and (ident = ? or ip = ?) and ts > ?');
+  $st->execute([$scope, $ident, $ip, time() - LOGIN_THROTTLE_WINDOW]);
+  if ((int)$st->fetchColumn() >= LOGIN_THROTTLE_MAX)
+    fail('Zu viele fehlgeschlagene Anmeldeversuche. Bitte in 15 Minuten erneut versuchen.', 429);
+}
+function recordLoginFailure(PDO $p, string $scope, string $ident): void {
+  $p->prepare('insert into login_attempts (scope, ident, ip, ts) values (?,?,?,?)')
+    ->execute([$scope, $ident, (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), time()]);
+}
+function clearLoginFailures(PDO $p, string $scope, string $ident): void {
+  $p->prepare('delete from login_attempts where scope = ? and (ident = ? or ip = ?)')
+    ->execute([$scope, $ident, (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0')]);
+}
 function currentUser(): ?array {
   $h = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
   if (!preg_match('/Bearer\s+([a-f0-9]{64})/i', $h, $m)) return null;
@@ -3917,6 +3999,7 @@ function handleLogin(array $body): never {
   $pass  = (string)($body['password'] ?? '');
   if (!$email || !$pass) fail('E-Mail und Passwort erforderlich.', 400);
   $p = db();
+  checkLoginThrottle($p, 'admin', $email);
   $count = (int)$p->query('select count(*) from users')->fetchColumn();
   if ($count === 0) {
     /* Erstinstallation: erster Login legt den Admin-Account an */
@@ -3927,8 +4010,10 @@ function handleLogin(array $body): never {
   $st = $p->prepare('select * from users where email=?'); $st->execute([$email]);
   $u = $st->fetch();
   if (!$u || !password_verify($pass, $u['pass_hash'])) {
+    recordLoginFailure($p, 'admin', $email);
     usleep(400000); fail('Anmeldung fehlgeschlagen.', 401);
   }
+  clearLoginFailures($p, 'admin', $email);
   $tok = bin2hex(random_bytes(32));
   $p->prepare('delete from tokens where expires<?')->execute([time()]);
   $p->prepare('insert into tokens (token,user_id,expires) values (?,?,?)')
@@ -4704,7 +4789,9 @@ const MAIL_ACCOUNT_KEYS = ['personal', 'system'];
 
 function mailAccountsRaw(): array {
   $j = json_decode((string)db()->query("select value from settings where key='mail_accounts'")->fetchColumn() ?: '{}', true);
-  return is_array($j) ? $j : [];
+  $j = is_array($j) ? $j : [];
+  foreach ($j as $k => $a) if (is_array($a) && isset($a['password'])) $j[$k]['password'] = secretDecrypt((string)$a['password']);
+  return $j;
 }
 /* Volle Konfiguration inkl. Passwort - nur fuer den internen Gebrauch beim Versand/Test,
    NIE als API-Antwort ausgeben. null = kein Passwort hinterlegt (Konto "aus"). */
@@ -5961,11 +6048,16 @@ function handlePortal(string $path, string $method, $body): never {
   if ($path === 'portal/account/login' && $method === 'POST') {
     $email = strtolower(trim((string)($body['email'] ?? '')));
     $pass = (string)($body['password'] ?? '');
+    checkLoginThrottle($p, 'portal', $email);
     $st = $p->prepare("select * from customers where lower(email) = ? and portal_hash is not null
       order by coalesce(created_at,'') asc limit 1");
     $st->execute([$email]);
     $c = $st->fetch();
-    if (!$c || !password_verify($pass, (string)$c['portal_hash'])) { usleep(500000); fail('E-Mail oder Passwort falsch.', 401); }
+    if (!$c || !password_verify($pass, (string)$c['portal_hash'])) {
+      recordLoginFailure($p, 'portal', $email);
+      usleep(500000); fail('E-Mail oder Passwort falsch.', 401);
+    }
+    clearLoginFailures($p, 'portal', $email);
     out(['token' => custToken($p, $c['id']), 'name' => trim(($c['company'] ?: trim($c['first_name'] . ' ' . $c['last_name']))),
       'partner' => partnerInfoForEmail($p, $email)]);
   }
@@ -6648,8 +6740,11 @@ function handlePortal(string $path, string $method, $body): never {
     if (!is_dir($dir)) mkdir($dir, 0755, true);
     $ff = $r['id'] . '-front.' . $front['ext'];
     $fb = $r['id'] . '-back.' . $back['ext'];
-    file_put_contents("$dir/$ff", processImage($front['bin'], 1600, 82));
-    file_put_contents("$dir/$fb", processImage($back['bin'], 1600, 82));
+    /* Ausweiskopien sind besonders vertrauliche Daten - Dateiinhalt liegt verschlüsselt auf
+       der Platte (siehe secretEncryptBytes), Zugriffsschutz durch Login bleibt zusätzlich
+       bestehen (siehe idfile-Route weiter unten). */
+    file_put_contents("$dir/$ff", secretEncryptBytes(processImage($front['bin'], 1600, 82)));
+    file_put_contents("$dir/$fb", secretEncryptBytes(processImage($back['bin'], 1600, 82)));
     $terms = json_decode($p->query("select value from settings where key='rental_contract'")->fetchColumn() ?: '{}', true);
     $snapshot = json_encode(['items' => rentalItems($p, $r), 'days' => rentalDays($r),
       'event_date' => $r['event_date'], 'end_date' => $r['end_date'],
@@ -7799,6 +7894,12 @@ try {
          Feld beim Speichern loescht kein zuvor gesetztes Passwort versehentlich. */
       if (!empty($body['password'])) $a['password'] = (string)$body['password'];
       $all[$which] = $a;
+      /* mailAccountsRaw() liefert alle Konten entschlüsselt zurück (nicht nur $which) -
+         vorm Speichern muessen deshalb ausnahmslos alle Passwoerter wieder verschluesselt
+         werden, sonst wuerde das unveraenderte zweite Konto hier im Klartext landen. */
+      foreach ($all as $k => $acc)
+        if (is_array($acc) && isset($acc['password']) && !str_starts_with((string)$acc['password'], 'enc:'))
+          $all[$k]['password'] = secretEncrypt((string)$acc['password']);
       $p->prepare("insert into settings (key, value, updated_at) values ('mail_accounts', ?, ?)
           on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
         ->execute([json_encode($all, JSON_UNESCAPED_UNICODE), now()]);
@@ -7975,7 +8076,7 @@ try {
       $cfg['model'] = trim((string)($body['model'] ?? '')) ?: $defaults['model'];
       if (isset($body['style'])) $cfg['style'] = trim((string)$body['style']);
       if (isset($body['workspace_id'])) $cfg['workspace_id'] = trim((string)$body['workspace_id']);
-      if (!empty($body['api_key'])) $cfg['api_key'] = trim((string)$body['api_key']);
+      if (!empty($body['api_key'])) $cfg['api_key'] = secretEncrypt(trim((string)$body['api_key']));
       $p->prepare("insert into settings (key, value, updated_at) values ('ai', ?, ?)
           on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
         ->execute([json_encode($cfg, JSON_UNESCAPED_UNICODE), now()]);
@@ -8030,7 +8131,7 @@ try {
     $p = db();
     $cfg = json_decode((string)$p->query("select value from settings where key='routing'")->fetchColumn() ?: '{}', true) ?: [];
     if ($method === 'POST') {
-      if (!empty($body['api_key'])) $cfg['api_key'] = trim((string)$body['api_key']);
+      if (!empty($body['api_key'])) $cfg['api_key'] = secretEncrypt(trim((string)$body['api_key']));
       $p->prepare("insert into settings (key, value, updated_at) values ('routing', ?, ?)
           on conflict(key) do update set value = excluded.value, updated_at = excluded.updated_at")
         ->execute([json_encode($cfg, JSON_UNESCAPED_UNICODE), now()]);
@@ -8050,7 +8151,7 @@ try {
     $origin = trim((string)($body['origin'] ?? '')) ?: trim(trim((string)($comp['street'] ?? '')) . ', ' . trim((string)($comp['zip_city'] ?? '')), ' ,');
     if ($origin === '') fail('Bitte zuerst deine Adresse (Lager/Zuhause) unter Einstellungen → Firmendaten hinterlegen.', 400);
     $cfg = json_decode((string)$p->query("select value from settings where key='routing'")->fetchColumn() ?: '{}', true) ?: [];
-    $apiKey = trim((string)($cfg['api_key'] ?? ''));
+    $apiKey = secretDecrypt((string)($cfg['api_key'] ?? ''));
     if ($apiKey === '') fail('Kein Routendienst eingerichtet – bitte in den Einstellungen unter „Automatische Fahrtstrecke" einen OpenRouteService-Schlüssel hinterlegen.', 400);
     $from = orsGeocode($origin, $apiKey);
     if (!$from) fail('Deine Adresse („' . $origin . '") konnte nicht gefunden werden – bitte in den Firmendaten prüfen.', 502);
@@ -8162,7 +8263,12 @@ try {
       if (!is_file($f)) fail('Datei nicht gefunden.', 404);
       $ext = pathinfo($f, PATHINFO_EXTENSION);
       header('Content-Type: ' . ($ext === 'jpg' ? 'image/jpeg' : 'image/' . $ext));
-      readfile($f); exit;
+      $raw = (string)file_get_contents($f);
+      /* Neu hochgeladene Ausweisfotos liegen verschlüsselt vor (secretEncryptBytes); ein
+         Altbestand von vor dieser Umstellung ist noch Klartext-Bilddatei - die Entschlüsselung
+         schlägt fehl (Poly1305-Prüfsumme passt nicht), dann wird die Datei roh ausgeliefert. */
+      echo secretDecryptBytes($raw) ?? $raw;
+      exit;
     }
   }
   fail('Unbekannter Endpunkt.', 404);
