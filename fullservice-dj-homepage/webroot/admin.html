@@ -6139,6 +6139,7 @@ function openEqModal(id){
     '<div id="eqImgGrid"></div>'+
     '<div id="eqFocalWrap"></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="ePub" style="width:auto;margin-right:6px" '+(e.public!==false?'checked':'')+'>Auf Homepage anzeigen (mietbar)</label>'+
+    '<label><input type="checkbox" id="eFav" style="width:auto;margin-right:6px" '+(e.favorite?'checked':'')+'>Häufig gebucht (erscheint im Picker unter „★ Häufig gebucht“)</label>'+
     '<h4 style="margin:16px 0 6px;color:var(--mut)">Verknüpfungen zu anderen Artikeln</h4>'+
     '<div class="grid2"><div><label>Zubehör-Empfehlung („passt dazu“ – bis zu 5)</label>'+
     eqRelSelects('eAddon',(e.addon_ids&&e.addon_ids.length?e.addon_ids:(e.addon_id?[e.addon_id]:[])),e.id)+'</div>'+
@@ -6182,6 +6183,7 @@ function saveEq(id){
     tier_month_pct:v('eTierMonth')!==''?Number(v('eTierMonth')):null,
     qty_total:Number(v('eQty'))||1,min_qty:Math.max(1,Number(v('eMinQty'))||1),placeholder:EQ_PH||null,status:v('eStatus'),
     images:eqImgs,image_url:eqImgs[0]||'',image_focal:v('eFocal'),public:document.getElementById('ePub').checked,rentable:document.getElementById('ePub').checked,
+    favorite:document.getElementById('eFav').checked,
     slug:v('eName').toLowerCase().replace(/[^a-z0-9äöüß]+/g,'-').replace(/^-|-$/g,'')};
   (id?api('equipment?id=eq.'+id,{method:'PATCH',body:body}):api('equipment',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');
@@ -8744,6 +8746,7 @@ function openProdModal(id){
     '<label>Passt dazu (Artikelnummer) <span class="mut sml" style="text-transform:none;letter-spacing:0">– wird automatisch mit ins Angebot/die Rechnung übernommen, wenn dieser Artikel eingefügt wird (z. B. Kabel zu Lautsprecher)</span></label>'+
     '<input id="pAddonSku" value="'+esc(p.addon_sku||'')+'" placeholder="z. B. KABEL-10">'+
     '<label style="margin-top:12px"><input type="checkbox" id="pActive" style="width:auto;margin-right:6px" '+(p.active!==false?'checked':'')+'>Aktiv (im „+ Artikel“-Picker sichtbar)</label>'+
+    '<label><input type="checkbox" id="pFav" style="width:auto;margin-right:6px" '+(p.favorite?'checked':'')+'>Häufig gebucht (erscheint im Picker unter „★ Häufig gebucht“)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveProd(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'products\',\''+id+'\',reloadProds)">Löschen</button>':'')+'</div>');
 }
@@ -8758,7 +8761,8 @@ function saveProd(id){
   var body={sku:v('pSku').toUpperCase(),name:v('pName'),category:v('pCat'),description:v('pDesc'),
     unit:v('pUnit')||'Stk.',price_net:v('pPrice')!==''?Number(v('pPrice')):null,
     addon_sku:v('pAddonSku')?v('pAddonSku').toUpperCase():null,kind:v('pKind')||'artikel',
-    bundle:bundle,sort:Number(v('pSort'))||0,active:document.getElementById('pActive').checked};
+    bundle:bundle,sort:Number(v('pSort'))||0,active:document.getElementById('pActive').checked,
+    favorite:document.getElementById('pFav').checked};
   (id?api('products?id=eq.'+id,{method:'PATCH',body:body}):api('products',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');reloadProds()}).catch(function(e){toast('Fehler (Artikelnummer doppelt?): '+e.message,1)});
 }
@@ -8777,6 +8781,7 @@ function openProductPicker(){
     '<div class="pp-filters">'+
     '<input type="search" autocomplete="off" data-lpignore="true" id="ppSearch" placeholder="Suchen (auch im Technikkatalog) …" oninput="renderPicker()">'+
     '<select id="ppCat" onchange="renderPicker()"><option value="">Alle Kategorien</option>'+
+    '<option value="__fav__">★ Häufig gebucht</option>'+
     cats.map(function(c){return '<option value="'+esc(c)+'">'+esc(c)+'</option>'}).join('')+'</select></div>'+
     '<div id="ppList" style="max-height:380px;overflow-y:auto"></div>'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">'+
@@ -8794,21 +8799,28 @@ function ppToggle(key,checked){
 function renderPicker(){
   var q=(v('ppSearch')||'').toLowerCase();
   var cat=v('ppCat')||'';
+  /* "Häufig gebucht" ist keine echte Kategorie, sondern eine Kombination aus manuell
+     markierten Favoriten (favorite, siehe Produkte-/Technik-Editor) und echten
+     Einfüge-Zahlen (use_count, siehe insertProduct()/ppBumpUse()). */
+  var isFav=cat==='__fav__';
   var prods=(CACHE.products||[]).filter(function(p){
-    return p.active&&(!cat||p.category===cat)&&(!q||[p.sku,p.name,p.category].join(' ').toLowerCase().indexOf(q)>=0);
+    return p.active&&(isFav?(p.favorite||p.use_count>0):(!cat||p.category===cat))&&(!q||[p.sku,p.name,p.category].join(' ').toLowerCase().indexOf(q)>=0);
   }).map(function(p){
     var isBundle=(p.bundle||[]).length>0;
     return{key:'p:'+p.id,sku:p.sku,name:p.name,unit:p.unit||'Stk.',price:prodPrice(p),desc:p.description||'',
+      fav:!!p.favorite,uses:p.use_count||0,
       badge:isBundle?'<span class="b gold">Set</span>':(p.kind==='dienstleistung'?'<span class="b blue">Dienstleistung</span>':'')};
   });
   var eq=(CACHE.equipment||[]).filter(function(e){
-    return e.status==='aktiv'&&(!cat||e.category===cat)&&(!q||[e.sku,e.name,e.category].join(' ').toLowerCase().indexOf(q)>=0);
+    return e.status==='aktiv'&&(isFav?(e.favorite||e.use_count>0):(!cat||e.category===cat))&&(!q||[e.sku,e.name,e.category].join(' ').toLowerCase().indexOf(q)>=0);
   }).map(function(e){
     var days=docRentalDays();
     return{key:'e:'+e.id,sku:e.sku||'–',name:e.name,unit:days>1?'Stk. ('+days+' Tage)':'Stk.',price:equipTieredPrice(e,days),desc:e.description||'',
+      fav:!!e.favorite,uses:e.use_count||0,
       badge:'<span class="b grey">Technikkatalog</span>'};
   });
-  var list=prods.concat(eq).sort(byNameDe);
+  var list=prods.concat(eq);
+  list=isFav?list.sort(function(a,b){return (b.fav?1:0)-(a.fav?1:0)||b.uses-a.uses||byNameDe(a,b)}):list.sort(byNameDe);
   document.getElementById('ppList').innerHTML=list.map(function(p){
     return '<div class="pp-item">'+
     '<label class="pp-check"><input type="checkbox"'+(PP_SEL[p.key]?' checked':'')+' onchange="ppToggle(\''+p.key+'\',this.checked)"></label>'+
@@ -8816,7 +8828,9 @@ function renderPicker(){
     '<div class="pp-meta mut">'+euro(p.price)+' <span class="pp-unit">/ '+esc(p.unit)+'</span>'+(p.badge?' <span class="pp-badge">'+p.badge+'</span>':'')+'</div>'+
     (p.desc?'<div class="pp-desc mut sml">'+esc(p.desc.slice(0,90))+'</div>':'')+'</div>'+
     '<button class="btn sm pp-add" onclick="insertProduct(\''+p.key+'\')">Einfügen</button></div>';
-  }).join('')||'<span class="mut sml">Nichts gefunden.</span>';
+  }).join('')||(isFav
+    ?'<span class="mut sml">Noch nichts als „häufig gebucht“ markiert – füllt sich von selbst, sobald du Artikel öfter einfügst, oder markiere Favoriten direkt bei Produkte/Technik.</span>'
+    :'<span class="mut sml">Nichts gefunden.</span>');
 }
 function insertSelectedProducts(){
   var keys=Object.keys(PP_SEL);if(!keys.length)return;
@@ -8824,8 +8838,19 @@ function insertSelectedProducts(){
   PP_SEL={};closeModal();renderItems();
   toast(keys.length+' Artikel eingefügt ✓');
 }
+/* Zaehlt eine echte Einfuegung (nicht nur Anschauen) - Basis fuer "Haeufig gebucht"
+   neben der manuellen favorite-Markierung. Nebenbei, ohne die eigentliche Aktion
+   aufzuhalten. */
+function ppBumpUse(key){
+  var isEq=key.indexOf('e:')===0,id=key.slice(2);
+  var list=isEq?CACHE.equipment:CACHE.products;
+  var it=list&&list.find(function(x){return x.id===id});if(!it)return;
+  it.use_count=(it.use_count||0)+1;
+  api((isEq?'equipment':'products')+'?id=eq.'+id,{method:'PATCH',body:{use_count:it.use_count}}).catch(function(){});
+}
 function insertProduct(key,opts){
   opts=opts||{};
+  ppBumpUse(key);
   if(key.indexOf('e:')===0){
     var eq=(CACHE.equipment||[]).find(function(x){return x.id===key.slice(2)});if(!eq)return;
     var days=docRentalDays();

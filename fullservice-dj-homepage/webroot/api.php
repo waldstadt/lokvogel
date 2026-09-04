@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 111;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 112;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -202,9 +202,9 @@ const JSON_COLS = [
 const BOOL_COLS = [
   'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'], 'badges' => ['public','light_bg'], 'blocks' => ['public'], 'event_reports' => ['public'],
   'workshop_events' => ['public'],
-  'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active'],
+  'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active','favorite'],
   'bookings' => ['review_requested','open_ended'],
-  'equipment' => ['public','rentable','own_rig','on_request'],
+  'equipment' => ['public','rentable','own_rig','on_request','favorite'],
   'equipment_sets' => ['public'],
   'booking_equipment' => ['out_done','back_done'],
   'communications' => ['followup_done'],
@@ -1208,6 +1208,15 @@ function upgrade(PDO $p): void {
     /* v111: Ratgeber-Artikel (SEO-Inhalte), frei im Backoffice anlegbar. */
     try { $p->exec(guidesDdl()); } catch (PDOException $e) {}
     try { seedGuides($p); } catch (PDOException $e) {}
+  }
+  if ($v < 112) {
+    /* v112: "Häufig gebucht" im Artikel-Picker - manuell markierbar (favorite) und
+       automatisch aus echten Einfüge-Zahlen (use_count), siehe insertProduct()/
+       ppToggleFav() in admin.html. */
+    try { $p->exec('alter table products add column favorite integer default 0'); } catch (PDOException $e) {}
+    try { $p->exec('alter table products add column use_count integer default 0'); } catch (PDOException $e) {}
+    try { $p->exec('alter table equipment add column favorite integer default 0'); } catch (PDOException $e) {}
+    try { $p->exec('alter table equipment add column use_count integer default 0'); } catch (PDOException $e) {}
   }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -3771,7 +3780,8 @@ create table equipment (id text primary key, sort integer default 0, name text n
   qty_total integer default 1, rentable integer default 1, public integer default 1,
   status text default 'aktiv', notes text, partner_rate real, addon_id text, addon_ids text, images text, fits_ids text, min_qty integer default 1, placeholder text,
   thomann_url text, own_rig integer default 0, day_rate_suggested real,
-  invoice_file text, invoice_name text, on_request integer default 0, created_at text);
+  invoice_file text, invoice_name text, on_request integer default 0, created_at text,
+  favorite integer default 0, use_count integer default 0);
 create table equipment_sets (id text primary key, sort integer default 0,
   name text not null, description text, image_url text, image_focal text default '50% 50%',
   discount_pct real default 5, fixed_price real, public integer default 1, created_at text);
@@ -3840,7 +3850,7 @@ create table email_templates (id text primary key, sort integer default 0, name 
 create table products (id text primary key, sku text unique, sort integer default 0,
   category text, name text not null, description text, unit text default 'Stk.',
   kind text default 'artikel', price_net real, bundle text default '[]', addon_sku text,
-  active integer default 1, created_at text);
+  active integer default 1, created_at text, favorite integer default 0, use_count integer default 0);
 create table quote_templates (id text primary key, sort integer default 0, name text not null,
   intro_text text, outro_text text, items text default '[]', created_at text);
 create table partners (id text primary key, code text unique, name text not null, company text,
