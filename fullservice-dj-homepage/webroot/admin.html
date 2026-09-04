@@ -9288,7 +9288,22 @@ function openModal(title,html){
   document.getElementById('modalBg').classList.add('v');
 }
 function closeModal(){document.getElementById('modalBg').classList.remove('v');window._composeSent=null}
-document.getElementById('modalBg').addEventListener('click',function(e){if(e.target===this)closeModal()});
+/* Nur schliessen, wenn Mausklick UND Loslassen beide auf dem Hintergrund waren - sonst
+   schliesst ein Text-Markieren im Formular (Drag ueber den Fensterrand hinaus) versehentlich
+   das ganze Fenster, weil der Browser den "click" dann auf dem Hintergrund feuert. Steht
+   noch ausgefuellter Text in einem Textfeld (z. B. eine laengere Mail), erst nachfragen -
+   ein echter Klick daneben soll den nicht kommentarlos wegwerfen. */
+(function(){
+  var bg=document.getElementById('modalBg'),mdOnBg=false;
+  bg.addEventListener('mousedown',function(e){mdOnBg=(e.target===this)});
+  bg.addEventListener('click',function(e){
+    if(e.target===this&&mdOnBg){
+      var hatText=[].some.call(document.querySelectorAll('#modalBox textarea'),function(t){return t.value.trim()});
+      if(!hatText||confirm('Fenster wirklich schließen? Der eingegebene Text geht dabei verloren.'))closeModal();
+    }
+    mdOnBg=false;
+  });
+})();
 document.addEventListener('keydown',function(e){
   if(e.key!=='Escape')return;
   var bg2=document.getElementById('modalBg2');
