@@ -256,8 +256,18 @@ function secretKey(): string {
   if (!is_dir(DATA_DIR)) mkdir(DATA_DIR, 0755, true);
   $f = DATA_DIR . '/secret.key';
   if (!file_exists($f)) {
-    file_put_contents($f, random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES));
-    @chmod($f, 0600);
+    /* Exklusiv anlegen (fopen 'x' schlaegt fehl, wenn die Datei schon existiert) - verhindert,
+       dass zwei nahezu gleichzeitige erste Anfragen je einen eigenen Schluessel erzeugen und
+       sich gegenseitig ueberschreiben (dann waere alles mit dem ersten Schluessel bereits
+       Verschluesselte nicht mehr entschluesselbar). Verliert das Rennen ein Aufruf, existiert
+       die Datei danach trotzdem - der folgende file_get_contents() liest einfach den Schluessel
+       des Gewinners. */
+    $fh = @fopen($f, 'x');
+    if ($fh) {
+      fwrite($fh, random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES));
+      fclose($fh);
+      @chmod($f, 0600);
+    }
   }
   return $key = (string)file_get_contents($f);
 }
@@ -282,8 +292,12 @@ function secretDecrypt(?string $val): string {
   $val = (string)$val;
   if ($val === '' || !str_starts_with($val, 'enc:')) return $val;
   $raw = base64_decode(substr($val, 4));
-  if ($raw === false) return '';
-  return secretDecryptBytes($raw) ?? '';
+  /* Faellt die Entschluesselung fehl (z.B. weil ein Klartext-Altbestand zufaellig mit
+     "enc:" anfaengt), lieber den Originalwert unveraendert zurueckgeben statt ihn still
+     auf '' zu leeren - ein falsch erkanntes Passwort ist immer noch besser als ein
+     kommentarlos verschwundenes. */
+  if ($raw === false) return $val;
+  return secretDecryptBytes($raw) ?? $val;
 }
 
 /* ---------- DB & Migration ---------- */

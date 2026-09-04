@@ -6139,7 +6139,7 @@ function openEqModal(id){
     '<div id="eqImgGrid"></div>'+
     '<div id="eqFocalWrap"></div>'+
     '<label style="margin-top:12px"><input type="checkbox" id="ePub" style="width:auto;margin-right:6px" '+(e.public!==false?'checked':'')+'>Auf Homepage anzeigen (mietbar)</label>'+
-    '<label><input type="checkbox" id="eFav" style="width:auto;margin-right:6px" '+(e.favorite?'checked':'')+'>Häufig gebucht (erscheint im Picker unter „★ Häufig gebucht“)</label>'+
+    '<label><input type="checkbox" id="eFav" style="width:auto;margin-right:6px" '+(e.favorite?'checked':'')+'>Häufig gebucht (erscheint im Artikel-Picker oben in der Kategorie-Auswahl)</label>'+
     '<h4 style="margin:16px 0 6px;color:var(--mut)">Verknüpfungen zu anderen Artikeln</h4>'+
     '<div class="grid2"><div><label>Zubehör-Empfehlung („passt dazu“ – bis zu 5)</label>'+
     eqRelSelects('eAddon',(e.addon_ids&&e.addon_ids.length?e.addon_ids:(e.addon_id?[e.addon_id]:[])),e.id)+'</div>'+
@@ -8746,7 +8746,7 @@ function openProdModal(id){
     '<label>Passt dazu (Artikelnummer) <span class="mut sml" style="text-transform:none;letter-spacing:0">– wird automatisch mit ins Angebot/die Rechnung übernommen, wenn dieser Artikel eingefügt wird (z. B. Kabel zu Lautsprecher)</span></label>'+
     '<input id="pAddonSku" value="'+esc(p.addon_sku||'')+'" placeholder="z. B. KABEL-10">'+
     '<label style="margin-top:12px"><input type="checkbox" id="pActive" style="width:auto;margin-right:6px" '+(p.active!==false?'checked':'')+'>Aktiv (im „+ Artikel“-Picker sichtbar)</label>'+
-    '<label><input type="checkbox" id="pFav" style="width:auto;margin-right:6px" '+(p.favorite?'checked':'')+'>Häufig gebucht (erscheint im Picker unter „★ Häufig gebucht“)</label>'+
+    '<label><input type="checkbox" id="pFav" style="width:auto;margin-right:6px" '+(p.favorite?'checked':'')+'>Häufig gebucht (erscheint im Artikel-Picker oben in der Kategorie-Auswahl)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveProd(\''+(id||'')+'\')">Speichern</button>'+
     (id?' <button class="btn r" onclick="delRow(\'products\',\''+id+'\',reloadProds)">Löschen</button>':'')+'</div>');
 }
@@ -8781,7 +8781,7 @@ function openProductPicker(){
     '<div class="pp-filters">'+
     '<input type="search" autocomplete="off" data-lpignore="true" id="ppSearch" placeholder="Suchen (auch im Technikkatalog) …" oninput="renderPicker()">'+
     '<select id="ppCat" onchange="renderPicker()"><option value="">Alle Kategorien</option>'+
-    '<option value="__fav__">★ Häufig gebucht</option>'+
+    '<option value="__fav__">Häufig gebucht</option>'+
     cats.map(function(c){return '<option value="'+esc(c)+'">'+esc(c)+'</option>'}).join('')+'</select></div>'+
     '<div id="ppList" style="max-height:380px;overflow-y:auto"></div>'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">'+
