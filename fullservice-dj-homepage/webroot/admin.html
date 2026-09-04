@@ -362,10 +362,14 @@ tr.neu td{background:rgba(255,111,91,.14)}
 @media(max-width:560px){
   .pp-filters{flex-direction:column}
   .pp-filters input,.pp-filters select{flex:none;width:100%}
-  .pp-item{flex-wrap:wrap;padding:12px 0}
-  .pp-item .pp-info{flex-basis:100%}
-  .pp-item .pp-add{flex:1 1 100%;margin-top:8px;padding:10px 16px}
-  .pp-check input{width:22px;height:22px}
+  /* Nur Name + Preis auf dem Handy - Artikelnummer, Einheit, Badge und Beschreibung
+     kosten hier nur Platz, ohne die Auswahl zu erleichtern. */
+  .pp-item{padding:8px 0;align-items:center}
+  .pp-item .pp-sku,.pp-item .pp-unit,.pp-item .pp-badge,.pp-item .pp-desc{display:none}
+  .pp-info{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .pp-meta{margin-top:0;flex:none}
+  .pp-check input{width:20px;height:20px}
+  .pp-add{padding:7px 12px;font-size:11px}
 }
 @media(max-width:560px){
   .it-row,.it-row.sml{grid-template-columns:28px 1fr;gap:5px;row-gap:4px;
@@ -8808,9 +8812,9 @@ function renderPicker(){
   document.getElementById('ppList').innerHTML=list.map(function(p){
     return '<div class="pp-item">'+
     '<label class="pp-check"><input type="checkbox"'+(PP_SEL[p.key]?' checked':'')+' onchange="ppToggle(\''+p.key+'\',this.checked)"></label>'+
-    '<div class="pp-info"><div><b>'+esc(p.name)+'</b> <span class="mut sml">'+esc(p.sku)+'</span></div>'+
-    '<div class="pp-meta mut">'+euro(p.price)+' / '+esc(p.unit)+(p.badge?' '+p.badge:'')+'</div>'+
-    (p.desc?'<div class="mut sml">'+esc(p.desc.slice(0,90))+'</div>':'')+'</div>'+
+    '<div class="pp-info"><div><b>'+esc(p.name)+'</b> <span class="pp-sku mut sml">'+esc(p.sku)+'</span></div>'+
+    '<div class="pp-meta mut">'+euro(p.price)+' <span class="pp-unit">/ '+esc(p.unit)+'</span>'+(p.badge?' <span class="pp-badge">'+p.badge+'</span>':'')+'</div>'+
+    (p.desc?'<div class="pp-desc mut sml">'+esc(p.desc.slice(0,90))+'</div>':'')+'</div>'+
     '<button class="btn sm pp-add" onclick="insertProduct(\''+p.key+'\')">Einfügen</button></div>';
   }).join('')||'<span class="mut sml">Nichts gefunden.</span>';
 }
