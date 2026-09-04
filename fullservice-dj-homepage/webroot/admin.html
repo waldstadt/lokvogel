@@ -9218,7 +9218,7 @@ function guideSectionRow(s){
     '<button type="button" class="btn g sm" onclick="guideSecImgFromPool(this)">Aus Medien-Pool wählen</button></div>'+
     '<label>Bildbeschreibung (klein, kursiv unter dem Bild)</label><input data-scap value="'+esc(s.image_caption||'')+'">'+
     '<label>Button nach diesem Abschnitt (optional, z. B. „Lass uns über Musik sprechen")</label><input data-scta value="'+esc(s.cta_label||'')+'" placeholder="z. B. Kontaktiere mich">'+
-    '<label>Spotify-Playlist einbetten (optional) – Embed-Link aus Spotify: „Teilen" → „Einbetten" → src-Adresse kopieren</label><input data-se value="'+esc(s.embed||'')+'" placeholder="https://open.spotify.com/embed/playlist/…">'+
+    '<label>Spotify-Playlists einbetten (optional, eine pro Zeile für mehrere) – Embed-Link aus Spotify: „Teilen" → „Einbetten" → src-Adresse kopieren</label><textarea data-se rows="2" placeholder="https://open.spotify.com/embed/playlist/…">'+esc((s.embeds||(s.embed?[s.embed]:[])).join('\n'))+'</textarea>'+
     '<a onclick="this.parentNode.remove()" style="color:var(--redl);font-size:12px">Abschnitt entfernen</a></div>';
 }
 function guideAddSection(){document.getElementById('gSections').insertAdjacentHTML('beforeend',guideSectionRow())}
@@ -9305,8 +9305,8 @@ function saveGuide(){
       image:div.querySelector('[data-simg]').value.trim(),
       image_caption:div.querySelector('[data-scap]').value.trim(),
       cta_label:div.querySelector('[data-scta]').value.trim(),
-      embed:div.querySelector('[data-se]').value.trim()};
-  }).filter(function(s){return s.heading||s.text||s.items.length||s.embed||s.image});
+      embeds:div.querySelector('[data-se]').value.split('\n').map(function(s){return s.trim()}).filter(Boolean)};
+  }).filter(function(s){return s.heading||s.text||s.items.length||s.embeds.length||s.image});
   var faq=[].map.call(document.querySelectorAll('#gFaq [data-gfaq]'),function(div){
     return {q:div.querySelector('[data-fq]').value.trim(),a:div.querySelector('[data-fa]').value.trim()};
   }).filter(function(f){return f.q&&f.a});

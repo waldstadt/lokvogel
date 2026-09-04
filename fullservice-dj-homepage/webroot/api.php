@@ -3661,7 +3661,7 @@ function guideRows(): array {
    'sections' => [
      ['heading' => 'Meine Lieblingshits aus den 90ern und 2000ern',
       'text' => '[Platzhaltertext] Das sind die Tracks, die bei mir garantiert für Stimmung sorgen – und die ich privat genauso gerne höre wie auf der Tanzfläche.',
-      'embed' => 'https://open.spotify.com/embed/playlist/37i9dQZF1EIUyJRqPTrkHe?utm_source=generator'],
+      'embeds' => ['https://open.spotify.com/embed/playlist/37i9dQZF1EIUyJRqPTrkHe?utm_source=generator']],
      ['heading' => 'Wie ich Musikwünsche einbaue',
       'text' => '[Platzhaltertext] Ihr schickt mir vorab eure Wünsche und No-Gos, und ich baue sie so ein, dass sie zur Stimmung des Abends passen – keine stumpfe Playlist von der Stange.'],
    ],

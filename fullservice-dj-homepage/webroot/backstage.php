@@ -128,11 +128,16 @@ if ($slug !== '') {
         <?php if (!empty($s['image_caption'])): ?><figcaption class="rg-cap"><?= rgEsc($s['image_caption']) ?></figcaption><?php endif; ?>
       </figure>
     <?php endif; ?>
-    <?php if (!empty($s['embed'])): ?>
-      <div class="rg-embed"><iframe src="<?= rgEsc($s['embed']) ?>" width="100%" height="352" frameborder="0"
+    <?php
+      /* "embeds" (Array, mehrere Playlists moeglich) ist der aktuelle Stand; das alte
+         Einzelfeld "embed" bleibt fuer laenger zurueckliegend gespeicherte Beitraege lesbar. */
+      $embeds = !empty($s['embeds']) && is_array($s['embeds']) ? $s['embeds'] : (!empty($s['embed']) ? [$s['embed']] : []);
+    ?>
+    <?php foreach ($embeds as $embedUrl): ?>
+      <div class="rg-embed"><iframe src="<?= rgEsc($embedUrl) ?>" width="100%" height="352" frameborder="0"
         allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"
         title="Spotify-Playlist"></iframe></div>
-    <?php endif; ?>
+    <?php endforeach; ?>
     <?php if (!empty($s['cta_label'])): ?>
       <p style="margin-top:18px"><a class="btn" href="<?= rgEsc($g['cta_href'] ?: ($homeHref . '#anfrage')) ?>"><?= rgEsc($s['cta_label']) ?></a></p>
     <?php endif; ?>
