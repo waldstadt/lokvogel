@@ -885,7 +885,7 @@ tr.neu td{background:rgba(255,111,91,.14)}
   <!-- RATGEBER -->
   <div class="pg" id="pg-guides">
     <div class="pt">Backstage</div><div class="ps">Persönliche Einblicke in deine Arbeit, deinen Musikgeschmack und deine Erfahrungen – jeder Beitrag eine eigene Seite unter /backstage/… Anders als bei Aktionsseiten braucht ein neuer Beitrag keine neue Datei, nur „+ Beitrag".</div>
-    <div style="margin-bottom:12px"><button class="btn sm" onclick="openGuideModal()">+ Beitrag</button> <button class="btn g sm" id="guideAiBtn" onclick="suggestGuideTopics()">Themenvorschläge</button> <a class="btn g sm" href="backstage" target="_blank">Backstage ansehen</a></div>
+    <div style="margin-bottom:12px"><button class="btn sm" onclick="openGuideModal()">+ Beitrag</button> <button class="btn g sm" id="guideAiBtn" onclick="suggestGuideTopics()">Themenvorschläge</button> <button class="btn g sm" onclick="openGuideOutlineModal()">Vorschläge zu einem Thema</button> <a class="btn g sm" href="backstage" target="_blank">Backstage ansehen</a></div>
     <div class="mut sml" style="margin-bottom:12px">Einmal im Monat schickt dir das Backoffice außerdem automatisch ein paar neue Themenideen per Mail/Telegram, sobald der tägliche Backup-Cronjob läuft.</div>
     <div class="tbl-wrap card"><table><thead><tr><th>Beitrag</th><th>Adresse</th><th>Status</th><th></th></tr></thead><tbody id="guideRows"></tbody></table></div>
   </div>
@@ -9261,9 +9261,34 @@ function openGuideModal(id){
     '<div><label>Farbschema/Ziel</label><select id="gTarget"><option value="index">DJ-Seite</option><option value="technik">Technik-Seite</option></select></div></div>'+
     '<label>Link-Ziel des Buttons (z. B. hochzeit.html#anfrage)</label><input id="gCtaHref" value="'+esc(g.cta_href||'')+'">'+
     '<label style="margin-top:12px"><input type="checkbox" id="gPub" style="width:auto;margin-right:6px" '+(g.published?'checked':'')+'>Veröffentlicht</label>'+
-    '<div style="margin-top:14px;display:flex;gap:8px"><button class="btn" onclick="saveGuide()">Speichern</button>'+
+    '<div id="gSeoResult"></div>'+
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="saveGuide()">Speichern</button>'+
+    '<button class="btn g" id="gSeoBtn" onclick="guideSeoCheck()">SEO-Check</button>'+
     (id?' <a class="btn g" href="backstage/'+esc(g.slug)+'" target="_blank" style="text-decoration:none">Beitrag ansehen</a> <button class="btn r" onclick="delRow(\'guides\',\''+id+'\',reloadGuides)">Löschen</button>':'')+'</div>');
   if(g.footer_target)document.getElementById('gTarget').value=g.footer_target;
+}
+/* Prueft den bereits geschriebenen Text und gibt nur Vorschlaege zurueck - schreibt
+   nichts um (bewusst getrennt vom KI-Textassistenten "Gross bearbeiten"). */
+function guideSeoCheck(){
+  var sectionsText=[].map.call(document.querySelectorAll('#gSections [data-gsec]'),function(div){
+    return (div.querySelector('[data-sh]').value+'\n'+div.querySelector('[data-st]').value).trim();
+  }).join('\n\n');
+  var body={title:v('gTitle'),meta_desc:v('gMeta'),h1:v('gH1'),intro:v('gIntro'),sections_text:sectionsText};
+  var btn=document.getElementById('gSeoBtn');
+  btn.disabled=true;btn.textContent='Wird geprüft …';
+  fetch('api.php/ai/seo-check-guide',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
+    .then(function(res){
+      btn.disabled=false;btn.textContent='SEO-Check';
+      if(!res.ok||res.j.error){toast((res.j&&res.j.error)||'KI-Anfrage fehlgeschlagen.',1);return}
+      var el=document.getElementById('gSeoResult');
+      if(!res.j.length){el.innerHTML='<div class="mut sml" style="margin-top:10px">Keine Anmerkungen – sieht gut aus.</div>';return}
+      el.innerHTML='<div class="card" style="margin-top:10px;padding:12px">'+
+        '<div class="sml" style="margin-bottom:6px"><b>SEO-Vorschläge</b> – reine Hinweise, dein Text wird dadurch nicht verändert.</div>'+
+        res.j.map(function(s){
+          return '<div style="margin-top:8px"><b class="sml">'+esc(s.area||'')+'</b><div class="mut sml">'+esc(s.suggestion)+'</div></div>';
+        }).join('')+'</div>';
+    }).catch(function(e){btn.disabled=false;btn.textContent='SEO-Check';toast(e.message,1)});
 }
 function guideImgFromPool(){
   openMediaPicker(function(url){if(url)document.getElementById('gImage').value=url});
@@ -9320,6 +9345,52 @@ function guideFromSuggestion(s){
   document.getElementById('gH1').value=s.title;
   document.getElementById('gSlug').value=guideSlugify(s.title);
   if(s.reason)document.getElementById('gIntro').value=s.reason;
+}
+/* Gliederungs-Vorschlag zu einem selbst vorgegebenen Thema: die KI liefert nur
+   Ueberschriften + Stichpunkte, keinen Fliesstext - den schreibt Markus selbst
+   (siehe Gespraech: eigene Stimme statt KI-Text, nicht wegen einer Google-Abwertung -
+   die gibt es laut Googles Helpful-Content-Richtlinien nicht fuer KI-unterstuetzte Texte). */
+function openGuideOutlineModal(){
+  openModal('Vorschläge zu einem Thema',
+    '<label>Thema</label><input id="goTopic" placeholder="z. B. Warum ich bei Regen nie improvisiere">'+
+    '<div style="margin-top:12px"><button class="btn" id="goBtn" onclick="guideRequestOutline()">Gliederung vorschlagen</button></div>'+
+    '<div id="goResult" style="margin-top:14px"></div>');
+}
+function guideRequestOutline(){
+  var topic=v('goTopic').trim();
+  if(!topic){toast('Bitte zuerst ein Thema eingeben.',1);return}
+  var btn=document.getElementById('goBtn');
+  btn.disabled=true;btn.textContent='Wird generiert …';
+  fetch('api.php/ai/suggest-guide-outline',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify({topic:topic})})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
+    .then(function(res){
+      btn.disabled=false;btn.textContent='Gliederung vorschlagen';
+      if(!res.ok||res.j.error){toast((res.j&&res.j.error)||'KI-Anfrage fehlgeschlagen.',1);return}
+      window._goResult=res.j;
+      document.getElementById('goResult').innerHTML=
+        '<div class="card" style="padding:12px">'+
+        '<b>'+esc(res.j.h1||topic)+'</b>'+(res.j.kicker?'<div class="mut sml" style="margin-top:4px">'+esc(res.j.kicker)+'</div>':'')+
+        (res.j.sections||[]).map(function(s){
+          return '<div style="margin-top:10px"><b class="sml">'+esc(s.heading||'')+'</b><ul style="margin:4px 0 0 20px;font-size:13px;color:var(--mut)">'+
+            (s.points||[]).map(function(p){return '<li>'+esc(p)+'</li>'}).join('')+'</ul></div>';
+        }).join('')+
+        '<div style="margin-top:12px"><button class="btn sm" onclick="guideOutlineApply()">Als neuen Beitrag anlegen</button></div>'+
+        '</div>';
+    }).catch(function(e){btn.disabled=false;btn.textContent='Gliederung vorschlagen';toast(e.message,1)});
+}
+function guideOutlineApply(){
+  var o=window._goResult;if(!o)return;
+  closeModal();
+  openGuideModal();
+  document.getElementById('gH1').value=o.h1||'';
+  document.getElementById('gTitle').value=o.h1||'';
+  document.getElementById('gSlug').value=guideSlugify(o.h1||'');
+  document.getElementById('gKicker').value=o.kicker||'';
+  var wrap=document.getElementById('gSections');
+  wrap.innerHTML=(o.sections||[]).map(function(s){
+    return guideSectionRow({heading:s.heading||'',text:'Stichpunkte:\n– '+(s.points||[]).join('\n– ')});
+  }).join('');
+  toast('Gliederung übernommen – Stichpunkte in eigenen Text umschreiben, dann speichern.');
 }
 
 /* ===== Bewertungen ===== */

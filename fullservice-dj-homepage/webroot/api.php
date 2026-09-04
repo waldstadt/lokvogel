@@ -8534,6 +8534,69 @@ try {
     if (!$suggestions) fail('KI-Anfrage fehlgeschlagen: konnte keine Themenvorschläge erzeugen.', 502);
     out($suggestions);
   }
+  /* Backstage: Gliederungs-Vorschlag zu einem selbst vorgegebenen Thema - anders als
+     suggestGuideTopics() (schlaegt Themen VOR) bekommt die KI hier ein Thema von Markus
+     genannt und schlaegt nur eine Gliederung (Ueberschriften + Stichpunkte) vor, KEINEN
+     fertigen Text - der eigentliche Text soll von Markus selbst kommen (siehe Gespraech:
+     eigene Stimme/Persoenlichkeit, nicht wegen einer angeblichen Google-Abwertung von
+     KI-Text - die gibt es laut Googles Helpful-Content-Richtlinien nicht). */
+  if ($path === 'ai/suggest-guide-outline' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $topic = trim((string)($body['topic'] ?? ''));
+    if ($topic === '') fail('Bitte zuerst ein Thema eingeben.', 400);
+    if (mb_strlen($topic) > 300) fail('Thema ist zu lang (max. 300 Zeichen).', 400);
+    $ai = aiConfigOrFail();
+    $system = 'Du hilfst beim Planen eines Backstage-Blogbeitrags fuer die Website eines DJ- und '
+      . 'Veranstaltungstechnik-Verleih-Betriebs. Backstage sind persoenliche Einblicke des Betreibers '
+      . 'in seine Arbeit, seinen Musikgeschmack und seine Erfahrungen - seine eigene Stimme, kein '
+      . 'unpersoenlicher Ratgeber. Du bekommst ein Thema und schlaegst dafuer NUR eine Gliederung vor: '
+      . 'einen Vorschlag fuer H1-Ueberschrift und Kicker, sowie 3-5 Abschnitte mit je einer '
+      . 'Zwischenueberschrift und 2-4 kurzen Stichpunkten (keine ausformulierten Saetze, keine '
+      . 'fertigen Absaetze) - der Betreiber schreibt den eigentlichen Text selbst anhand der '
+      . 'Stichpunkte. Antworte AUSSCHLIESSLICH als kompaktes JSON-Objekt ohne Markdown-Codeblock, '
+      . 'exakt in der Form {"h1":"...","kicker":"...","sections":[{"heading":"...","points":["...","..."]}]}.';
+    try {
+      $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $topic, 700);
+    } catch (RuntimeException $e) { fail($e->getMessage(), 502); }
+    $raw = trim(preg_replace('#^```(?:json)?|```$#m', '', $raw));
+    $j = json_decode($raw, true);
+    if (!is_array($j) || empty($j['sections'])) fail('KI-Anfrage fehlgeschlagen: konnte keine Gliederung erzeugen.', 502);
+    out($j);
+  }
+  /* Backstage: SEO-Check eines selbst geschriebenen Beitrags - gibt NUR Vorschlaege
+     zurueck, schreibt den Text nicht um (bewusst getrennt vom KI-Textassistenten/
+     "Gross bearbeiten", der Text ersetzt - hier bleibt Markus' eigener Text unangetastet). */
+  if ($path === 'ai/seo-check-guide' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $title = trim((string)($body['title'] ?? ''));
+    $meta = trim((string)($body['meta_desc'] ?? ''));
+    $h1 = trim((string)($body['h1'] ?? ''));
+    $intro = trim((string)($body['intro'] ?? ''));
+    $sectionsText = trim((string)($body['sections_text'] ?? ''));
+    if ($h1 === '' && $sectionsText === '') fail('Bitte zuerst Überschrift oder Text eingeben.', 400);
+    $ai = aiConfigOrFail();
+    $system = 'Du bist ein SEO-Prüfer für einen Backstage-Blogbeitrag einer DJ- und Veranstaltungstechnik-'
+      . 'Verleih-Website. Du bekommst Browser-Titel, Meta-Beschreibung, H1, Einleitung und die '
+      . 'Abschnittstexte eines bereits fertig geschriebenen Beitrags. Prüfe NUR - schreibe NICHTS um und '
+      . 'liefere KEINEN Fließtext. Gib konkrete, umsetzbare Verbesserungsvorschläge (z. B. zu Länge der '
+      . 'Meta-Beschreibung, Keyword-Nutzung in H1/Überschriften, fehlenden internen Verlinkungen, '
+      . 'Lesbarkeit, Struktur). Antworte AUSSCHLIESSLICH als kompaktes JSON-Array ohne Markdown-Codeblock, '
+      . 'jedes Element exakt in der Form {"area":"...","suggestion":"..."} - area ein kurzes Schlagwort '
+      . '(z. B. "Meta-Beschreibung", "Überschriften", "Keywords"), suggestion ein bis zwei Sätze konkreter '
+      . 'Vorschlag. Maximal 8 Vorschläge, nur wirklich hilfreiche - keine Füllvorschläge, wenn etwas schon gut ist.';
+    $userText = "Browser-Titel: $title\nMeta-Beschreibung (" . mb_strlen($meta) . " Zeichen): $meta\n"
+      . "H1: $h1\nEinleitung: $intro\n\nAbschnittstexte:\n" . mb_substr($sectionsText, 0, 4000);
+    try {
+      $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 700);
+    } catch (RuntimeException $e) { fail($e->getMessage(), 502); }
+    $raw = trim(preg_replace('#^```(?:json)?|```$#m', '', $raw));
+    $j = json_decode($raw, true);
+    if (!is_array($j)) fail('KI-Anfrage fehlgeschlagen: konnte keine SEO-Vorschläge erzeugen.', 502);
+    $out = [];
+    foreach ($j as $item) if (!empty($item['suggestion']))
+      $out[] = ['area' => trim((string)($item['area'] ?? '')), 'suggestion' => trim((string)$item['suggestion'])];
+    out($out);
+  }
   /* Technik-Check-Fotos: geschützt in data/checkpics, Zugriff nur angemeldet */
   if (preg_match('#^checkpic/([a-f0-9-]{30,40})$#', $path, $m) && $method === 'POST') {
     if (!currentUser()) fail('Nicht angemeldet.', 401);
