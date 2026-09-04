@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 110;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 111;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -181,6 +181,7 @@ const JSON_COLS = [
   'tech_checks' => ['data'],
   'equipment' => ['addon_ids', 'images', 'fits_ids'],
   'campaign_pages' => ['cards', 'features', 'form_cfg'],
+  'guides' => ['sections', 'faq'],
   'blocks' => ['media'],
   'event_reports' => ['media'],
 ];
@@ -199,7 +200,7 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks','payments','mail_messages','discount_codes'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks','payments','mail_messages','discount_codes','guides'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
@@ -1188,6 +1189,11 @@ function upgrade(PDO $p): void {
   if ($v < 110) {
     /* v110: Bruteforce-Bremse fuer Admin-/Kundenkonto-Login (siehe loginDdl/checkLoginThrottle). */
     try { $p->exec(loginDdl()); } catch (PDOException $e) {}
+  }
+  if ($v < 111) {
+    /* v111: Ratgeber-Artikel (SEO-Inhalte), frei im Backoffice anlegbar. */
+    try { $p->exec(guidesDdl()); } catch (PDOException $e) {}
+    try { seedGuides($p); } catch (PDOException $e) {}
   }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
@@ -3463,6 +3469,131 @@ function campaignPageRows(): array {
   ];
 }
 
+/* ==================== Ratgeber (SEO-Inhaltsartikel) ====================
+   Frei anlegbare Artikel (anders als die 14 Aktionsseiten mit fester Datei je Slug) -
+   ein neuer Artikel braucht keine neue Datei, ratgeber.php rendert jeden Slug aus
+   dieser Tabelle direkt. Sections sind ein einfaches Array aus {heading, text, items}
+   (items optional, fuer Aufzaehlungen), faq ein Array aus {q, a} (liefert zusaetzlich
+   FAQPage-Markup fuer Google, siehe ratgeber.php). */
+function guidesDdl(): string {
+  return "create table if not exists guides (id text primary key,
+    slug text unique not null, published integer default 0, sort integer default 0,
+    title text, meta_desc text, kicker text, h1 text, intro text,
+    sections text default '[]', faq text default '[]',
+    cta_label text, cta_href text, footer_target text default 'index',
+    created_at text, updated_at text)";
+}
+/* Nur einfügen, was noch fehlt (Slug-Abgleich) - eigene Änderungen an bestehenden
+   Artikeln bleiben bei Migrationen unberührt, wie bei seedCampaignPages(). */
+function seedGuides(PDO $p): void {
+  $ins = $p->prepare('insert into guides (id, slug, published, sort, title, meta_desc, kicker, h1, intro,
+      sections, faq, cta_label, cta_href, footer_target, created_at, updated_at)
+    values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+  $has = $p->prepare('select count(*) from guides where slug = ?');
+  foreach (guideRows() as $r) {
+    $has->execute([$r['slug']]);
+    if ((int)$has->fetchColumn()) continue;
+    $ins->execute([uuid(), $r['slug'], 1, $r['sort'], $r['title'], $r['meta_desc'], $r['kicker'], $r['h1'], $r['intro'],
+      json_encode($r['sections'], JSON_UNESCAPED_UNICODE), json_encode($r['faq'], JSON_UNESCAPED_UNICODE),
+      $r['cta_label'], $r['cta_href'], $r['footer_target'], now(), now()]);
+  }
+}
+function guideRows(): array {
+  return [
+
+  ['slug' => 'was-kostet-ein-hochzeits-dj', 'sort' => 10,
+   'title' => 'Was kostet ein Hochzeits-DJ? | DJ Lauschgift, Hemer',
+   'meta_desc' => 'Was ein Hochzeits-DJ kostet, hängt von mehr ab als vom Ruf des DJs. Ehrliche Übersicht, welche Posten in ein seriöses Angebot gehören und woran ihr unseriöse Angebote erkennt.',
+   'kicker' => 'Preise & Ehrlichkeit', 'h1' => 'Was kostet ein Hochzeits-DJ wirklich?',
+   'intro' => 'Die Preisfrage ist berechtigt, und die Antworten im Netz schwanken zwischen 300 und 3.000 Euro – ohne dass klar wird, warum. Ich sage euch, was tatsächlich in den Preis einfließt und was ihr von einem seriösen Angebot erwarten könnt.',
+   'sections' => [
+     ['heading' => 'Warum es keinen Festpreis von der Stange gibt',
+      'text' => 'Ein Hochzeits-DJ für vier Stunden Tanzfläche in einem kleinen Saal kostet etwas anderes als einer, der schon zum Sektempfang die Anlage stellt, die freie Trauung beschallt und bis zwei Uhr morgens bleibt. Auch Termin und Anfahrt spielen rein: ein Samstag im Juni ist gefragter als ein Sonntag im November, und eine Anfahrt quer durchs Land schlägt sich im Preis nieder. Wer euch einen Pauschalpreis nennt, ohne nach eurem Ablauf zu fragen, hat entweder Glück oder rechnet grob über den Daumen.'],
+     ['heading' => 'Diese Posten gehören in ein seriöses Angebot',
+      'text' => 'Achtet darauf, dass diese Punkte einzeln aufgeschlüsselt sind, nicht in einer Pauschale versteckt:',
+      'items' => [
+        'DJ-Leistung für die vereinbarte Spielzeit',
+        'Auf- und Abbau samt Soundcheck, bevor der erste Gast da ist',
+        'Tonanlage passend zur Location und Gästezahl',
+        'Funkmikrofon für Reden, Spiele oder die freie Trauung, falls gebraucht',
+        'Anfahrt',
+        'Licht, falls gewünscht',
+      ]],
+     ['heading' => 'Woran ihr unseriöse Angebote erkennt',
+      'text' => 'Drei Warnzeichen: ein Pauschalpreis ganz ohne Aufschlüsselung, ein Angebot ohne vorheriges Gespräch (der DJ kennt weder eure Location noch euren Musikgeschmack) und eine Technik-Beschreibung, die so vage bleibt, dass ihr sie nicht mit einem anderen Angebot vergleichen könnt.'],
+     ['heading' => 'Was es bei mir kostet',
+      'text' => 'Ehrliche Antwort: kommt darauf an. Aber so lauft es ab – wir telefonieren oder treffen uns, ich frage nach eurem Ablauf und eurer Location, und danach bekommt ihr einen Festpreis mit jedem Posten einzeln aufgeschlüsselt. Der gilt dann auch, ohne Nachschlag am Ende des Abends.'],
+   ],
+   'faq' => [
+     ['q' => 'Muss ich vor der Buchung ein Angebot verlangen?', 'a' => 'Ja, unbedingt – und zwar eines, in dem jeder Posten einzeln steht. So könnt ihr verschiedene Angebote wirklich vergleichen, statt nur die Endsumme nebeneinanderzulegen.'],
+     ['q' => 'Gibt es einen Mindestpreis?', 'a' => 'Einen festen Mindestpreis nenne ich ungern, weil er von Termin und Aufwand abhängt. Schreibt mir einfach – die erste Einschätzung kostet nichts.'],
+     ['q' => 'Was passiert, wenn der DJ kurzfristig ausfällt?', 'a' => 'Bei mir ist die wichtige Technik doppelt vorhanden, und für den unwahrscheinlichen Fall, dass ich selbst ausfalle, schlage ich euch persönlich Kollegen aus meinem Netzwerk vor. Das steht auch so in meinen AGB.'],
+   ],
+   'cta_label' => 'Jetzt unverbindlich anfragen', 'cta_href' => 'hochzeit.html#anfrage', 'footer_target' => 'index'],
+
+  ['slug' => 'checkliste-technik-firmenevent', 'sort' => 20,
+   'title' => 'Checkliste: Technik fürs Firmenevent | Lauschgift Veranstaltungstechnik, Hemer',
+   'meta_desc' => 'Ton- und Lichttechnik fürs Firmenevent planen: Diese Checkliste hilft, vor dem Termin an alles zu denken – von der Teilnehmerzahl bis zum Stromanschluss.',
+   'kicker' => 'Checkliste', 'h1' => 'Technik fürs Firmenevent – die Checkliste vor dem Termin',
+   'intro' => 'Für ein Firmensommerfest, eine Messe oder eine Betriebsversammlung braucht es selten einen DJ, aber fast immer verlässliche Ton- und Lichttechnik. Diese Liste hilft, vor dem Anruf beim Techniker schon an das Wichtigste gedacht zu haben.',
+   'sections' => [
+     ['heading' => 'Vor dem Termin klären',
+      'text' => '',
+      'items' => [
+        'Teilnehmerzahl – und ob drinnen, draußen oder beides',
+        'Location: Halle, Zelt oder Freifläche',
+        'Stromanschluss vorhanden oder wird ein Generator gebraucht',
+        'Programm-Ablauf: Reden, Hintergrundmusik, Auftritte',
+        'Zeitfenster für Aufbau vor Beginn',
+      ]],
+     ['heading' => 'Diese Technik kommt meistens infrage',
+      'text' => '',
+      'items' => [
+        'Funkmikrofon für Reden und Moderation',
+        'Beschallung für Hintergrundmusik oder Programm',
+        'Ambiente- oder Bühnenlicht, je nach Location',
+      ]],
+     ['heading' => 'Am Tag selbst',
+      'text' => 'Aufbau und Soundcheck laufen, bevor der erste Gast da ist. Während der Veranstaltung habt ihr einen festen Ansprechpartner – keinen Techniker, den ihr erst suchen müsst, wenn das Mikrofon aussetzt. Nach dem Ende wird zügig abgebaut.'],
+     ['heading' => 'Wann ihr einen Techniker holt statt selbst zu improvisieren',
+      'text' => 'Eine Bluetooth-Box aus dem Elektromarkt reicht für zwanzig Leute im Büro. Sobald Reden gehalten werden, mehr als fünfzig Personen zuhören sollen oder die Location akustisch schwierig ist (Halle, Zelt, hohe Decken), lohnt sich echte Technik mit jemandem, der sie bedient.'],
+   ],
+   'faq' => [
+     ['q' => 'Ab wie vielen Gästen brauchen wir einen Techniker?', 'a' => 'Eine feste Zahl gibt es nicht, aber ab etwa fünfzig Personen mit Redebeiträgen wird ein Funkmikrofon mit echter Beschallung spürbar besser als jede improvisierte Lösung.'],
+     ['q' => 'Kann die Technik auch dauerhaft installiert bleiben?', 'a' => 'Ja – für Locations, die regelmäßig Veranstaltungen ausrichten, biete ich Festinstallation mit Wartung an, siehe die Technik-Seite.'],
+     ['q' => 'Wir haben mehrere Standorte gleichzeitig – geht das?', 'a' => 'Über mein Partner-Netzwerk bekommt ihr für alle Standorte einen festen Ansprechpartner – mich.'],
+   ],
+   'cta_label' => 'Unverbindlich anfragen', 'cta_href' => 'technik.html#anfrage', 'footer_target' => 'technik'],
+
+  ['slug' => 'ablauf-hochzeitsfeier-mit-dj', 'sort' => 30,
+   'title' => 'So läuft eine Hochzeitsfeier mit DJ ab | DJ Lauschgift, Hemer',
+   'meta_desc' => 'Was passiert zwischen Buchung und Tanzfläche? Der Ablauf einer Hochzeitsfeier mit DJ, transparent erklärt – vom Kennenlerngespräch bis zum letzten Song.',
+   'kicker' => 'Ablauf & Vertrauen', 'h1' => 'So läuft eine Hochzeitsfeier mit mir als DJ ab',
+   'intro' => 'Die meisten Brautpaare buchen zum ersten (und einzigen) Mal einen DJ und wissen nicht genau, was zwischen Anfrage und Tanzfläche eigentlich passiert. Hier ist der Ablauf, wie ich ihn mit euch durchgehe.',
+   'sections' => [
+     ['heading' => 'Vor der Hochzeit',
+      'text' => '',
+      'items' => [
+        'Kennenlerngespräch, bevor irgendetwas gebucht wird',
+        'Festpreis-Angebot mit allen Posten einzeln aufgeschlüsselt',
+        'Musikwünsche und No-Gos sammelt ihr bequem online, kein Zettelchaos',
+        'Ablauf des Abends gemeinsam abstimmen: Sektempfang, Dinner, Reden, Tanzfläche',
+      ]],
+     ['heading' => 'Am Hochzeitstag',
+      'text' => 'Aufbau und Soundcheck sind durch, bevor der erste Gast eintrifft. Zum Sektempfang und beim Essen läuft dezente Hintergrundmusik, beim Programm – Reden, Spiele, Anschneiden der Torte – stelle ich Mikrofon und Einsätze. Sobald der erste Tanz vorbei ist, übernimmt die Tanzfläche, und ich bleibe den ganzen Abend ansprechbar für Wünsche, auch spontane.'],
+     ['heading' => 'Nach der Feier',
+      'text' => 'Ich baue ab, während ihr in die Hochzeitsnacht startet. Ein paar Tage später melde ich mich noch einmal – nicht, um etwas zu verkaufen, sondern weil mich ehrlich interessiert, wie der Abend für euch war.'],
+   ],
+   'faq' => [
+     ['q' => 'Können wir eigene Musikwünsche einbringen?', 'a' => 'Das ist sogar der Normalfall – ihr bekommt von mir einen Link, über den ihr (und auf Wunsch auch eure Gäste) Wünsche und No-Gos eintragen könnt.'],
+     ['q' => 'Was, wenn Gäste spontan etwas wünschen?', 'a' => 'Ich nehme Wünsche den ganzen Abend über an und baue sie ein, wenn es zur Stimmung passt.'],
+     ['q' => 'Wie früh sollten wir buchen?', 'a' => 'Beliebte Samstage in der Hauptsaison sind bei mir oft schon ein Jahr vorher weg – je früher ihr euch meldet, desto sicherer der Termin.'],
+   ],
+   'cta_label' => 'Termin anfragen', 'cta_href' => 'hochzeit.html#anfrage', 'footer_target' => 'index'],
+
+  ];
+}
+
 /* v65: Markus' Bandbreite bei Hintergrundmusik (Dire Straits, Motown, Funk bis House)
    in die Empfangs-Passagen dreier Aktionsseiten einweben. Ersetzt Karten-Texte NUR,
    wenn sie noch exakt dem v64-Seed entsprechen - eigene Änderungen bleiben unberührt. */
@@ -3692,6 +3823,8 @@ SQL);
   $p->exec(mailAutoDdl());
   $p->exec(campaignPagesDdl());
   seedCampaignPages($p);
+  $p->exec(guidesDdl());
+  seedGuides($p);
   seed($p);
   seedExtraTemplates($p);
   seedServiceProducts($p);

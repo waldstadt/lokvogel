@@ -12,10 +12,15 @@ $pages = [
   ['halloween.html', '0.8', 'monthly'],
 ];
 /* Aktionsseiten nur listen, wenn sie im Backoffice eingeschaltet sind */
+$guides = [];
 try {
   $db = new PDO('sqlite:' . __DIR__ . '/data/dj.sqlite');
   foreach ($db->query("select slug from campaign_pages where enabled = 1 order by sort") as $row)
     $pages[] = [$row['slug'] . '.html', '0.8', 'monthly'];
+  /* Ratgeber-Artikel haben keine eigene Datei (siehe ratgeber.php) - eigener Zweig,
+     der nicht ueber die is_file()-Pruefung der uebrigen Seiten laeuft. */
+  foreach ($db->query("select slug, updated_at from guides where published = 1 order by sort") as $row)
+    $guides[] = $row;
 } catch (Throwable $e) {}
 echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
@@ -25,5 +30,12 @@ foreach ($pages as [$f, $prio, $freq]) {
   echo "  <url><loc>$base/" . ($f === 'index.html' ? '' : $f) . "</loc>" .
     '<lastmod>' . gmdate('Y-m-d', (int)filemtime($file)) . '</lastmod>' .
     "<changefreq>$freq</changefreq><priority>$prio</priority></url>\n";
+}
+if ($guides)
+  echo "  <url><loc>$base/ratgeber</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>\n";
+foreach ($guides as $row) {
+  $lastmod = $row['updated_at'] ? gmdate('Y-m-d', strtotime((string)$row['updated_at'])) : gmdate('Y-m-d');
+  echo "  <url><loc>$base/ratgeber/" . rawurlencode((string)$row['slug']) . "</loc>" .
+    "<lastmod>$lastmod</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>\n";
 }
 echo "</urlset>\n";

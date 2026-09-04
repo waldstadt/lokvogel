@@ -24,3 +24,12 @@
 <FilesMatch "^(hochzeit|vereinsfest-technik|abiball|firmensommerfest|betriebsversammlung|seminartechnik|messe|objektbeleuchtung|instore-dj|produktpraesentation|tagesparty|technik-check|workshops|technik-vor-ort)\.html$">
   SetHandler application/x-httpd-php
 </FilesMatch>
+
+# Ratgeber (SEO-Artikel): huebsche URLs ohne Dateiendung, damit im Backoffice frei
+# angelegte Artikel keine eigene Datei brauchen (siehe ratgeber.php). Greift nur mit
+# aktivem mod_rewrite; ratgeber.php?slug=... funktioniert notfalls auch direkt.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^ratgeber/([a-z0-9-]+)/?$ ratgeber.php?slug=$1 [L,QSA]
+  RewriteRule ^ratgeber/?$ ratgeber.php [L,QSA]
+</IfModule>
