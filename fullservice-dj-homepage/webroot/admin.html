@@ -9261,30 +9261,30 @@ function openGuideModal(id){
     '<div><label>Farbschema/Ziel</label><select id="gTarget"><option value="index">DJ-Seite</option><option value="technik">Technik-Seite</option></select></div></div>'+
     '<label>Link-Ziel des Buttons (z. B. hochzeit.html#anfrage)</label><input id="gCtaHref" value="'+esc(g.cta_href||'')+'">'+
     '<label style="margin-top:12px"><input type="checkbox" id="gPub" style="width:auto;margin-right:6px" '+(g.published?'checked':'')+'>Veröffentlicht</label>'+
-    '<div id="gSeoResult"></div>'+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="saveGuide()">Speichern</button>'+
-    '<button class="btn g" id="gSeoBtn" onclick="guideSeoCheck()">SEO-Check</button>'+
     (id?' <a class="btn g" href="backstage/'+esc(g.slug)+'" target="_blank" style="text-decoration:none">Beitrag ansehen</a> <button class="btn r" onclick="delRow(\'guides\',\''+id+'\',reloadGuides)">Löschen</button>':'')+'</div>');
   if(g.footer_target)document.getElementById('gTarget').value=g.footer_target;
 }
-/* Prueft den bereits geschriebenen Text und gibt nur Vorschlaege zurueck - schreibt
-   nichts um (bewusst getrennt vom KI-Textassistenten "Gross bearbeiten"). */
-function guideSeoCheck(){
+/* SEO-Check lebt in "Gross bearbeiten" (edBtn/openTextEditor), nicht als eigener Button
+   im Beitrags-Editor - dort ist ohnehin schon der Ort fuer KI-Unterstuetzung am Text.
+   Liest den GANZEN Beitrag aus (nicht nur das gerade offene Feld) und gibt nur
+   Vorschlaege zurueck, schreibt nichts um. */
+function edSeoCheck(){
   var sectionsText=[].map.call(document.querySelectorAll('#gSections [data-gsec]'),function(div){
     return (div.querySelector('[data-sh]').value+'\n'+div.querySelector('[data-st]').value).trim();
   }).join('\n\n');
   var body={title:v('gTitle'),meta_desc:v('gMeta'),h1:v('gH1'),intro:v('gIntro'),sections_text:sectionsText};
-  var btn=document.getElementById('gSeoBtn');
+  var btn=document.getElementById('edSeoBtn');
   btn.disabled=true;btn.textContent='Wird geprüft …';
   fetch('api.php/ai/seo-check-guide',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
     .then(function(res){
       btn.disabled=false;btn.textContent='SEO-Check';
       if(!res.ok||res.j.error){toast((res.j&&res.j.error)||'KI-Anfrage fehlgeschlagen.',1);return}
-      var el=document.getElementById('gSeoResult');
+      var el=document.getElementById('edSeoResult');if(!el)return;
       if(!res.j.length){el.innerHTML='<div class="mut sml" style="margin-top:10px">Keine Anmerkungen – sieht gut aus.</div>';return}
       el.innerHTML='<div class="card" style="margin-top:10px;padding:12px">'+
-        '<div class="sml" style="margin-bottom:6px"><b>SEO-Vorschläge</b> – reine Hinweise, dein Text wird dadurch nicht verändert.</div>'+
+        '<div class="sml" style="margin-bottom:6px"><b>SEO-Vorschläge für den ganzen Beitrag</b> – reine Hinweise, dein Text wird dadurch nicht verändert.</div>'+
         res.j.map(function(s){
           return '<div style="margin-top:8px"><b class="sml">'+esc(s.area||'')+'</b><div class="mut sml">'+esc(s.suggestion)+'</div></div>';
         }).join('')+'</div>';
@@ -10276,9 +10276,15 @@ function edBtn(id){
   return '<div style="text-align:right;margin-top:3px"><a class="sml" onclick="openTextEditor(\''+id+'\')">'+
   '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Groß bearbeiten</a></div>';
 }
+/* Backstage-Felder erkennen (fest id gMeta/gIntro, oder ein dynamisches Abschnitts-
+   Textfeld gSecText<n>) - nur dort ergibt ein Beitrags-weiter SEO-Check Sinn, bei
+   allen anderen "Gross bearbeiten"-Aufrufen (Produkttexte, E-Mails, …) bleibt der
+   Button weg. */
+function edIsGuideField(id){return id==='gMeta'||id==='gIntro'||/^gSecText\d+$/.test(id)}
 function openTextEditor(id){
   var src=document.getElementById(id);if(!src)return;
   ED_TARGET=id;ED_UNDO=null;
+  var isGuide=edIsGuideField(id);
   openOvl2('Text bearbeiten',
     '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+
     '<button class="btn g sm" style="font-weight:700" title="Auswahl fett" onclick="edWrap(\'**\',\'**\')">B</button>'+
@@ -10286,10 +10292,13 @@ function openTextEditor(id){
     '<button class="btn g sm" title="Auswahl verlinken" onclick="edLink()">Link</button>'+
     '<button class="btn g sm" id="edAiBtn" title="Aus Stichpunkten oder schlechtem Text einen fertigen Artikeltext machen" onclick="edAiImprove()">'+
     '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Mit KI verbessern</button>'+
-    '<a class="sml" id="edAiUndo" style="display:none" onclick="edAiUndo()">Rückgängig</a></div>'+
+    '<a class="sml" id="edAiUndo" style="display:none" onclick="edAiUndo()">Rückgängig</a>'+
+    (isGuide?' <button class="btn g sm" id="edSeoBtn" title="Ganzen Beitrag auf SEO prüfen – ändert den Text nicht" onclick="edSeoCheck()">SEO-Check</button>':'')+
+    '</div>'+
     '<textarea id="edArea" style="min-height:320px" oninput="edLenUpdate()"></textarea>'+
     '<div class="sml mut" id="edLenHint" style="margin-top:6px"></div>'+
     '<div class="mut sml" style="margin-top:2px">**fett**, *kursiv*, [Text](https://…) – wird auf der Homepage formatiert angezeigt.</div>'+
+    (isGuide?'<div id="edSeoResult"></div>':'')+
     '<div style="margin-top:12px"><button class="btn" onclick="edApply()">Übernehmen</button> <button class="btn g" onclick="closeOvl2()">Abbrechen</button></div>');
   document.getElementById('edArea').value=src.value;
   edLenUpdate();
