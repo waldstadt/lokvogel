@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 106;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 109;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1119,6 +1119,22 @@ function upgrade(PDO $p): void {
        Aenderungen von Markus an diesen Seiten erhalten bleiben. */
     try { addFilialistenPitch($p); } catch (PDOException $e) {}
   }
+  if ($v < 107) {
+    /* v107: optionale Positionen in Angebot/Rechnung - stehen mit auf dem Beleg, zaehlen
+       aber nicht in die Gesamtsumme (siehe printedLineTotal/docCalc in admin.html). */
+    try { $p->exec("alter table document_items add column optional integer default 0"); } catch (PDOException $e) {}
+  }
+  if ($v < 108) {
+    /* v108: Feiertage/Ferien NRW als rein informative Kalender-Anzeige. */
+    try { $p->exec(calendarFeedDdl()); } catch (PDOException $e) {}
+  }
+  if ($v < 109) {
+    /* v109: Bundesland waehlbar (Dropdown im Kalender) - subdivision-Spalte ergaenzt den
+       Cache-Schluessel. Die Tabelle enthaelt nur wiederbeschaffbare Zwischendaten (aus
+       openholidaysapi.org), deshalb einfach neu angelegt statt kompliziert migriert. */
+    try { $p->exec('drop table if exists calendar_feed_cache'); } catch (PDOException $e) {}
+    try { $p->exec(calendarFeedDdl()); } catch (PDOException $e) {}
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1239,6 +1255,59 @@ function statsEngageDdl(): array {
 function statsUtmDdl(): string {
   return "create table if not exists stats_utm (day text not null, campaign text not null,
     kind text not null, n integer not null default 0, primary key (day, campaign, kind))";
+}
+
+function calendarFeedDdl(): string {
+  return "create table if not exists calendar_feed_cache (kind text not null, year integer not null,
+    subdivision text not null default 'DE-NW', data text not null, fetched_at text,
+    primary key (kind, year, subdivision))";
+}
+const BUNDESLAENDER = ['BW','BY','BE','BB','HB','HH','HE','MV','NI','NW','RP','SL','SN','ST','SH','TH'];
+/* Feiertage/Ferien NRW: rein informative Kalender-Anzeige, keine Personendaten. Ein Jahr
+   pro Aufruf ueber openholidaysapi.org (oeffentliche Daten, kein API-Schluessel), danach
+   in der eigenen DB zwischengespeichert - kein wiederholter Aussenzugriff je Kalenderaufruf.
+   Schlaegt der Aussendienst fehl, wird ein leeres Ergebnis zurueckgegeben (rein informativ,
+   der Kalender selbst darf davon nie abhaengen). */
+function fetchCalendarFeed(PDO $p, string $kind, int $year, string $land): array {
+  $land = in_array($land, BUNDESLAENDER, true) ? $land : 'NW';
+  $subdivision = 'DE-' . $land;
+  $st = $p->prepare('select data from calendar_feed_cache where kind = ? and year = ? and subdivision = ?');
+  $st->execute([$kind, $year, $subdivision]);
+  $cached = $st->fetchColumn();
+  if ($cached !== false) return json_decode((string)$cached, true) ?: [];
+  $endpoint = $kind === 'ferien' ? 'SchoolHolidays' : 'PublicHolidays';
+  $url = "https://openholidaysapi.org/$endpoint?countryIsoCode=DE&languageIsoCode=DE"
+    . "&validFrom=$year-01-01&validTo=$year-12-31&subdivisionCode=$subdivision";
+  $ctx = stream_context_create(['http' => ['timeout' => 10, 'ignore_errors' => true,
+    'header' => "Accept: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; " . uaName() . "/1.0)\r\n"]]);
+  $resp = @file_get_contents($url, false, $ctx);
+  $raw = $resp !== false ? json_decode((string)$resp, true) : null;
+  /* Nur eine tatsaechlich als JSON-Array lesbare Antwort gilt als erreichter Dienst - eine
+     Fehlerseite/Textantwort (z. B. von einem dazwischenhaengenden Proxy) json_decodet zu
+     null und darf nicht als "leeres Jahr" in die Zwischenspeicherung wandern. */
+  $ok = is_array($raw);
+  $out = [];
+  foreach (($ok ? $raw : []) as $row) {
+    if (!is_array($row) || empty($row['startDate'])) continue;
+    $name = '';
+    foreach ((array)($row['name'] ?? []) as $n) {
+      if (is_array($n) && ($n['language'] ?? '') === 'DE') { $name = (string)($n['text'] ?? ''); break; }
+    }
+    if ($name === '' && is_array($row['name'] ?? null) && !empty($row['name'][0]['text']))
+      $name = (string)$row['name'][0]['text'];
+    if ($name === '') continue;
+    $out[] = ['name' => $name, 'start' => $row['startDate'], 'end' => $row['endDate'] ?? $row['startDate']];
+  }
+  /* Nur ein tatsaechlich erreichter Aussendienst wird gecacht - schlaegt die Anfrage fehl
+     (kein Netz, Dienst down), soll der naechste Kalender-Aufruf es erneut versuchen statt
+     ein leeres Jahr fuer immer festzuschreiben. */
+  if ($ok) {
+    try {
+      $p->prepare('insert or replace into calendar_feed_cache (kind, year, subdivision, data, fetched_at) values (?,?,?,?,?)')
+        ->execute([$kind, $year, $subdivision, json_encode($out, JSON_UNESCAPED_UNICODE), now()]);
+    } catch (PDOException $e) {}
+  }
+  return $out;
 }
 /* Taeglich wechselnder anonymer Besucher-Hash: IP + User-Agent + Tagesdatum + ein einmalig
    erzeugtes Pfeffer-Geheimnis (nie mit der IP zusammen gespeichert) ergeben einen Hash, der
@@ -1644,7 +1713,7 @@ function docContentHash(PDO $p, string $docId): string {
   $norm = fn($v) => is_numeric($v) ? (string)(float)$v : (string)($v ?? '');
   $parts = [];
   foreach (DOC_VERSION_FIELDS as $c) $parts[] = $norm($d[$c] ?? null);
-  $it = $p->prepare('select description, note, qty, unit, unit_price, discount_value, discount_type, is_header, group_pos from document_items where document_id = ? order by pos, rowid');
+  $it = $p->prepare('select description, note, qty, unit, unit_price, discount_value, discount_type, is_header, group_pos, optional from document_items where document_id = ? order by pos, rowid');
   $it->execute([$docId]);
   foreach ($it->fetchAll() as $r) $parts[] = implode("\x1f", array_map($norm, array_values($r)));
   return sha1(implode("\x1e", $parts));
@@ -3541,7 +3610,8 @@ create table forms (id text primary key, token text unique not null, title text 
 create table document_items (id text primary key,
   document_id text not null references documents(id) on delete cascade,
   pos integer default 1, description text not null, note text, qty real default 1, unit text, unit_price real default 0,
-  discount_value real default 0, discount_type text default 'pct', is_header integer default 0, group_pos integer);
+  discount_value real default 0, discount_type text default 'pct', is_header integer default 0, group_pos integer,
+  optional integer default 0);
 SQL);
   $p->exec(rentalContractsDdl());
   $p->exec(friendsDdl());
@@ -3557,6 +3627,7 @@ SQL);
   $p->exec(discountCodesDdl());
   foreach (statsEngageDdl() as $sql) $p->exec($sql);
   $p->exec(statsUtmDdl());
+  $p->exec(calendarFeedDdl());
   $p->exec(paymentsDdl());
   foreach (docIndexDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
@@ -4156,7 +4227,11 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
            der Client zaehlte bisher selbst hoch und ueberschrieb dabei Zaehler, die
            inzwischen woanders (anderes Geraet, Workshop-Rechnung) weitergelaufen waren. */
         if ($t === 'documents') assertGutschriftNotZero($row, null);
-        if ($t === 'documents' && !empty($row['share_token']) && in_array((string)($row['doc_type'] ?? ''), ADDRESS_DOC_TYPES, true)
+        /* Angebote brauchen die vollstaendige Adresse schon beim Anlegen (nicht erst beim
+           Versand wie die uebrigen Belegtypen) - Markus will keine Angebots-Entwuerfe ohne
+           Rechnungsanschrift im System haben. */
+        if ($t === 'documents' && in_array((string)($row['doc_type'] ?? ''), ADDRESS_DOC_TYPES, true)
+            && ((string)($row['doc_type'] ?? '') === 'angebot' || !empty($row['share_token']))
             && !docCustomerAddressOk($p, (string)($row['customer_id'] ?? '')))
           fail(ADDRESS_INCOMPLETE_MSG, 422);
         $ownTx = false;
@@ -4232,7 +4307,12 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
              Kundenadresse - Entwurf speichern bleibt erlaubt. */
           $wirdVersand = (($row['status'] ?? null) === 'versendet' && ($b['status'] ?? '') !== 'versendet');
           $wirdFreigabe = !empty($row['share_token']) && (string)$row['share_token'] !== (string)($b['share_token'] ?? '');
-          if (($wirdVersand || $wirdFreigabe) && in_array((string)$b['doc_type'], ADDRESS_DOC_TYPES, true)
+          /* Angebote: schon jede inhaltliche Aenderung braucht die vollstaendige Adresse,
+             nicht erst Versand/Freigabe wie bei den uebrigen Belegtypen (siehe POST oben). */
+          $istAngebot = (string)$b['doc_type'] === 'angebot';
+          $aendertInhalt = (bool)array_diff(array_keys($row), $allowed);
+          if ((($wirdVersand || $wirdFreigabe) || ($istAngebot && $aendertInhalt))
+              && in_array((string)$b['doc_type'], ADDRESS_DOC_TYPES, true)
               && !docCustomerAddressOk($p, (string)($row['customer_id'] ?? $b['customer_id'] ?? '')))
             fail(ADDRESS_INCOMPLETE_MSG, 422);
           if (docLockedRow($b) && array_diff(array_keys($row), $allowed))
@@ -6232,7 +6312,7 @@ function handlePortal(string $path, string $method, $body): never {
   }
   if (preg_match('#^portal/offer/([a-f0-9]+)$#', $path, $m) && $method === 'GET') {
     $d = portalDoc($m[1], (string)($_GET['plz'] ?? ''));
-    $it = $p->prepare('select pos, description, note, qty, unit, unit_price, discount_value, discount_type, is_header, group_pos from document_items where document_id = ? order by pos');
+    $it = $p->prepare('select pos, description, note, qty, unit, unit_price, discount_value, discount_type, is_header, group_pos, optional from document_items where document_id = ? order by pos');
     $it->execute([$d['id']]);
     $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
     $ups = [];
@@ -7618,6 +7698,14 @@ try {
       'signups_total' => (int)$p->query("select count(*) from workshop_signups where created_at >= '$from'")->fetchColumn(),
       'newsletter_total' => (int)$p->query("select count(*) from newsletter where confirmed_at is not null and unsubscribed_at is null")->fetchColumn(),
     ]);
+  }
+  /* Feiertage/Ferien NRW: rein informative Kalender-Anzeige fuer Markus, ein Jahr pro
+     Abfrage, serverseitig zwischengespeichert (siehe fetchCalendarFeed). */
+  if (preg_match('#^calendar/(feiertage|ferien)$#', $path, $m) && $method === 'GET') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $year = max(2020, min(2100, (int)($_GET['year'] ?? gmdate('Y'))));
+    $land = strtoupper(trim((string)($_GET['land'] ?? 'NW')));
+    out(fetchCalendarFeed(db(), $m[1], $year, $land));
   }
   /* Newsletter-Versand an alle bestätigten Abonnenten (oder Testmail an die eigene Adresse) */
   if ($path === 'newsletter/send' && $method === 'POST') {

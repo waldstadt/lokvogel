@@ -301,7 +301,10 @@ function groupDocItems(items){
   });
   return groups;
 }
-function groupTotal(items,g){return g.subs.reduce(function(s,i){return s+lineTotal(items[i])},lineTotal(items[g.main]))}
+function groupTotal(items,g){
+  var t=function(it){return it.optional?0:lineTotal(it)};
+  return g.subs.reduce(function(s,i){return s+t(items[i])},t(items[g.main]));
+}
 /* Bei einer Rabattstaffel-Unterposition steckt in it.qty Stückzahl × Tage dieser Stufe (für die
    korrekte Summe). Angezeigt wird die tatsächliche Stückzahl - es bleiben ja immer gleich viele
    Geräte, egal wie viele Miettage - die Tage stehen in der Einheit ("Stk. (N Tage)"). */
@@ -318,8 +321,9 @@ function docRowsHtml(items,f){
     if(!g.subs.length){
       var info=it.note?'<span class="info">i</span><span class="tip">'+esc(it.note)+'</span>':'';
       var rab=Number(it.discount_value)?'<div style="font-size:11px;color:var(--grn)">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):Number(it.discount_value)+' %')+'</div>':'';
+      var opt=it.optional?'<div style="font-size:11px;color:var(--mut2)">optional – nicht in der Gesamtsumme enthalten</div>':'';
       return '<tr><td class="num">'+label+'</td>'+
-        '<td class="pos-desc" onclick="this.classList.toggle(\'open\')">'+esc(it.description)+info+rab+'</td>'+
+        '<td class="pos-desc" onclick="this.classList.toggle(\'open\')">'+esc(it.description)+info+rab+opt+'</td>'+
         '<td class="num">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
         '<td class="num">'+euro(lineTotal(it)*f)+'</td></tr>';
     }
@@ -348,7 +352,7 @@ function renderOffer(){
     (DOC.company.phone?' · '+esc(DOC.company.phone):'');
   var rows=docRowsHtml(items,f);
   var totals='';
-  var sub=items.reduce(function(s,it){return s+lineTotal(it)},0);
+  var sub=items.reduce(function(s,it){return s+(it.optional?0:lineTotal(it))},0);
   var dv=Number(d.discount_value)||0;
   var disc=dv?(d.discount_type==='eur'?Math.min(sub,dv):sub*Math.min(100,dv)/100):0;
   if(disc)totals+='<tr class="totals"><td colspan="3" class="num">Zwischensumme</td><td class="num">'+euro(sub*f)+'</td></tr>'+
@@ -619,8 +623,9 @@ function docRowsHtmlPrint(items,f){
     var it=items[g.main],label=String(gi+1);
     if(!g.subs.length){
       var rab=Number(it.discount_value)?'<div style="font-size:10px;color:#666">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):Number(it.discount_value)+' %')+'</div>':'';
+      var opt=it.optional?'<div style="font-size:10px;color:#666">optional – nicht in der Gesamtsumme enthalten</div>':'';
       return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+label+'</td>'+
-      '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+
+      '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+opt+
       (it.note?'<div style="font-size:10px;color:#666;margin-top:2px">'+esc(it.note)+'</div>':'')+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+euro(lineTotal(it)*f)+'</td></tr>';
@@ -664,7 +669,7 @@ function downloadPdf(){
   var brutto=d.price_mode==='brutto'&&!d.is_small_business;
   var f=brutto?1:(Number(d.tax_rate)?1/(1+Number(d.tax_rate)/100):1);
   var rows=docRowsHtmlPrint(DOC.items,f);
-  var sub=DOC.items.reduce(function(s,it){return s+lineTotal(it)},0);
+  var sub=DOC.items.reduce(function(s,it){return s+(it.optional?0:lineTotal(it))},0);
   var dv=Number(d.discount_value)||0;
   var disc=dv?(d.discount_type==='eur'?Math.min(sub,dv):sub*Math.min(100,dv)/100):0;
   var totals='';

@@ -283,6 +283,8 @@ tr.neu td{background:rgba(255,111,91,.14)}
 .cal .ev.k-technik{border-left-color:var(--blu);background:rgba(85,136,221,.14)}
 .cal .ev.k-workshop{border-left-color:#3fa89b;background:rgba(63,168,155,.14)}
 .cal .ev.k-privat{border-left-color:#b08fd8;background:rgba(176,143,216,.14)}
+.cal .ev.k-feiertag{border-left-color:var(--redl);background:rgba(229,128,128,.14)}
+.cal .ev.k-ferien{border-left-color:#6bb6d9;background:rgba(107,182,217,.14)}
 /* Handy: statt abgeschnittener Texte ein Punkt je Eintrag in der Farbe der Kategorie;
    Tag antippen zeigt die Eintraege im Panel unter dem Gitter. Am Desktop bleiben die
    Textzeilen, die Punkte sind dort aus. */
@@ -297,6 +299,8 @@ tr.neu td{background:rgba(255,111,91,.14)}
 .cal .cdots i.k-technik{background:var(--blu)}
 .cal .cdots i.k-workshop{background:#3fa89b}
 .cal .cdots i.k-privat{background:#b08fd8}
+.cal .cdots i.k-feiertag{background:var(--redl)}
+.cal .cdots i.k-ferien{background:#6bb6d9}
 .cal .cdots b{font-size:9px;color:var(--gll);font-weight:400;line-height:8px}
 .cal-day{margin-top:12px;border:1px solid var(--bdr);border-left:3px solid var(--acc);padding:10px 12px;font-size:12px}
 .cal-day .cdh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-weight:700;color:var(--wh)}
@@ -322,6 +326,8 @@ tr.neu td{background:rgba(255,111,91,.14)}
 .cal-legend .c-technik i{border-color:var(--blu);background:rgba(85,136,221,.14)}
 .cal-legend .c-workshop i{border-color:#3fa89b;background:rgba(63,168,155,.14)}
 .cal-legend .c-privat i{border-color:#b08fd8;background:rgba(176,143,216,.14)}
+.cal-legend .c-feiertag i{border-color:var(--redl);background:rgba(229,128,128,.14)}
+.cal-legend .c-ferien i{border-color:#6bb6d9;background:rgba(107,182,217,.14)}
 
 /* Items-Editor */
 .it-row{display:grid;grid-template-columns:36px 1fr 70px 100px 90px 90px 28px;gap:6px;align-items:center;margin-bottom:6px}
@@ -554,6 +560,8 @@ tr.neu td{background:rgba(255,111,91,.14)}
     <div class="card"><div class="cal" id="calGrid"></div>
       <div class="cal-day" id="calDay" style="display:none"></div>
       <div class="cal-legend" id="calLayers"></div>
+      <div class="sml" style="margin-top:8px"><label style="display:inline-flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--gll)">Feiertage/Ferien für
+        <select id="calLand" onchange="calLandChange()" style="width:auto;margin:0"></select></label></div>
     </div>
     <div class="tbl-wrap card"><table><thead><tr><th>Datum</th><th>Titel / Kunde</th><th>Art</th><th>Location</th><th class="num">Gig-Wert</th><th>Status</th></tr></thead><tbody id="bookRows"></tbody></table></div>
   </div>
@@ -2605,7 +2613,9 @@ var CAL_LAYERS=[
   {key:'fertig',  label:'Abgeschlossen'},
   {key:'technik', label:'Technikvermietung'},
   {key:'workshop',label:'Workshops'},
-  {key:'privat',  label:'Privat / geblockt'}
+  {key:'privat',  label:'Privat / geblockt'},
+  {key:'feiertag',label:'Feiertage NRW'},
+  {key:'ferien',  label:'Ferien NRW'}
 ];
 function calLayerOn(key){
   try{var v=localStorage.getItem('cal_'+key);return v===null?true:v==='1'}catch(e){return true}
@@ -2683,6 +2693,13 @@ function calDayItems(ds){
     var end=x.end_date||x.start_date;if(!(x.start_date<=ds&&end>=ds))return;
     out.push({k:'privat',label:x.title,title:x.title,who:x.note||'',status:'geblockt',open:"openBlockModal('"+x.id+"')",link:'Blocker öffnen'});
   });
+  var y=Number(ds.slice(0,4));
+  if(calLayerOn('feiertag'))(CAL_FEED.feiertag[y]||[]).forEach(function(h){
+    if(h.start<=ds&&h.end>=ds)out.push({k:'feiertag',label:h.name,title:h.name,who:'',status:'Feiertag NRW',open:'',link:''});
+  });
+  if(calLayerOn('ferien'))(CAL_FEED.ferien[y]||[]).forEach(function(f){
+    if(f.start<=ds&&f.end>=ds)out.push({k:'ferien',label:f.name,title:f.name,who:'',status:'Ferien NRW',open:'',link:''});
+  });
   return out;
 }
 var CAL_SEL=null;
@@ -2690,6 +2707,8 @@ function renderCal(){
   renderCalLayers();
   CAL_OFFERED=calOfferedBookings();
   var y=calBase.getFullYear(),m=calBase.getMonth();
+  renderCalLandSelect();
+  [y-1,y,y+1].forEach(function(yy){calLoadFeed('feiertag',yy);calLoadFeed('ferien',yy)});
   document.getElementById('calTitle').textContent=calBase.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
   var first=new Date(y,m,1),start=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate();
   var today=new Date().toISOString().slice(0,10);
@@ -2722,10 +2741,40 @@ function renderCalDay(){
   el.innerHTML='<div class="cdh"><span>'+dt(CAL_SEL)+(items.length?'':' – frei')+'</span><button class="btn g sm" onclick="calPickDay(\''+CAL_SEL+'\')">Schließen</button></div>'+
     (items.length?items.map(function(it){
       return '<div class="cdi"><i class="k-'+it.k+'" style="background:'+calDotColor(it.k)+'"></i><div style="flex:1;min-width:0"><b>'+esc(it.title)+'</b>'+(it.who?' · '+esc(it.who):'')+
-        '<span class="mut sml">'+esc(LBL[it.k]||it.k)+' · '+esc(it.status)+'</span></div><a onclick="'+it.open+'">'+it.link+'</a></div>';
+        '<span class="mut sml">'+esc(LBL[it.k]||it.k)+' · '+esc(it.status)+'</span></div>'+(it.link?'<a onclick="'+it.open+'">'+it.link+'</a>':'')+'</div>';
     }).join(''):'<span class="mut sml">Nichts eingetragen – dieser Tag ist noch frei.</span>');
 }
-function calDotColor(k){return {anfrage:'var(--yel)',angebot:'var(--acc)',fest:'var(--grn)',fertig:'var(--gl)',technik:'var(--blu)',workshop:'#3fa89b',privat:'#b08fd8'}[k]||'var(--gl)'}
+function calDotColor(k){return {anfrage:'var(--yel)',angebot:'var(--acc)',fest:'var(--grn)',fertig:'var(--gl)',technik:'var(--blu)',workshop:'#3fa89b',privat:'#b08fd8',feiertag:'var(--redl)',ferien:'#6bb6d9'}[k]||'var(--gl)'}
+/* Feiertage/Ferien, Bundesland waehlbar: rein informative Anzeige, pro Jahr+Bundesland
+   einmal geholt und serverseitig zwischengespeichert (siehe fetchCalendarFeed in api.php).
+   Beim Blaettern werden gleich ein paar Jahre um das angezeigte herum mitgeladen, damit
+   das Umschalten nicht jedes Mal auf einen neuen Aussendienst-Aufruf wartet. */
+var CAL_LAENDER=[['NW','Nordrhein-Westfalen'],['BW','Baden-Württemberg'],['BY','Bayern'],['BE','Berlin'],
+  ['BB','Brandenburg'],['HB','Bremen'],['HH','Hamburg'],['HE','Hessen'],['MV','Mecklenburg-Vorpommern'],
+  ['NI','Niedersachsen'],['RP','Rheinland-Pfalz'],['SL','Saarland'],['SN','Sachsen'],['ST','Sachsen-Anhalt'],
+  ['SH','Schleswig-Holstein'],['TH','Thüringen']];
+function calLand(){try{return localStorage.getItem('cal_land')||'NW'}catch(e){return 'NW'}}
+function calLandChange(){
+  try{localStorage.setItem('cal_land',v('calLand'))}catch(e){}
+  CAL_FEED={feiertag:{},ferien:{}};
+  renderCal();
+}
+function renderCalLandSelect(){
+  var el=document.getElementById('calLand');if(!el||el.options.length)return;
+  var cur=calLand();
+  el.innerHTML=CAL_LAENDER.map(function(l){return '<option value="'+l[0]+'"'+(l[0]===cur?' selected':'')+'>'+esc(l[1])+'</option>'}).join('');
+}
+var CAL_FEED={feiertag:{},ferien:{}};
+function calLoadFeed(kind,year){
+  var land=calLand();
+  if(CAL_FEED[kind][year])return;
+  CAL_FEED[kind][year]=[];
+  fetch('api.php/calendar/'+(kind==='feiertag'?'feiertage':'ferien')+'?year='+year+'&land='+land,{headers:{Authorization:'Bearer '+TOKEN}})
+    .then(function(r){return r.json()}).then(function(rows){
+      CAL_FEED[kind][year]=Array.isArray(rows)?rows:[];
+      renderCal();
+    }).catch(function(){});
+}
 /* ===== Blocker: Tage/Zeitraeume ohne Kunde belegen (Urlaub, privat, ...) ===== */
 function openBlockModal(id){
   var b=id?(CACHE.blocks||[]).find(function(x){return x.id===id}):{};b=b||{};
@@ -4306,7 +4355,10 @@ function groupDocItems(items){
   });
   return groups;
 }
-function groupTotal(items,g){return g.subs.reduce(function(s,i){return s+lineTotal(items[i])},lineTotal(items[g.main]))}
+function groupTotal(items,g){
+  var t=function(it){return it.optional?0:lineTotal(it)};
+  return g.subs.reduce(function(s,i){return s+t(items[i])},t(items[g.main]));
+}
 /* Bei einer Rabattstaffel-Unterposition steckt in it.qty Stückzahl × Tage dieser Stufe (für die
    korrekte Summe, qty×unit_price). Angezeigt wird aber die tatsächliche Stückzahl - es bleiben ja
    immer gleich viele Geräte, egal wie viele Miettage - die Tage stehen dafür in der Einheit
@@ -4358,11 +4410,12 @@ function itemRowHtml(it,i,posLabel,locked,sml){
   '<span class="it-lbl">Einzelpreis brutto</span><input type="number" step="0.01" value="'+it.unit_price+'" placeholder="Einzelpreis" title="Einzelpreis brutto" oninput="itSet('+i+',\'unit_price\',this.value)">'+
   '<span class="it-lbl">Gesamt</span><input value="'+euro(sum)+'" disabled class="num" title="Gesamt" data-sum="'+i+'">'+
   (locked?'<span></span>':'<span class="it-act">'+itMoveBtns(i)+'<a onclick="itDel('+i+')" style="color:var(--redl)" title="Position löschen">✕</a></span>')+'</div>'+
-  '<div style="padding-left:42px;padding-right:34px;display:flex;gap:6px">'+
+  '<div style="padding-left:42px;padding-right:34px;display:flex;gap:6px;align-items:center">'+
   '<input value="'+esc(it.note||'')+'" oninput="itSet('+i+',\'note\',this.value)" placeholder="Erklärung fürs Kundenkonto (erscheint beim Drüberfahren) – optional" style="font-size:10px;padding:5px 8px;color:var(--gll)">'+
   '<input type="number" step="0.01" value="'+(it.discount_value||0)+'" oninput="itSet('+i+',\'discount_value\',this.value)" title="Rabatt auf diese Position" style="width:74px;font-size:10px;padding:5px 8px" placeholder="Rabatt">'+
   '<select onchange="itSet('+i+',\'discount_type\',this.value)" style="width:52px;font-size:10px;padding:5px 4px">'+
   '<option value="pct"'+(it.discount_type!=='eur'?' selected':'')+'>%</option><option value="eur"'+(it.discount_type==='eur'?' selected':'')+'>€</option></select>'+
+  '<label style="display:flex;align-items:center;gap:4px;margin:0;text-transform:none;letter-spacing:0;font-size:10px;color:var(--gll);white-space:nowrap" title="Steht mit auf dem Beleg, zählt aber nicht in die Gesamtsumme – z. B. eine buchbare Zusatzleistung"><input type="checkbox" style="width:auto;margin:0" '+(it.optional?'checked':'')+' onchange="itSet('+i+',\'optional\',this.checked)">optional</label>'+
   '</div>';
 }
 function headerRowHtml(it,i,posLabel,locked){
@@ -4483,7 +4536,7 @@ function docCalc(){
      Miettage-Staffel erzeugt Einzelpreise mit halben Cent (50 % von 89,95 €); würde die
      Summe aus denen gebildet, liefe sie am gedruckten Beleg vorbei und die Differenz tauchte
      als Phantom-Rabattzeile wieder auf. */
-  var sub=r2(curItems.reduce(function(s,it){return s+printedLineTotal(it,1)},0));
+  var sub=r2(curItems.reduce(function(s,it){return s+(it.optional?0:printedLineTotal(it,1))},0));
   var dv=Number(v('docDiscVal'))||0,dtp=v('docDiscType')||'pct',dl=v('docDiscLabel')||'Rabatt';
   var disc=dv?(dtp==='eur'?Math.min(sub,r2(dv)):r2(sub*Math.min(100,dv)/100)):0;
   var gross=r2(sub-disc);
@@ -4525,6 +4578,20 @@ function saveDoc(){
   if(DOC_SAVING)return;
   var custId=v('docCust');
   if(!custId){toast('Bitte Kunden wählen.',1);return}
+  /* Regel von Markus: Kein Angebot ohne vollstaendige Kundenadresse - anders als bei den
+     uebrigen Belegtypen gilt das schon beim allerersten Speichern (Entwurf), nicht erst
+     beim Versand. Fehlt sie, fragt derselbe Dialog wie sonst vorm Teilen/Senden. */
+  if(v('docType')==='angebot'){
+    var custA=CACHE.customers.find(function(x){return x.id===custId});
+    if(!custAddressComplete(custA)){
+      askCustAddress(custA).then(function(){saveDocDo()}).catch(function(e){toast(e.message,1)});
+      return;
+    }
+  }
+  saveDocDo();
+}
+function saveDocDo(){
+  var custId=v('docCust');
   var type=v('docType'),c=docCalc();
   if(type==='gutschrift'&&Math.abs(c.gross)<0.005){toast('Eine Gutschrift über 0,00 € ergibt keinen Sinn – bitte Positionen prüfen.',1);return}
   /* Lieferschein speichert keine Preise - was in einem alten Beleg noch an Preisen stand,
@@ -4571,7 +4638,7 @@ function saveDoc(){
         var pk=pKey(it);
         return {document_id:d.id,pos:i+1,description:it.description,note:it.note||null,qty:it.qty,unit:it.unit,unit_price:preislos?0:it.unit_price,
           discount_value:preislos?0:(it.discount_value||0),discount_type:it.discount_type||'pct',
-          is_header:it.is_header?1:0,group_pos:pk!=null?(gidPos[pk]!=null?gidPos[pk]:null):null}});
+          is_header:it.is_header?1:0,group_pos:pk!=null?(gidPos[pk]!=null?gidPos[pk]:null):null,optional:it.optional?1:0}});
       return items.length?api('document_items',{method:'POST',body:items}):null;
     });
   }).then(function(){
@@ -5315,8 +5382,9 @@ function docRowsHtml(items,f){
     var it=filtered[g.main],label=String(gi+1);
     if(!g.subs.length){
       var rab=Number(it.discount_value)?'<div style="font-size:10px;color:#666">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):it.discount_value+' %')+'</div>':'';
+      var opt=it.optional?'<div style="font-size:10px;color:#666">optional – nicht in der Gesamtsumme enthalten</div>':'';
       return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+label+'</td>'+
-      '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+opt+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+it.qty+' '+esc(it.unit||'')+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(printedUnit(it,f))+'</td>'+
       '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right">'+euro(printedLineTotal(it,f))+'</td></tr>';
@@ -5356,7 +5424,8 @@ function printedLineTotal(it,f){
   return Math.round(sum*100)/100;
 }
 function printedGroupTotal(items,g,f){
-  return g.subs.reduce(function(s,i){return s+printedLineTotal(items[i],f)},printedLineTotal(items[g.main],f));
+  var t=function(it){return it.optional?0:printedLineTotal(it,f)};
+  return g.subs.reduce(function(s,i){return s+t(items[i])},t(items[g.main]));
 }
 function docPrintedSum(items,f){
   var filtered=items.filter(function(it){return it.description});
