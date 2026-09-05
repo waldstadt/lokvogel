@@ -135,6 +135,7 @@ th.sorted{color:var(--acc)}
 .selbar[hidden]{display:none}
 .selbar .spacer{flex:1}
 th.chk,td.chk{width:1%;text-align:center}
+.tbl-wrap:not(.selmode) th.chk,.tbl-wrap:not(.selmode) td.chk{display:none}
 
 /* Breadcrumb (Kunden-/Buchungsdetail) */
 .crumb{font-size:11px;color:var(--gl);margin-bottom:6px}
@@ -630,6 +631,7 @@ tr.neu td{background:rgba(255,111,91,.14)}
   <!-- PRODUKTE -->
   <div class="pg" id="pg-prod">
     <div class="phead"><div><div class="pt">Produktkatalog</div><div class="ps">Artikel mit Nummern &amp; Kategorien – per „+ Artikel“ blitzschnell ins Angebot. Pakete bündeln mehrere Artikel zu einer Position.</div></div>
+      <button class="btn g sm" id="prodSelModeBtn" onclick="prodSelModeToggle()">Mehrere Artikel bearbeiten</button>
       <button class="btn" onclick="openProdModal()">+ Neuer Artikel</button></div>
     <div id="prodSelBar" class="selbar" hidden>
       <span id="prodSelCount" class="mut sml"></span><span class="spacer"></span>
@@ -637,7 +639,7 @@ tr.neu td{background:rgba(255,111,91,.14)}
       <button class="btn r sm" onclick="prodBulkDelete()">Löschen</button>
     </div>
     <input type="search" autocomplete="off" data-lpignore="true" id="prodSearch" placeholder="Suchen (Nummer, Name, Kategorie) …" oninput="renderProducts()" style="margin-bottom:12px">
-    <div class="tbl-wrap card"><table><thead><tr><th class="chk"><input type="checkbox" id="prodSelAll" onclick="prodSelToggleAll(this.checked)"></th><th>Nr.</th><th>Name</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis brutto</th><th>Typ</th><th>Status</th></tr></thead><tbody id="prodRows"></tbody></table></div>
+    <div class="tbl-wrap card" id="prodTblWrap"><table><thead><tr><th class="chk"><input type="checkbox" id="prodSelAll" onclick="prodSelToggleAll(this.checked)"></th><th>Nr.</th><th>Name</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis brutto</th><th>Typ</th><th>Status</th></tr></thead><tbody id="prodRows"></tbody></table></div>
   </div>
 
   <!-- DOKUMENTE -->
@@ -784,6 +786,7 @@ tr.neu td{background:rgba(255,111,91,.14)}
   <!-- TECHNIK -->
   <div class="pg" id="pg-tech">
     <div class="phead"><div><div class="pt">Technik</div><div class="ps">Bestand, Verleihpreise &amp; Homepage-Anzeige</div></div>
+      <button class="btn g sm" id="eqSelModeBtn" onclick="eqSelModeToggle()">Mehrere Artikel bearbeiten</button>
       <button class="btn" onclick="openEqModal()">+ Neuer Artikel</button></div>
     <div id="eqSelBar" class="selbar" hidden>
       <span id="eqSelCount" class="mut sml"></span><span class="spacer"></span>
@@ -5998,7 +6001,17 @@ function renderEq(){
   eqSelSync();
 }
 function reloadEq(){return api('equipment?select=*&order=sort').then(function(r){CACHE.equipment=r||[];renderEq()})}
-/* ===== Technik: Mehrfachauswahl (Checkboxen) statt frueherer Stapel-Bearbeitung-Tabelle ===== */
+/* ===== Technik: Mehrfachauswahl (Checkboxen) statt frueherer Stapel-Bearbeitung-Tabelle =====
+   Checkbox-Spalte bleibt standardmaessig ausgeblendet (aufgeraeumtere Liste) und erscheint erst,
+   wenn ueber den Button "Mehrere Artikel bearbeiten" der Auswahlmodus eingeschaltet wird. */
+var eqSelMode=false;
+function eqSelModeToggle(){
+  eqSelMode=!eqSelMode;
+  if(!eqSelMode)EQ_SEL={};
+  var wrap=document.getElementById('eqViewWrap');if(wrap)wrap.classList.toggle('selmode',eqSelMode);
+  var btn=document.getElementById('eqSelModeBtn');if(btn)btn.textContent=eqSelMode?'Auswahl beenden':'Mehrere Artikel bearbeiten';
+  renderEq();
+}
 var EQ_SEL={};
 function eqSelToggle(id,ch){if(ch)EQ_SEL[id]=true;else delete EQ_SEL[id];eqSelSync();}
 function eqSelToggleAll(ch){
@@ -8702,6 +8715,14 @@ function renderProducts(){
   prodSelSync();
 }
 /* ===== Produkte: Mehrfachauswahl (gleiches Muster wie Technik) ===== */
+var prodSelMode=false;
+function prodSelModeToggle(){
+  prodSelMode=!prodSelMode;
+  if(!prodSelMode)PROD_SEL={};
+  var wrap=document.getElementById('prodTblWrap');if(wrap)wrap.classList.toggle('selmode',prodSelMode);
+  var btn=document.getElementById('prodSelModeBtn');if(btn)btn.textContent=prodSelMode?'Auswahl beenden':'Mehrere Artikel bearbeiten';
+  renderProducts();
+}
 var PROD_SEL={};
 function prodSelToggle(id,ch){if(ch)PROD_SEL[id]=true;else delete PROD_SEL[id];prodSelSync();}
 function prodSelToggleAll(ch){
