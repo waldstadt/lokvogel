@@ -6029,7 +6029,7 @@ function eqBulkEditOpen(){
   var ids=eqSelIds();if(!ids.length)return;
   openModal(ids.length+' Artikel bearbeiten',
     '<div class="mut sml" style="margin-bottom:12px">Änderungen wirken sofort auf alle '+ids.length+' ausgewählten Artikel.</div>'+
-    '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px;margin-bottom:10px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:90px">Sichtbar</span> <button class="btn g sm" onclick="eqBulkSet(\'public\',true)">an</button> <button class="btn g sm" onclick="eqBulkSet(\'public\',false)">aus</button></div>'+
+    '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px;margin-bottom:10px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:150px">Auf Homepage (mietbar)</span> <button class="btn g sm" onclick="eqBulkSet(\'public\',true)">an</button> <button class="btn g sm" onclick="eqBulkSet(\'public\',false)">aus</button></div>'+
     '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px;margin-bottom:10px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:90px">Auf Anfrage</span> <button class="btn g sm" onclick="eqBulkSet(\'on_request\',true)">an</button> <button class="btn g sm" onclick="eqBulkSet(\'on_request\',false)">aus</button></div>'+
     '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px;margin-bottom:10px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:90px">Status</span> <select id="eqBulkStatus"><option>aktiv</option><option>wartung</option><option>inaktiv</option></select> <button class="btn g sm" onclick="eqBulkSet(\'status\',v(\'eqBulkStatus\'))">setzen</button></div>'+
     '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:90px">Preis €/Tag</span> <select id="eqBulkPriceMode"><option value="pct+">+ %</option><option value="pct-">− %</option><option value="fix">fester Wert €</option></select> <input type="number" step="0.01" id="eqBulkPriceVal" placeholder="0" style="width:80px"> <button class="btn g sm" onclick="eqBulkPrice()">anpassen</button></div>');
@@ -6037,6 +6037,10 @@ function eqBulkEditOpen(){
 function eqBulkSet(field,val){
   var ids=eqSelIds();if(!ids.length)return;
   var body={};body[field]=val;
+  /* "Sichtbar" haengt in der Einzelbearbeitung (openEqModal/saveEq) an einem einzigen
+     Haken, der gleichzeitig public UND rentable setzt - hier genauso, sonst geraet die
+     Anzeige auseinander (renderEq() zeigt "sichtbar" nur bei public&&rentable). */
+  if(field==='public')body.rentable=val;
   Promise.all(ids.map(function(id){return api('equipment?id=eq.'+id,{method:'PATCH',body:body})}))
     .then(function(){toast('Gespeichert ✓');closeModal();return reloadEq()})
     .catch(function(e){toast(e.message,1)});
