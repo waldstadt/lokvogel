@@ -1506,6 +1506,16 @@ document.addEventListener('change',function(e){
       return;
     }
     inp.dispatchEvent(new Event('change',{bubbles:true}));
+    /* defineProperty hat "files" als feste eigene Eigenschaft auf DIESEM Element ueberschrieben
+       (siehe oben) - bei einmaligen Feldern (die nach dem Upload eh geleert/neu erzeugt werden)
+       war das folgenlos, aber ein dauerhaftes Feld wie das Medien-Pool-Upload-Feld zeigt sonst
+       fuer immer die Fotos von diesem einen Umwandlungslauf, egal was als naechstes ausgewaehlt
+       wird - der Browser aktualisiert eine so ueberschriebene Eigenschaft bei einer neuen
+       Dateiauswahl nicht mehr von selbst. delete entfernt die eigene Eigenschaft wieder, danach
+       greift wieder die normale, native files-Eigenschaft des Feldes. Erst NACH dispatchEvent,
+       weil der synchron ausgefuehrte onchange-Handler (z. B. mediaPgUpload) inp.files bis
+       dahin bereits ausgelesen haben muss. */
+    try{delete inp.files}catch(err){}
   });
 },true);
 function toast(msg,err){
