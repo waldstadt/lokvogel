@@ -1401,10 +1401,15 @@ function heicToJpeg(file){
    und liess Umwandlungen reihenweise fehlschlagen, ohne dass am Ende irgendetwas
    hochgeladen wurde. Jetzt hoechstens CONCURRENCY gleichzeitig, mit Fortschrittsanzeige,
    und der eigentliche Fehler landet zusaetzlich in der Konsole statt nur als knapper Toast. */
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms)})}
 function heicConvertBatch(files,onProgress){
   var total=files.filter(isHeicFile).length,done=0,idx=0;
   var results=new Array(files.length);
   var CONCURRENCY=3;
+  /* Kleine Pause nach jeder Umwandlung, bevor die naechste in diesem "Arbeiter" startet -
+     gibt dem Handy kurz Luft (Speicher/CPU vom WASM-Decoder abbauen), bevor es weitergeht.
+     Kostet bei 31 Fotos nur wenige Sekunden extra, macht das Ganze aber robuster. */
+  var PAUSE_MS=200;
   function worker(){
     return new Promise(function(resolveWorker){
       function next(){
@@ -1413,11 +1418,13 @@ function heicConvertBatch(files,onProgress){
         var f=files[i];
         if(!isHeicFile(f)){results[i]=f;next();return}
         heicToJpeg(f).then(function(nf){
-          results[i]=nf;done++;if(onProgress)onProgress(done,total);next();
+          results[i]=nf;done++;if(onProgress)onProgress(done,total);
+          sleep(PAUSE_MS).then(next);
         }).catch(function(err){
           console.error('HEIC-Umwandlung fehlgeschlagen für "'+f.name+'":',err);
           toast('HEIC-Umwandlung fehlgeschlagen – „'+f.name+'" wird übersprungen.',1);
-          results[i]=null;done++;if(onProgress)onProgress(done,total);next();
+          results[i]=null;done++;if(onProgress)onProgress(done,total);
+          sleep(PAUSE_MS).then(next);
         });
       }
       next();
@@ -2946,7 +2953,7 @@ function openBlockModal(id){
   openModal(id?'Geblockten Zeitraum bearbeiten':'Zeitraum blocken',
     '<p class="mut sml" style="margin-bottom:14px">Blockt Tage im Kalender ohne Kundenbezug – für Urlaub, private Termine oder alles, wo du einfach nicht verfügbar bist.</p>'+
     '<label>Titel *</label><input id="blTitle" value="'+esc(b.title||'')+'" placeholder="z. B. Urlaub, Familienfeier, kein Bock">'+
-    '<div class="grid2"><div><label>Von *</label><input type="date" id="blFrom" value="'+(b.start_date||'')+'"></div>'+
+    '<div class="grid2"><div><label>Von *</label><input type="date" id="blFrom" value="'+(b.start_date||(id?'':CAL_SEL||''))+'"></div>'+
     '<div><label>Bis (leer = nur ein Tag)</label><input type="date" id="blTo" value="'+(b.end_date||'')+'"></div></div>'+
     '<label>Notiz</label><input id="blNote" value="'+esc(b.note||'')+'">'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveBlock(\''+(id||'')+'\')">Speichern</button>'+
@@ -3322,7 +3329,7 @@ function openBookModal(b,presetCust){
     '<div><label>Art</label><select id="bKind" onchange="bookDateCheck()"><option value="dj">DJ</option><option value="technik">Technikverleih</option><option value="dj_technik">DJ + Technik</option></select></div>'+
     '<div><label>Anlass</label><input id="bType" value="'+esc(b.event_type||'')+'" placeholder="Hochzeit, Geburtstag …"></div></div>'+
     '<label>Titel</label><input id="bTitle" value="'+esc(b.title||'')+'" placeholder="z. B. Hochzeit Lisa & Tom">'+
-    '<div class="grid4"><div><label>Datum *</label><input type="date" id="bDate" value="'+(b.event_date||'')+'" onchange="bookDateCheck()" oninput="bookDateCheck()"></div>'+
+    '<div class="grid4"><div><label>Datum *</label><input type="date" id="bDate" value="'+(b.event_date||(b.id?'':CAL_SEL||''))+'" onchange="bookDateCheck()" oninput="bookDateCheck()"></div>'+
     '<div><label>Ende (Verleih)</label><input type="date" id="bEnd" value="'+(b.end_date||'')+'"></div>'+
     '<div><label>Beginn</label><input type="time" id="bStart" value="'+(b.start_time||'')+'"></div>'+
     '<div><label>Ende</label><input type="time" id="bTend" value="'+(b.end_time||'')+'"></div></div>'+
@@ -10146,7 +10153,10 @@ function uploadFilesSeq(files,each,done){
     toast('Lade hoch … '+(i+1)+' / '+files.length);
     fetch(API+'/storage/'+encodeURIComponent(name),{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:f})
       .then(function(r){if(!r.ok)throw new Error('Upload fehlgeschlagen ('+r.status+')');return r.json()})
-      .then(function(j){urls.push(j.url);if(each)each(j.url);i++;next()})
+      /* Kurze Pause zwischen den Uploads - vor allem auf dem Handy/Mobilfunk robuster,
+         als 31 Anfragen ohne jede Pause direkt hintereinander abzufeuern. */
+      .then(function(j){urls.push(j.url);if(each)each(j.url);return sleep(150)})
+      .then(function(){i++;next()})
       .catch(function(e){toast(e.message,1);i++;next()});
   }
   next();
