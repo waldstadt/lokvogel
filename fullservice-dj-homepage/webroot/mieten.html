@@ -509,9 +509,13 @@ function rentCard(e){
   }
   addon+=setHint;
   var open=e.id?' clickable" tabindex="0" role="button" onclick="openProductModal(\''+jsq(e.id)+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openProductModal(\''+jsq(e.id)+'\')}"':'"';
+  /* Name als echter Link auf die eigene Artikel-Adresse (siehe technik-artikel.php) -
+     zaehlt fuer Google und laesst sich gezielt verlinken/empfehlen; Rest der Kachel
+     oeffnet weiterhin schnell das Produktfenster. */
+  var nameHtml=e.slug?'<a href="technik/'+esc(e.slug)+'" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none">'+esc(e.name)+'</a>':esc(e.name);
   return '<div class="rent reveal vis'+(st.gone?' unavail':'')+open+'><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
     (e.category?'<div class="rc">'+esc(e.category)+'</div>':'')+
-    '<h4>'+esc(e.name)+'</h4><p>'+esc(e.description||'')+'</p>'+
+    '<h4>'+nameHtml+'</h4><p>'+esc(e.description||'')+'</p>'+
     '<div class="rp">'+price+'</div>'+av+addon+cartCtrl+'</div></div>';
 }
 /* ---- Produktfenster (Detailansicht) ---- */

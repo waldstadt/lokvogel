@@ -8,11 +8,13 @@ $base = ($https ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'lauschg
 $pages = [
   ['index.html', '1.0', 'weekly'],
   ['technik.html', '0.9', 'weekly'],
+  ['mieten.html', '0.8', 'weekly'],
   ['weihnachtsfeier.html', '0.8', 'monthly'],
   ['halloween.html', '0.8', 'monthly'],
 ];
 /* Aktionsseiten nur listen, wenn sie im Backoffice eingeschaltet sind */
 $guides = [];
+$eqRows = [];
 try {
   $db = new PDO('sqlite:' . __DIR__ . '/data/dj.sqlite');
   foreach ($db->query("select slug from campaign_pages where enabled = 1 order by sort") as $row)
@@ -21,6 +23,10 @@ try {
      der nicht ueber die is_file()-Pruefung der uebrigen Seiten laeuft. */
   foreach ($db->query("select slug, updated_at from guides where published = 1 order by sort") as $row)
     $guides[] = $row;
+  /* Technik-Artikel haben ebenfalls keine eigene Datei (siehe technik-artikel.php) -
+     nur oeffentlich vermietbare, aktive Artikel mit gesetztem Slug. */
+  foreach ($db->query("select slug from equipment where public = 1 and rentable = 1 and status = 'aktiv' and slug is not null and slug != '' order by sort") as $row)
+    $eqRows[] = $row['slug'];
 } catch (Throwable $e) {}
 echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
@@ -38,4 +44,6 @@ foreach ($guides as $row) {
   echo "  <url><loc>$base/backstage/" . rawurlencode((string)$row['slug']) . "</loc>" .
     "<lastmod>$lastmod</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>\n";
 }
+foreach ($eqRows as $slug)
+  echo "  <url><loc>$base/technik/" . rawurlencode($slug) . "</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>\n";
 echo "</urlset>\n";

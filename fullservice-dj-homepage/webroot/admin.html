@@ -6109,6 +6109,7 @@ function openEqModal(id){
     eqRelSelects('eFits',e.fits_ids||[],e.id)+'</div></div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveEq(\''+(id||'')+'\')">Speichern</button>'+
     (eqNextId?' <button class="btn g sm" onclick="saveEq(\''+id+'\',function(){openEqModal(\''+eqNextId+'\')})">Speichern &amp; nächster Artikel</button>':'')+
+    (id&&e.slug&&e.public!==false?' <a class="btn g" href="technik/'+esc(e.slug)+'" target="_blank" style="text-decoration:none">Artikel ansehen</a>':'')+
     (id?' <button class="btn r" onclick="delEq(\''+id+'\')">Löschen</button>':'')+'</div>');
   EQ_IMAGES=eqImagesOf(e);EQ_FOCAL=e.image_focal||'50% 50%';renderEqImgGrid();renderEqFocal();
   EQ_PH=e.placeholder||'';renderEqPhRow();

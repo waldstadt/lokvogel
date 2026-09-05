@@ -35,4 +35,7 @@
   RewriteEngine On
   RewriteRule ^backstage/([a-z0-9-]+)/?$ backstage.php?slug=$1 [L,QSA]
   RewriteRule ^backstage/?$ backstage.php [L,QSA]
+  # Technik-Artikel: eigene Adresse je Vermiet-Artikel fuer Google und zum gezielten
+  # Verlinken/Empfehlen einzelner Geraete (siehe technik-artikel.php).
+  RewriteRule ^technik/([a-z0-9-]+)/?$ technik-artikel.php?slug=$1 [L,QSA]
 </IfModule>
