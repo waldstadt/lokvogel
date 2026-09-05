@@ -1363,19 +1363,32 @@ var TOAST_HIDE_T=null;
 /* HEIC/HEIF (iPhone-Fotoformat) kann kein Browser anzeigen und laesst sich auch serverseitig
    nicht umwandeln (GD in api.php kennt das Format nicht, und auf Shared-Hosting wie All-Inkl
    gibt es dafuer normalerweise auch kein ImageMagick) - deshalb hier im Browser selbst nach
-   JPEG umgewandelt, noch bevor die Datei ueberhaupt hochgeladen wird. Bibliothek (heic2any,
-   MIT-Lizenz) liegt selbst gehostet unter vendor/ (keine externen Dienste/CDNs, siehe
-   CLAUDE.md) und wird nur bei Bedarf nachgeladen, statt jede Seite groesser zu machen. */
-var HEIC_LIB_LOADING=null;
-function loadHeic2Any(){
-  if(window.heic2any)return Promise.resolve();
+   JPEG umgewandelt, noch bevor die Datei ueberhaupt hochgeladen wird. Bibliothek (libheif-js,
+   LGPL-3.0, aktueller direkter Emscripten-Build von libheif) liegt selbst gehostet unter
+   vendor/ (keine externen Dienste/CDNs, siehe CLAUDE.md) und wird nur bei Bedarf nachgeladen,
+   statt jede Seite groesser zu machen. Ersetzt die vorherige heic2any-Bibliothek, die auf
+   einem mehrere Jahre alten libheif-Stand aufsetzte und aktuelle iPhone-Fotos ("ERR_LIBHEIF
+   format not supported") gar nicht mehr dekodieren konnte. */
+var HEIC_LIB_LOADING=null,HEIC_MOD=null;
+/* vendor/libheif-bundle.js definiert ein globales "libheif", das aber selbst nur eine
+   Emscripten-Factory-Funktion ist (kein fertiges Modul) - erst der Aufruf libheif() liefert,
+   asynchron, das eigentliche Modul mit HeifDecoder etc. Einmal aufgeloest, in HEIC_MOD
+   zwischengespeichert statt bei jedem Foto neu zu initialisieren. */
+function loadHeicLib(){
+  if(HEIC_MOD)return Promise.resolve(HEIC_MOD);
   if(HEIC_LIB_LOADING)return HEIC_LIB_LOADING;
   HEIC_LIB_LOADING=new Promise(function(resolve,reject){
+    if(window.libheif){resolve();return}
     var s=document.createElement('script');
-    s.src='vendor/heic2any.min.js';
+    s.src='vendor/libheif-bundle.js';
     s.onload=function(){resolve()};
     s.onerror=function(){HEIC_LIB_LOADING=null;reject(new Error('HEIC-Bibliothek konnte nicht geladen werden.'))};
     document.head.appendChild(s);
+  }).then(function(){
+    return window.libheif();
+  }).then(function(mod){
+    HEIC_MOD=mod;
+    return mod;
   });
   return HEIC_LIB_LOADING;
 }
@@ -1384,15 +1397,28 @@ function isHeicFile(f){
   return /\.(heic|heif)$/.test(n)||t.indexOf('heic')>=0||t.indexOf('heif')>=0;
 }
 function heicToJpeg(file){
-  return loadHeic2Any().then(function(){
-    /* heic2any prueft intern strikt auf eine "echte" Blob-Instanz und lehnt ein File-Objekt
-       (aus einem <input type=file>) manchmal ab, obwohl File von Blob erbt - deshalb hier
-       einmal explizit in ein Blob umkopiert. */
-    return window.heic2any({blob:new Blob([file],{type:file.type}),toType:'image/jpeg',quality:0.85});
-  }).then(function(result){
-    var blob=Array.isArray(result)?result[0]:result;
-    var name=file.name.replace(/\.(heic|heif)$/i,'')+'.jpg';
-    return new File([blob],name,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
+  return loadHeicLib().then(function(mod){
+    return file.arrayBuffer().then(function(buf){return [mod,buf]});
+  }).then(function(r){
+    var mod=r[0],buf=r[1];
+    var decoder=new mod.HeifDecoder();
+    var images=decoder.decode(new Uint8Array(buf));
+    if(!images||!images.length)throw new Error('Keine Bilddaten in der Datei gefunden.');
+    var image=images[0];
+    var width=image.get_width(),height=image.get_height();
+    return new Promise(function(resolve,reject){
+      image.display({data:new Uint8ClampedArray(width*height*4),width:width,height:height},function(displayData){
+        if(!displayData){reject(new Error('HEIC-Bild konnte nicht dekodiert werden.'));return}
+        var canvas=document.createElement('canvas');
+        canvas.width=width;canvas.height=height;
+        canvas.getContext('2d').putImageData(new ImageData(displayData.data,width,height),0,0);
+        canvas.toBlob(function(blob){
+          if(!blob){reject(new Error('JPEG-Export fehlgeschlagen.'));return}
+          var name=file.name.replace(/\.(heic|heif)$/i,'')+'.jpg';
+          resolve(new File([blob],name,{type:'image/jpeg',lastModified:file.lastModified||Date.now()}));
+        },'image/jpeg',0.85);
+      });
+    });
   });
 }
 /* Mehrere HEIC-Fotos gleichzeitig (Promise.all ueber alle Dateien) hat auf dem Handy
