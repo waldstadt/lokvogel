@@ -91,8 +91,15 @@ textarea{min-height:70px;resize:vertical}
      ohne das Layout zu verschieben. */
   a[onclick]{display:inline-block;padding:10px 0;margin:-10px 0;line-height:20px}
   td a[onclick],#docItems a[onclick],.it-act a{padding:10px 8px;margin:-10px -8px}
-  td input[type=checkbox],.cal-legend input[type=checkbox]{width:22px;height:22px;margin:9px;padding:0;cursor:pointer}
-  .cal-legend label{min-height:40px;display:inline-flex;align-items:center}
+  td input[type=checkbox]{width:22px;height:22px;margin:9px;padding:0;cursor:pointer}
+  /* Die Kalender-Legende (Anfragen/Angeboten/.../Ferien NRW) hatte auf dem Handy die
+     grossen Tabellen-Kaestchen von oben geerbt (44px Ziel inkl. Rand) und blieb dabei
+     im unveraenderten flex-wrap-Zeilenumbruch - je nach Textlaenge stand mal ein
+     Eintrag, mal zwei pro Zeile, wirkte kaputt. Eigene, kleinere Checkbox-Groesse plus
+     eine Spalte statt Zeilenumbruch macht daraus eine saubere Liste. */
+  .cal-legend{flex-direction:column;flex-wrap:nowrap;gap:2px}
+  .cal-legend input[type=checkbox]{width:18px;height:18px;margin:0 8px 0 0;padding:0;cursor:pointer;flex:none}
+  .cal-legend label{width:100%;min-height:38px;display:flex;align-items:center}
 }
 /* Kundeninhalte (Planer, Notizen, Nachrichten) können sehr lange Wörter enthalten -
    ohne Umbruchregel zieht ein einziger Wert die ganze Oberfläche in die Breite. */
@@ -1388,6 +1395,38 @@ function heicToJpeg(file){
     return new File([blob],name,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
   });
 }
+/* Mehrere HEIC-Fotos gleichzeitig (Promise.all ueber alle Dateien) hat auf dem Handy
+   dazu gefuehrt, dass beim Hochladen eines ganzen Fotoalbums (z. B. 31 Fotos) alle
+   Umwandlungen auf einmal starten - das ueberlastet den WASM-Decoder im mobilen Safari
+   und liess Umwandlungen reihenweise fehlschlagen, ohne dass am Ende irgendetwas
+   hochgeladen wurde. Jetzt hoechstens CONCURRENCY gleichzeitig, mit Fortschrittsanzeige,
+   und der eigentliche Fehler landet zusaetzlich in der Konsole statt nur als knapper Toast. */
+function heicConvertBatch(files,onProgress){
+  var total=files.filter(isHeicFile).length,done=0,idx=0;
+  var results=new Array(files.length);
+  var CONCURRENCY=3;
+  function worker(){
+    return new Promise(function(resolveWorker){
+      function next(){
+        var i=idx++;
+        if(i>=files.length){resolveWorker();return}
+        var f=files[i];
+        if(!isHeicFile(f)){results[i]=f;next();return}
+        heicToJpeg(f).then(function(nf){
+          results[i]=nf;done++;if(onProgress)onProgress(done,total);next();
+        }).catch(function(err){
+          console.error('HEIC-Umwandlung fehlgeschlagen für "'+f.name+'":',err);
+          toast('HEIC-Umwandlung fehlgeschlagen – „'+f.name+'" wird übersprungen.',1);
+          results[i]=null;done++;if(onProgress)onProgress(done,total);next();
+        });
+      }
+      next();
+    });
+  }
+  var workers=[];
+  for(var w=0;w<Math.min(CONCURRENCY,files.length||1);w++)workers.push(worker());
+  return Promise.all(workers).then(function(){return results});
+}
 /* Faengt jede Dateiauswahl auf einem Bild-Feld in der Erfassungsphase ab, noch bevor das
    eigentliche onchange (z. B. eqUpload) die Datei sieht - HEIC-Dateien werden dabei durch
    ihre JPEG-Umwandlung ersetzt, alles andere laeuft unveraendert durch. stopPropagation()
@@ -1400,17 +1439,19 @@ document.addEventListener('change',function(e){
   var accept=(inp.getAttribute('accept')||'').toLowerCase();
   if(accept.indexOf('image')===-1)return;
   var files=Array.prototype.slice.call(inp.files||[]);
-  if(!files.some(isHeicFile))return;
+  var heicTotal=files.filter(isHeicFile).length;
+  if(!heicTotal)return;
   e.stopPropagation();
-  toast('Wandle HEIC-Foto(s) um …');
-  Promise.all(files.map(function(f){
-    return isHeicFile(f)?heicToJpeg(f).catch(function(err){
-      toast('HEIC-Umwandlung fehlgeschlagen – „'+f.name+'" wird übersprungen.',1);
-      return null;
-    }):f;
-  })).then(function(converted){
+  toast(heicTotal>1?('Wandle '+heicTotal+' HEIC-Fotos um … (0/'+heicTotal+')'):'Wandle HEIC-Foto um …');
+  heicConvertBatch(files,function(done,total){
+    if(total>1)toast('Wandle HEIC-Fotos um … ('+done+'/'+total+')');
+  }).then(function(converted){
     var kept=converted.filter(Boolean);
-    if(!kept.length)return;
+    if(!kept.length){
+      toast('HEIC-Umwandlung fehlgeschlagen – keine der '+files.length+' Datei(en) konnte umgewandelt werden. Details in der Browser-Konsole.',1);
+      return;
+    }
+    if(kept.length<files.length)toast(kept.length+' von '+files.length+' Datei(en) bereit, Rest wurde übersprungen.',1);
     var dt=new DataTransfer();
     kept.forEach(function(f){dt.items.add(f)});
     inp.files=dt.files;
