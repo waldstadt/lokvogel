@@ -6063,6 +6063,8 @@ function priceAdjust(mode,val,cur){
 }
 function openEqModal(id){
   var e=id?CACHE.equipment.find(function(x){return x.id===id}):{};e=e||{};
+  var eqNextId=null;
+  if(id){var nav=eqBuildNav(),idx=nav.indexOf(id);if(idx>=0&&idx<nav.length-1)eqNextId=nav[idx+1]}
   openModal(id?'Artikel bearbeiten':'Neuer Artikel',
     '<div class="grid3"><div><label>Name *</label><input id="eName" value="'+esc(e.name||'')+'"></div>'+
     '<div><label>Kategorie</label><input id="eCat" value="'+esc(e.category||'')+'" placeholder="Lautsprecher, Licht, Nebel/Haze …"></div>'+
@@ -6106,10 +6108,18 @@ function openEqModal(id){
     '<div><label>Passend für („passend für" – bis zu 5, z. B. Kabel/Stativ zu einem Gerät)</label>'+
     eqRelSelects('eFits',e.fits_ids||[],e.id)+'</div></div>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveEq(\''+(id||'')+'\')">Speichern</button>'+
+    (eqNextId?' <button class="btn g sm" onclick="saveEq(\''+id+'\',function(){openEqModal(\''+eqNextId+'\')})">Speichern &amp; nächster Artikel</button>':'')+
     (id?' <button class="btn r" onclick="delEq(\''+id+'\')">Löschen</button>':'')+'</div>');
   EQ_IMAGES=eqImagesOf(e);EQ_FOCAL=e.image_focal||'50% 50%';renderEqImgGrid();renderEqFocal();
   EQ_PH=e.placeholder||'';renderEqPhRow();
   if(e.status)document.getElementById('eStatus').value=e.status;
+}
+/* Liste in genau der Reihenfolge/Filterung, die gerade in der Technik-Uebersicht zu
+   sehen ist (Suchfeld + Sortierung) - Grundlage fuer "Speichern & naechster Artikel". */
+function eqBuildNav(){
+  var q=(v('eqSearch')||'').toLowerCase();
+  var list=(CACHE.equipment||[]).filter(function(e){return !q||[e.name,e.category].join(' ').toLowerCase().indexOf(q)>=0});
+  return applySort(list,'equipment').map(function(e){return e.id});
 }
 /* Fünf Auswahlfelder für eine Artikel-Beziehung („passt dazu" / „passend für"). */
 function byNameDe(a,b){return String(a.name||'').localeCompare(String(b.name||''),'de')}
@@ -6129,7 +6139,7 @@ function eqRelValues(prefix){
   for(var i=0;i<5;i++){var s=document.getElementById(prefix+i);var val=s&&s.value;if(val&&out.indexOf(val)===-1)out.push(val)}
   return out;
 }
-function saveEq(id){
+function saveEq(id,then){
   if(!v('eName')){toast('Name fehlt.',1);return}
   var eqImgs=EQ_IMAGES.filter(function(u){return u&&String(u).trim()});
   var addonIds=eqRelValues('eAddon'),fitsIds=eqRelValues('eFits');
@@ -6146,8 +6156,8 @@ function saveEq(id){
     favorite:document.getElementById('eFav').checked,
     slug:v('eName').toLowerCase().replace(/[^a-z0-9äöüß]+/g,'-').replace(/^-|-$/g,'')};
   (id?api('equipment?id=eq.'+id,{method:'PATCH',body:body}):api('equipment',{method:'POST',body:body}))
-    .then(function(){closeModal();toast('Gespeichert ✓');
-      api('equipment?select=*&order=sort').then(function(r){CACHE.equipment=r||[];renderEq()})})
+    .then(function(){toast('Gespeichert ✓');return api('equipment?select=*&order=sort')})
+    .then(function(r){CACHE.equipment=r||[];renderEq();if(then)then();else closeModal()})
     .catch(function(e){toast(e.message,1)});
 }
 function delEq(id){
@@ -8743,9 +8753,16 @@ function prodBulkPrice(){
   })).then(function(){toast('Preise angepasst ✓');closeModal();reloadProds()})
     .catch(function(e){toast(e.message,1)});
 }
+function prodBuildNav(){
+  var q=(v('prodSearch')||'').toLowerCase();
+  var list=(CACHE.products||[]).filter(function(p){return !q||[p.sku,p.name,p.category].join(' ').toLowerCase().indexOf(q)>=0});
+  return applySort(list,'products').map(function(p){return p.id});
+}
 function openProdModal(id){
   var p=id?(CACHE.products||[]).find(function(x){return x.id===id}):{};p=p||{};
   var bundleLines=(p.bundle||[]).map(function(c){return c.sku+' | '+(c.qty||1)}).join('\n');
+  var prodNextId=null;
+  if(id){var nav=prodBuildNav(),idx=nav.indexOf(id);if(idx>=0&&idx<nav.length-1)prodNextId=nav[idx+1]}
   openModal(id?'Artikel bearbeiten':'Neuer Artikel',
     '<div class="grid3"><div><label>Artikelnummer *</label><input id="pSku" value="'+esc(p.sku||'')+'" placeholder="DJ-100"></div>'+
     '<div><label>Kategorie</label><input id="pCat" value="'+esc(p.category||'')+'" placeholder="DJ-Leistung, Ton, Licht …"></div>'+
@@ -8762,9 +8779,10 @@ function openProdModal(id){
     '<label style="margin-top:12px"><input type="checkbox" id="pActive" style="width:auto;margin-right:6px" '+(p.active!==false?'checked':'')+'>Aktiv (im „+ Artikel“-Picker sichtbar)</label>'+
     '<label><input type="checkbox" id="pFav" style="width:auto;margin-right:6px" '+(p.favorite?'checked':'')+'>Häufig gebucht (erscheint im Artikel-Picker oben in der Kategorie-Auswahl)</label>'+
     '<div style="margin-top:14px"><button class="btn" onclick="saveProd(\''+(id||'')+'\')">Speichern</button>'+
+    (prodNextId?' <button class="btn g sm" onclick="saveProd(\''+id+'\',function(){openProdModal(\''+prodNextId+'\')})">Speichern &amp; nächster Artikel</button>':'')+
     (id?' <button class="btn r" onclick="delRow(\'products\',\''+id+'\',reloadProds)">Löschen</button>':'')+'</div>');
 }
-function saveProd(id){
+function saveProd(id,then){
   if(!v('pSku')||!v('pName')){toast('Artikelnummer und Name fehlen.',1);return}
   var bundle=document.getElementById('pBundle').value.split('\n').map(function(l){
     var parts=l.split('|').map(function(s){return s.trim()});
@@ -8778,7 +8796,9 @@ function saveProd(id){
     bundle:bundle,sort:Number(v('pSort'))||0,active:document.getElementById('pActive').checked,
     favorite:document.getElementById('pFav').checked};
   (id?api('products?id=eq.'+id,{method:'PATCH',body:body}):api('products',{method:'POST',body:body}))
-    .then(function(){closeModal();toast('Gespeichert ✓');reloadProds()}).catch(function(e){toast('Fehler (Artikelnummer doppelt?): '+e.message,1)});
+    .then(function(){toast('Gespeichert ✓');return api('products?select=*&order=sort')})
+    .then(function(r){CACHE.products=r||[];renderProducts();if(then)then();else closeModal()})
+    .catch(function(e){toast('Fehler (Artikelnummer doppelt?): '+e.message,1)});
 }
 function reloadProds(){api('products?select=*&order=sort').then(function(r){CACHE.products=r||[];renderProducts()})}
 var PP_SEL={};
