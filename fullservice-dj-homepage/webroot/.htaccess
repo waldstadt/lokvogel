@@ -14,7 +14,15 @@
   # frame-src erlaubt zusaetzlich open.spotify.com: bewusste, mit Markus abgestimmte
   # Ausnahme von "keine externen Dienste" fuer eingebettete Playlists im Backstage-Bereich
   # (siehe backstage.php) - alles andere bleibt 'self'.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self' https://open.spotify.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+  # worker-src erlaubt zusaetzlich blob: - die HEIC-Umwandlung (heic2any, siehe admin.html)
+  # startet ihren Bilddecoder als Web-Worker aus einer blob:-URL; ohne dieses Zugestaendnis
+  # faellt worker-src auf script-src zurueck (kein blob: dort erlaubt) und der Worker laesst
+  # sich gar nicht erst erzeugen - Browser mit strikter CSP-Durchsetzung (z. B. Safari)
+  # blockieren das dann lautlos, ohne dass im Code selbst etwas falsch waere. 'wasm-unsafe-eval'
+  # in script-src erlaubt zusaetzlich, dass dieser Worker seinen WebAssembly-Bilddecoder
+  # (libheif) uebersetzen darf - deutlich enger als 'unsafe-eval', erlaubt nur WebAssembly,
+  # kein beliebiges eval() von Text-Code.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' https://open.spotify.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
   # Nur wirksam, wenn ueber HTTPS ausgeliefert (Browser ignorieren HSTS ueber HTTP ohnehin).
   Header always set Strict-Transport-Security "max-age=15552000; includeSubDomains"
 </IfModule>
