@@ -992,6 +992,13 @@ tr.neu td{background:rgba(255,111,91,.14)}
           <label style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--wh)"><input type="checkbox" id="cPackImgs" style="width:auto;margin-right:6px" onchange="savePackSec()">Bilder in den Paketkacheln anzeigen</label>
           <div class="mut sml" style="margin-bottom:8px">Ohne Haken sehen die Kacheln aus wie bisher – nützlich, solange noch nicht jedes Paket ein Bild hat. Reihenfolge per Ziehen am ⠿-Griff ändern, Klick aufs Badge schaltet live/aus.</div>
           <div id="packList" class="sml"></div></div>
+        <div class="card" id="cms-ablauf"><h3>So läuft's <button class="btn sm" style="float:right" onclick="openStepModal()">+ Schritt</button></h3>
+          <label>Überschrift der Sektion</label><input id="cAblTitle">
+          <label>Einleitungstext</label><textarea id="cAblText" style="min-height:70px"></textarea>
+          <div style="margin-top:10px"><button class="btn sm" onclick="saveContent('process')">Text speichern</button></div>
+          <div class="sml" style="margin:14px 0 8px;font-weight:600;color:var(--wh)">Schritte</div>
+          <div class="mut sml" style="margin-bottom:8px">Die Nummerierung (01, 02, …) ergibt sich automatisch aus der Reihenfolge. Reihenfolge per Ziehen am ⠿-Griff ändern, Klick aufs Badge schaltet live/aus.</div>
+          <div id="stepsAdminList" class="sml"></div></div>
         <div class="card" id="cms-faq"><h3>FAQ <span style="float:right;display:flex;gap:6px"><button class="btn g sm" id="faqAiBtn" onclick="suggestFaq()">KI-Vorschlag</button><button class="btn sm" onclick="openFaqModal()">+ Frage</button></span></h3>
           <div class="mut sml" style="margin-bottom:8px">Reihenfolge per Ziehen am ⠿-Griff ändern – Klick aufs Badge schaltet live/aus.</div>
           <div id="faqAdminList" class="sml"></div></div>
@@ -1658,12 +1665,13 @@ function ensureRest(){
     api('campaign_pages?select=*&order=sort'),
     api('blocks?select=*&order=anchor,sort'),
     api('event_reports?select=*&order=sort'),
-    api('guides?select=*&order=sort')
+    api('guides?select=*&order=sort'),
+    api('process_steps?select=*&order=sort')
   ]).then(function(r){
     CACHE.content={};(r[0]||[]).forEach(function(x){CACHE.content[x.key]=x.value});
     CACHE.packages=r[1]||[];CACHE.faq=r[2]||[];CACHE.upsells=r[3]||[];CACHE.reviews=r[4]||[];
     CACHE.partners=r[5]||[];CACHE.campaigns=r[6]||[];CACHE.module=r[7]||[];CACHE.reports=r[8]||[];
-    CACHE.guides=r[9]||[];
+    CACHE.guides=r[9]||[];CACHE.process_steps=r[10]||[];
     REST_LOADED=true;
     renderRest();
   }).catch(function(e){REST_PROMISE=null;toast('Nachladen fehlgeschlagen: '+e.message,1)});
@@ -6410,6 +6418,8 @@ function renderCms(){
   document.getElementById('cThTeaText').value=g('tech_teaser','text');
   document.getElementById('cServTitle').value=g('services','title')||'Das bekommt ihr';
   document.getElementById('cServText').value=g('services','text')||'Vom Sektempfang bis zum letzten Song: Musik, Ton für die freie Trauung, dezentes Licht passend zur Location – und ein Plan B für alle Fälle. Ihr feiert, ich kümmere mich um den Rest.';
+  document.getElementById('cAblTitle').value=g('process','title')||'Vier Schritte bis zur Party';
+  document.getElementById('cAblText').value=g('process','text')||'Kein kompliziertes Hin und Her – so einfach kommen wir zusammen.';
   document.getElementById('cLocTitle').value=g('loc_section','title')||'Orte, an denen ich besonders gerne auflege';
   document.getElementById('cLocText').value=g('loc_section','text')||'Deutschlandweit gibt es Locations, mit denen die Zusammenarbeit einfach herausragend läuft – eingespielte Teams, gute Technik-Bedingungen, tolle Räume. Diese Häuser empfehle ich aus voller Überzeugung.';
   document.getElementById('cLocMax').value=Number(g('loc_section','max_count'))||0;
@@ -6450,7 +6460,7 @@ function renderCms(){
   themeNote('technik');
   var pi=document.getElementById('cPackImgs');
   if(pi)pi.checked=!((CACHE.content.pack_sec||{}).images===false);
-  renderPackAdmin();renderFaqAdmin();reloadLocs();reloadFriends();reloadBadges();renderBadgeSec();
+  renderPackAdmin();renderStepsAdmin();renderFaqAdmin();reloadLocs();reloadFriends();reloadBadges();renderBadgeSec();
   renderSectionsCard();renderInstagram();loadVersions();
 }
 /* Dieselbe Zuordnung wie auf den oeffentlichen Seiten (FONT_HEADS dort) - die Kachel
@@ -6601,6 +6611,7 @@ function buildContentVal(key){
   if(key==='seo')return {title:v('cSeoTitle'),description:v('cSeoDesc')};
   if(key==='guarantee')return {title:v('cGTitle'),text:v('cGText')};
   if(key==='services')return Object.assign({},CACHE.content&&CACHE.content.services||{},{title:v('cServTitle'),text:v('cServText')});
+  if(key==='process')return Object.assign({},CACHE.content&&CACHE.content.process||{},{title:v('cAblTitle'),text:v('cAblText')});
   if(key==='loc_section'){
     var oldL=CACHE.content.loc_section||{};
     return Object.assign({},oldL,{title:v('cLocTitle'),text:v('cLocText'),
@@ -6858,7 +6869,8 @@ var DD_LISTS={
   reviews:{tbl:'reviews',cache:'reviews',render:function(){renderRevAdmin()}},
   badges:{tbl:'badges',cache:'badges',render:function(){renderBadgeAdmin()}},
   blocks:{tbl:'blocks',cache:'module',render:function(){renderModulAdmin()}},
-  event_reports:{tbl:'event_reports',cache:'reports',render:function(){renderReportAdmin()}}
+  event_reports:{tbl:'event_reports',cache:'reports',render:function(){renderReportAdmin()}},
+  process_steps:{tbl:'process_steps',cache:'process_steps',render:function(){renderStepsAdmin()}}
 };
 function pubSwitch(name,id,isPub){
   return '<span class="b '+(isPub?'green':'grey')+'" style="cursor:pointer" title="Klicken zum Ein-/Ausschalten" '+
@@ -6930,6 +6942,30 @@ function savePack(id){
     public:document.getElementById('pPub').checked};
   if(!id)body.sort=(CACHE.packages||[]).length;
   (id?api('packages?id=eq.'+id,{method:'PATCH',body:body}):api('packages',{method:'POST',body:body}))
+    .then(function(){closeModal();toast('Gespeichert ✓');renderCmsReload()}).catch(function(e){toast(e.message,1)});
+}
+function renderStepsAdmin(){
+  document.getElementById('stepsAdminList').innerHTML=(CACHE.process_steps||[]).map(function(s,i){
+    return '<div'+ddAttrs('process_steps',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
+    '<span class="mut" style="width:22px">'+('0'+(i+1)).slice(-2)+'</span>'+
+    '<a onclick="openStepModal(\''+s.id+'\')" style="flex:1">'+esc(s.title)+'</a>'+
+    pubSwitch('process_steps',s.id,!!s.public)+'</div>';
+  }).join('')||'<span class="mut">Keine Schritte.</span>';
+}
+function openStepModal(id){
+  var s=id?CACHE.process_steps.find(function(x){return x.id===id}):{};s=s||{};
+  openModal(id?'Schritt bearbeiten':'Neuer Schritt',
+    '<label>Titel *</label><input id="sTitle" value="'+esc(s.title||'')+'">'+
+    '<label>Text</label><textarea id="sText" style="min-height:100px">'+esc(s.text||'')+'</textarea>'+
+    '<label style="margin-top:12px"><input type="checkbox" id="sPub" style="width:auto;margin-right:6px" '+(s.public!==false?'checked':'')+'>Auf Homepage anzeigen</label>'+
+    SORT_HINT+
+    '<div style="margin-top:14px"><button class="btn" onclick="saveStep(\''+(id||'')+'\')">Speichern</button>'+
+    (id?' <button class="btn r" onclick="delRow(\'process_steps\',\''+id+'\',renderCmsReload)">Löschen</button>':'')+'</div>');
+}
+function saveStep(id){
+  var body={title:v('sTitle'),text:v('sText'),public:document.getElementById('sPub').checked};
+  if(!id)body.sort=(CACHE.process_steps||[]).length;
+  (id?api('process_steps?id=eq.'+id,{method:'PATCH',body:body}):api('process_steps',{method:'POST',body:body}))
     .then(function(){closeModal();toast('Gespeichert ✓');renderCmsReload()}).catch(function(e){toast(e.message,1)});
 }
 function pImgUpload(inp){
@@ -7931,8 +7967,8 @@ function dlBackup(name){
     .catch(function(e){toast(e.message,1)});
 }
 function renderCmsReload(){
-  Promise.all([api('packages?select=*&order=sort'),api('faq?select=*&order=sort')]).then(function(r){
-    CACHE.packages=r[0]||[];CACHE.faq=r[1]||[];renderPackAdmin();renderFaqAdmin()});
+  Promise.all([api('packages?select=*&order=sort'),api('faq?select=*&order=sort'),api('process_steps?select=*&order=sort')]).then(function(r){
+    CACHE.packages=r[0]||[];CACHE.faq=r[1]||[];CACHE.process_steps=r[2]||[];renderPackAdmin();renderFaqAdmin();renderStepsAdmin()});
 }
 
 /* ===== KI-Textassistent ===== */
@@ -10656,9 +10692,9 @@ var HOME_SECTION_ORDER_DEFAULT=['ueber','leistungen','ablauf','backstage','galer
 var HOME_SECTIONS=[['ueber','Über mich'],['leistungen','Leistungen'],['ablauf','Ablauf'],['backstage','Backstage'],['galerie','Galerie'],
   ['bewertungen','Bewertungen'],['garantie','Garantie'],['technik','Technik-Teaser'],['locations','Locations'],
   ['freunde','Freunde'],['partner','Logo-Leisten'],['faq','FAQ']];
-/* Welche Karte weiter unten die Texte pflegt - "Ablauf" hat feste Texte, darum keine; "Backstage"
-   pflegt sich nicht ueber eine CMS-Karte, sondern ueber die eigene Backstage-Seite (Beitraege). */
-var HOME_SECTION_CARDS={hero:'cms-hero',ueber:'cms-ueber',leistungen:'cms-leistungen',galerie:'cms-galerie',
+/* Welche Karte weiter unten die Texte pflegt - "Backstage" pflegt sich nicht ueber eine
+   CMS-Karte, sondern ueber die eigene Backstage-Seite (Beitraege). */
+var HOME_SECTION_CARDS={hero:'cms-hero',ueber:'cms-ueber',leistungen:'cms-leistungen',ablauf:'cms-ablauf',galerie:'cms-galerie',
   bewertungen:'cms-bewertungen',garantie:'cms-garantie',technik:'cms-technik',locations:'cms-locations',
   freunde:'cms-freunde',partner:'cms-partner',faq:'cms-faq',anfrage:'cms-kontakt'};
 function homeSectionName(id){var f=HOME_SECTIONS.find(function(s){return s[0]===id});return f?f[1]:id}
@@ -10904,6 +10940,7 @@ function fillContent(key,val){
   }
   if(key==='guarantee'){set('cGTitle',val.title);set('cGText',val.text)}
   if(key==='services'){set('cServTitle',val.title);set('cServText',val.text)}
+  if(key==='process'){set('cAblTitle',val.title);set('cAblText',val.text)}
   if(key==='loc_section'){
     set('cLocTitle',val.title);set('cLocText',val.text);set('cLocMax',Number(val.max_count)||0);
     document.getElementById('cLocRotate').checked=!!val.rotate;

@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 115;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 116;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -205,7 +205,7 @@ const JSON_COLS = [
   'event_reports' => ['media'],
 ];
 const BOOL_COLS = [
-  'packages' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'], 'badges' => ['public','light_bg'], 'blocks' => ['public'], 'event_reports' => ['public'],
+  'packages' => ['public'], 'process_steps' => ['public'], 'faq' => ['public'], 'locations' => ['public','image_approved','highlight'], 'friends' => ['public'], 'badges' => ['public','light_bg'], 'blocks' => ['public'], 'event_reports' => ['public'],
   'workshop_events' => ['public'],
   'upsells' => ['active','show_portal'], 'reviews' => ['public'], 'products' => ['active','favorite'],
   'bookings' => ['review_requested','open_ended'],
@@ -219,11 +219,11 @@ const TABLES = ['settings','site_content','packages','faq','equipment','location
   'customers','communications','bookings','booking_equipment','documents','document_items','email_templates',
   'doc_events','form_templates','forms','upsells','reviews','products','partners','rental_contracts','friends',
   'workshop_events','workshop_signups','doc_audit','customer_files','newsletter','equipment_sets','equipment_set_items',
-  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks','payments','mail_messages','discount_codes','guides'];
+  'calendar_blocks','content_versions','quote_templates','event_plan_changes','campaign_pages','badges','blocks','event_reports','tech_checks','payments','mail_messages','discount_codes','guides','process_steps'];
 const PK = ['settings' => 'key', 'site_content' => 'key'];   // sonst: id
 
 /* Öffentliche Zugriffe (ohne Login) */
-const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items','campaign_pages','badges','blocks','event_reports','guides'];
+const PUBLIC_READ   = ['site_content','packages','faq','equipment','locations','reviews','friends','equipment_sets','equipment_set_items','campaign_pages','badges','blocks','event_reports','guides','process_steps'];
 const INQUIRY_FIELDS = ['name','email','phone','event_type','event_date','location','guests','message'];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -1264,6 +1264,21 @@ function upgrade(PDO $p): void {
        Themenvorschlaegen zu persoenlichen Geschichten, Technik und Musik-Playlists. */
     try { seedGuides($p); } catch (PDOException $e) {}
   }
+  if ($v < 116) {
+    /* v116: "So laeuft's" (Ablauf) war eine feste Text-Passage - jetzt eine frei
+       bearbeitbare Liste wie die Leistungspakete (hinzufuegen/loeschen/sortieren im
+       Backoffice). Die vier bisherigen Schritte werden 1:1 als Ausgangsdaten uebernommen,
+       damit sich an der Homepage zunaechst nichts sichtbar aendert. */
+    try { $p->exec(processStepsDdl()); seedProcessSteps($p); } catch (PDOException $e) {}
+    try {
+      $exists = (int)$p->query("select count(*) from site_content where key = 'process'")->fetchColumn();
+      if (!$exists) {
+        $p->prepare("insert into site_content (key,value,updated_at) values ('process',?,?)")
+          ->execute([json_encode(['title' => 'Vier Schritte bis zur Party',
+            'text' => 'Kein kompliziertes Hin und Her – so einfach kommen wir zusammen.'], JSON_UNESCAPED_UNICODE), now()]);
+      }
+    } catch (PDOException $e) {}
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1673,6 +1688,29 @@ function paymentsDdl(): string {
   return 'create table if not exists payments (id text primary key,
     document_id text not null references documents(id) on delete cascade,
     amount real not null default 0, paid_at text, method text, note text, created_at text)';
+}
+/* "So läuft's" (Ablauf) war lange eine feste Text-Passage direkt in index.html - auf
+   Wunsch jetzt eine echte, frei bearbeitbare Liste wie die Leistungspakete (hinzufügen,
+   löschen, per Drag&Drop sortieren). Die fortlaufende Nummer (01, 02, ...) wird nicht
+   gespeichert, sondern aus der Position berechnet - sonst müsste sie bei jeder Umsortierung
+   von Hand mitgepflegt werden. */
+function processStepsDdl(): string {
+  return "create table if not exists process_steps (id text primary key, sort integer default 0,
+    title text not null, text text, public integer default 1, created_at text)";
+}
+function seedProcessSteps(PDO $p): void {
+  $ins = $p->prepare('insert into process_steps (id, sort, title, text, public, created_at) values (?,?,?,?,1,?)');
+  $has = $p->prepare('select count(*) from process_steps where title = ?');
+  foreach ([
+    [1, 'Anfragen', 'Formular ausfüllen oder kurz anrufen. Ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort – auch wenn der Termin schon vergeben ist.'],
+    [2, 'Kennenlernen', 'Telefonat oder Treffen: Wir sprechen über den Ablauf, eure Musik – und darüber, was auf keinen Fall laufen darf.'],
+    [3, 'Angebot', 'Ihr bekommt ein klares Angebot mit festen Posten für Dauer und Technik. Keine versteckten Kosten, kein Kleingedrucktes.'],
+    [4, 'Feiern', 'Ich bin rechtzeitig da, die Technik steht, bevor eure Gäste kommen – und dann gehört die Tanzfläche euch.'],
+  ] as [$s, $t, $tx]) {
+    $has->execute([$t]);
+    if ((int)$has->fetchColumn()) continue;
+    $ins->execute([uuid(), $s, $t, $tx, now()]);
+  }
 }
 /* Das Postfach: eingehende Mails (per IMAP abgerufen, Knopf "Postfach aktualisieren")
    UND jede ausgehende Mail (automatisch beim Versand protokolliert, siehe logOutgoingMail()
@@ -4109,6 +4147,8 @@ SQL);
   $p->exec(calendarFeedDdl());
   $p->exec(loginDdl());
   $p->exec(paymentsDdl());
+  $p->exec(processStepsDdl());
+  seedProcessSteps($p);
   foreach (docIndexDdl() as $sql) $p->exec($sql);
   $p->exec(docAuditDdl());
   foreach (portalAccountDdl() as $sql) $p->exec($sql);
@@ -4157,6 +4197,7 @@ function seed(PDO $p): void {
     ['hero', '{"title":"DJ Lauschgift","headline":"Volle Tanzfläche.\n*Ohne Schnickschnack.*","scrim":{"mode":"gleich","pct":30},"badges":[{"value": "23", "label": "Jahre hinter den Decks"}, {"value": "Plan B", "label": "immer inklusive"}, {"value": "Seeburg", "label": "Premium-Sound"}],"subtitle":"DJ für Hochzeiten, Geburtstage & Firmenfeiern · deutschlandweit","text":"Ich bin Markus – seit 23 Jahren DJ, quer durch Deutschland unterwegs. Keine Show um meine Person, kein Programm von der Stange: Ich lese den Raum und spiele das, was eure Gäste auf die Tanzfläche bringt. Ihr müsst euch um nichts kümmern – dafür bin ich da.","cta":"Unverbindlich anfragen","image":""}'],
     ['about', '{"title":"Einfach Markus. Und trotzdem kein Standard-DJ.","gear":["23 Jahre am Pult","Alle Generationen auf der Tanzfläche","Von der Hochzeit bis zur Firmenfeier","Eigene Ton- und Lichttechnik","Sauerland und ganz NRW"],"text":"Angefangen hat alles mit zwei Plattenspielern und einem alten Mischpult zum 18. Geburtstag. Ein Jahr lang habe ich in der heimischen Garage geübt, bis ich für bekannte DJs das Warm-up in angesagten Clubs übernehmen durfte. Den eigentlichen Wendepunkt gab es aber bei einer ganz anderen Feier: Als meine Tante mich zu ihrem runden Geburtstag fragte, ob ich auch gemischte Musik auflegen könnte, war ich skeptisch – bis Jung und Alt gemeinsam auf der Tanzfläche standen und weitersangen, als ich den Regler runterzog. Seitdem ist mir in 23 Jahren kein einziger Abend langweilig geworden.\\n\\nWas mich von vielen anderen unterscheidet: Ich bin ein echter Technik- und Menschenfreund. Ich nehme euch und eure Gäste bewusst wahr und setze auf Licht- und Tontechnik, die man sonst eher von deutlich größeren Produktionen kennt – weil auch eine Feier mit 40 Gästen großartige Technik verdient. Mein Sound kommt von Seeburg Acoustic Line, einem der deutschen Top-Hersteller für mobile PA-Systeme – das hört man sofort. Dazu passe ich mich flexibel an jede Location an, ob Scheune, Schloss, Industriehalle oder Gartenparty: Ich kenne mein Equipment in- und auswendig und weiß, wie ich jeden Raum klanglich und optisch in Szene setze.","image":"img/markus_1.jpg"}'],
     ['services', '{"title":"Das bekommt ihr","text":"Vom Sektempfang bis zum letzten Song: Musik, Ton für die freie Trauung, dezentes Licht passend zur Location – und ein Plan B für alle Fälle. Ihr feiert, ich kümmere mich um den Rest.","image":""}'],
+    ['process', '{"title":"Vier Schritte bis zur Party","text":"Kein kompliziertes Hin und Her – so einfach kommen wir zusammen."}'],
     ['guarantee', '{"title":"Schon ausgebucht? Ihr steht trotzdem nicht ohne DJ da.","text":"Wenn ich an eurem Termin keine Zeit habe – oder merke, dass ich nicht der richtige DJ für eure Feier bin – wähle ich persönlich bis zu fünf Kollegen aus meinem Partner-Netzwerk aus, die wirklich zu euch passen. Keine anonyme Liste: Ich kenne die Kollegen und ihre Stärken, und ihr bekommt die Vorschläge direkt von mir – auch günstigere Optionen sind dabei, falls euer Budget das erfordert. Und Transparenz gehört dazu: Für eine erfolgreiche Vermittlung erhalte ich eine kleine Provision (Details in den AGB)."}'],
     ['rental', '{"title":"Technik mieten","text":"Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung."}'],
     ['tech_hero', '{"headline":"Jedes Wort verständlich.\n*Auch in der schwierigsten Location.*","scrim":{"mode":"gleich","pct":30},"badges":[{"value": "24 h", "label": "= 1 Miettag"}, {"value": "50 %", "label": "jeder Folgetag"}, {"value": "Hemer", "label": "Lager & Abholung"}],"subtitle":"Lauschgift Veranstaltungstechnik · Hemer","text":"Große Bühnen mit viel Platz kann jeder beschallen. Die Kunst ist die kleine Location: niedrige Decke, harte Wände, Publikum direkt vor der Box. Genau darauf bin ich spezialisiert – Ton und Licht für Veranstaltungen von 30 bis 200 Gästen, mit hochwertiger Technik, die dafür gebaut ist."}'],

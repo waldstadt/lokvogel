@@ -358,15 +358,10 @@ a.lg:hover{border-color:var(--pri);transform:translateY(-2px)}
   <div class="wrap">
     <div class="reveal">
       <div class="kicker">So läuft's</div>
-      <h2>Vier Schritte bis zur Party</h2>
-      <p class="lead">Kein kompliziertes Hin und Her – so einfach kommen wir zusammen.</p>
+      <h2 id="ablTitle">Vier Schritte bis zur Party</h2>
+      <p class="lead" id="ablText">Kein kompliziertes Hin und Her – so einfach kommen wir zusammen.</p>
     </div>
-    <div class="steps">
-      <div class="step reveal"><div class="n">01</div><h4>Anfragen</h4><p>Formular ausfüllen oder kurz anrufen. Ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort – auch wenn der Termin schon vergeben ist.</p></div>
-      <div class="step reveal"><div class="n">02</div><h4>Kennenlernen</h4><p>Telefonat oder Treffen: Wir sprechen über den Ablauf, eure Musik – und darüber, was auf keinen Fall laufen darf.</p></div>
-      <div class="step reveal"><div class="n">03</div><h4>Angebot</h4><p>Ihr bekommt ein klares Angebot mit festen Posten für Dauer und Technik. Keine versteckten Kosten, kein Kleingedrucktes.</p></div>
-      <div class="step reveal"><div class="n">04</div><h4>Feiern</h4><p>Ich bin rechtzeitig da, die Technik steht, bevor eure Gäste kommen – und dann gehört die Tanzfläche euch.</p></div>
-    </div>
+    <div class="steps" id="stepsGrid"></div>
   </div>
 </section>
 <div id="blkslot-ablauf"></div>
@@ -606,6 +601,12 @@ var FALLBACK={
     {title:'Geburtstag & private Feier',subtitle:'Eure Party, euer Sound',features:['Musik nach euren Wünschen','Profi-PA (Seeburg Acoustic Line)','Licht, das zur Stimmung passt']},
     {title:'Firmenfeier',subtitle:'Vom Empfang bis zur Party souverän',features:['Hintergrundmusik & Partyprogramm','Mikrofon & Ton für Reden','Enge Abstimmung mit eurer Planung']}
   ],
+  process_steps:[
+    {title:'Anfragen',text:'Formular ausfüllen oder kurz anrufen. Ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort – auch wenn der Termin schon vergeben ist.'},
+    {title:'Kennenlernen',text:'Telefonat oder Treffen: Wir sprechen über den Ablauf, eure Musik – und darüber, was auf keinen Fall laufen darf.'},
+    {title:'Angebot',text:'Ihr bekommt ein klares Angebot mit festen Posten für Dauer und Technik. Keine versteckten Kosten, kein Kleingedrucktes.'},
+    {title:'Feiern',text:'Ich bin rechtzeitig da, die Technik steht, bevor eure Gäste kommen – und dann gehört die Tanzfläche euch.'}
+  ],
   faq:[
     {question:'Spielst du Musikwünsche?',answer:'Ja, klar – Wünsche von euch und euren Gästen gehören dazu. Vorab besprechen wir, was auf jeden Fall laufen soll und was gar nicht.'},
     {question:'Wie läuft die Buchung ab?',answer:'Anfrage über das Formular oder telefonisch, dann ein kurzes Kennenlerngespräch, ein klares Angebot – und mit eurer Bestätigung ist der Termin fest reserviert.'},
@@ -840,6 +841,12 @@ function renderPacks(list){
     return '<div class="pack reveal vis">'+bild+'<div class="pack-in"><h3>'+esc(p.title)+'</h3><div class="psub">'+esc(p.subtitle||'')+'</div><ul>'+feats+'</ul>'+price+'</div></div>';
   }).join('');
 }
+function renderSteps(list){
+  document.getElementById('stepsGrid').innerHTML=list.map(function(s,i){
+    var n=('0'+(i+1)).slice(-2);
+    return '<div class="step reveal vis"><div class="n">'+n+'</div><h4>'+esc(s.title)+'</h4><p>'+esc(s.text||'')+'</p></div>';
+  }).join('');
+}
 function renderFaq(list){
   var el=document.getElementById('faqList');
   el.innerHTML=list.map(function(f,i){
@@ -853,7 +860,7 @@ function renderFaq(list){
     });
   });
 }
-renderPacks(FALLBACK.packages);renderFaq(FALLBACK.faq);
+renderPacks(FALLBACK.packages);renderSteps(FALLBACK.process_steps);renderFaq(FALLBACK.faq);
 
 /* ===== Inhalte vom Server laden (überschreibt Fallbacks) ===== */
 function sfetch(path){
@@ -902,6 +909,10 @@ function applyContent(rows){
   if(c.services){
     if(c.services.title)document.getElementById('servTitle').textContent=c.services.title;
     if(c.services.text)document.getElementById('servText').textContent=c.services.text;
+  }
+  if(c.process){
+    if(c.process.title)document.getElementById('ablTitle').textContent=c.process.title;
+    if(c.process.text)document.getElementById('ablText').textContent=c.process.text;
   }
   if(c.tech_teaser){
     if(c.tech_teaser.title)document.getElementById('rentTitle').textContent=c.tech_teaser.title;
@@ -1197,6 +1208,7 @@ PACK_ROWS=null;
 sfetch('packages?select=*&public=eq.true&order=sort').then(function(r){
   PACK_ROWS=r;if(r.length&&CONTENT_FERTIG)renderPacks(r);
 }).catch(function(){});
+sfetch('process_steps?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderSteps(r)}).catch(function(){});
 sfetch('faq?select=*&public=eq.true&order=sort').then(function(r){if(r.length)renderFaq(r)}).catch(function(){});
 sfetch('guides?select=*&published=eq.true&order=sort').then(function(r){
   var el=document.getElementById('bsGrid');if(!el)return;
