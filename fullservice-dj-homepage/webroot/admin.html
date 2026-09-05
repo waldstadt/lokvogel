@@ -9744,19 +9744,34 @@ function closeModal(){document.getElementById('modalBg').classList.remove('v');w
 })();
 document.addEventListener('keydown',function(e){
   if(e.key!=='Escape')return;
-  var bg2=document.getElementById('modalBg2');
-  if(bg2&&bg2.classList.contains('v')){closeModal2();return}   /* erst das obere Fenster */
+  var bg2=document.getElementById('ovl2Bg');
+  if(bg2&&bg2.classList.contains('v')){closeOvl2Safe();return}   /* erst das obere Fenster (frueher fälschlich auf ein nicht existierendes "modalBg2" geprüft - Escape im Text-Editor riss dadurch das darunterliegende Fenster weg, ohne den Editor selbst zu schliessen */
   if(document.getElementById('modalBg').classList.contains('v'))closeModal();
 });
 function v(id){var el=document.getElementById(id);return el?el.value.trim():''}
 
-/* ===== Zweites Overlay (liegt über offenen Modals – für Medien-Pool & Text-Editor) ===== */
+/* ===== Zweites Overlay (liegt über offenen Modals – für Medien-Pool & Text-Editor) =====
+   closeOvl2Safe() fragt nach, wenn der Text-Editor (openTextEditor) offen ist UND sich der
+   Text seit dem Öffnen geändert hat - sonst ging beim versehentlichen Daneben-Klicken
+   (z. B. Text markieren, Maus verlässt dabei die Box) oder bei Escape der ganze Text
+   kommentarlos verloren. Bei allen anderen ovl2-Inhalten (Medien-Pool o.ä.) verhält es sich
+   wie bisher, weil ED_TARGET dann leer ist. */
 function openOvl2(title,html){
-  document.getElementById('ovl2Box').innerHTML='<h3>'+title+'<span class="x" onclick="closeOvl2()">✕</span></h3>'+html;
+  document.getElementById('ovl2Box').innerHTML='<h3>'+title+'<span class="x" onclick="closeOvl2Safe()">✕</span></h3>'+html;
   document.getElementById('ovl2Bg').classList.add('v');
 }
 function closeOvl2(){document.getElementById('ovl2Bg').classList.remove('v')}
-document.getElementById('ovl2Bg').addEventListener('click',function(e){if(e.target===this)closeOvl2()});
+function closeOvl2Safe(){
+  if(typeof edDirty==='function'&&edDirty()&&!confirm('Fenster wirklich schließen? Ungespeicherte Änderungen gehen dabei verloren.'))return;
+  if(typeof edClearDraft==='function')edClearDraft();
+  ED_TARGET=null;
+  closeOvl2();
+}
+(function(){
+  var bg=document.getElementById('ovl2Bg'),mdOnBg=false;
+  bg.addEventListener('mousedown',function(e){mdOnBg=(e.target===this)});
+  bg.addEventListener('click',function(e){if(e.target===this&&mdOnBg)closeOvl2Safe();mdOnBg=false});
+})();
 
 /* ===== Batch-Upload: mehrere Dateien nacheinander über den /storage-Upload ===== */
 function uploadFilesSeq(files,each,done){
@@ -10304,7 +10319,71 @@ function igSync(){
 }
 
 /* ===== Text-Editor („Groß bearbeiten") mit Mini-Markdown ===== */
-var ED_TARGET=null,ED_UNDO=null;
+/* ED_ORIG = Text beim Öffnen (für die Änderungserkennung/Abbrechen-Rückfrage).
+   ED_HIST/ED_HIST_I = Rückgängig/Wiederholen-Verlauf (mehrstufig, nicht nur ein Schritt).
+   Automatisches Zwischenspeichern (edDraftSave) + der Verlauf sind bewusst hier zentral
+   gebaut, weil ALLE "Groß bearbeiten"-Aufrufe im ganzen Backoffice über diese eine
+   openTextEditor()-Funktion laufen (Produkttexte, Technik, Seiteninhalte, Mails,
+   Backstage-Beiträge, …) - eine Reparatur hier wirkt überall. Anlass: gemeldeter
+   Datenverlust, wenn sich das Fenster unabsichtlich schloss oder die KI-Antwort
+   abgeschnitten wurde, ohne dass das auffiel. */
+var ED_TARGET=null,ED_ORIG='',ED_HIST=[],ED_HIST_I=-1,ED_HIST_TIMER=null,ED_DRAFT_TIMER=null;
+function edDirty(){var t=document.getElementById('edArea');return !!ED_TARGET&&!!t&&t.value!==ED_ORIG}
+function edDraftKey(){return 'edDraft:'+ED_TARGET}
+/* Entwurf inkl. Ausgangstext speichern - der Ausgangstext dient beim nächsten Öffnen als
+   Fingerabdruck: nur anbieten, wenn seitdem wirklich am selben Stand weitergearbeitet wurde
+   (sonst könnte bei gleicher Feld-ID aber anderem Datensatz ein falscher Entwurf auftauchen). */
+function edDraftSave(){
+  if(!ED_TARGET)return;
+  var t=document.getElementById('edArea');if(!t)return;
+  try{
+    if(t.value===ED_ORIG)localStorage.removeItem(edDraftKey());
+    else localStorage.setItem(edDraftKey(),JSON.stringify({v:t.value,orig:ED_ORIG,ts:Date.now()}));
+  }catch(e){}
+}
+function edClearDraft(){if(ED_TARGET)try{localStorage.removeItem(edDraftKey())}catch(e){}}
+function edDraftSaveSoon(){clearTimeout(ED_DRAFT_TIMER);ED_DRAFT_TIMER=setTimeout(edDraftSave,800)}
+/* Verlauf: neue Momentaufnahme nur, wenn sie sich vom letzten Stand unterscheidet; ein
+   späterer Schritt wird verworfen, sobald man nach einem Rückgängig neu weiterschreibt. */
+function edHistPush(val){
+  if(ED_HIST[ED_HIST_I]===val)return;
+  ED_HIST=ED_HIST.slice(0,ED_HIST_I+1);
+  ED_HIST.push(val);
+  ED_HIST_I=ED_HIST.length-1;
+  edHistSync();
+}
+function edHistSync(){
+  var u=document.getElementById('edUndoBtn'),r=document.getElementById('edRedoBtn');
+  if(u)u.disabled=ED_HIST_I<=0;
+  if(r)r.disabled=ED_HIST_I>=ED_HIST.length-1;
+}
+function edHistPushSoon(){clearTimeout(ED_HIST_TIMER);ED_HIST_TIMER=setTimeout(function(){
+  var t=document.getElementById('edArea');if(t)edHistPush(t.value);
+},1200)}
+function edUndo(){
+  if(ED_HIST_I<=0)return;
+  ED_HIST_I--;
+  document.getElementById('edArea').value=ED_HIST[ED_HIST_I];
+  edLenUpdate();edHistSync();edDraftSave();
+}
+function edRedo(){
+  if(ED_HIST_I>=ED_HIST.length-1)return;
+  ED_HIST_I++;
+  document.getElementById('edArea').value=ED_HIST[ED_HIST_I];
+  edLenUpdate();edHistSync();edDraftSave();
+}
+function edOninput(){edLenUpdate();edHistPushSoon();edDraftSaveSoon()}
+function edRestoreDraft(){
+  var t=document.getElementById('edArea'),raw;
+  try{raw=localStorage.getItem(edDraftKey())}catch(e){raw=null}
+  if(!raw||!t)return;
+  var d;try{d=JSON.parse(raw)}catch(e){return}
+  if(d&&d.v)t.value=d.v;
+  edHistPush(t.value);edLenUpdate();
+  var b=document.getElementById('edDraftBanner');if(b)b.remove();
+  toast('Entwurf wiederhergestellt.');
+}
+function edDismissDraft(){edClearDraft();var b=document.getElementById('edDraftBanner');if(b)b.remove()}
 /* Empfohlene Zeichen-Zielbereiche je Textfeld – grobe Richtwerte fürs Lesen am Bildschirm
    bzw. (bei cSeoDesc) die von Google in der Suche angezeigte Länge. Felder ohne Eintrag
    zeigen nur die reine Zeichenzahl ohne Zielbereich (z. B. Notizen, Rechtstexte). */
@@ -10343,25 +10422,45 @@ function edBtn(id){
 function edIsGuideField(id){return id==='gMeta'||id==='gIntro'||/^gSecText\d+$/.test(id)}
 function openTextEditor(id){
   var src=document.getElementById(id);if(!src)return;
-  ED_TARGET=id;ED_UNDO=null;
+  ED_TARGET=id;ED_ORIG=src.value;ED_HIST=[src.value];ED_HIST_I=0;
   var isGuide=edIsGuideField(id);
   openOvl2('Text bearbeiten',
+    '<div id="edDraftBanner"></div>'+
     '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+
+    '<button class="btn g sm" id="edUndoBtn" title="Rückgängig" onclick="edUndo()" disabled>↶ Rückgängig</button>'+
+    '<button class="btn g sm" id="edRedoBtn" title="Wiederholen" onclick="edRedo()" disabled>↷ Wiederholen</button>'+
+    '<span style="width:1px;height:20px;background:var(--bdr)"></span>'+
     '<button class="btn g sm" style="font-weight:700" title="Auswahl fett" onclick="edWrap(\'**\',\'**\')">B</button>'+
     '<button class="btn g sm" style="font-style:italic" title="Auswahl kursiv" onclick="edWrap(\'*\',\'*\')">I</button>'+
     '<button class="btn g sm" title="Auswahl verlinken" onclick="edLink()">Link</button>'+
     '<button class="btn g sm" id="edAiBtn" title="Aus Stichpunkten oder schlechtem Text einen fertigen Artikeltext machen" onclick="edAiImprove()">'+
     '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Mit KI verbessern</button>'+
-    '<a class="sml" id="edAiUndo" style="display:none" onclick="edAiUndo()">Rückgängig</a>'+
     (isGuide?' <button class="btn g sm" id="edSeoBtn" title="Ganzen Beitrag auf SEO prüfen – ändert den Text nicht" onclick="edSeoCheck()">SEO-Check</button>':'')+
     '</div>'+
-    '<textarea id="edArea" style="min-height:320px" oninput="edLenUpdate()"></textarea>'+
+    '<textarea id="edArea" style="min-height:320px" oninput="edOninput()"></textarea>'+
     '<div class="sml mut" id="edLenHint" style="margin-top:6px"></div>'+
-    '<div class="mut sml" style="margin-top:2px">**fett**, *kursiv*, [Text](https://…) – wird auf der Homepage formatiert angezeigt.</div>'+
+    '<div id="edTruncWarn"></div>'+
+    '<div class="mut sml" style="margin-top:2px">**fett**, *kursiv*, [Text](https://…) – wird auf der Homepage formatiert angezeigt. Der Text wird automatisch zwischengespeichert, solange das Fenster offen ist.</div>'+
     (isGuide?'<div id="edSeoResult"></div>':'')+
-    '<div style="margin-top:12px"><button class="btn" onclick="edApply()">Übernehmen</button> <button class="btn g" onclick="closeOvl2()">Abbrechen</button></div>');
+    '<div style="margin-top:12px"><button class="btn" onclick="edApply()">Übernehmen</button> <button class="btn g" onclick="closeOvl2Safe()">Abbrechen</button></div>');
   document.getElementById('edArea').value=src.value;
   edLenUpdate();
+  var raw;try{raw=localStorage.getItem(edDraftKey())}catch(e){raw=null}
+  if(raw){
+    var d=null;try{d=JSON.parse(raw)}catch(e){}
+    if(d&&d.orig===ED_ORIG&&d.v&&d.v!==ED_ORIG){
+      var when=d.ts?new Date(d.ts).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'}):'';
+      document.getElementById('edDraftBanner').innerHTML=
+        '<div class="card" style="border-color:var(--acc);padding:10px 12px;margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+        '<span class="sml">Es gibt einen nicht übernommenen Entwurf'+(when?' vom '+when:'')+' – vermutlich wurde das Fenster vorher unerwartet geschlossen.</span>'+
+        '<button class="btn g sm" onclick="edRestoreDraft()">Entwurf wiederherstellen</button>'+
+        '<button class="btn g sm" onclick="edDismissDraft()">Verwerfen</button></div>';
+    } else edClearDraft();
+  }
+}
+function edTruncWarn(show){
+  var el=document.getElementById('edTruncWarn');if(!el)return;
+  el.innerHTML=show?'<div class="sml" style="color:var(--red);margin-top:6px">Die KI-Antwort wurde wegen der Länge abgeschnitten – der Text ist vermutlich unvollständig. Bitte kürzeren Ausgangstext verwenden oder in Abschnitten arbeiten, bevor du „Übernehmen" klickst.</div>':'';
 }
 function edAiImprove(){
   var t=document.getElementById('edArea');if(!t)return;
@@ -10373,7 +10472,7 @@ function edAiImprove(){
   if(EDIT_LEN_HINT[ED_TARGET])body.target_len=EDIT_LEN_HINT[ED_TARGET];
   var btn=document.getElementById('edAiBtn');
   btn.disabled=true;btn.textContent='Wird generiert …';
-  ED_UNDO=t.value;
+  edHistPush(t.value);edTruncWarn(false);
   fetch('api.php/ai/rewrite',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
     .then(function(res){
@@ -10381,20 +10480,15 @@ function edAiImprove(){
       btn.innerHTML='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Mit KI verbessern';
       if(!res.ok||res.j.error){toast((res.j&&res.j.error)||'KI-Anfrage fehlgeschlagen.',1);return}
       t.value=res.j.text||'';
-      document.getElementById('edAiUndo').style.display='inline';
+      edHistPush(t.value);edDraftSave();
       edLenUpdate();
-      toast('Text generiert – bei Bedarf anpassen, dann „Übernehmen".');
+      edTruncWarn(!!res.j.truncated);
+      toast(res.j.truncated?'Text generiert, aber abgeschnitten – siehe Hinweis unten.':'Text generiert – bei Bedarf anpassen, dann „Übernehmen".',res.j.truncated?1:0);
     }).catch(function(e){
       btn.disabled=false;
       btn.innerHTML='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Mit KI verbessern';
       toast(e.message,1);
     });
-}
-function edAiUndo(){
-  var t=document.getElementById('edArea');
-  if(t&&ED_UNDO!==null)t.value=ED_UNDO;
-  document.getElementById('edAiUndo').style.display='none';
-  edLenUpdate();
 }
 function edWrap(pre,post){
   var t=document.getElementById('edArea');if(!t)return;
@@ -10403,6 +10497,7 @@ function edWrap(pre,post){
   t.value=t.value.slice(0,s)+pre+sel+post+t.value.slice(e);
   t.focus();
   t.setSelectionRange(s+pre.length,s+pre.length+sel.length);
+  edHistPush(t.value);edDraftSave();
 }
 function edLink(){
   var t=document.getElementById('edArea');if(!t)return;
@@ -10414,10 +10509,12 @@ function edLink(){
   t.value=t.value.slice(0,s)+rep+t.value.slice(e);
   t.focus();
   t.setSelectionRange(s+1,s+1+sel.length);
+  edHistPush(t.value);edDraftSave();
 }
 function edApply(){
   var src=document.getElementById(ED_TARGET);
   if(src)src.value=document.getElementById('edArea').value;
+  edClearDraft();ED_TARGET=null;
   closeOvl2();
   toast('Übernommen – „Speichern" nicht vergessen.');
 }

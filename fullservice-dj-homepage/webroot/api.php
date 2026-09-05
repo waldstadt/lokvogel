@@ -72,8 +72,12 @@ function partnerInfoForEmail(PDO $p, string $email): ?array {
    (Backup-Ergebnis) rausgeht. Die beiden echten HTTP-Endpunkte faengt die Exception direkt
    am Aufrufort ab und wandeln sie dort weiterhin in fail() um - fuer den Browser aendert
    sich nichts. */
+/* Rueckgabe {text, truncated}: "truncated" ist true, wenn die Antwort nur wegen max_tokens
+   abgeschnitten wurde - Aufrufer sollen den Nutzer dann warnen statt den unvollstaendigen
+   Text kommentarlos als fertig zu behandeln (siehe Markus' Meldung: KI-Text wurde
+   abgeschnitten, ohne dass das irgendwo sichtbar war). */
 function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $model,
-                    string $workspaceId, string $system, string $userText, int $maxTokens): string {
+                    string $workspaceId, string $system, string $userText, int $maxTokens): array {
   $baseUrl = rtrim($baseUrl, '/');
   if ($provider === 'claude') {
     $reqBody = json_encode([
@@ -98,7 +102,7 @@ function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $mo
     }
     $generated = '';
     foreach ((array)($j['content'] ?? []) as $block) { if (($block['type'] ?? '') === 'text') $generated .= (string)($block['text'] ?? ''); }
-    return trim($generated);
+    return ['text' => trim($generated), 'truncated' => ($j['stop_reason'] ?? '') === 'max_tokens'];
   }
   $reqBody = json_encode([
     'model' => $model,
@@ -123,7 +127,8 @@ function aiCallLLM(string $provider, string $apiKey, string $baseUrl, string $mo
     }
     throw new RuntimeException('KI-Anfrage fehlgeschlagen: ' . $msg);
   }
-  return trim((string)($j['choices'][0]['message']['content'] ?? ''));
+  return ['text' => trim((string)($j['choices'][0]['message']['content'] ?? '')),
+    'truncated' => ($j['choices'][0]['finish_reason'] ?? '') === 'length'];
 }
 /* Liefert {provider,apiKey,baseUrl,model,workspaceId} aus settings.ai oder null, wenn kein
    Zugang eingerichtet ist - fuer Aufrufer, die selbst unbeaufsichtigt laufen (Cron) und
@@ -3850,7 +3855,7 @@ function suggestGuideTopics(int $n = 5): array {
   $userText = "Vorhandene Backstage-Beiträge:\n" . ($existing ? implode("\n", $existing) : '(keine)')
     . "\n\nAktionsseiten-Themen (nicht wiederholen):\n" . ($campaigns ? implode("\n", $campaigns) : '(keine)');
   try {
-    $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 700);
+    $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 1000)['text'];
   } catch (RuntimeException $e) { return []; }
   $raw = trim(preg_replace('#^```(?:json)?|```$#m', '', $raw));
   $j = json_decode($raw, true);
@@ -8658,10 +8663,10 @@ try {
         (int)$targetLen[0], (int)$targetLen[1]);
     }
     try {
-      $generated = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $style, $text, 800);
+      $result = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $style, $text, 2000);
     } catch (RuntimeException $e) { fail($e->getMessage(), 502); }
-    if ($generated === '') fail('KI-Anfrage fehlgeschlagen: keine Antwort erhalten.', 502);
-    out(['text' => $generated]);
+    if ($result['text'] === '') fail('KI-Anfrage fehlgeschlagen: keine Antwort erhalten.', 502);
+    out(['text' => $result['text'], 'truncated' => $result['truncated']]);
   }
   /* KI-Textassistent: FAQ-Vorschlag aus den Website-Inhalten generieren. Ein Klick = ein
      Vorschlag (Frage+Antwort); der Admin sieht ihn im FAQ-Editor und kann ihn vor dem
@@ -8692,7 +8697,7 @@ try {
     $userText = "Website-Inhalte:\n" . mb_substr($siteText, 0, 3000)
       . "\n\nBereits vorhandene FAQ-Fragen (nicht wiederholen):\n" . ($existing ? implode("\n", $existing) : '(noch keine)');
     try {
-      $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 400);
+      $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 700)['text'];
     } catch (RuntimeException $e) { fail($e->getMessage(), 502); }
     $raw = trim(preg_replace('#^```(?:json)?|```$#m', '', $raw));
     $j = json_decode($raw, true);
@@ -8733,7 +8738,7 @@ try {
       . 'Stichpunkte. Antworte AUSSCHLIESSLICH als kompaktes JSON-Objekt ohne Markdown-Codeblock, '
       . 'exakt in der Form {"h1":"...","kicker":"...","sections":[{"heading":"...","points":["...","..."]}]}.';
     try {
-      $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $topic, 700);
+      $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $topic, 1200)['text'];
     } catch (RuntimeException $e) { fail($e->getMessage(), 502); }
     $raw = trim(preg_replace('#^```(?:json)?|```$#m', '', $raw));
     $j = json_decode($raw, true);
@@ -8764,7 +8769,7 @@ try {
     $userText = "Browser-Titel: $title\nMeta-Beschreibung (" . mb_strlen($meta) . " Zeichen): $meta\n"
       . "H1: $h1\nEinleitung: $intro\n\nAbschnittstexte:\n" . mb_substr($sectionsText, 0, 4000);
     try {
-      $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 700);
+      $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 1200)['text'];
     } catch (RuntimeException $e) { fail($e->getMessage(), 502); }
     $raw = trim(preg_replace('#^```(?:json)?|```$#m', '', $raw));
     $j = json_decode($raw, true);
