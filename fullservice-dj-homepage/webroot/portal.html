@@ -183,6 +183,62 @@ function agencyOn(){var c=coOf();return !!c.agency_enabled&&!!c.agency_name}
    damit liesse sich aus einem Attribut ausbrechen (style, onfocus und so weiter). */
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);
   return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+/* HEIC/HEIF (iPhone-Fotoformat) kann kein Browser anzeigen und laesst sich auch serverseitig
+   nicht umwandeln - deshalb hier im Browser selbst nach JPEG umgewandelt, noch bevor die
+   Datei ueberhaupt hochgeladen wird (gleiches Muster wie in admin.html). Bibliothek
+   (heic2any, MIT-Lizenz) liegt selbst gehostet unter vendor/ und wird nur bei Bedarf
+   nachgeladen. */
+var HEIC_LIB_LOADING=null;
+function loadHeic2Any(){
+  if(window.heic2any)return Promise.resolve();
+  if(HEIC_LIB_LOADING)return HEIC_LIB_LOADING;
+  HEIC_LIB_LOADING=new Promise(function(resolve,reject){
+    var s=document.createElement('script');
+    s.src='vendor/heic2any.min.js';
+    s.onload=function(){resolve()};
+    s.onerror=function(){HEIC_LIB_LOADING=null;reject(new Error('HEIC-Bibliothek konnte nicht geladen werden.'))};
+    document.head.appendChild(s);
+  });
+  return HEIC_LIB_LOADING;
+}
+function isHeicFile(f){
+  var n=(f.name||'').toLowerCase(),t=(f.type||'').toLowerCase();
+  return /\.(heic|heif)$/.test(n)||t.indexOf('heic')>=0||t.indexOf('heif')>=0;
+}
+function heicToJpeg(file){
+  return loadHeic2Any().then(function(){
+    /* heic2any prueft intern strikt auf eine "echte" Blob-Instanz und lehnt ein File-Objekt
+       (aus einem <input type=file>) manchmal ab, obwohl File von Blob erbt - deshalb hier
+       einmal explizit in ein Blob umkopiert. */
+    return window.heic2any({blob:new Blob([file],{type:file.type}),toType:'image/jpeg',quality:0.85});
+  }).then(function(result){
+    var blob=Array.isArray(result)?result[0]:result;
+    var name=file.name.replace(/\.(heic|heif)$/i,'')+'.jpg';
+    return new File([blob],name,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
+  });
+}
+document.addEventListener('change',function(e){
+  var inp=e.target;
+  if(!inp||inp.tagName!=='INPUT'||inp.type!=='file')return;
+  var accept=(inp.getAttribute('accept')||'').toLowerCase();
+  if(accept.indexOf('image')===-1)return;
+  var files=Array.prototype.slice.call(inp.files||[]);
+  if(!files.some(isHeicFile))return;
+  e.stopPropagation();
+  Promise.all(files.map(function(f){
+    return isHeicFile(f)?heicToJpeg(f).catch(function(err){
+      alert('HEIC-Umwandlung fehlgeschlagen – „'+f.name+'" wird übersprungen.');
+      return null;
+    }):f;
+  })).then(function(converted){
+    var kept=converted.filter(Boolean);
+    if(!kept.length)return;
+    var dt=new DataTransfer();
+    kept.forEach(function(f){dt.items.add(f)});
+    inp.files=dt.files;
+    inp.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+},true);
 /* Nur echte Web-Adressen verlinken - javascript: im Feld waere sonst ausfuehrbar. */
 function safeUrl(u){u=String(u==null?'':u).trim();return /^https?:\/\//i.test(u)?u:''}
 function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}

@@ -1345,6 +1345,70 @@ var API='api.php';
 /* ===== Basis ===== */
 var TOKEN=null,S={},CACHE={};
 var TOAST_HIDE_T=null;
+/* HEIC/HEIF (iPhone-Fotoformat) kann kein Browser anzeigen und laesst sich auch serverseitig
+   nicht umwandeln (GD in api.php kennt das Format nicht, und auf Shared-Hosting wie All-Inkl
+   gibt es dafuer normalerweise auch kein ImageMagick) - deshalb hier im Browser selbst nach
+   JPEG umgewandelt, noch bevor die Datei ueberhaupt hochgeladen wird. Bibliothek (heic2any,
+   MIT-Lizenz) liegt selbst gehostet unter vendor/ (keine externen Dienste/CDNs, siehe
+   CLAUDE.md) und wird nur bei Bedarf nachgeladen, statt jede Seite groesser zu machen. */
+var HEIC_LIB_LOADING=null;
+function loadHeic2Any(){
+  if(window.heic2any)return Promise.resolve();
+  if(HEIC_LIB_LOADING)return HEIC_LIB_LOADING;
+  HEIC_LIB_LOADING=new Promise(function(resolve,reject){
+    var s=document.createElement('script');
+    s.src='vendor/heic2any.min.js';
+    s.onload=function(){resolve()};
+    s.onerror=function(){HEIC_LIB_LOADING=null;reject(new Error('HEIC-Bibliothek konnte nicht geladen werden.'))};
+    document.head.appendChild(s);
+  });
+  return HEIC_LIB_LOADING;
+}
+function isHeicFile(f){
+  var n=(f.name||'').toLowerCase(),t=(f.type||'').toLowerCase();
+  return /\.(heic|heif)$/.test(n)||t.indexOf('heic')>=0||t.indexOf('heif')>=0;
+}
+function heicToJpeg(file){
+  return loadHeic2Any().then(function(){
+    /* heic2any prueft intern strikt auf eine "echte" Blob-Instanz und lehnt ein File-Objekt
+       (aus einem <input type=file>) manchmal ab, obwohl File von Blob erbt - deshalb hier
+       einmal explizit in ein Blob umkopiert. */
+    return window.heic2any({blob:new Blob([file],{type:file.type}),toType:'image/jpeg',quality:0.85});
+  }).then(function(result){
+    var blob=Array.isArray(result)?result[0]:result;
+    var name=file.name.replace(/\.(heic|heif)$/i,'')+'.jpg';
+    return new File([blob],name,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
+  });
+}
+/* Faengt jede Dateiauswahl auf einem Bild-Feld in der Erfassungsphase ab, noch bevor das
+   eigentliche onchange (z. B. eqUpload) die Datei sieht - HEIC-Dateien werden dabei durch
+   ihre JPEG-Umwandlung ersetzt, alles andere laeuft unveraendert durch. stopPropagation()
+   in der Erfassungsphase verhindert, dass das inline-onchange am Feld selbst schon mit den
+   Original-Dateien laeuft; nach der Umwandlung wird ein frisches change-Event ausgeloest,
+   das dann - ohne noch HEIC zu enthalten - ganz normal durchgereicht wird. */
+document.addEventListener('change',function(e){
+  var inp=e.target;
+  if(!inp||inp.tagName!=='INPUT'||inp.type!=='file')return;
+  var accept=(inp.getAttribute('accept')||'').toLowerCase();
+  if(accept.indexOf('image')===-1)return;
+  var files=Array.prototype.slice.call(inp.files||[]);
+  if(!files.some(isHeicFile))return;
+  e.stopPropagation();
+  toast('Wandle HEIC-Foto(s) um …');
+  Promise.all(files.map(function(f){
+    return isHeicFile(f)?heicToJpeg(f).catch(function(err){
+      toast('HEIC-Umwandlung fehlgeschlagen – „'+f.name+'" wird übersprungen.',1);
+      return null;
+    }):f;
+  })).then(function(converted){
+    var kept=converted.filter(Boolean);
+    if(!kept.length)return;
+    var dt=new DataTransfer();
+    kept.forEach(function(f){dt.items.add(f)});
+    inp.files=dt.files;
+    inp.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+},true);
 function toast(msg,err){
   var t=document.getElementById('toast');
   /* Steht noch ein Hinweis (z. B. ein Fehler mit 8 s), rueckt er als Kopie nach oben und
