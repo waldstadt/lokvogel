@@ -129,21 +129,12 @@ th.sortable:hover{color:var(--gll)}
 th.sorted{color:var(--acc)}
 .sortarrow{display:inline-block;margin-left:4px;vertical-align:-2px;line-height:0}
 .sortarrow svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-/* Stapel-Bearbeitung Technik */
-#eqBatchBar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
-#eqBatchBar[hidden]{display:none}
-#eqBatchBar .grp{display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:6px 8px;border-radius:6px}
-#eqBatchBar .grp .lbl{font-size:10px;color:var(--gl);text-transform:uppercase;letter-spacing:.06em}
-#eqBatchBar input,#eqBatchBar select{margin:0}
-#eqBatchBar .spacer{flex:1}
-table.batch td,table.batch th{white-space:nowrap}
-table.batch input,table.batch select{margin:0;padding:4px 6px;font-size:12px}
-table.batch input[type=number]{width:80px}
-table.batch input.cat{width:120px}
-table.batch td select{min-width:92px}
-table.batch tr.dirty td{background:rgba(255,111,91,.14)}
-table.batch tr.dirty td:first-child{box-shadow:inset 3px 0 0 var(--acc)}
-table.batch td.chk,table.batch th.chk{text-align:center}
+/* Mehrfachauswahl (Produkte & Technik): Checkbox-Spalte + Auswahl-Leiste,
+   ersetzt die frühere separate Stapel-Bearbeitung-Tabellenansicht. */
+.selbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;padding:8px 12px;border:1px solid var(--bdr);border-radius:6px;background:rgba(255,111,91,.06)}
+.selbar[hidden]{display:none}
+.selbar .spacer{flex:1}
+th.chk,td.chk{width:1%;text-align:center}
 
 /* Breadcrumb (Kunden-/Buchungsdetail) */
 .crumb{font-size:11px;color:var(--gl);margin-bottom:6px}
@@ -640,8 +631,13 @@ tr.neu td{background:rgba(255,111,91,.14)}
   <div class="pg" id="pg-prod">
     <div class="phead"><div><div class="pt">Produktkatalog</div><div class="ps">Artikel mit Nummern &amp; Kategorien – per „+ Artikel“ blitzschnell ins Angebot. Pakete bündeln mehrere Artikel zu einer Position.</div></div>
       <button class="btn" onclick="openProdModal()">+ Neuer Artikel</button></div>
+    <div id="prodSelBar" class="selbar" hidden>
+      <span id="prodSelCount" class="mut sml"></span><span class="spacer"></span>
+      <button class="btn g sm" onclick="prodBulkEditOpen()">Bearbeiten</button>
+      <button class="btn r sm" onclick="prodBulkDelete()">Löschen</button>
+    </div>
     <input type="search" autocomplete="off" data-lpignore="true" id="prodSearch" placeholder="Suchen (Nummer, Name, Kategorie) …" oninput="renderProducts()" style="margin-bottom:12px">
-    <div class="tbl-wrap card"><table><thead><tr><th>Nr.</th><th>Name</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis brutto</th><th>Typ</th><th>Status</th></tr></thead><tbody id="prodRows"></tbody></table></div>
+    <div class="tbl-wrap card"><table><thead><tr><th class="chk"><input type="checkbox" id="prodSelAll" onclick="prodSelToggleAll(this.checked)"></th><th>Nr.</th><th>Name</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis brutto</th><th>Typ</th><th>Status</th></tr></thead><tbody id="prodRows"></tbody></table></div>
   </div>
 
   <!-- DOKUMENTE -->
@@ -788,20 +784,14 @@ tr.neu td{background:rgba(255,111,91,.14)}
   <!-- TECHNIK -->
   <div class="pg" id="pg-tech">
     <div class="phead"><div><div class="pt">Technik</div><div class="ps">Bestand, Verleihpreise &amp; Homepage-Anzeige</div></div>
-      <div style="display:flex;gap:8px"><button class="btn g" id="eqBatchToggle" onclick="toggleEqBatch()">Stapel bearbeiten</button>
-      <button class="btn" onclick="openEqModal()">+ Neuer Artikel</button></div></div>
-    <div id="eqBatchBar" hidden>
-      <div class="grp"><span class="lbl">Sichtbar</span><button class="btn g sm" onclick="eqBatchSet('public',true)">an</button><button class="btn g sm" onclick="eqBatchSet('public',false)">aus</button></div>
-      <div class="grp"><span class="lbl">Auf Anfrage</span><button class="btn g sm" onclick="eqBatchSet('on_request',true)">an</button><button class="btn g sm" onclick="eqBatchSet('on_request',false)">aus</button></div>
-      <div class="grp"><span class="lbl">Status</span><select id="eqBatchStatus"><option>aktiv</option><option>wartung</option><option>inaktiv</option></select><button class="btn g sm" onclick="eqBatchSet('status',document.getElementById('eqBatchStatus').value)">setzen</button></div>
-      <div class="grp"><span class="lbl">Preis</span><select id="eqBatchPriceMode"><option value="pct+">+ %</option><option value="pct-">− %</option><option value="fix">fester Wert €</option></select><input type="number" step="0.01" id="eqBatchPriceVal" placeholder="0" style="width:80px"><button class="btn g sm" onclick="eqBatchPrice()">anpassen</button></div>
-      <div class="spacer"></div>
-      <span id="eqBatchCount" class="mut sml"></span>
-      <button class="btn" onclick="eqBatchSave()">Änderungen speichern</button>
+      <button class="btn" onclick="openEqModal()">+ Neuer Artikel</button></div>
+    <div id="eqSelBar" class="selbar" hidden>
+      <span id="eqSelCount" class="mut sml"></span><span class="spacer"></span>
+      <button class="btn g sm" onclick="eqBulkEditOpen()">Bearbeiten</button>
+      <button class="btn r sm" onclick="eqBulkDelete()">Löschen</button>
     </div>
     <input type="search" autocomplete="off" data-lpignore="true" id="eqSearch" placeholder="Suchen (Name, Kategorie) …" oninput="renderEq()" style="margin-bottom:12px">
-    <div class="tbl-wrap card" id="eqViewWrap"><table><thead><tr><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Nächstes Mal im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
-    <div class="tbl-wrap card" id="eqBatchWrap" hidden><table class="batch"><thead><tr><th class="chk"><input type="checkbox" id="eqBatchAll" onclick="eqBatchToggleAll(this.checked)"></th><th>Name</th><th>Kategorie</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th class="num">Bestand</th><th>Status</th><th class="chk">Auf Anfrage</th><th class="chk">Sichtbar</th></tr></thead><tbody id="eqBatchRows"></tbody></table></div>
+    <div class="tbl-wrap card" id="eqViewWrap"><table><thead><tr><th class="chk"><input type="checkbox" id="eqSelAll" onclick="eqSelToggleAll(this.checked)"></th><th>Name</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">€/Tag</th><th class="num">Partner €/Tag</th><th>Homepage</th><th>Status</th><th>Nächstes Mal im Einsatz</th></tr></thead><tbody id="eqRows"></tbody></table></div>
     <div class="card"><h3>Sets <span class="mut sml" style="font-weight:400">– mehrere Artikel als ein buchbares Paket (z. B. Lautsprecher + Kabel + Endstufe)</span> <button class="btn sm" style="float:right" onclick="openSetModal()">+ Set</button></h3>
       <div id="setAdminList" class="sml"></div></div>
   </div>
@@ -5987,7 +5977,6 @@ function eqNextUseSortVal(e){
   return Math.round((new Date(n.date+'T00:00:00')-today)/86400000);
 }
 function renderEq(){
-  if(eqBatch.on){renderEqBatch();return;}
   var q=(v('eqSearch')||'').toLowerCase();
   var list=(CACHE.equipment||[]).filter(function(e){
     return !q||[e.name,e.category].join(' ').toLowerCase().indexOf(q)>=0;
@@ -5998,108 +5987,75 @@ function renderEq(){
     var noPhoto=!e.image_url&&!(e.images&&e.images.length);
     var flags=(noPrice?' <span class="b red" title="Kein Tagespreis hinterlegt">kein Preis</span>':'')+
       (noPhoto?' <span class="b red" title="Kein Produktfoto hinterlegt">kein Foto</span>':'');
-    return '<tr class="click" onclick="openEqModal(\''+e.id+'\')"><td><b>'+esc(e.name)+'</b>'+(e.on_request?' <span class="b yel" title="Nur auf Anfrage – Bestätigung manuell">auf Anfrage</span>':'')+flags+'</td><td>'+esc(e.category||'–')+'</td>'+
+    return '<tr class="click" onclick="openEqModal(\''+e.id+'\')"><td class="chk" onclick="event.stopPropagation()"><input type="checkbox"'+(EQ_SEL[e.id]?' checked':'')+' onchange="eqSelToggle(\''+e.id+'\',this.checked)"></td><td><b>'+esc(e.name)+'</b>'+(e.on_request?' <span class="b yel" title="Nur auf Anfrage – Bestätigung manuell">auf Anfrage</span>':'')+flags+'</td><td>'+esc(e.category||'–')+'</td>'+
     '<td class="num">'+e.qty_total+'</td><td class="num">'+euro(e.day_rate)+'</td>'+
     '<td class="num">'+(e.partner_rate!=null?euro(e.partner_rate):'<span class="mut">auto</span>')+'</td>'+
     '<td>'+(e.public&&e.rentable?'<span class="b green">sichtbar</span>':'<span class="b grey">verborgen</span>')+'</td>'+
     '<td><span class="b '+({aktiv:'green',wartung:'yel',inaktiv:'grey'}[e.status]||'grey')+'">'+e.status+'</span></td>'+
     '<td>'+(nu?'<a class="b blue" onclick="event.stopPropagation();openEinsatzplan(\''+e.id+'\',\''+nu.date+'\')" title="Im Einsatzplan zeigen">'+lbl+'</a>':'–')+'</td></tr>';
-  }).join('')||'<tr><td colspan="8" class="mut">'+(q?'Nichts gefunden.':'Noch keine Artikel.')+'</td></tr>';
+  }).join('')||'<tr><td colspan="9" class="mut">'+(q?'Nichts gefunden.':'Noch keine Artikel.')+'</td></tr>';
   updateSortIndicators('equipment');
+  eqSelSync();
 }
-/* ===== Technik: Stapel-Bearbeitung ===== */
-var eqBatch={on:false,sel:{},changes:{}};
-function eqDirty(){for(var k in eqBatch.changes)return true;return false;}
-function eqBatchCount(){
-  var el=document.getElementById('eqBatchCount');if(!el)return;
-  var ch=Object.keys(eqBatch.changes).length,sel=0;
-  for(var k in eqBatch.sel)if(eqBatch.sel[k])sel++;
-  el.textContent=(sel?sel+' ausgewählt':'')+(sel&&ch?' · ':'')+(ch?ch+' geändert (nicht gespeichert)':'');
+function reloadEq(){return api('equipment?select=*&order=sort').then(function(r){CACHE.equipment=r||[];renderEq()})}
+/* ===== Technik: Mehrfachauswahl (Checkboxen) statt frueherer Stapel-Bearbeitung-Tabelle ===== */
+var EQ_SEL={};
+function eqSelToggle(id,ch){if(ch)EQ_SEL[id]=true;else delete EQ_SEL[id];eqSelSync();}
+function eqSelToggleAll(ch){
+  (CACHE.equipment||[]).forEach(function(e){if(ch)EQ_SEL[e.id]=true;else delete EQ_SEL[e.id]});
+  renderEq();
 }
-function eqEff(e,field){var c=eqBatch.changes[e.id];return c&&(field in c)?c[field]:e[field];}
-function eqRecord(id,field,val){
-  var e=CACHE.equipment.find(function(x){return x.id===id});if(!e)return;
-  var orig=e[field],same;
-  if(typeof orig==='boolean'||typeof val==='boolean')same=(!!orig===!!val);
-  else same=((orig==null?'':String(orig))===(val==null?'':String(val)));
-  if(!eqBatch.changes[id])eqBatch.changes[id]={};
-  if(same)delete eqBatch.changes[id][field];else eqBatch.changes[id][field]=val;
-  if(!Object.keys(eqBatch.changes[id]).length)delete eqBatch.changes[id];
+function eqSelIds(){return Object.keys(EQ_SEL).filter(function(id){return (CACHE.equipment||[]).some(function(e){return e.id===id})});}
+function eqSelSync(){
+  var ids=eqSelIds(),n=ids.length;
+  var bar=document.getElementById('eqSelBar');if(bar)bar.hidden=!n;
+  var cnt=document.getElementById('eqSelCount');if(cnt)cnt.textContent=n+' ausgewählt';
+  var all=document.getElementById('eqSelAll');
+  if(all)all.checked=(CACHE.equipment||[]).length>0&&(CACHE.equipment||[]).every(function(e){return EQ_SEL[e.id]});
 }
-function eqEditField(id,field,raw,type){
-  var val;
-  if(type==='num')val=(raw===''?(field==='partner_rate'?null:0):Number(raw));
-  else if(type==='bool')val=!!raw;
-  else val=raw;
-  eqRecord(id,field,val);
-  var tr=document.getElementById('eqbr-'+id);if(tr)tr.classList.toggle('dirty',!!eqBatch.changes[id]);
-  eqBatchCount();
-}
-function renderEqBatch(){
-  document.getElementById('eqBatchRows').innerHTML=applySort((CACHE.equipment||[]).slice(),'equipment').map(function(e){
-    var pr=eqEff(e,'partner_rate'),st=eqEff(e,'status')||'aktiv';
-    return '<tr id="eqbr-'+e.id+'"'+(eqBatch.changes[e.id]?' class="dirty"':'')+'>'+
-      '<td class="chk"><input type="checkbox"'+(eqBatch.sel[e.id]?' checked':'')+' onchange="eqBatch.sel[\''+e.id+'\']=this.checked;eqBatchSyncAll();eqBatchCount()"></td>'+
-      '<td><a onclick="openEqModal(\''+e.id+'\')"><b>'+esc(e.name)+'</b></a></td>'+
-      '<td><input class="cat" value="'+esc(eqEff(e,'category')||'')+'" onchange="eqEditField(\''+e.id+'\',\'category\',this.value,\'text\')"></td>'+
-      '<td class="num"><input type="number" step="0.01" value="'+(eqEff(e,'day_rate')!=null?eqEff(e,'day_rate'):0)+'" onchange="eqEditField(\''+e.id+'\',\'day_rate\',this.value,\'num\')"></td>'+
-      '<td class="num"><input type="number" step="0.01" placeholder="auto" value="'+(pr!=null?pr:'')+'" onchange="eqEditField(\''+e.id+'\',\'partner_rate\',this.value,\'num\')"></td>'+
-      '<td class="num"><input type="number" value="'+(eqEff(e,'qty_total')!=null?eqEff(e,'qty_total'):1)+'" onchange="eqEditField(\''+e.id+'\',\'qty_total\',this.value,\'num\')"></td>'+
-      '<td><select onchange="eqEditField(\''+e.id+'\',\'status\',this.value,\'text\')">'+['aktiv','wartung','inaktiv'].map(function(o){return '<option'+(st===o?' selected':'')+'>'+o+'</option>'}).join('')+'</select></td>'+
-      '<td class="chk"><input type="checkbox"'+(eqEff(e,'on_request')?' checked':'')+' onchange="eqEditField(\''+e.id+'\',\'on_request\',this.checked,\'bool\')"></td>'+
-      '<td class="chk"><input type="checkbox"'+(eqEff(e,'public')!==false?' checked':'')+' onchange="eqEditField(\''+e.id+'\',\'public\',this.checked,\'bool\')"></td>'+
-    '</tr>';
-  }).join('')||'<tr><td colspan="9" class="mut">Noch keine Artikel.</td></tr>';
-  eqBatchSyncAll();eqBatchCount();
-}
-function eqBatchSyncAll(){
-  var all=(CACHE.equipment||[]).length&&(CACHE.equipment||[]).every(function(e){return eqBatch.sel[e.id]});
-  var cb=document.getElementById('eqBatchAll');if(cb)cb.checked=!!all;
-}
-function eqBatchToggleAll(ch){(CACHE.equipment||[]).forEach(function(e){eqBatch.sel[e.id]=ch});renderEqBatch();}
-function eqSelIds(){return Object.keys(eqBatch.sel).filter(function(k){return eqBatch.sel[k]&&(CACHE.equipment||[]).some(function(e){return e.id===k})});}
-function eqBatchSet(field,val){
-  var ids=eqSelIds();if(!ids.length){toast('Erst Zeilen auswählen.',1);return}
-  ids.forEach(function(id){eqRecord(id,field,val)});renderEqBatch();
-}
-function eqBatchPrice(){
-  var ids=eqSelIds();if(!ids.length){toast('Erst Zeilen auswählen.',1);return}
-  var mode=document.getElementById('eqBatchPriceMode').value,val=Number(document.getElementById('eqBatchPriceVal').value);
-  if(mode!=='fix'&&!val){toast('Prozentwert fehlt.',1);return}
-  ids.forEach(function(id){
-    var e=CACHE.equipment.find(function(x){return x.id===id});if(!e)return;
-    var cur=Number(eqEff(e,'day_rate'))||0,nv;
-    if(mode==='pct+')nv=cur*(1+val/100);else if(mode==='pct-')nv=cur*(1-val/100);else nv=val;
-    eqRecord(id,'day_rate',Math.round(nv*100)/100);
+function eqBulkDelete(){
+  var ids=eqSelIds();if(!ids.length)return;
+  if(!confirm(ids.length+' Artikel wirklich endgültig löschen? Das lässt sich nicht rückgängig machen.'))return;
+  Promise.all(ids.map(function(id){
+    return api('equipment?id=eq.'+id,{method:'DELETE'}).then(function(){return {ok:true}}).catch(function(e){return {ok:false,err:e}});
+  })).then(function(results){
+    var okCount=results.filter(function(r){return r.ok}).length,failCount=results.length-okCount;
+    EQ_SEL={};
+    toast(okCount+' Artikel gelöscht'+(failCount?', '+failCount+' nicht möglich (vermutlich Gigs zugeordnet)':' ✓'),failCount?1:0);
+    return reloadEq();
   });
-  renderEqBatch();
 }
-function eqBatchSave(){
-  var ids=Object.keys(eqBatch.changes);
-  if(!ids.length){toast('Keine Änderungen zu speichern.',1);return}
-  Promise.all(ids.map(function(id){return api('equipment?id=eq.'+id,{method:'PATCH',body:eqBatch.changes[id]})}))
-    .then(function(){toast('Gespeichert ✓');eqBatch.changes={};return api('equipment?select=*&order=sort')})
-    .then(function(r){CACHE.equipment=r||[];renderEqBatch()})
+function eqBulkEditOpen(){
+  var ids=eqSelIds();if(!ids.length)return;
+  openModal(ids.length+' Artikel bearbeiten',
+    '<div class="mut sml" style="margin-bottom:12px">Änderungen wirken sofort auf alle '+ids.length+' ausgewählten Artikel.</div>'+
+    '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px;margin-bottom:10px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:90px">Sichtbar</span> <button class="btn g sm" onclick="eqBulkSet(\'public\',true)">an</button> <button class="btn g sm" onclick="eqBulkSet(\'public\',false)">aus</button></div>'+
+    '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px;margin-bottom:10px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:90px">Auf Anfrage</span> <button class="btn g sm" onclick="eqBulkSet(\'on_request\',true)">an</button> <button class="btn g sm" onclick="eqBulkSet(\'on_request\',false)">aus</button></div>'+
+    '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px;margin-bottom:10px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:90px">Status</span> <select id="eqBulkStatus"><option>aktiv</option><option>wartung</option><option>inaktiv</option></select> <button class="btn g sm" onclick="eqBulkSet(\'status\',v(\'eqBulkStatus\'))">setzen</button></div>'+
+    '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:90px">Preis €/Tag</span> <select id="eqBulkPriceMode"><option value="pct+">+ %</option><option value="pct-">− %</option><option value="fix">fester Wert €</option></select> <input type="number" step="0.01" id="eqBulkPriceVal" placeholder="0" style="width:80px"> <button class="btn g sm" onclick="eqBulkPrice()">anpassen</button></div>');
+}
+function eqBulkSet(field,val){
+  var ids=eqSelIds();if(!ids.length)return;
+  var body={};body[field]=val;
+  Promise.all(ids.map(function(id){return api('equipment?id=eq.'+id,{method:'PATCH',body:body})}))
+    .then(function(){toast('Gespeichert ✓');closeModal();return reloadEq()})
     .catch(function(e){toast(e.message,1)});
 }
-function toggleEqBatch(){
-  var tgl=document.getElementById('eqBatchToggle');
-  if(eqBatch.on){
-    if(eqDirty()&&!confirm('Es gibt ungespeicherte Änderungen. Stapelmodus verlassen und verwerfen?'))return;
-    eqBatch.on=false;eqBatch.changes={};eqBatch.sel={};
-    tgl.textContent='Stapel bearbeiten';tgl.classList.add('g');
-    document.getElementById('eqBatchBar').hidden=true;
-    document.getElementById('eqBatchWrap').hidden=true;
-    document.getElementById('eqViewWrap').hidden=false;
-    renderEq();
-  }else{
-    eqBatch.on=true;
-    tgl.textContent='Stapelmodus schließen';tgl.classList.remove('g');
-    document.getElementById('eqBatchBar').hidden=false;
-    document.getElementById('eqBatchWrap').hidden=false;
-    document.getElementById('eqViewWrap').hidden=true;
-    renderEqBatch();
-  }
+function eqBulkPrice(){
+  var ids=eqSelIds();if(!ids.length)return;
+  var mode=v('eqBulkPriceMode'),val=Number(v('eqBulkPriceVal'));
+  if(mode!=='fix'&&!val){toast('Prozentwert fehlt.',1);return}
+  Promise.all(ids.map(function(id){
+    var e=(CACHE.equipment||[]).find(function(x){return x.id===id});if(!e)return Promise.resolve();
+    var nv=priceAdjust(mode,val,Number(e.day_rate)||0);
+    return api('equipment?id=eq.'+id,{method:'PATCH',body:{day_rate:nv}});
+  })).then(function(){toast('Preise angepasst ✓');closeModal();return reloadEq()})
+    .catch(function(e){toast(e.message,1)});
+}
+/* Gemeinsame Preis-Anpassungs-Rechnung fuer Technik- und Produkt-Mehrfachauswahl. */
+function priceAdjust(mode,val,cur){
+  var nv=mode==='pct+'?cur*(1+val/100):mode==='pct-'?cur*(1-val/100):val;
+  return Math.round(nv*100)/100;
 }
 function openEqModal(id){
   var e=id?CACHE.equipment.find(function(x){return x.id===id}):{};e=e||{};
@@ -8721,13 +8677,67 @@ function renderProducts(){
   });
   document.getElementById('prodRows').innerHTML=applySort(list,'products').map(function(p){
     var isBundle=(p.bundle||[]).length>0;
-    return '<tr class="click" onclick="openProdModal(\''+p.id+'\')"><td><b>'+esc(p.sku||'–')+'</b></td>'+
+    return '<tr class="click" onclick="openProdModal(\''+p.id+'\')"><td class="chk" onclick="event.stopPropagation()"><input type="checkbox"'+(PROD_SEL[p.id]?' checked':'')+' onchange="prodSelToggle(\''+p.id+'\',this.checked)"></td><td><b>'+esc(p.sku||'–')+'</b></td>'+
     '<td>'+esc(p.name)+(p.description?'<br><span class="mut sml">'+esc(p.description.slice(0,80))+'…</span>':'')+'</td>'+
     '<td>'+esc(p.category||'–')+'</td><td>'+esc(p.unit||'Stk.')+'</td>'+
     '<td class="num">'+euro(prodPrice(p))+'</td>'+
     '<td>'+(isBundle?'<span class="b gold">Set ('+(p.bundle||[]).length+')</span>':(p.kind==='dienstleistung'?'<span class="b blue">Dienstleistung</span>':'<span class="b grey">Artikel</span>'))+'</td>'+
     '<td>'+(p.active?'<span class="b green">aktiv</span>':'<span class="b grey">aus</span>')+'</td></tr>';
-  }).join('')||'<tr><td colspan="7" class="mut">Keine Artikel gefunden.</td></tr>';
+  }).join('')||'<tr><td colspan="8" class="mut">Keine Artikel gefunden.</td></tr>';
+  prodSelSync();
+}
+/* ===== Produkte: Mehrfachauswahl (gleiches Muster wie Technik) ===== */
+var PROD_SEL={};
+function prodSelToggle(id,ch){if(ch)PROD_SEL[id]=true;else delete PROD_SEL[id];prodSelSync();}
+function prodSelToggleAll(ch){
+  (CACHE.products||[]).forEach(function(p){if(ch)PROD_SEL[p.id]=true;else delete PROD_SEL[p.id]});
+  renderProducts();
+}
+function prodSelIds(){return Object.keys(PROD_SEL).filter(function(id){return (CACHE.products||[]).some(function(p){return p.id===id});});}
+function prodSelSync(){
+  var ids=prodSelIds(),n=ids.length;
+  var bar=document.getElementById('prodSelBar');if(bar)bar.hidden=!n;
+  var cnt=document.getElementById('prodSelCount');if(cnt)cnt.textContent=n+' ausgewählt';
+  var all=document.getElementById('prodSelAll');
+  if(all)all.checked=(CACHE.products||[]).length>0&&(CACHE.products||[]).every(function(p){return PROD_SEL[p.id]});
+}
+function prodBulkDelete(){
+  var ids=prodSelIds();if(!ids.length)return;
+  if(!confirm(ids.length+' Artikel wirklich endgültig löschen? Das lässt sich nicht rückgängig machen.'))return;
+  Promise.all(ids.map(function(id){
+    return api('products?id=eq.'+id,{method:'DELETE'}).then(function(){return {ok:true}}).catch(function(e){return {ok:false,err:e}});
+  })).then(function(results){
+    var okCount=results.filter(function(r){return r.ok}).length,failCount=results.length-okCount;
+    PROD_SEL={};
+    toast(okCount+' Artikel gelöscht'+(failCount?', '+failCount+' nicht möglich':' ✓'),failCount?1:0);
+    reloadProds();
+  });
+}
+function prodBulkEditOpen(){
+  var ids=prodSelIds();if(!ids.length)return;
+  openModal(ids.length+' Artikel bearbeiten',
+    '<div class="mut sml" style="margin-bottom:12px">Änderungen wirken sofort auf alle '+ids.length+' ausgewählten Artikel.</div>'+
+    '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px;margin-bottom:10px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:90px">Aktiv</span> <button class="btn g sm" onclick="prodBulkSet(\'active\',true)">an</button> <button class="btn g sm" onclick="prodBulkSet(\'active\',false)">aus</button></div>'+
+    '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px;margin-bottom:10px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:90px">Kategorie</span> <input id="prodBulkCat" placeholder="neue Kategorie" style="flex:1"> <button class="btn g sm" onclick="prodBulkSet(\'category\',v(\'prodBulkCat\'))">setzen</button></div>'+
+    '<div class="grp" style="display:flex;gap:6px;align-items:center;border:1px solid var(--bdr);padding:8px;border-radius:6px"><span class="lbl sml mut" style="text-transform:uppercase;letter-spacing:.06em;min-width:90px">Preis brutto</span> <select id="prodBulkPriceMode"><option value="pct+">+ %</option><option value="pct-">− %</option><option value="fix">fester Wert €</option></select> <input type="number" step="0.01" id="prodBulkPriceVal" placeholder="0" style="width:80px"> <button class="btn g sm" onclick="prodBulkPrice()">anpassen</button></div>');
+}
+function prodBulkSet(field,val){
+  var ids=prodSelIds();if(!ids.length)return;
+  var body={};body[field]=val;
+  Promise.all(ids.map(function(id){return api('products?id=eq.'+id,{method:'PATCH',body:body})}))
+    .then(function(){toast('Gespeichert ✓');closeModal();reloadProds()})
+    .catch(function(e){toast(e.message,1)});
+}
+function prodBulkPrice(){
+  var ids=prodSelIds();if(!ids.length)return;
+  var mode=v('prodBulkPriceMode'),val=Number(v('prodBulkPriceVal'));
+  if(mode!=='fix'&&!val){toast('Prozentwert fehlt.',1);return}
+  Promise.all(ids.map(function(id){
+    var p=(CACHE.products||[]).find(function(x){return x.id===id});if(!p)return Promise.resolve();
+    var nv=priceAdjust(mode,val,Number(p.price_net)||0);
+    return api('products?id=eq.'+id,{method:'PATCH',body:{price_net:nv}});
+  })).then(function(){toast('Preise angepasst ✓');closeModal();reloadProds()})
+    .catch(function(e){toast(e.message,1)});
 }
 function openProdModal(id){
   var p=id?(CACHE.products||[]).find(function(x){return x.id===id}):{};p=p||{};
