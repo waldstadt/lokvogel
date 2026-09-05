@@ -4224,7 +4224,7 @@ function docAbsagen(){
     (agencyEnabled()&&cust.email?' – mit Vermittlungs-Angebot über '+esc(agencyName()):'')+'</label>'+
     '<label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer">'+
     '<input type="checkbox" id="absFrei" style="width:auto"'+(gigFrei?' checked':' disabled')+'> Termin freigeben'+(b?(gigFrei?' (Gig am '+dt(b.event_date)+' auf storniert, Kalender wieder frei)':' – der Gig ist schon '+esc(b.status)):' – kein Gig verknüpft')+'</label>'+
-    '<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn r" onclick="doDocAbsage()">Absagen</button><button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+    '<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn r" onclick="doDocAbsage()">Absagen</button><button class="btn g" onclick="closeModalSafe()">Abbrechen</button></div>');
   setTimeout(function(){var t=document.getElementById('absGrund');if(t)t.focus()},50);
 }
 function doDocAbsage(){
@@ -4271,7 +4271,7 @@ function askStorno(){
     openModal('Storno nicht möglich – '+esc(d.number),
       '<div class="msg err" style="margin-bottom:12px"><b>Diese Rechnung ist schon bezahlt.</b> Eine bezahlte Rechnung wird nicht storniert, sondern per Gutschrift ausgeglichen – so bleibt nachvollziehbar, dass Geld geflossen ist (GoBD).</div>'+
       '<div class="sml mut" style="margin-bottom:14px">Die Gutschrift übernimmt die Positionen mit umgekehrtem Vorzeichen, du kürzt sie bei Bedarf auf den Teilbetrag. Den Betrag überweist du dem Kunden zurück.</div>'+
-      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="closeModal();docToInvoice(\'gutschrift\')">Gutschrift erstellen</button><button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="closeModal();docToInvoice(\'gutschrift\')">Gutschrift erstellen</button><button class="btn g" onclick="closeModalSafe()">Abbrechen</button></div>');
     return;
   }
   openModal('Storno – '+esc(d.number),
@@ -4279,7 +4279,7 @@ function askStorno(){
     (istZahlbeleg(d.doc_type)&&d.status!=='entwurf'?' Ist nur ein Betrag oder ein Tippfehler falsch, ist die Korrekturrechnung der bessere Weg.':'')+'</div>'+
     '<label>Grund *</label><textarea id="stornoReason" style="min-height:70px" placeholder="z. B. Kunde hat abgesagt, Doppelbeleg, falscher Kunde"></textarea>'+
     '<div class="sml mut" style="margin-top:4px">Der Grund landet im Änderungsprotokoll und als Notiz in der Kunden-Timeline.</div>'+
-    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn r" onclick="doStorno()">Jetzt stornieren</button><button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn r" onclick="doStorno()">Jetzt stornieren</button><button class="btn g" onclick="closeModalSafe()">Abbrechen</button></div>');
   setTimeout(function(){var t=document.getElementById('stornoReason');if(t)t.focus()},50);
 }
 function doStorno(){
@@ -4299,7 +4299,7 @@ function askPaid(){
     '<label>Notiz (optional)</label><input id="paidNote" placeholder="z. B. Überweisung, PayPal, bar">'+
     '<div class="sml" id="paidRest" style="margin-top:8px"></div>'+
     '<div class="sml mut" style="margin-top:6px">Das Zahldatum zählt für Umsatz und Export – lieber das Datum vom Kontoauszug als „heute“. Liegt der Betrag unter dem offenen Betrag, bleibt die Rechnung offen; der Rest wird später mit der Schlussrechnung abgerechnet.</div>'+
-    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="paidBtn" onclick="doPaid()">Als bezahlt markieren</button><button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="paidBtn" onclick="doPaid()">Als bezahlt markieren</button><button class="btn g" onclick="closeModalSafe()">Abbrechen</button></div>');
   renderPaidRest();
 }
 /* Offener Betrag der Rechnung (brutto abzueglich verrechneter und erhaltener Zahlungen) */
@@ -5480,7 +5480,7 @@ function showSendBlockers(list,mode){
     '<div class="sml mut" style="margin-bottom:14px">Auf einer Rechnung müssen Steuernummer oder USt-IdNr. und die Bankverbindung stehen – sonst kann der Kunde nicht überweisen und das Finanzamt beanstandet den Beleg.</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="closeModal();gotoSetting(\''+list[0].go+'\')">Zu den Einstellungen</button>'+
     (mode==='print'?'<button class="btn g" onclick="closeModal();printDoc(true)">Trotzdem drucken</button>':'')+
-    '<button class="btn g" onclick="closeModal()">Abbrechen</button></div>');
+    '<button class="btn g" onclick="closeModalSafe()">Abbrechen</button></div>');
 }
 function printDoc(force){
   /* Lieferschein = Uebergabeprotokoll ohne Preise, nie das Rechnungslayout. */
@@ -9721,24 +9721,90 @@ function mailReply(email){
 function composeSent(){var f=window._composeSent;window._composeSent=null;if(f)f()}
 
 /* ===== Modal-Helfer ===== */
-function openModal(title,html){
-  document.getElementById('modalBox').innerHTML='<h3>'+title+'<span class="x" onclick="closeModal()">✕</span></h3>'+html;
-  document.getElementById('modalBg').classList.add('v');
+/* MODAL_SNAPSHOT haelt die Feldwerte beim Oeffnen fest, damit ein Schliessversuch erkennen
+   kann, ob sich seitdem etwas geaendert hat (modalDirty()) - Grundlage fuer die
+   Speichern/Verwerfen/Fenster-nicht-schliessen-Abfrage in closeModalSafe(). Deckt Eingabe-,
+   Text- und Auswahlfelder ab (der weit ueberwiegende Teil aller Formulare hier); rein
+   listenbasierte Bearbeitungen ausserhalb von Formularfeldern (z. B. Bild-Reihenfolge per
+   Drag&Drop) werden dadurch nicht separat erkannt - "Speichern" sichert aber in jedem Fall
+   den tatsaechlichen aktuellen Stand, unabhaengig davon, ob die Abfrage ausgeloest wurde. */
+var MODAL_SNAPSHOT=null;
+function modalSnapshot(){
+  var snap={};
+  document.querySelectorAll('#modalBox input, #modalBox textarea, #modalBox select').forEach(function(el,i){
+    var key=el.id||('idx'+i);
+    snap[key]=(el.type==='checkbox'||el.type==='radio')?el.checked:el.value;
+  });
+  return snap;
 }
-function closeModal(){document.getElementById('modalBg').classList.remove('v');window._composeSent=null}
+function modalDirty(){
+  if(!MODAL_SNAPSHOT)return false;
+  var now=modalSnapshot();
+  for(var k in now)if(now[k]!==MODAL_SNAPSHOT[k])return true;
+  return false;
+}
+/* Findet den "Speichern"-Knopf des aktuell offenen Fensters - Konvention in diesem Backoffice:
+   die primäre Speichern-Aktion hat immer genau die Klasse "btn" (ohne "g"/"r"/weitere
+   Zusätze), Abbrechen/Löschen-Knöpfe daneben immer "btn g"/"btn r". So kann "Speichern" in
+   der Schliessen-Abfrage generisch den echten, zum jeweiligen Fenster passenden
+   Speichern-Code auslösen, ohne dass jedes Fenster einzeln registriert werden müsste. */
+function modalPrimaryBtn(){
+  var btns=document.querySelectorAll('#modalBox button');
+  for(var i=0;i<btns.length;i++)if(btns[i].className.trim()==='btn')return btns[i];
+  return null;
+}
+/* Generischer Speichern/Verwerfen/Fenster-nicht-schliessen-Dialog - ersetzt das schlichte
+   OK/Abbrechen von confirm(), weil "Speichern" hier eine echte dritte Option sein soll,
+   nicht nur "schliessen ja/nein". */
+function showCloseChoice(cb){
+  var host=document.createElement('div');
+  host.id='closeChoiceBg';
+  host.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  host.innerHTML='<div class="card" style="max-width:400px;padding:20px 22px">'+
+    '<h3 style="margin:0 0 6px">Ungespeicherte Änderungen</h3>'+
+    '<p class="sml mut" style="margin:0 0 16px">Es gibt Änderungen in diesem Fenster, die noch nicht gespeichert wurden.</p>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+    '<button class="btn" id="ccSave">Speichern</button>'+
+    '<button class="btn r" id="ccDiscard">Verwerfen</button>'+
+    '<button class="btn g" id="ccCancel">Fenster nicht schließen</button>'+
+    '</div></div>';
+  document.body.appendChild(host);
+  function done(choice){if(host.parentNode)host.parentNode.removeChild(host);cb(choice)}
+  document.getElementById('ccSave').onclick=function(){done('save')};
+  document.getElementById('ccDiscard').onclick=function(){done('discard')};
+  document.getElementById('ccCancel').onclick=function(){done('cancel')};
+  host.addEventListener('click',function(e){if(e.target===host)done('cancel')});
+}
+function openModal(title,html){
+  document.getElementById('modalBox').innerHTML='<h3>'+title+'<span class="x" onclick="closeModalSafe()">✕</span></h3>'+html;
+  document.getElementById('modalBg').classList.add('v');
+  /* Verzoegert, nicht synchron: einige Fenster (z. B. openEqModal) fuellen nach diesem
+     Aufruf noch weitere Felder nach (Fokuspunkt-Regler, Platzhalter-Icon, Bilder-Grid) -
+     wuerde die Momentaufnahme sofort hier genommen, saehen deren Standardwerte gleich
+     nach dem Oeffnen wie eine "Aenderung" aus, ohne dass etwas eingegeben wurde. */
+  setTimeout(function(){MODAL_SNAPSHOT=modalSnapshot()},0);
+}
+function closeModal(){document.getElementById('modalBg').classList.remove('v');window._composeSent=null;MODAL_SNAPSHOT=null}
+function closeModalSafe(){
+  if(!modalDirty()){closeModal();return}
+  showCloseChoice(function(choice){
+    if(choice==='discard')closeModal();
+    else if(choice==='save'){
+      var btn=modalPrimaryBtn();
+      if(btn)btn.click();
+      else toast('Automatisches Speichern hier nicht möglich – bitte den passenden Speichern-Knopf im Fenster benutzen.',1);
+    }
+    /* 'cancel': Fenster bleibt offen, nichts weiter tun. */
+  });
+}
 /* Nur schliessen, wenn Mausklick UND Loslassen beide auf dem Hintergrund waren - sonst
    schliesst ein Text-Markieren im Formular (Drag ueber den Fensterrand hinaus) versehentlich
-   das ganze Fenster, weil der Browser den "click" dann auf dem Hintergrund feuert. Steht
-   noch ausgefuellter Text in einem Textfeld (z. B. eine laengere Mail), erst nachfragen -
-   ein echter Klick daneben soll den nicht kommentarlos wegwerfen. */
+   das ganze Fenster, weil der Browser den "click" dann auf dem Hintergrund feuert. */
 (function(){
   var bg=document.getElementById('modalBg'),mdOnBg=false;
   bg.addEventListener('mousedown',function(e){mdOnBg=(e.target===this)});
   bg.addEventListener('click',function(e){
-    if(e.target===this&&mdOnBg){
-      var hatText=[].some.call(document.querySelectorAll('#modalBox textarea'),function(t){return t.value.trim()});
-      if(!hatText||confirm('Fenster wirklich schließen? Der eingegebene Text geht dabei verloren.'))closeModal();
-    }
+    if(e.target===this&&mdOnBg)closeModalSafe();
     mdOnBg=false;
   });
 })();
@@ -9746,7 +9812,7 @@ document.addEventListener('keydown',function(e){
   if(e.key!=='Escape')return;
   var bg2=document.getElementById('ovl2Bg');
   if(bg2&&bg2.classList.contains('v')){closeOvl2Safe();return}   /* erst das obere Fenster (frueher fälschlich auf ein nicht existierendes "modalBg2" geprüft - Escape im Text-Editor riss dadurch das darunterliegende Fenster weg, ohne den Editor selbst zu schliessen */
-  if(document.getElementById('modalBg').classList.contains('v'))closeModal();
+  if(document.getElementById('modalBg').classList.contains('v'))closeModalSafe();
 });
 function v(id){var el=document.getElementById(id);return el?el.value.trim():''}
 
