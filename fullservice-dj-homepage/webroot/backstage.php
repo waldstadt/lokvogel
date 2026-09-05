@@ -16,6 +16,10 @@
 declare(strict_types=1);
 
 function rgEsc($s): string { return htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8'); }
+/* Vorschaubild-URL zu einer hochgeladenen Datei (siehe thumb.php) - nur fuer die kleine
+   Kachel in der Beitragsliste, das Titelbild eines einzelnen Beitrags bleibt in voller
+   Aufloesung. */
+function rgThumb(?string $u): string { return $u ? str_replace('uploads/', 'uploads/.thumbs/', $u) : ''; }
 /* Leichtgewichtige Auszeichnung fuer Fliesstext: **fett**, *kursiv*, [Text](https://...) -
    gleiches Muster wie mdRender() in index.html/technik.html, damit Texte aus dem
    "Gross bearbeiten"-Editor im Backoffice (admin.html, edLink()/edWrap()) hier genauso
@@ -203,7 +207,7 @@ $rows = $pdo->query("select slug, title, h1, meta_desc, kicker, image from guide
 <div class="wrap rg-list">
 <?php foreach ($rows as $r): ?>
   <a href="backstage/<?= rgEsc($r['slug']) ?>">
-    <?php if (!empty($r['image'])): ?><img src="<?= rgEsc($r['image']) ?>" alt=""><?php endif; ?>
+    <?php if (!empty($r['image'])): ?><img src="<?= rgEsc(rgThumb($r['image'])) ?>" alt="" onerror="this.onerror=null;this.src='<?= rgEsc($r['image']) ?>'"><?php endif; ?>
     <div>
       <?php if (!empty($r['kicker'])): ?><div class="kicker" style="margin-bottom:4px"><?= rgEsc($r['kicker']) ?></div><?php endif; ?>
       <h3><?= rgEsc($r['h1'] ?: $r['title']) ?></h3>

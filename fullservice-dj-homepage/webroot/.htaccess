@@ -38,4 +38,10 @@
   # Technik-Artikel: eigene Adresse je Vermiet-Artikel fuer Google und zum gezielten
   # Verlinken/Empfehlen einzelner Geraete (siehe technik-artikel.php).
   RewriteRule ^technik/([a-z0-9-]+)/?$ technik-artikel.php?slug=$1 [L,QSA]
+  # Vorschaubilder fuer Kacheln (Medienpool, Galerie, Technik-/Produktkarten, ...): beim
+  # ersten Aufruf per PHP erzeugt und ab dann als ganz normale Datei ausgeliefert (siehe
+  # thumb.php). RewriteCond sorgt dafuer, dass eine schon erzeugte Miniatur direkt von
+  # Apache kommt, ohne nochmal PHP zu bemuehen.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^uploads/\.thumbs/(.+)$ thumb.php?f=$1 [L,QSA]
 </IfModule>

@@ -680,6 +680,13 @@ document.addEventListener('click',function(e){
   if(a)navClose();
 });
 function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
+/* Vorschaubild-URL zu einer hochgeladenen Datei (siehe thumb.php) - fuer Kacheln, nicht
+   fuer grossflaechige Bilder (Hero, Über-mich). Wird beim ersten Aufruf server-seitig
+   erzeugt, daher reine String-Umwandlung ohne Rueckfrage. */
+function thumbUrl(u){return u&&u.indexOf('uploads/')>=0?u.replace('uploads/','uploads/.thumbs/'):u}
+/* Fallback fuers Vorschaubild auf das Originalbild, falls die Miniatur aus irgendeinem
+   Grund nicht erzeugt werden konnte (z. B. Bildformat ohne Thumbnail-Unterstützung). */
+function imgFallback(el){el.onerror=null;if(el.dataset.full)el.src=el.dataset.full;else el.remove()}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
 /* Tages-Seed: deterministisch pro Tag, damit z. B. Bewertungen nicht bei jedem Reload springen */
@@ -823,7 +830,7 @@ function renderPacks(list){
     var price=p.price_from?('<div class="price">'+esc(p.price_note||'ab')+' '+euro(p.price_from)+' <small>inkl. MwSt., zzgl. Anfahrt</small></div>')
       :'<div class="price" style="font-size:14px;color:var(--mut);font-weight:400">Preis richtet sich nach Aufwand &amp; Dauer – im kostenlosen Kennenlerngespräch gibt es ein klares Angebot</div>';
     var bild=(zeigeBilder&&p.image_url)
-      ? '<img class="pack-img" src="'+esc(p.image_url)+'" alt="" loading="lazy" style="object-position:'+cssUrl(p.image_focal||'50% 50%')+'" onerror="this.remove()">'
+      ? '<img class="pack-img" src="'+esc(thumbUrl(p.image_url))+'" data-full="'+esc(p.image_url)+'" alt="" loading="lazy" style="object-position:'+cssUrl(p.image_focal||'50% 50%')+'" onerror="imgFallback(this)">'
       : '';
     return '<div class="pack reveal vis">'+bild+'<div class="pack-in"><h3>'+esc(p.title)+'</h3><div class="psub">'+esc(p.subtitle||'')+'</div><ul>'+feats+'</ul>'+price+'</div></div>';
   }).join('');
@@ -938,7 +945,7 @@ function applyContent(rows){
       }else galSel=galAll.slice(0,galMax);
     }
     document.getElementById('galGrid').innerHTML=galSel.map(function(src){
-      return '<img src="'+esc(src)+'" alt="Impression von einer Feier mit DJ Lauschgift" loading="lazy" onerror="this.remove();galCleanup()">';
+      return '<img src="'+esc(thumbUrl(src))+'" data-full="'+esc(src)+'" alt="Impression von einer Feier mit DJ Lauschgift" loading="lazy" onerror="if(this.dataset.full&&this.src!==this.dataset.full){this.onerror=null;this.src=this.dataset.full}else{this.remove();galCleanup()}">';
     }).join('');
     showSection('galerie');
   }
@@ -987,8 +994,8 @@ function renderReports(rows,box,max){
     var med=Array.isArray(r.media)?r.media:[];
     if(med.length&&med[0]&&med[0].url){
       var img=document.createElement('img');
-      img.src=med[0].url;img.alt='';img.loading='lazy';
-      img.addEventListener('error',function(){img.remove()});
+      img.src=thumbUrl(med[0].url);img.alt='';img.loading='lazy';
+      img.addEventListener('error',function(){if(img.src!==med[0].url)img.src=med[0].url;else img.remove()});
       karte.appendChild(img);
     }
     var innen=document.createElement('div');innen.className='rep-in';
@@ -1192,7 +1199,7 @@ sfetch('guides?select=*&published=eq.true&order=sort').then(function(r){
   if(!sel.length){document.getElementById('backstage').style.display='none';return}
   el.innerHTML=sel.map(function(g){
     return '<a class="bs-card reveal vis" href="backstage/'+encodeURIComponent(g.slug)+'">'+
-      (g.image?'<div class="bs-img" style="background-image:url(\''+cssUrl(g.image)+'\')"></div>':'')+
+      (g.image?'<div class="bs-img" style="background-image:url(\''+cssUrl(thumbUrl(g.image))+'\')"></div>':'')+
       '<div class="bs-body">'+(g.kicker?'<div class="kicker">'+esc(g.kicker)+'</div>':'')+
       '<h4>'+esc(g.h1||g.title)+'</h4><p>'+esc(g.meta_desc||'')+'</p></div></a>';
   }).join('');
@@ -1218,7 +1225,7 @@ function renderLocations(){
   var sel=pickRotate(LOC_DATA,LOC_CFG.max_count,LOC_CFG.rotate,VISIT_SEED,function(l){return !!(l.image_url&&(l.image_source!=='web'||l.image_approved))});
   document.getElementById('locGrid').innerHTML=sel.map(function(l){
     var showImg=l.image_url&&(l.image_source!=='web'||l.image_approved);
-    var img=showImg?' style="background-image:url(\''+cssUrl(l.image_url)+'\');background-position:'+cssUrl(l.image_focal||'50% 50%')+'"':'';
+    var img=showImg?' style="background-image:url(\''+cssUrl(thumbUrl(l.image_url))+'\');background-position:'+cssUrl(l.image_focal||'50% 50%')+'"':'';
     var icon=showImg?'':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
     var meta=[l.address,l.city,l.region].filter(Boolean).join(' · ');
     var links=[];
@@ -1253,7 +1260,7 @@ sfetch('locations?select=*&public=eq.true&order=sort').then(function(r){
 sfetch('friends?select=*&public=eq.true&order=sort').then(function(r){
   if(!r.length)return;
   document.getElementById('friendGrid').innerHTML=r.map(function(f){
-    var img=f.image_url?' style="background-image:url(\''+cssUrl(f.image_url)+'\');background-position:'+cssUrl(f.image_focal||'50% 50%')+'"':'';
+    var img=f.image_url?' style="background-image:url(\''+cssUrl(thumbUrl(f.image_url))+'\');background-position:'+cssUrl(f.image_focal||'50% 50%')+'"':'';
     return '<div class="rent reveal vis">'+(f.image_url?'<div class="ri"'+img+'></div>':'')+'<div class="rb">'+
       (f.category?'<div class="rc">'+esc(f.category)+'</div>':'')+
       '<h4>'+esc(f.name)+'</h4><p>'+mdRender(f.description||'')+'</p>'+

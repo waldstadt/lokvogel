@@ -14,6 +14,9 @@
 declare(strict_types=1);
 
 function taEsc($s): string { return htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8'); }
+/* Vorschaubild-URL zu einer hochgeladenen Datei (siehe thumb.php) - nur fuer die kleine
+   Bilderleiste unter dem Hauptfoto, das Hauptfoto selbst bleibt in voller Aufloesung. */
+function taThumb(string $u): string { return str_replace('uploads/', 'uploads/.thumbs/', $u); }
 /* Gleiches leichtgewichtiges Markdown wie rgMd() in backstage.php - die Beschreibung
    wird ueber denselben "Gross bearbeiten"-Editor gepflegt und kann Fett-, Kursiv- und
    Link-Auszeichnung enthalten. */
@@ -114,7 +117,7 @@ if ($e['day_rate']) {
       <?php if ($images): ?>
         <img class="ta-img" src="<?= taEsc($images[0]) ?>" alt="<?= taEsc($e['name']) ?>">
         <?php if (count($images) > 1): ?>
-          <div class="ta-thumbs"><?php foreach (array_slice($images, 1, 6) as $img): ?><img src="<?= taEsc($img) ?>" alt=""><?php endforeach; ?></div>
+          <div class="ta-thumbs"><?php foreach (array_slice($images, 1, 6) as $img): ?><img src="<?= taEsc(taThumb($img)) ?>" alt="" onerror="this.onerror=null;this.src='<?= taEsc($img) ?>'"><?php endforeach; ?></div>
         <?php endif; ?>
       <?php endif; ?>
     </div>

@@ -364,6 +364,9 @@ document.addEventListener('click',function(e){
   if(a)navClose();
 });
 function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
+/* Vorschaubild-URL zu einer hochgeladenen Datei (siehe thumb.php) - fuer Kacheln und
+   kleine Sammelbilder, nicht fuer das grosse Hauptbild im Produktfenster. */
+function thumbUrl(u){return u&&u.indexOf('uploads/')>=0?u.replace('uploads/','uploads/.thumbs/'):u}
 function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 /* Sicher als JS-String-Literal in Inline-onclick="fn('…')" – siehe admin.html */
@@ -490,7 +493,7 @@ function fitsItems(e){return relOf(e,'fits_ids','addon_ids')}    // „passend f
 /* Mindestabnahme: manche Artikel nur im Set (z. B. 6er). */
 function minQty(e){return Math.max(1,Number(e&&e.min_qty)||1)}
 function rentCard(e){
-  var img=e.image_url?' style="background-image:url(\''+cssUrl(e.image_url)+'\');background-position:'+cssUrl(e.image_focal||'50% 50%')+'"':'';
+  var img=e.image_url?' style="background-image:url(\''+cssUrl(thumbUrl(e.image_url))+'\');background-position:'+cssUrl(e.image_focal||'50% 50%')+'"':'';
   var icon=e.image_url?'':itemIcon(e);
   var pp=partnerPrice(e);
   var price=priceLabel(e.day_rate,pp);
@@ -550,7 +553,7 @@ function renderProductModal(){
   var thumbs='';
   if(imgs.length>1){
     thumbs='<div class="pm-thumbs">'+imgs.map(function(u,i){
-      return '<button type="button" class="pm-thumb'+(i===GAL_IDX?' active':'')+'" onclick="galSet('+i+')"><img src="'+esc(u)+'" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'"></button>';
+      return '<button type="button" class="pm-thumb'+(i===GAL_IDX?' active':'')+'" onclick="galSet('+i+')"><img src="'+esc(thumbUrl(u))+'" data-full="'+esc(u)+'" alt="" loading="lazy" onerror="if(this.dataset.full&&this.src!==this.dataset.full){this.onerror=null;this.src=this.dataset.full}else{this.style.visibility=\'hidden\'}"></button>';
     }).join('')+'</div>';
   }
   var st=availState(e);
@@ -567,7 +570,7 @@ function renderProductModal(){
     if(!list.length)return '';
     return '<div class="pm-addons"><div class="pm-h">'+title+'</div><div class="pm-addon-grid">'+list.map(function(a){
       var ai=prodImages(a)[0];
-      var thumb=ai?'<div class="pm-addon-img" style="background-image:url(\''+cssUrl(ai)+'\')"></div>':'<div class="pm-addon-img">'+itemIcon(a)+'</div>';
+      var thumb=ai?'<div class="pm-addon-img" style="background-image:url(\''+cssUrl(thumbUrl(ai))+'\')"></div>':'<div class="pm-addon-img">'+itemIcon(a)+'</div>';
       var ap=PARTNER?partnerPrice(a):a.day_rate;
       return '<button type="button" class="pm-addon" onclick="openProductModal(\''+jsq(a.id)+'\')">'+thumb+
         '<span class="pm-addon-name">'+esc(a.name)+'</span>'+
@@ -688,11 +691,11 @@ function setItemImages(s){
 }
 function setImageArea(s){
   if(s.image_url)
-    return '<div class="ri" style="background-image:url(\''+cssUrl(s.image_url)+'\');background-position:'+cssUrl(s.image_focal||'50% 50%')+'"></div>';
+    return '<div class="ri" style="background-image:url(\''+cssUrl(thumbUrl(s.image_url))+'\');background-position:'+cssUrl(s.image_focal||'50% 50%')+'"></div>';
   var imgs=setItemImages(s).slice(0,4);
   if(!imgs.length)return '<div class="ri">'+catIcon('')+'</div>';
   return '<div class="ri set-collage n'+imgs.length+'">'+imgs.map(function(u){
-    return '<div style="background-image:url(\''+cssUrl(u)+'\')"></div>';
+    return '<div style="background-image:url(\''+cssUrl(thumbUrl(u))+'\')"></div>';
   }).join('')+'</div>';
 }
 /* Enthaltene Artikel eines Sets, in Set-Reihenfolge - {qty, e}. */
@@ -708,7 +711,7 @@ function setImageAreaModal(s){
   var imgs=setItemImages(s).slice(0,4);
   if(!imgs.length)return '<div class="pm-main"><span class="pm-fallback">'+catIcon('')+'</span></div>';
   return '<div class="pm-main pm-collage n'+imgs.length+'">'+imgs.map(function(u){
-    return '<div style="background-image:url(\''+cssUrl(u)+'\')"></div>';
+    return '<div style="background-image:url(\''+cssUrl(thumbUrl(u))+'\')"></div>';
   }).join('')+'</div>';
 }
 /* Set-Kachel - gleiche Optik wie eine Artikel-Kachel (rentCard), Sets sind eine ganz normale

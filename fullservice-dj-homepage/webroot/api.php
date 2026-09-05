@@ -7612,6 +7612,22 @@ function mediaPfad(string $folder, string $name, bool $archivErlaubt = false): s
 function mediaUrl(string $folder, string $name): string {
   return 'uploads/' . ($folder !== '' ? $folder . '/' : '') . $name;
 }
+/* Vorschaubilder (siehe thumb.php) liegen gespiegelt unter uploads/.thumbs/<selber Pfad>
+   und werden dort erst bei Bedarf erzeugt - hier wird nur, falls schon eine Miniatur
+   existiert, dieselbe Verschieben/Umbenennen/Loeschen-Aktion auf sie angewendet, damit
+   keine verwaisten alten Vorschaubilder liegen bleiben. Rein stringbasiert (kein
+   realpath), damit auch ein noch nicht existierendes Ziel berechnet werden kann. */
+const MEDIA_THUMB_DIR = '.thumbs';
+function mediaThumbFsPath(string $pfad): ?string {
+  foreach ([UPLOAD_DIR, realpath(UPLOAD_DIR) ?: UPLOAD_DIR] as $basis) {
+    if (strpos($pfad, $basis . '/') === 0) {
+      $rel = substr($pfad, strlen($basis) + 1);
+      if ($rel === '' || str_starts_with($rel, MEDIA_THUMB_DIR . '/')) return null;
+      return UPLOAD_DIR . '/' . MEDIA_THUMB_DIR . '/' . $rel;
+    }
+  }
+  return null;
+}
 /* Verweise auf eine Datei in der ganzen Datenbank umschreiben. Die URLs sind eindeutig
    genug (Zeitstempel im Namen), deshalb reicht ein einfaches Ersetzen ueber alle
    Textspalten - sonst muesste jedes Feld einzeln gepflegt werden und ginge irgendwann
@@ -7808,6 +7824,7 @@ try {
     if (!is_dir($dir)) fail('Ordner nicht gefunden.', 404);
     if ((glob($dir . '/*') ?: []) !== []) fail('Der Ordner ist nicht leer – erst die Dateien verschieben oder archivieren.', 409);
     if (!@rmdir($dir)) fail('Ordner ließ sich nicht löschen.', 500);
+    @rmdir(UPLOAD_DIR . '/' . MEDIA_THUMB_DIR . '/' . $slug); // nur wenn leer, sonst folgenlos ignoriert
     out(['ok' => true]);
   }
   /* Verschieben und Umbenennen ziehen die Verweise in der Datenbank mit. */
@@ -7825,6 +7842,11 @@ try {
       $neu = $zielDir . '/' . $name;
       if (is_file($neu)) fail('Im Zielordner liegt schon eine Datei mit dem Namen „' . $name . '“.', 409);
       if (!@rename($quelle, $neu)) fail('Verschieben fehlgeschlagen.', 500);
+      $thumbQuelle = mediaThumbFsPath($quelle);
+      if ($thumbQuelle && is_file($thumbQuelle)) {
+        $thumbNeu = mediaThumbFsPath($neu);
+        if ($thumbNeu) { @mkdir(dirname($thumbNeu), 0755, true); @rename($thumbQuelle, $thumbNeu); }
+      }
       mediaVerweiseUmschreiben($p, mediaUrl($von, $name), mediaUrl($ziel === '' ? '' : basename($zielDir), $name));
       $n++;
     }
@@ -7847,6 +7869,11 @@ try {
     $dir = dirname($quelle);
     if (is_file($dir . '/' . $neuName)) fail('Eine Datei mit dem Namen gibt es hier schon.', 409);
     if (!@rename($quelle, $dir . '/' . $neuName)) fail('Umbenennen fehlgeschlagen.', 500);
+    $thumbAlt = mediaThumbFsPath($quelle);
+    if ($thumbAlt && is_file($thumbAlt)) {
+      $thumbNeu = mediaThumbFsPath($dir . '/' . $neuName);
+      if ($thumbNeu) @rename($thumbAlt, $thumbNeu);
+    }
     if ($folder !== MEDIA_ARCHIV)
       mediaVerweiseUmschreiben(db(), mediaUrl($folder, $alt), mediaUrl($folder, $neuName));
     else {
@@ -7868,6 +7895,11 @@ try {
       /* Namenskollision im Archiv: Zeitstempel davor, damit nichts ueberschrieben wird. */
       if (is_file($ziel)) { $name2 = time() . '-' . $name; $ziel = $dir . '/' . $name2; } else $name2 = $name;
       if (!@rename($quelle, $ziel)) fail('Verschieben ins Archiv fehlgeschlagen.', 500);
+      $thumbQuelle = mediaThumbFsPath($quelle);
+      if ($thumbQuelle && is_file($thumbQuelle)) {
+        $thumbZiel = mediaThumbFsPath($ziel);
+        if ($thumbZiel) { @mkdir(dirname($thumbZiel), 0755, true); @rename($thumbQuelle, $thumbZiel); }
+      }
       $idx[$name2] = $folder;
       $n++;
     }
@@ -7886,6 +7918,11 @@ try {
       $ziel = $zielDir . '/' . $name;
       if (is_file($ziel)) fail('Am Ursprungsort liegt schon wieder eine Datei mit dem Namen „' . $name . '“.', 409);
       if (!@rename($quelle, $ziel)) fail('Wiederherstellen fehlgeschlagen.', 500);
+      $thumbQuelle = mediaThumbFsPath($quelle);
+      if ($thumbQuelle && is_file($thumbQuelle)) {
+        $thumbZiel = mediaThumbFsPath($ziel);
+        if ($thumbZiel) { @mkdir(dirname($thumbZiel), 0755, true); @rename($thumbQuelle, $thumbZiel); }
+      }
       unset($idx[$name]);
       $n++;
     }
@@ -7902,6 +7939,8 @@ try {
       $name = mediaName((string)($it['name'] ?? ''));
       $pfad = mediaPfad(MEDIA_ARCHIV, $name, true);
       if (!@unlink($pfad)) fail('Datei ließ sich nicht löschen (Schreibrechte prüfen).', 500);
+      $thumbPfad = mediaThumbFsPath($pfad);
+      if ($thumbPfad && is_file($thumbPfad)) @unlink($thumbPfad);
       unset($idx[$name]);
       $n++;
     }

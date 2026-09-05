@@ -1376,6 +1376,10 @@ function esc(s){var d=document.createElement('div');d.textContent=s==null?'':Str
    ein &#39; im Attribut zurück zu ' und der Wert bricht aus dem String aus (XSS). */
 function jsq(s){return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'))}
 function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
+/* Vorschaubild-URL zu einer hochgeladenen Datei (siehe thumb.php) - fuer Kacheln/kleine
+   Vorschauen, nicht fuer Zoom-/Detailansichten (dort bleibt das Originalbild). Wird beim
+   ersten Aufruf server-seitig erzeugt, daher reine String-Umwandlung ohne Rueckfrage. */
+function thumbUrl(u){return u&&u.indexOf('uploads/')>=0?u.replace('uploads/','uploads/.thumbs/'):u}
 function dt(d){if(!d)return '–';return new Date(d).toLocaleDateString('de-DE')}
 function dtt(d){if(!d)return '–';return new Date(d).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})}
 /* Kunde zu einem Datensatz (Gig, Beleg, Notiz ...) ueber customer_id nachschlagen. Frueher
@@ -6745,7 +6749,7 @@ function renderEqImgGrid(){
   el.innerHTML=EQ_IMAGES.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">'+
     EQ_IMAGES.map(function(u,i){
       return '<div draggable="true" ondragstart="eqDragStart('+i+',event)" ondragover="eqDragOver(event)" ondrop="eqDrop('+i+',event)" style="position:relative;cursor:grab">'+
-      '<img src="'+esc(u)+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:'+(i===0?'2px solid var(--acc)':'1px solid var(--bdr)')+'">'+
+      '<img src="'+esc(thumbUrl(u))+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:'+(i===0?'2px solid var(--acc)':'1px solid var(--bdr)')+'">'+
       (i===0?'<span style="position:absolute;top:4px;left:4px;background:var(--acc);color:#141414;font-size:10px;padding:1px 6px;border-radius:4px">Hauptbild</span>':'')+
       '<a onclick="eqImgRemove('+i+')" title="Bild entfernen" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.65);color:var(--wh);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:0;width:12px;height:12px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></a>'+
       '<div class="mut" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(u)+'">'+esc(u.split('/').pop())+'</div></div>';
@@ -7299,7 +7303,7 @@ function renderReportAdmin(){
   el.innerHTML=(CACHE.reports||[]).map(function(r,i){
     var med=Array.isArray(r.media)?r.media:[];
     return '<div'+ddAttrs('event_reports',i)+' style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:grab">'+ddGrip()+
-    (med[0]&&med[0].url?'<img src="'+esc(med[0].url)+'" alt="" style="width:44px;height:32px;object-fit:cover;border-radius:3px">':'<span class="mut sml">ohne Foto</span>')+
+    (med[0]&&med[0].url?'<img src="'+esc(thumbUrl(med[0].url))+'" alt="" style="width:44px;height:32px;object-fit:cover;border-radius:3px">':'<span class="mut sml">ohne Foto</span>')+
     '<a onclick="openReportModal(\''+r.id+'\')" style="flex:1">'+esc(r.title)+'</a>'+
     '<span class="mut sml">'+esc(r.meta||'')+' · '+med.length+(med.length===1?' Foto':' Fotos')+'</span>'+
     pubSwitch('event_reports',r.id,!!r.public)+'</div>';
@@ -7324,7 +7328,7 @@ function renderReportMedia(){
   var mw=document.getElementById('repMediaWrap');if(!mw)return;
   var rows=curReportMedia.map(function(m,i){
     return '<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+
-      '<img src="'+esc(m.url)+'" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:3px">'+
+      '<img src="'+esc(thumbUrl(m.url))+'" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:3px">'+
       '<input value="'+esc(m.caption||'')+'" placeholder="Bildunterschrift (optional)" oninput="repMedSet('+i+',this.value)" style="flex:1;margin:0">'+
       (i===0?'<span class="b green" title="Dieses Foto steht auf der Kachel">Titelbild</span>':'<button class="btn g sm" onclick="repMedUp('+i+')" title="nach oben">↑</button>')+
       '<button class="btn r sm" onclick="repMedDel('+i+')">Weg</button></div>';
@@ -9803,7 +9807,7 @@ function mpRenderGrid(){
       return '<div onclick="mpPick('+i+')" style="cursor:pointer;position:relative">'+
       (m.kind==='video'
         ? '<video src="'+esc(m.url)+'" muted loop autoplay playsinline preload="metadata" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:2px solid '+(sel?'var(--acc)':'var(--bdr)')+';background:#000"></video>'
-        : '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:2px solid '+(sel?'var(--acc)':'var(--bdr)')+'">')+
+        : '<img src="'+esc(thumbUrl(m.url))+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:2px solid '+(sel?'var(--acc)':'var(--bdr)')+'">')+
       (m.kind==='video'?'<span style="position:absolute;bottom:34px;left:6px;background:rgba(0,0,0,.65);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px">Video</span>':'')+
       (sel?'<span style="position:absolute;top:6px;right:6px;background:var(--acc);color:#141414;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:0;width:12px;height:12px"><polyline points="20 6 9 17 4 12"/></svg></span>':'')+
       '<div class="mut" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
@@ -9985,7 +9989,7 @@ function mpKachel(m,i){
     '<div onclick="mpGross('+i+')" style="cursor:zoom-in">'+
     (vid
       ? '<video src="'+esc(m.url)+'" muted loop autoplay playsinline preload="metadata" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px;background:#000"></video>'
-      : '<img src="'+esc(m.url)+'" loading="lazy" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px">')+
+      : '<img src="'+esc(thumbUrl(m.url))+'" loading="lazy" style="width:100%;height:130px;object-fit:cover;border-radius:6px;margin-bottom:6px">')+
     '</div>'+
     '<div class="mut sml" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
     '<div class="mut sml" style="margin-bottom:8px">'+mpInfo(m)+'</div>'+
@@ -10000,7 +10004,7 @@ function mpZeile(m,i){
     '<div onclick="mpGross('+i+')" style="cursor:zoom-in;flex:none">'+
     (vid
       ? '<video src="'+esc(m.url)+'" muted preload="metadata" style="width:54px;height:38px;object-fit:cover;border-radius:4px;background:#000"></video>'
-      : '<img src="'+esc(m.url)+'" loading="lazy" style="width:54px;height:38px;object-fit:cover;border-radius:4px">')+
+      : '<img src="'+esc(thumbUrl(m.url))+'" loading="lazy" style="width:54px;height:38px;object-fit:cover;border-radius:4px">')+
     '</div>'+
     '<div style="flex:1;min-width:0">'+
       '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--wh)" title="'+esc(m.name)+'">'+esc(m.name)+'</div>'+
@@ -10226,7 +10230,7 @@ function renderGalGrid(){
   el.innerHTML=GAL_IMAGES.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">'+
     GAL_IMAGES.map(function(u,i){
       return '<div draggable="true" ondragstart="galDragStart('+i+',event)" ondragover="galDragOver(event)" ondrop="galDrop('+i+',event)" style="position:relative;cursor:grab">'+
-      '<img src="'+esc(u)+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:1px solid var(--bdr)">'+
+      '<img src="'+esc(thumbUrl(u))+'" loading="lazy" style="width:100%;height:110px;object-fit:cover;border-radius:6px;border:1px solid var(--bdr)">'+
       '<a onclick="galRemove('+i+')" title="Bild entfernen" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.65);color:var(--wh);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-right:0;width:12px;height:12px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></a>'+
       '<div class="mut" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(u)+'">'+esc(u.split('/').pop())+'</div></div>';
     }).join('')+'</div>'

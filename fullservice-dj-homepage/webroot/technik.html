@@ -675,6 +675,9 @@ document.addEventListener('click',function(e){
   if(a)navClose();
 });
 function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
+/* Vorschaubild-URL zu einer hochgeladenen Datei (siehe thumb.php) - nur fuer die kleine
+   Kachel in der Terminliste, die Detailansicht zeigt weiterhin das Originalbild. */
+function thumbUrl(u){return u&&u.indexOf('uploads/')>=0?u.replace('uploads/','uploads/.thumbs/'):u}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 var LEGAL={};
 
@@ -752,7 +755,7 @@ function loadWorkshops(){
       var full=w.free<=0;
       var aud=w.audience==='dj'?'DJs & Alleinunterhalter':(w.audience==='live'?'Livemusik':'');
       return '<div style="background:var(--card);border:1px solid var(--line);border-radius:5px;padding:22px 20px">'+
-        (w.image_url?'<img src="'+esc(w.image_url)+'" alt="'+esc(w.title)+'" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;object-position:'+cssUrl(w.image_focal||'50% 50%')+';border-radius:4px;margin-bottom:14px" onerror="this.remove()">':'')+
+        (w.image_url?'<img src="'+esc(thumbUrl(w.image_url))+'" data-full="'+esc(w.image_url)+'" alt="'+esc(w.title)+'" loading="lazy" style="width:100%;aspect-ratio:4/3;object-fit:cover;object-position:'+cssUrl(w.image_focal||'50% 50%')+';border-radius:4px;margin-bottom:14px" onerror="if(this.dataset.full&&this.src!==this.dataset.full){this.onerror=null;this.src=this.dataset.full}else{this.remove()}">':'')+
         '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:6px">'+wsDate(w)+'</div>'+
         (aud?'<div style="display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:3px;padding:3px 10px;color:var(--mut);margin-bottom:8px">'+aud+'</div>':'')+
         '<h4 style="font-size:16px;margin-bottom:6px'+(w.image_url?'':';font-weight:800')+'">'+esc(w.title)+'</h4>'+
