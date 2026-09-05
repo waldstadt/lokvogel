@@ -17,12 +17,20 @@
   # worker-src erlaubt zusaetzlich blob: - die HEIC-Umwandlung (heic2any, siehe admin.html)
   # startet ihren Bilddecoder als Web-Worker aus einer blob:-URL; ohne dieses Zugestaendnis
   # faellt worker-src auf script-src zurueck (kein blob: dort erlaubt) und der Worker laesst
-  # sich gar nicht erst erzeugen - Browser mit strikter CSP-Durchsetzung (z. B. Safari)
-  # blockieren das dann lautlos, ohne dass im Code selbst etwas falsch waere. 'wasm-unsafe-eval'
-  # in script-src erlaubt zusaetzlich, dass dieser Worker seinen WebAssembly-Bilddecoder
-  # (libheif) uebersetzen darf - deutlich enger als 'unsafe-eval', erlaubt nur WebAssembly,
-  # kein beliebiges eval() von Text-Code.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' https://open.spotify.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+  # sich gar nicht erst erzeugen - mit Playwright/Chromium samt dieser CSP nachgestellt und
+  # bestaetigt: Chrome meldet dann exakt "Refused to create a worker from 'blob:...'" und die
+  # Umwandlung haengt sich lautlos auf (kein Fehler, kein Fortschritt) - deckt sich mit dem
+  # beobachteten Verhalten in Safari (iPhone und Mac). 'unsafe-eval' in script-src ist
+  # zusaetzlich noetig, weil dieser Worker seinen WebAssembly-Bilddecoder (libheif) ueber
+  # eval()-basierten Code initialisiert - 'wasm-unsafe-eval' allein (WebAssembly ohne
+  # generelles eval) reichte im selben Nachbau nicht, Chrome blockierte dort noch mit
+  # "Refused to evaluate a string as JavaScript ... 'unsafe-eval' is not an allowed source".
+  # Erst mit beidem zusammen kommt die Umwandlung tatsaechlich bis zur echten Bilddecoder-
+  # Pruefung durch. Bewusster, begrenzter Kompromiss nur wegen dieser einen Bibliothek - die
+  # Seite arbeitet ohnehin schon mit 'unsafe-inline' (Inline-onclick-Handler, kein Nonce-
+  # System), diese CSP ist also primaer ein Riegel gegen fremde/externe Ressourcen, keine
+  # strikte XSS-Haertung.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' https://open.spotify.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
   # Nur wirksam, wenn ueber HTTPS ausgeliefert (Browser ignorieren HSTS ueber HTTP ohnehin).
   Header always set Strict-Transport-Security "max-age=15552000; includeSubDomains"
 </IfModule>
