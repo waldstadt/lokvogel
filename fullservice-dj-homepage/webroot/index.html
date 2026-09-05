@@ -92,8 +92,13 @@ nav.scrolled{border-bottom-color:var(--line)}
 
 /* PACKAGES */
 #ablauf{background:var(--bg2)}
-.pack-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:44px}
-.pack{background:var(--card);border:1px solid var(--line);border-radius:5px;display:flex;flex-direction:column;overflow:hidden;transition:border-color .25s,transform .25s}
+/* Statt starrem Grid ein horizontal scrollbares Band: passen alle Pakete nebeneinander
+   (bis zu drei bei der ueblichen Wrap-Breite), sieht es aus wie vorher; kommt ein
+   viertes Paket dazu oder wird der Bildschirm zu schmal, ist der Rest per Wischen/
+   Scrollen erreichbar statt in eine zweite Zeile umzubrechen oder gequetscht zu werden. */
+.pack-grid{display:flex;gap:20px;margin-top:44px;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:6px}
+.pack-grid::-webkit-scrollbar{display:none}
+.pack{background:var(--card);border:1px solid var(--line);border-radius:5px;display:flex;flex-direction:column;overflow:hidden;transition:border-color .25s,transform .25s;flex:1 0 280px;max-width:330px;scroll-snap-align:start}
 .pack-in{padding:34px 30px;display:flex;flex-direction:column;flex:1}
 .pack-img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;border-bottom:1px solid var(--line);background:var(--bg2)}
 .pack:hover{border-color:rgba(var(--acc-rgb),.5);transform:translateY(-4px)}
