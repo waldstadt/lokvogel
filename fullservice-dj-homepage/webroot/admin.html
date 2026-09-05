@@ -255,6 +255,7 @@ tr.neu td{background:rgba(255,111,91,.14)}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px}
 .modal-bg.v{display:flex}
 .modal{background:var(--cd);border:1px solid var(--bdr);max-width:760px;width:100%;padding:24px}
+.modal.doc{max-width:1200px}
 .modal h3{display:flex;justify-content:space-between}
 .modal h3 .x{cursor:pointer;color:var(--gl);font-size:16px}
 
@@ -9363,23 +9364,74 @@ function guideSlugify(s){
   return String(s||'').toLowerCase().replace(/[äöüß]/g,function(c){return map[c]})
     .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
 }
+/* Feste interne Ziele fuer das CTA-Ziel-Dropdown (Abschnitt + Beitrag) - recherchierte
+   echte Anker/Seiten der Website. Kampagnenseiten kommen dynamisch aus CACHE.campaigns
+   dazu, damit neue/geloeschte Kampagnenseiten nicht hier gepflegt werden muessen. */
+var CTA_TARGET_GROUPS=[
+  ['Kontakt & Formulare',[
+    ['index.html#anfrage','Kontaktformular (Startseite)'],
+    ['technik.html#anfrage','Kontaktformular (Technik)'],
+    ['technik.html#workshops','Workshop-Termine/Anmeldung']]],
+  ['Startseite',[
+    ['index.html#leistungen','Leistungen'],['index.html#ablauf','Ablauf'],
+    ['index.html#garantie','Garantie'],['index.html#technik','Technik-Teaser'],
+    ['index.html#faq','FAQ'],['index.html#locations','Lieblingslocations'],
+    ['index.html#bewertungen','Bewertungen']]],
+  ['Technik-Seite',[
+    ['technik.html#techniker','Techniker buchen'],
+    ['technik.html#installation','Festinstallation'],
+    ['technik.html#konditionen','Konditionen']]],
+  ['Sonstige Seiten',[['mieten.html','Mietpark (Katalog)']]]
+];
+function ctaOpt(value,label,current){
+  return '<option value="'+esc(value)+'"'+(value===current?' selected':'')+'>'+esc(label)+'</option>';
+}
+/* Dropdown schreibt seinen Wert nur in das Href-Feld, wenn eine echte Option gewaehlt
+   wurde - die Platzhalter-Option ("eigenes Ziel eintragen") loescht ein bereits von Hand
+   eingetragenes externes Ziel (z. B. eine Location-Website) nicht versehentlich. */
+function ctaTargetPick(hrefId,val){
+  if(!val)return;
+  document.getElementById(hrefId).value=val;
+}
+function ctaTargetField(hrefId,current,placeholder,extraAttr){
+  var campaignOpts=(CACHE.campaigns||[]).filter(function(c){return c.enabled}).map(function(c){
+    return ctaOpt(c.slug+'.html',c.page_title||c.h1_line1||c.slug,current);
+  }).join('');
+  var html='<div class="grid2"><div><label>Ziel (Auswahl)</label><select onchange="ctaTargetPick(\''+hrefId+'\',this.value)">'+
+    '<option value="">— eigenes Ziel rechts eintragen —</option>'+
+    CTA_TARGET_GROUPS.map(function(g){
+      return '<optgroup label="'+esc(g[0])+'">'+g[1].map(function(o){return ctaOpt(o[0],o[1],current)}).join('')+'</optgroup>';
+    }).join('')+
+    (campaignOpts?'<optgroup label="Kampagnenseiten">'+campaignOpts+'</optgroup>':'')+
+    '<optgroup label="Extern"><option value="">Sonstige URL rechts eintragen…</option></optgroup>'+
+    '</select></div>'+
+    '<div><label>Link-Ziel</label><input id="'+hrefId+'"'+(extraAttr||'')+' value="'+esc(current||'')+'" placeholder="'+esc(placeholder||'z. B. hochzeit.html#anfrage')+'"></div></div>';
+  return html;
+}
 var GSEC_SEQ=0;
 function guideSectionRow(s){
   s=s||{};
-  var tid='gSecText'+(GSEC_SEQ++);
-  return '<div class="card" style="margin:8px 0;padding:12px" data-gsec>'+
-    '<label>Zwischenüberschrift</label><input data-sh value="'+esc(s.heading||'')+'">'+
-    '<label>Untertitel (optional)</label><input data-ssub value="'+esc(s.subtitle||'')+'">'+
-    '<label>Text (optional, leer lassen für reine Liste)</label><textarea id="'+tid+'" data-st rows="3">'+esc(s.text||'')+'</textarea>'+
+  var n=GSEC_SEQ++;
+  var tid='gSecText'+n,hid='gSecCtaHref'+n;
+  return '<div class="card" style="margin:14px 0;padding:16px;border-left:3px solid var(--acc)" data-gsec>'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
+    '<input data-sh value="'+esc(s.heading||'')+'" placeholder="Zwischenüberschrift" style="font-size:19px;font-weight:700;border:none;background:transparent;padding:2px 0;flex:1">'+
+    '<a onclick="this.closest(\'[data-gsec]\').remove()" style="color:var(--redl);font-size:12px;white-space:nowrap;margin-top:8px">Abschnitt entfernen</a></div>'+
+    '<input data-ssub value="'+esc(s.subtitle||'')+'" placeholder="Untertitel (optional)" style="color:var(--mut);border:none;background:transparent;padding:2px 0;margin-bottom:8px;width:100%">'+
+    '<textarea id="'+tid+'" data-st rows="4" placeholder="Text (optional, leer lassen für reine Liste)">'+esc(s.text||'')+'</textarea>'+
     edBtn(tid)+
-    '<label>Aufzählungspunkte (einer pro Zeile, optional)</label><textarea data-si rows="4">'+esc((s.items||[]).join('\n'))+'</textarea>'+
+    '<div class="sml mut" id="'+tid+'Hint" style="margin-top:2px"></div>'+
+    '<label style="margin-top:10px">Aufzählungspunkte (einer pro Zeile, optional)</label><textarea data-si rows="3">'+esc((s.items||[]).join('\n'))+'</textarea>'+
     '<label>Bild zu diesem Abschnitt (optional)</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
     '<input data-simg value="'+esc(s.image||'')+'" style="flex:1;min-width:160px" placeholder="Aus Medien-Pool wählen…">'+
     '<button type="button" class="btn g sm" onclick="guideSecImgFromPool(this)">Aus Medien-Pool wählen</button></div>'+
     '<label>Bildbeschreibung (klein, kursiv unter dem Bild)</label><input data-scap value="'+esc(s.image_caption||'')+'">'+
-    '<label>Button nach diesem Abschnitt (optional, z. B. „Lass uns über Musik sprechen")</label><input data-scta value="'+esc(s.cta_label||'')+'" placeholder="z. B. Kontaktiere mich">'+
     '<label>Spotify-Playlists einbetten (optional, eine pro Zeile für mehrere) – Embed-Link aus Spotify: „Teilen" → „Einbetten" → src-Adresse kopieren</label><textarea data-se rows="2" placeholder="https://open.spotify.com/embed/playlist/…">'+esc((s.embeds||(s.embed?[s.embed]:[])).join('\n'))+'</textarea>'+
-    '<a onclick="this.parentNode.remove()" style="color:var(--redl);font-size:12px">Abschnitt entfernen</a></div>';
+    '<div class="sml" style="margin:12px 0 4px;font-weight:600;color:var(--wh)">Button nach diesem Abschnitt (optional)</div>'+
+    '<label>Button-Text</label><input data-scta value="'+esc(s.cta_label||'')+'" placeholder="z. B. Kontaktiere mich">'+
+    '<div class="mut sml" style="margin:2px 0 4px">Ohne eigenes Ziel nutzt der Button das Beitrags-Ziel unten.</div>'+
+    ctaTargetField(hid,s.cta_href||'','leer = Beitrags-Ziel verwenden',' data-scta-href')+
+    '</div>';
 }
 function guideAddSection(){document.getElementById('gSections').insertAdjacentHTML('beforeend',guideSectionRow())}
 function guideSecImgFromPool(btn){
@@ -9394,6 +9446,31 @@ function guideFaqRow(f){
     '<a onclick="this.parentNode.remove()" style="color:var(--redl);font-size:12px">Frage entfernen</a></div>';
 }
 function guideAddFaq(){document.getElementById('gFaq').insertAdjacentHTML('beforeend',guideFaqRow())}
+function suggestGuideFaq(){
+  var sectionsText=[].map.call(document.querySelectorAll('#gSections [data-gsec]'),function(div){
+    return (div.querySelector('[data-sh]').value+'\n'+div.querySelector('[data-st]').value).trim();
+  }).join('\n\n');
+  var existing=[].map.call(document.querySelectorAll('#gFaq [data-gfaq]'),function(div){
+    return {q:div.querySelector('[data-fq]').value.trim()};
+  });
+  var body={title:v('gTitle'),intro:v('gIntro'),sections_text:sectionsText,existing:existing};
+  var btn=document.getElementById('gFaqAiBtn');
+  btn.disabled=true;btn.textContent='Wird generiert …';
+  fetch('api.php/ai/suggest-guide-faq',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
+    .then(function(res){
+      btn.disabled=false;btn.textContent='KI-Vorschlag';
+      if(!res.ok||res.j.error){toast((res.j&&res.j.error)||'KI-Anfrage fehlgeschlagen.',1);return}
+      document.getElementById('gFaq').insertAdjacentHTML('beforeend',res.j.map(guideFaqRow).join(''));
+      toast('Vorschlag eingefügt – prüfen/anpassen, dann „Speichern".');
+    }).catch(function(e){btn.disabled=false;btn.textContent='KI-Vorschlag';toast(e.message,1)});
+}
+/* Gesamtdokument-Ansicht: der ganze Beitrag - Kopf, Google-Beschreibung, Einleitung,
+   alle Abschnitte, Fragen, Beitrags-CTA - steht als ein durchgehendes, aber klar
+   gegliedertes Dokument in einem breiteren Fenster (Klasse "doc"), statt verstreuter
+   Einzelfelder. Markus soll den Beitrag im Zusammenhang lesen/bearbeiten koennen, und
+   die KI bekommt beim "Gross bearbeiten" je Feld mit, welchen Teil sie gerade schreibt
+   (siehe edAiImprove()/ai/rewrite kind=guide). */
 function openGuideModal(id){
   var g=id?(CACHE.guides||[]).find(function(x){return x.id===id}):{};g=g||{};
   window._guideId=id||'';
@@ -9403,27 +9480,66 @@ function openGuideModal(id){
     '<div><label>Kicker</label><input id="gKicker" value="'+esc(g.kicker||'')+'"></div></div>'+
     '<div class="grid2"><div><label>Adresse (/backstage/…)</label><input id="gSlug" value="'+esc(g.slug||'')+'"></div>'+
     '<div><label style="text-transform:none;letter-spacing:0"><input type="checkbox" id="gSlugTouched" style="width:auto;margin-right:6px" '+(id?'checked':'')+'>Adresse manuell festlegen</label></div></div>'+
-    '<label>Beschreibung für Google (150–160 Zeichen)</label><textarea id="gMeta" rows="2">'+esc(g.meta_desc||'')+'</textarea>'+edBtn('gMeta')+
-    '<label>Überschrift (H1)</label><input id="gH1" value="'+esc(g.h1||'')+'">'+
-    '<label>Untertitel / Einleitung</label><textarea id="gIntro" rows="3">'+esc(g.intro||'')+'</textarea>'+edBtn('gIntro')+
     '<label>Titelbild (optional)</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
     '<input id="gImage" value="'+esc(g.image||'')+'" style="flex:1;min-width:200px" placeholder="Aus Medien-Pool wählen…">'+
     '<button type="button" class="btn g sm" onclick="guideImgFromPool()">Aus Medien-Pool wählen</button></div>'+
     '<label>Bildbeschreibung (klein, kursiv unter dem Titelbild)</label><input id="gImgCap" value="'+esc(g.image_caption||'')+'" placeholder="Beschreibt, was auf dem Bild zu sehen ist">'+
-    '<div class="sec-label" style="margin-top:14px">Abschnitte</div>'+
-    '<div id="gSections">'+(g.sections||[]).map(guideSectionRow).join('')+'</div>'+
+    '<label style="margin-top:14px">Beschreibung für Google (150–160 Zeichen)</label><textarea id="gMeta" rows="2" oninput="guideWcUpdate();guideInlineHint(\'gMeta\')">'+esc(g.meta_desc||'')+'</textarea>'+edBtn('gMeta')+
+    '<div class="sml mut" id="gMetaHint" style="margin-top:2px"></div>'+
+    '<h1 style="margin:16px 0 6px"><input id="gH1" value="'+esc(g.h1||'')+'" placeholder="Überschrift (H1)" style="font-size:28px;font-weight:700;border:none;background:transparent;width:100%;padding:2px 0"></h1>'+
+    '<textarea id="gIntro" rows="3" placeholder="Untertitel / Einleitung" oninput="guideWcUpdate();guideInlineHint(\'gIntro\')">'+esc(g.intro||'')+'</textarea>'+edBtn('gIntro')+
+    '<div class="sml mut" id="gIntroHint" style="margin-top:2px"></div>'+
+    '<div class="sml mut" id="gWordCount" style="margin-top:10px;padding:8px 10px;border:1px solid var(--bdr);border-radius:6px"></div>'+
+    '<div class="sec-label" style="margin-top:18px">Abschnitte</div>'+
+    '<div id="gSections" oninput="guideWcUpdate();guideInlineHint(event.target.id)">'+(g.sections||[]).map(guideSectionRow).join('')+'</div>'+
     '<button class="btn g sm" onclick="guideAddSection()">+ Abschnitt</button>'+
-    '<div class="sec-label" style="margin-top:14px">Häufige Fragen (optional, Google zeigt sie ggf. als Rich-Snippet)</div>'+
+    '<div class="sec-label" style="margin-top:18px">Häufige Fragen <span class="mut sml" style="text-transform:none;letter-spacing:0">(optional, Google zeigt sie ggf. als Rich-Snippet)</span> <button class="btn g sm" style="float:right" onclick="suggestGuideFaq()" id="gFaqAiBtn">KI-Vorschlag</button></div>'+
     '<div id="gFaq">'+(g.faq||[]).map(guideFaqRow).join('')+'</div>'+
     '<button class="btn g sm" onclick="guideAddFaq()">+ Frage</button>'+
-    '<div class="sec-label" style="margin-top:14px">Aufruf zum Handeln</div>'+
+    '<div class="sec-label" style="margin-top:18px">Aufruf zum Handeln (Fallback-Ziel für Abschnitte ohne eigenes Ziel)</div>'+
     '<div class="grid3"><div style="grid-column:span 2"><label>Button-Text</label><input id="gCtaLabel" value="'+esc(g.cta_label||'Unverbindlich anfragen')+'"></div>'+
-    '<div><label>Farbschema/Ziel</label><select id="gTarget"><option value="index">DJ-Seite</option><option value="technik">Technik-Seite</option></select></div></div>'+
-    '<label>Link-Ziel des Buttons (z. B. hochzeit.html#anfrage)</label><input id="gCtaHref" value="'+esc(g.cta_href||'')+'">'+
+    '<div><label>Fußzeile/Design</label><select id="gTarget"><option value="index">DJ-Seite</option><option value="technik">Technik-Seite</option></select></div></div>'+
+    ctaTargetField('gCtaHref',g.cta_href||'')+
     '<label style="margin-top:12px"><input type="checkbox" id="gPub" style="width:auto;margin-right:6px" '+(g.published?'checked':'')+'>Veröffentlicht</label>'+
     '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="saveGuide()">Speichern</button>'+
-    (id?' <a class="btn g" href="backstage/'+esc(g.slug)+'" target="_blank" style="text-decoration:none">Beitrag ansehen</a> <button class="btn r" onclick="delRow(\'guides\',\''+id+'\',reloadGuides)">Löschen</button>':'')+'</div>');
+    (id?' <a class="btn g" href="backstage/'+esc(g.slug)+'" target="_blank" style="text-decoration:none">Beitrag ansehen</a> <button class="btn r" onclick="delRow(\'guides\',\''+id+'\',reloadGuides)">Löschen</button>':'')+'</div>',
+    {wide:true});
   if(g.footer_target)document.getElementById('gTarget').value=g.footer_target;
+  guideWcUpdate();
+  ['gMeta','gIntro'].forEach(guideInlineHint);
+  [].forEach.call(document.querySelectorAll('#gSections [data-st]'),function(t){guideInlineHint(t.id)});
+}
+/* Zeichen-Ampel direkt im kleinen Feld (nicht nur in "Gross bearbeiten") - selbe
+   Richtwerte/Logik wie edLenUpdate(), aber auf ein beliebiges "<id>Hint"-Element
+   angewandt statt auf #edLenHint. */
+function guideInlineHint(id){
+  if(!id)return;
+  var t=document.getElementById(id),h=document.getElementById(id+'Hint');
+  if(!t||!h)return;
+  var n=t.value.length,range=lenHintFor(id);
+  if(!range){h.textContent='';return}
+  var lo=range[0],hi=range[1],txt,color;
+  if(n===0){txt=n+' Zeichen – empfohlen '+lo+'–'+hi;color=''}
+  else if(n<lo*0.6||n>hi*1.6){txt=n+' Zeichen – empfohlen '+lo+'–'+hi+' (deutlich '+(n<lo?'zu kurz':'zu lang')+')';color='var(--red)'}
+  else if(n<lo||n>hi){txt=n+' Zeichen – empfohlen '+lo+'–'+hi+' ('+(n<lo?'etwas knapp':'etwas lang')+')';color='#c9902e'}
+  else{txt=n+' Zeichen – im empfohlenen Bereich ('+lo+'–'+hi+')';color='#3fae5c'}
+  h.textContent=txt;h.style.color=color;
+}
+/* Gesamt-Wortzahl-Anzeige (Einleitung + alle Abschnittstexte), echte Woerter statt
+   Zeichen - anders als die einzelnen Feld-Ampeln (edLenUpdate) ist das eine reine
+   Anzeige ohne KI-Kopplung, Richtwert 500-1500 Woerter fuer den ganzen Artikel. */
+function guideWordCount(){
+  var text=v('gIntro')+' '+[].map.call(document.querySelectorAll('#gSections [data-st]'),function(t){return t.value}).join(' ');
+  return text.trim()?text.trim().split(/\s+/).length:0;
+}
+function guideWcUpdate(){
+  var el=document.getElementById('gWordCount');if(!el)return;
+  var n=guideWordCount(),lo=500,hi=1500,txt,color;
+  if(n===0){txt='0 Wörter – empfohlen '+lo+'–'+hi;color=''}
+  else if(n<lo*0.5||n>hi*1.6){txt=n+' Wörter – empfohlen '+lo+'–'+hi+' (deutlich '+(n<lo?'zu kurz':'zu lang')+')';color='var(--red)'}
+  else if(n<lo||n>hi){txt=n+' Wörter – empfohlen '+lo+'–'+hi+' ('+(n<lo?'etwas knapp':'etwas lang')+')';color='#c9902e'}
+  else{txt=n+' Wörter – im empfohlenen Bereich für einen ganzen Beitrag ('+lo+'–'+hi+')';color='#3fae5c'}
+  el.textContent=txt;el.style.color=color;
 }
 /* SEO-Check lebt in "Gross bearbeiten" (edBtn/openTextEditor), nicht als eigener Button
    im Beitrags-Editor - dort ist ohnehin schon der Ort fuer KI-Unterstuetzung am Text.
@@ -9465,6 +9581,7 @@ function saveGuide(){
       image:div.querySelector('[data-simg]').value.trim(),
       image_caption:div.querySelector('[data-scap]').value.trim(),
       cta_label:div.querySelector('[data-scta]').value.trim(),
+      cta_href:div.querySelector('[data-scta-href]').value.trim(),
       embeds:div.querySelector('[data-se]').value.split('\n').map(function(s){return s.trim()}).filter(Boolean)};
   }).filter(function(s){return s.heading||s.text||s.items.length||s.embeds.length||s.image});
   var faq=[].map.call(document.querySelectorAll('#gFaq [data-gfaq]'),function(div){
@@ -9513,44 +9630,62 @@ function guideFromSuggestion(s){
 function openGuideOutlineModal(){
   openModal('Vorschläge zu einem Thema',
     '<label>Thema</label><input id="goTopic" placeholder="z. B. Warum ich bei Regen nie improvisiere">'+
-    '<div style="margin-top:12px"><button class="btn" id="goBtn" onclick="guideRequestOutline()">Gliederung vorschlagen</button></div>'+
+    '<label style="margin-top:10px">Was soll die KI liefern?</label>'+
+    '<label style="text-transform:none;letter-spacing:0;font-weight:400"><input type="radio" name="goMode" value="outline" checked style="width:auto;margin-right:6px">Nur Gliederung – Überschriften + Stichpunkte, ich schreibe den Text selbst</label>'+
+    '<label style="text-transform:none;letter-spacing:0;font-weight:400;margin-top:4px"><input type="radio" name="goMode" value="draft" style="width:auto;margin-right:6px">Volltext-Entwurf – die KI schreibt gleich fertigen Text zum Nachbessern</label>'+
+    '<div style="margin-top:12px"><button class="btn" id="goBtn" onclick="guideRequestOutline()">Vorschlag erzeugen</button></div>'+
     '<div id="goResult" style="margin-top:14px"></div>');
 }
 function guideRequestOutline(){
   var topic=v('goTopic').trim();
   if(!topic){toast('Bitte zuerst ein Thema eingeben.',1);return}
+  var mode=(document.querySelector('input[name="goMode"]:checked')||{}).value||'outline';
   var btn=document.getElementById('goBtn');
   btn.disabled=true;btn.textContent='Wird generiert …';
-  fetch('api.php/ai/suggest-guide-outline',{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify({topic:topic})})
+  fetch('api.php/ai/suggest-guide-'+(mode==='draft'?'draft':'outline'),{method:'POST',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},body:JSON.stringify({topic:topic})})
     .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
     .then(function(res){
-      btn.disabled=false;btn.textContent='Gliederung vorschlagen';
+      btn.disabled=false;btn.textContent='Vorschlag erzeugen';
       if(!res.ok||res.j.error){toast((res.j&&res.j.error)||'KI-Anfrage fehlgeschlagen.',1);return}
-      window._goResult=res.j;
+      window._goResult=res.j;window._goMode=mode;
       document.getElementById('goResult').innerHTML=
         '<div class="card" style="padding:12px">'+
         '<b>'+esc(res.j.h1||topic)+'</b>'+(res.j.kicker?'<div class="mut sml" style="margin-top:4px">'+esc(res.j.kicker)+'</div>':'')+
+        (mode==='draft'&&res.j.meta_desc?'<div class="mut sml" style="margin-top:6px"><i>'+esc(res.j.meta_desc)+'</i></div>':'')+
+        (mode==='draft'&&res.j.intro?'<p class="sml" style="margin-top:6px">'+esc(res.j.intro)+'</p>':'')+
         (res.j.sections||[]).map(function(s){
-          return '<div style="margin-top:10px"><b class="sml">'+esc(s.heading||'')+'</b><ul style="margin:4px 0 0 20px;font-size:13px;color:var(--mut)">'+
-            (s.points||[]).map(function(p){return '<li>'+esc(p)+'</li>'}).join('')+'</ul></div>';
+          return '<div style="margin-top:10px"><b class="sml">'+esc(s.heading||'')+'</b>'+
+            (mode==='draft'?
+              ((s.subtitle?'<div class="mut sml">'+esc(s.subtitle)+'</div>':'')+'<p class="sml" style="margin:4px 0 0">'+esc(s.text||'')+'</p>'):
+              ('<ul style="margin:4px 0 0 20px;font-size:13px;color:var(--mut)">'+(s.points||[]).map(function(p){return '<li>'+esc(p)+'</li>'}).join('')+'</ul>'))+
+            '</div>';
         }).join('')+
         '<div style="margin-top:12px"><button class="btn sm" onclick="guideOutlineApply()">Als neuen Beitrag anlegen</button></div>'+
         '</div>';
-    }).catch(function(e){btn.disabled=false;btn.textContent='Gliederung vorschlagen';toast(e.message,1)});
+    }).catch(function(e){btn.disabled=false;btn.textContent='Vorschlag erzeugen';toast(e.message,1)});
 }
 function guideOutlineApply(){
   var o=window._goResult;if(!o)return;
+  var isDraft=window._goMode==='draft';
   closeModal();
   openGuideModal();
   document.getElementById('gH1').value=o.h1||'';
   document.getElementById('gTitle').value=o.h1||'';
   document.getElementById('gSlug').value=guideSlugify(o.h1||'');
   document.getElementById('gKicker').value=o.kicker||'';
+  if(isDraft){
+    document.getElementById('gMeta').value=o.meta_desc||'';
+    document.getElementById('gIntro').value=o.intro||'';
+  }
   var wrap=document.getElementById('gSections');
   wrap.innerHTML=(o.sections||[]).map(function(s){
-    return guideSectionRow({heading:s.heading||'',text:'Stichpunkte:\n– '+(s.points||[]).join('\n– ')});
+    return isDraft?guideSectionRow({heading:s.heading||'',subtitle:s.subtitle||'',text:s.text||''})
+      :guideSectionRow({heading:s.heading||'',text:'Stichpunkte:\n– '+(s.points||[]).join('\n– ')});
   }).join('');
-  toast('Gliederung übernommen – Stichpunkte in eigenen Text umschreiben, dann speichern.');
+  guideWcUpdate();
+  ['gMeta','gIntro'].forEach(guideInlineHint);
+  [].forEach.call(document.querySelectorAll('#gSections [data-st]'),function(t){guideInlineHint(t.id)});
+  toast(isDraft?'Entwurf übernommen – nachbessern/ergänzen, dann speichern.':'Gliederung übernommen – Stichpunkte in eigenen Text umschreiben, dann speichern.');
 }
 
 /* ===== Bewertungen ===== */
@@ -9875,8 +10010,10 @@ function showCloseChoice(cb){
   document.getElementById('ccCancel').onclick=function(){done('cancel')};
   host.addEventListener('click',function(e){if(e.target===host)done('cancel')});
 }
-function openModal(title,html){
-  document.getElementById('modalBox').innerHTML='<h3>'+title+'<span class="x" onclick="closeModalSafe()">✕</span></h3>'+html;
+function openModal(title,html,opts){
+  var box=document.getElementById('modalBox');
+  box.innerHTML='<h3>'+title+'<span class="x" onclick="closeModalSafe()">✕</span></h3>'+html;
+  box.classList.toggle('doc',!!(opts&&opts.wide));
   document.getElementById('modalBg').classList.add('v');
   /* Verzoegert, nicht synchron: einige Fenster (z. B. openEqModal) fuellen nach diesem
      Aufruf noch weitere Felder nach (Fokuspunkt-Regler, Platzhalter-Icon, Bilder-Grid) -
@@ -10561,12 +10698,20 @@ var EDIT_LEN_HINT={
   tBody:[300,900],rBody:[300,900],remBody:[300,900],
   tcUse:[100,400],tcProb:[100,400],tcWish:[100,400],tcFind:[150,500],
   tcWhy:[150,500],tcPersonal:[150,500],tcSteps:[150,500],
-  lDesc:[80,250],frDesc:[80,250],fA:[150,500],cSeoDesc:[120,160]
+  lDesc:[80,250],frDesc:[80,250],fA:[150,500],cSeoDesc:[120,160],
+  gMeta:[150,160],gIntro:[250,600]
 };
+/* Wie EDIT_LEN_HINT, aber auch fuer dynamische Abschnitts-Textfelder
+   (gSecText<n> - eine laufende Nummer pro Abschnitt, kein fester Schluessel
+   in der Map moeglich). Ca. 60-150 Woerter je Abschnitt, als Zeichenzahl
+   grob geschaetzt (Richtwert, keine harte Grenze - siehe edAiImprove()). */
+function lenHintFor(id){
+  return EDIT_LEN_HINT[id]||(/^gSecText\d+$/.test(id)?[400,1000]:null);
+}
 function edLenUpdate(){
   var t=document.getElementById('edArea'),h=document.getElementById('edLenHint');
   if(!t||!h)return;
-  var n=t.value.length,range=EDIT_LEN_HINT[ED_TARGET];
+  var n=t.value.length,range=lenHintFor(ED_TARGET);
   if(!range){h.textContent=n+' Zeichen';h.className='mut sml';return}
   var lo=range[0],hi=range[1],cls,txt;
   if(n===0){cls='mut';txt=n+' Zeichen – empfohlen '+lo+'–'+hi}
@@ -10633,9 +10778,11 @@ function edAiImprove(){
   var text=t.value.trim();
   if(!text){toast('Bitte zuerst Stichpunkte oder einen Text eingeben.',1);return}
   var isEq=['eDesc','sDesc','pDesc','uDesc'].indexOf(ED_TARGET)>=0;
-  var body={text:text,kind:isEq?'equipment':'page'};
+  var isGuide=edIsGuideField(ED_TARGET);
+  var body={text:text,kind:isEq?'equipment':(isGuide?'guide':'page')};
   if(ED_TARGET==='eDesc')body.category=v('eCat');
-  if(EDIT_LEN_HINT[ED_TARGET])body.target_len=EDIT_LEN_HINT[ED_TARGET];
+  if(isGuide)body.field=ED_TARGET==='gMeta'?'meta_desc':(ED_TARGET==='gIntro'?'intro':'section');
+  var lh=lenHintFor(ED_TARGET);if(lh)body.target_len=lh;
   var btn=document.getElementById('edAiBtn');
   btn.disabled=true;btn.textContent='Wird generiert …';
   edHistPush(t.value);edTruncWarn(false);
@@ -10680,6 +10827,9 @@ function edLink(){
 function edApply(){
   var src=document.getElementById(ED_TARGET);
   if(src)src.value=document.getElementById('edArea').value;
+  /* .value= loest kein "input"-Event aus - die Zeichen-Ampel/Wortzahl im Hintergrund-
+     Fenster (Beitrags-Editor) muessen darum von Hand aktualisiert werden. */
+  if(src&&edIsGuideField(ED_TARGET)){guideInlineHint(ED_TARGET);guideWcUpdate()}
   edClearDraft();ED_TARGET=null;
   closeOvl2();
   toast('Übernommen – „Speichern" nicht vergessen.');

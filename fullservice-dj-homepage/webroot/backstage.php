@@ -143,7 +143,7 @@ if ($slug !== '') {
         title="Spotify-Playlist"></iframe></div>
     <?php endforeach; ?>
     <?php if (!empty($s['cta_label'])): ?>
-      <p style="margin-top:18px"><a class="btn" href="<?= rgEsc($g['cta_href'] ?: ($homeHref . '#anfrage')) ?>"><?= rgEsc($s['cta_label']) ?></a></p>
+      <p style="margin-top:18px"><a class="btn" href="<?= rgEsc($s['cta_href'] ?: ($g['cta_href'] ?: ($homeHref . '#anfrage'))) ?>"><?= rgEsc($s['cta_label']) ?></a></p>
     <?php endif; ?>
   </section>
 <?php endforeach; ?>

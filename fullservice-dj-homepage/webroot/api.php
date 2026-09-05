@@ -8678,6 +8678,7 @@ try {
     if (mb_strlen($text) > 4000) fail('Text ist zu lang (max. 4000 Zeichen).', 400);
     $kind = (string)($body['kind'] ?? 'page');
     $category = trim((string)($body['category'] ?? ''));
+    $field = (string)($body['field'] ?? '');
     $ai = aiConfigOrFail();
     $p = db();
     $cfg = json_decode((string)$p->query("select value from settings where key='ai'")->fetchColumn() ?: '{}', true) ?: [];
@@ -8694,6 +8695,24 @@ try {
         . 'Vermietungs-Artikeltext (ca. 2–4 Sätze) für die Produktseite eines DJ- und Veranstaltungstechnik-'
         . 'Verleihs. Zielgruppe sind Kunden, die dieses Gerät mieten möchten.';
       if ($category !== '') $style .= ' Kategorie: ' . $category . '.';
+    } elseif ($kind === 'guide') {
+      /* Backstage-Beitrag: die KI muss wissen, welches der drei Felder eines Blogartikels
+         sie gerade schreibt - eine Google-Meta-Beschreibung braucht eine ganz andere
+         Anweisung als ein Fließtext-Abschnitt. Ohne dieses Feld bekam die KI bisher fuer
+         alle drei denselben generischen Seitentext-Auftrag. */
+      if ($field === 'meta_desc') {
+        $style .= ' Du schreibst die Meta-Beschreibung (Google-Suchergebnis-Vorschau) für einen '
+          . 'Backstage-Blogbeitrag. Ein Satz, der zum Klicken einlädt und die Kernaussage des Beitrags '
+          . 'auf den Punkt bringt - keine Wiederholung der Überschrift, kein Clickbait.';
+      } elseif ($field === 'intro') {
+        $style .= ' Du schreibst die Einleitung eines Backstage-Blogbeitrags (steht direkt unter der '
+          . 'Überschrift). Sie soll neugierig auf den restlichen Beitrag machen, ohne die Überschrift '
+          . 'zu wiederholen oder den Beitrag schon vorwegzunehmen.';
+      } else {
+        $style .= ' Du schreibst einen Abschnitt eines Backstage-Blogbeitrags - einen gut lesbaren '
+          . 'Absatz, der sich flüssig an die vorherigen Abschnitte anschließt (auch wenn du sie nicht '
+          . 'siehst, geht es um denselben Beitrag).';
+      }
     } else {
       $style .= ' Mach aus dem gegebenen Stichpunkte-Text bzw. Rohtext einen ansprechenden Seiten- oder '
         . 'Werbetext. Halte dich dabei ungefähr an die Länge des Eingabetexts.';
@@ -8702,6 +8721,11 @@ try {
     if (count($targetLen) === 2 && is_numeric($targetLen[0]) && is_numeric($targetLen[1])) {
       $style .= sprintf(' Ziel-Länge des Textes: etwa %d bis %d Zeichen (nicht strikt, aber orientiere dich daran).',
         (int)$targetLen[0], (int)$targetLen[1]);
+      if ($kind === 'guide') {
+        $style .= ' Das ist eine Orientierung, keine harte Grenze - bei einem inhaltlich komplexen oder '
+          . 'erklärungsbedürftigen Thema darf der Text spürbar länger ausfallen, wenn es der '
+          . 'Verständlichkeit dient.';
+      }
     }
     try {
       $result = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $style, $text, 2000);
@@ -8785,6 +8809,75 @@ try {
     $j = json_decode($raw, true);
     if (!is_array($j) || empty($j['sections'])) fail('KI-Anfrage fehlgeschlagen: konnte keine Gliederung erzeugen.', 502);
     out($j);
+  }
+  /* Backstage: Volltext-Entwurf zu einem selbst vorgegebenen Thema - zweite Option NEBEN
+     ai/suggest-guide-outline (die bleibt bestehen: nur Stichpunkte, wenn Markus lieber
+     selbst formuliert). Hier schreibt die KI gleich fertigen Fliesstext je Feld/Abschnitt,
+     an denselben Wortzahl-Richtwerten orientiert wie edAiImprove() (kind=guide), inklusive
+     derselben Ausnahme fuer komplexe Themen. Markus bearbeitet das Ergebnis danach in der
+     Gesamtdokument-Ansicht nach statt bei null anzufangen. */
+  if ($path === 'ai/suggest-guide-draft' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $topic = trim((string)($body['topic'] ?? ''));
+    if ($topic === '') fail('Bitte zuerst ein Thema eingeben.', 400);
+    if (mb_strlen($topic) > 300) fail('Thema ist zu lang (max. 300 Zeichen).', 400);
+    $ai = aiConfigOrFail();
+    $system = 'Du schreibst einen kompletten Entwurf fuer einen Backstage-Blogbeitrag der Website eines '
+      . 'DJ- und Veranstaltungstechnik-Verleih-Betriebs. Backstage sind persoenliche Einblicke des '
+      . 'Betreibers in seine Arbeit, seinen Musikgeschmack und seine Erfahrungen - persoenlich, locker, '
+      . 'professionell, keine Floskeln, keine Emojis, Gedankenstrich als Halbgeviertstrich „–". Du '
+      . 'bekommst ein Thema und schreibst dazu: eine H1-Ueberschrift, einen Kicker, eine Meta-'
+      . 'Beschreibung fuer Google (ca. 150-160 Zeichen, ein Satz, der zum Klicken einlaedt), eine '
+      . 'Einleitung (ca. 250-600 Zeichen, macht neugierig, wiederholt die Ueberschrift nicht) sowie '
+      . '3-5 Abschnitte mit je einer Zwischenueberschrift, optional einem kurzen Untertitel und einem '
+      . 'fertig ausformulierten Absatztext (ca. 400-1000 Zeichen je Abschnitt, gut lesbar, schliesst '
+      . 'fluessig an den vorherigen Abschnitt an). Diese Laengen sind Orientierung, keine harte Grenze - '
+      . 'bei einem inhaltlich komplexen oder erklaerungsbeduerftigen Thema duerfen Abschnitte spuerbar '
+      . 'laenger ausfallen, wenn es der Verstaendlichkeit dient. Antworte AUSSCHLIESSLICH als kompaktes '
+      . 'JSON-Objekt ohne Markdown-Codeblock, exakt in der Form {"h1":"...","kicker":"...",'
+      . '"meta_desc":"...","intro":"...","sections":[{"heading":"...","subtitle":"...","text":"..."}]}.';
+    try {
+      $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $topic, 3000)['text'];
+    } catch (RuntimeException $e) { fail($e->getMessage(), 502); }
+    $raw = trim(preg_replace('#^```(?:json)?|```$#m', '', $raw));
+    $j = json_decode($raw, true);
+    if (!is_array($j) || empty($j['sections'])) fail('KI-Anfrage fehlgeschlagen: konnte keinen Entwurf erzeugen.', 502);
+    out($j);
+  }
+  /* Backstage: Fragen-Vorschlaege (Haeufige Fragen) fuer den GERADE bearbeiteten Beitrag -
+     anders als ai/suggest-faq (Website-weite FAQ) liest dieser Endpunkt nicht aus der DB,
+     sondern bekommt Titel/Einleitung/Abschnitte direkt vom Client mitgeschickt, weil ein
+     neuer, noch nicht gespeicherter Beitrag ebenfalls Fragen vorgeschlagen bekommen soll. */
+  if ($path === 'ai/suggest-guide-faq' && $method === 'POST') {
+    if (!currentUser()) fail('Nicht angemeldet.', 401);
+    $title = trim((string)($body['title'] ?? ''));
+    $intro = trim((string)($body['intro'] ?? ''));
+    $sectionsText = trim((string)($body['sections_text'] ?? ''));
+    $existing = (array)($body['existing'] ?? []);
+    if ($title === '' && $sectionsText === '') fail('Bitte zuerst Überschrift oder Abschnitte ausfüllen.', 400);
+    $ai = aiConfigOrFail();
+    $system = 'Du hilfst, die "Häufige Fragen"-Liste unter einem Backstage-Blogbeitrag einer DJ- und '
+      . 'Veranstaltungstechnik-Verleih-Website zu ergänzen. Du bekommst Titel, Einleitung und die '
+      . 'Abschnittstexte des Beitrags sowie bereits vorhandene Fragen. Schlage 1 bis 3 neue, sinnvolle '
+      . 'Fragen samt kurzer, passender Antwort vor, die inhaltlich zum Beitrag passen und sich klar von '
+      . 'den vorhandenen Fragen unterscheiden. Antworte AUSSCHLIESSLICH als kompaktes JSON-Array ohne '
+      . 'Markdown-Codeblock, jedes Element exakt in der Form {"q":"...","a":"..."}. Die Antworten im Ton '
+      . 'von ' . (ownerName() ?: 'dem Inhaber') . (companyName() ? ' (' . companyName() . ')' : '') . ': persönlich, locker, professionell, '
+      . 'keine Floskeln, Gedankenstrich als Halbgeviertstrich „–", ca. 1–3 Sätze je Antwort.';
+    $existingText = implode("\n", array_map(function ($f) { return (string)($f['q'] ?? ''); }, $existing));
+    $userText = "Titel: $title\nEinleitung: $intro\n\nAbschnitte:\n" . mb_substr($sectionsText, 0, 4000)
+      . "\n\nBereits vorhandene Fragen (nicht wiederholen):\n" . ($existingText !== '' ? $existingText : '(noch keine)');
+    try {
+      $raw = aiCallLLM($ai['provider'], $ai['apiKey'], $ai['baseUrl'], $ai['model'], $ai['workspaceId'], $system, $userText, 900)['text'];
+    } catch (RuntimeException $e) { fail($e->getMessage(), 502); }
+    $raw = trim(preg_replace('#^```(?:json)?|```$#m', '', $raw));
+    $j = json_decode($raw, true);
+    if (!is_array($j)) fail('KI-Anfrage fehlgeschlagen: konnte keine Fragen erzeugen.', 502);
+    $out = [];
+    foreach ($j as $item) if (!empty($item['q']) && !empty($item['a']))
+      $out[] = ['q' => trim((string)$item['q']), 'a' => trim((string)$item['a'])];
+    if (!$out) fail('KI-Anfrage fehlgeschlagen: konnte keine Fragen erzeugen.', 502);
+    out($out);
   }
   /* Backstage: SEO-Check eines selbst geschriebenen Beitrags - gibt NUR Vorschlaege
      zurueck, schreibt den Text nicht um (bewusst getrennt vom KI-Textassistenten/
