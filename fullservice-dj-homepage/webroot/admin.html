@@ -1454,7 +1454,24 @@ document.addEventListener('change',function(e){
     if(kept.length<files.length)toast(kept.length+' von '+files.length+' Datei(en) bereit, Rest wurde übersprungen.',1);
     var dt=new DataTransfer();
     kept.forEach(function(f){dt.items.add(f)});
-    inp.files=dt.files;
+    /* Ein einfaches "inp.files=dt.files" schlaegt in manchen (v. a. aelteren mobilen)
+       Browsern lautlos fehl, weil "files" dort nur eine lesbare Eigenschaft ohne echten
+       Setter ist - keine Fehlermeldung, aber inp.files bleibt unveraendert und der
+       anschliessende Upload haette dann doch wieder die Original-HEIC-Dateien gesehen.
+       defineProperty ueberschreibt die Eigenschaft direkt an diesem Element und
+       funktioniert zuverlaessig unabhaengig vom nativen Setter. */
+    try{
+      Object.defineProperty(inp,'files',{value:dt.files,configurable:true});
+    }catch(err){
+      console.error('Konnte umgewandelte Datei(en) nicht in das Auswahlfeld zurückschreiben:',err);
+      toast('Die umgewandelten Fotos konnten in diesem Browser nicht automatisch übernommen werden. Bitte die Seite neu laden und erneut versuchen.',1);
+      return;
+    }
+    if(!inp.files||inp.files.length!==kept.length){
+      console.error('inp.files nach defineProperty unerwartet:',inp.files);
+      toast('Die umgewandelten Fotos konnten in diesem Browser nicht automatisch übernommen werden. Bitte die Seite neu laden und erneut versuchen.',1);
+      return;
+    }
     inp.dispatchEvent(new Event('change',{bubbles:true}));
   });
 },true);
