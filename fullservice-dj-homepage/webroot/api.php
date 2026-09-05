@@ -8709,9 +8709,21 @@ try {
           . 'Überschrift). Sie soll neugierig auf den restlichen Beitrag machen, ohne die Überschrift '
           . 'zu wiederholen oder den Beitrag schon vorwegzunehmen.';
       } else {
-        $style .= ' Du schreibst einen Abschnitt eines Backstage-Blogbeitrags - einen gut lesbaren '
-          . 'Absatz, der sich flüssig an die vorherigen Abschnitte anschließt (auch wenn du sie nicht '
-          . 'siehst, geht es um denselben Beitrag).';
+        /* field === 'article' (Gesamtdokument-Ansicht im Backoffice, siehe admin.html gBody):
+           der komplette Artikeltext mit "## Ueberschrift"-Zeilen als Abschnittsmarkierungen wird
+           in EINEM Stueck geschickt, damit die KI den ganzen Beitrag zusammenhaengend schreiben/
+           verbessern kann statt nur einen isolierten Abschnitt zu sehen. Kein target_len fuer
+           dieses Feld (siehe lenHintFor() in admin.html - gBody hat keinen EDIT_LEN_HINT-Eintrag,
+           eine Zeichen-Zielspanne passt nicht zu einer Wortzahl-Richtgroesse fuer einen ganzen
+           Artikel), daher die Wortzahl-Empfehlung direkt hier im Prompt statt ueber target_len. */
+        $style .= ' Du bekommst den kompletten Text eines Backstage-Blogbeitrags mit mehreren Abschnitten - '
+          . 'Abschnittsüberschriften stehen als eigene Zeilen im Format "## Überschrift". Schreibe bzw. '
+          . 'verbessere den GESAMTEN Artikel als ein zusammenhängendes Stück: erhalte die "## Überschrift"-'
+          . 'Zeilen an ihrer Stelle (die Überschrift selbst darfst du bei Bedarf leicht anpassen), und '
+          . 'schreibe darunter gut lesbaren Fließtext, der sich zwischen den Abschnitten liest wie aus '
+          . 'einem Guss. Richtwert für die Gesamtlänge: etwa 500 bis 1500 Wörter - das ist eine '
+          . 'Orientierung, keine harte Grenze; bei einem inhaltlich komplexen oder erklärungsbedürftigen '
+          . 'Thema darf der Artikel spürbar länger ausfallen, wenn es der Verständlichkeit dient.';
       }
     } else {
       $style .= ' Mach aus dem gegebenen Stichpunkte-Text bzw. Rohtext einen ansprechenden Seiten- oder '
