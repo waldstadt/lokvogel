@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /portal.html
+Disallow: /api.php
+Disallow: /deploy.php
+Disallow: /data/
+Disallow: /uploads/
+
+Sitemap: https://lauschgift.net/sitemap.php

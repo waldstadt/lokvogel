@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Technik mieten – Mietpark | Lauschgift Veranstaltungstechnik Hemer</title>
+<link rel="canonical" href="https://lauschgift.net/mieten.html">
+<meta name="description" content="Ton- und Lichttechnik mieten in Hemer: Mischpulte, Lautsprecher, Mikrofone, Licht und mehr – nach Kategorie durchsuchen, in den Tourcase legen, Anfrage abschicken.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%233cc8b4'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
+
+<link href="fonts.css" rel="stylesheet">
+<script src="theme.js"></script>
+<script src="kontakt.js"></script>
+<script>applyCachedTheme('technik')</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.ic{width:17px;height:17px;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block}
+
+:root{
+  --bg:#0e1213; --bg2:#131819; --card:#181e20; --line:#26302f;
+  --acc:#3cc8b4; --acc2:#5fdcc9; --txt:#eef2f0; --mut:#9aa8a3; --mut2:#899692;
+}
+html{scroll-behavior:smooth;scroll-padding-top:88px}/* scroll-padding-top: sonst beginnt ein angesprungener Abschnitt unter der
+   fest stehenden Menueleiste. */
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4,.gro{font-family:'Space Grotesk',sans-serif;letter-spacing:-.01em}
+a{color:var(--acc-txt);text-decoration:none}
+img{max-width:100%;display:block}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+section{padding:60px 0 88px}
+.kicker{font-family:'Space Grotesk',sans-serif;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);margin-bottom:14px;font-weight:600}
+.kicker::before{content:"";display:inline-block;width:22px;height:2px;background:var(--acc);vertical-align:middle;margin-right:10px}
+h1{font-size:clamp(30px,4.6vw,44px);font-weight:700;line-height:1.12;margin-bottom:18px;letter-spacing:-.02em}
+.lead{color:var(--mut);max-width:640px}
+
+.logo{display:flex;align-items:center;gap:9px;color:var(--txt)}
+.logo svg{width:26px;height:26px;flex-shrink:0}
+.logo .wm{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;letter-spacing:-.02em}
+.logo .wm i{font-style:normal;color:var(--acc-txt)}
+.logo .wm small{display:block;font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);line-height:1.2}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--nav-bg);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav-in{max-width:1080px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.nav-links{display:flex;gap:20px;align-items:center;flex-wrap:nowrap}
+.nav-links a{color:var(--mut);font-size:13px;letter-spacing:.03em;transition:color .2s;white-space:nowrap}
+.nav-links a:hover{color:var(--txt)}
+.nav-links a.cur{color:var(--txt)}
+.btn{display:inline-block;background:var(--acc);color:var(--btn-txt);padding:13px 28px;font-size:13px;font-weight:600;letter-spacing:.04em;border:none;border-radius:3px;cursor:pointer;transition:background .2s;font-family:'Space Grotesk',sans-serif}
+.btn:hover{background:var(--acc2)}
+.btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--acc-txt);color:var(--acc-txt);background:transparent}
+.btn.small{padding:9px 18px;font-size:12px}
+.nav-links .btn{color:var(--btn-txt)}
+.burger{display:none;background:none;border:none;color:var(--txt);font-size:24px;cursor:pointer}
+@media(max-width:1024px){
+  .nav-links{display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);flex-direction:column;padding:20px;gap:18px;border-bottom:1px solid var(--line)}
+  .nav-links.open{display:flex}
+  .burger{display:block}
+}
+
+.cats{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
+.cat-chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mut);border:1px solid var(--line);border-radius:3px;padding:8px 15px;cursor:pointer;transition:border-color .2s,color .2s,background .2s;background:transparent;font-family:inherit;margin:0}
+.cat-chip:hover{border-color:var(--acc-txt);color:var(--txt)}
+.cat-chip.active{border-color:var(--acc-txt);color:var(--btn-txt);background:var(--acc)}
+.cat-chip svg{width:14px;height:14px}
+
+.rent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:18px;margin-top:28px}
+.cat-head{grid-column:1/-1;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);border-bottom:1px solid var(--line);padding-bottom:8px;margin-top:18px}
+.cat-head:first-child{margin-top:0}
+.cat-head span{color:var(--mut2);font-family:'Inter',sans-serif;font-weight:400;letter-spacing:0;text-transform:none;font-size:12px;margin-left:8px}
+.rent{background:var(--card);border:1px solid var(--line);border-radius:5px;overflow:hidden;transition:border-color .25s}
+.rent:hover{border-color:rgba(var(--acc-rgb),.5)}
+.rent .ri{aspect-ratio:4/3;background:var(--bg) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--mut2)}
+/* Set-Hauptbild ohne eigenes Foto: automatische Collage aus den Hauptbildern der enthaltenen Artikel */
+.rent .ri.set-collage{display:grid;gap:1px;background:var(--line);grid-auto-rows:1fr;align-items:stretch;justify-content:stretch}
+.rent .ri.set-collage>div{background:var(--bg) center/cover no-repeat;min-height:0;min-width:0}
+.rent .ri.set-collage.n1{grid-template-columns:1fr}
+.rent .ri.set-collage.n2{grid-template-columns:1fr 1fr}
+.rent .ri.set-collage.n3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.rent .ri.set-collage.n3>div:first-child{grid-row:span 2}
+.rent .ri.set-collage.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.rent .ri svg{width:38px;height:38px;stroke-width:1.6}
+.rent .rb{padding:18px 20px}
+.rent h4{font-size:16px;font-weight:700;margin-bottom:4px}
+.rent .rc{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc-txt);margin-bottom:8px;font-weight:600}
+.rent p{font-size:13px;color:var(--mut);margin-bottom:12px;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.rent.clickable{cursor:pointer}
+.rent .addon .addon-link{cursor:pointer;color:var(--acc-txt);font-weight:600}
+.rent .addon .addon-link:hover{color:var(--acc2);text-decoration:underline}
+.rent .addon .addon-link b{color:inherit}
+.rent .rp{font-size:15px;font-weight:600}
+.rent .rp small{color:var(--mut2);font-weight:400;font-size:12px}
+.rent-note{margin-top:24px;font-size:13px;color:var(--mut2)}
+.rent .avail{font-size:11px;font-weight:600;margin-top:8px}
+.rent .avail.ok{color:var(--ok)}.rent .avail.no{color:var(--err)}
+.rent .old{color:var(--mut2);text-decoration:line-through;font-weight:400;font-size:12px;margin-right:6px}
+.rent .addon{font-size:11px;color:var(--mut2);margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+.rent .addon b{color:var(--acc-txt);font-weight:600}
+.set-hint{font-size:11px;font-weight:600;color:var(--acc2);margin-top:8px}
+.set-avail{font-size:12.5px;color:var(--mut);margin-top:10px}
+.set-avail .addon-link{cursor:pointer;color:var(--acc-txt);font-weight:600}
+.set-avail .addon-link:hover{color:var(--acc2);text-decoration:underline}
+
+/* Am Wunschtermin belegt: sichtbar, aber ausgegraut - Badge bleibt in Volltonfarbe */
+.rent.unavail .ri{filter:grayscale(1);opacity:.45}
+.rent.unavail h4,.rent.unavail .rc,.rent.unavail .rp,.rent.unavail .addon{opacity:.62}
+.rent.unavail p{opacity:.75}
+.avail.checking{font-size:12px;color:var(--mut);margin-top:10px}
+.badge-gone{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;font-weight:700;letter-spacing:.02em;background:#c0392b;color:#fff;padding:6px 11px;border-radius:3px}
+.badge-req{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:11.5px;font-weight:600;color:var(--acc-txt);background:rgba(var(--acc-rgb),.12);border:1px solid rgba(var(--acc-rgb),.35);padding:5px 10px;border-radius:3px}
+.badge-gone .ic,.badge-req .ic{width:14px;height:14px;vertical-align:-2px}
+.rent .cart-warn{font-size:11px;color:var(--err);margin-top:8px}
+
+input,select,textarea{width:100%;padding:13px 15px;background:var(--bg);border:1px solid var(--line);color:var(--txt);font:inherit;font-size:15px;outline:0;margin-bottom:18px;border-radius:4px;transition:border-color .2s}
+::placeholder{color:var(--mut);font-style:italic;opacity:1}
+input:focus,select:focus,textarea:focus{border-color:var(--acc-txt)}
+label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:0 0 6px;font-weight:600}
+
+footer{border-top:1px solid var(--line);padding:40px 0;font-size:13px;color:var(--mut2)}
+.foot-in{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+footer a{color:var(--mut)}
+footer a:hover{color:var(--acc-txt)}
+
+.msg{padding:12px 14px;font-size:13px;margin-bottom:14px;display:none;border:1px solid;border-radius:4px}
+.msg.ok{display:block;border-color:var(--ok-line);background:var(--ok-bg);color:var(--ok)}
+.msg.err{display:block;border-color:var(--err-line);background:var(--err-bg);color:var(--err)}
+
+/* ---- Tourcase (Warenkorb) ---- */
+.tc-fab{position:fixed;right:22px;bottom:22px;z-index:170;background:var(--acc);color:var(--btn-txt);border:none;border-radius:4px;padding:15px 22px 15px 18px;display:flex;align-items:center;gap:9px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 8px 24px var(--shadow);transition:background .2s,transform .2s}
+.tc-fab:hover{background:var(--acc2);transform:translateY(-1px)}
+.tc-fab svg{width:19px;height:19px;stroke-width:2.2}
+.tc-fab .tc-count{background:var(--btn-txt);color:var(--acc-txt);border-radius:3px;padding:1px 8px;font-size:12px;min-width:20px;text-align:center}
+.tc-panel{position:fixed;top:0;right:-420px;width:400px;max-width:92vw;height:100%;background:var(--bg2);border-left:1px solid var(--line);z-index:160;overflow-y:auto;transition:right .3s ease;padding:26px 22px 100px}
+.tc-panel.open{right:0}
+.tc-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:155;display:none}
+.tc-backdrop.open{display:block}
+/* Mobil liegt der Tourcase-Knopf (z-index 170) ueber dem offenen Seitenfenster und
+   verdeckte dort den Absenden-Knopf - solange das Fenster offen ist, weicht er aus. */
+@media(max-width:700px){body.tc-open .tc-fab{display:none}}
+.tc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.tc-head h3{font-size:19px}
+.tc-head h3 span{display:block;font-size:12px;font-weight:400;color:var(--mut);letter-spacing:0;text-transform:none;margin-top:2px}
+.tc-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
+.tc-dates input{margin-bottom:0}
+.tc-dates label{margin-bottom:4px}
+.tc-close{background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer;line-height:1}
+.tc-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;gap:10px}
+.tc-item span:first-child{flex:1}
+
+/* ---- Produktfenster (Detail-Modal) ---- */
+.pm-bg{position:fixed;inset:0;background:var(--overlay);z-index:210;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:40px 16px}
+.pm-win{max-width:860px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:6px;position:relative}
+.pm-close{position:absolute;top:12px;right:12px;z-index:3;background:var(--card);border:1px solid var(--line);color:var(--txt);width:36px;height:36px;border-radius:4px;font-size:19px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center}
+.pm-close:hover{border-color:var(--acc-txt);color:var(--acc-txt)}
+.pm-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:26px;padding:26px}
+.pm-main{position:relative;aspect-ratio:4/3;background:var(--bg);border-radius:5px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.pm-main img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pm-fallback{display:flex;align-items:center;justify-content:center;color:var(--mut2)}
+.pm-fallback svg{width:66px;height:66px;stroke-width:1.4;stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.pm-thumbs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.pm-thumb{width:66px;aspect-ratio:4/3;padding:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;cursor:pointer;background:var(--bg)}
+.pm-thumb.active{border-color:var(--acc-txt)}
+.pm-thumb img{width:100%;height:100%;object-fit:cover}
+.pm-info .rc{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc-txt);margin-bottom:8px;font-weight:600}
+.pm-info h3{font-size:22px;font-weight:700;margin-bottom:10px;line-height:1.2}
+.pm-info .rp{font-size:17px;font-weight:600}
+.pm-info .rp .old{color:var(--mut2);text-decoration:line-through;font-weight:400;font-size:13px;margin-right:6px}
+.pm-info .rp small{color:var(--mut2);font-weight:400;font-size:12px}
+.pm-desc{color:var(--mut);font-size:14px;line-height:1.7;margin:14px 0;white-space:pre-wrap}
+.pm-cart{margin-top:16px;display:flex;gap:8px;align-items:center}
+.pm-cart input{margin:0;width:66px;padding:9px}
+.pm-cart .btn{white-space:nowrap}
+.pm-addons{border-top:1px solid var(--line);padding:22px 26px 28px}
+.pm-h{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);margin-bottom:14px}
+.pm-addon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px}
+.pm-addon{display:flex;flex-direction:column;text-align:left;gap:8px;background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:10px;cursor:pointer;color:var(--txt);font:inherit}
+.pm-addon:hover{border-color:var(--acc-txt)}
+.pm-addon-img{position:relative;aspect-ratio:4/3;background:var(--bg) center/cover no-repeat;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--mut2)}
+.pm-addon-img svg{width:30px;height:30px;stroke-width:1.5;stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.pm-addon-name{font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:600;line-height:1.25}
+.pm-addon-price{font-size:12px;color:var(--acc-txt);font-weight:600}
+.pm-addon-price small{color:var(--mut2);font-weight:400}
+/* Set-Produktfenster: Collage im Hauptbild + Liste der enthaltenen Artikel mit Info */
+.pm-main.pm-collage{display:grid;gap:1px;background:var(--line);grid-auto-rows:1fr;align-items:stretch;justify-content:stretch;padding:0}
+.pm-main.pm-collage>div{background:var(--bg) center/cover no-repeat;min-height:0;min-width:0}
+.pm-main.pm-collage.n1{grid-template-columns:1fr}
+.pm-main.pm-collage.n2{grid-template-columns:1fr 1fr}
+.pm-main.pm-collage.n3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.pm-main.pm-collage.n3>div:first-child{grid-row:span 2}
+.pm-main.pm-collage.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.pm-items{display:flex;flex-direction:column;gap:10px}
+.pm-item{display:flex;gap:12px;align-items:flex-start;text-align:left;background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:10px;cursor:pointer}
+.pm-item:hover{border-color:var(--acc-txt)}
+.pm-item-img{flex:none;width:64px;aspect-ratio:4/3;background:var(--bg) center/cover no-repeat;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--mut2)}
+.pm-item-img svg{width:24px;height:24px;stroke-width:1.5;stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.pm-item-txt{min-width:0}
+.pm-item-name{font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:600;line-height:1.3;color:var(--txt)}
+.pm-item-desc{font-size:12px;color:var(--mut);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* Mobil: kompakte Zeilen statt hoher Karten + wischbare, mitlaufende Kategorie-Leiste */
+@media(max-width:700px){
+  .cats{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;position:sticky;top:57px;z-index:90;background:var(--bg);padding:10px 0;scrollbar-width:none}
+  .cats::-webkit-scrollbar{display:none}
+  .cat-chip{flex-shrink:0;white-space:nowrap}
+  .rent-grid{grid-template-columns:1fr;gap:12px}
+  .rent{display:grid;grid-template-columns:132px 1fr;align-items:start}
+  /* Artikelbilder bleiben auch mobil im Querformat (4:3) - Technik fotografiert man quer */
+  .rent .ri{width:112px;aspect-ratio:4/3;height:auto;margin:14px 0 14px 14px;border-radius:4px}
+  .rent .ri svg{width:26px;height:26px}
+  .rent .rb{padding:12px 14px}
+  .rent h4{font-size:15px}
+  .rent p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12.5px;margin-bottom:8px}
+  .rent .addon{display:none}
+  .cat-head{margin-top:14px}
+  .pm-bg{padding:0}
+  .pm-win{border-radius:0;min-height:100%}
+  .pm-grid{grid-template-columns:1fr;padding:16px 16px 4px;gap:16px}
+  .pm-addons{padding:16px}
+  .pm-addon-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav id="nav">
+  <div class="nav-in">
+    <a class="logo" href="technik.html#top" aria-label="Lauschgift Veranstaltungstechnik">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>
+      <span class="wm">lauschgift<i>.</i><small>Veranstaltungstechnik</small></span>
+    </a>
+    <button class="burger" onclick="navToggle()" aria-label="Menü">☰</button>
+    <div class="nav-links" id="nl">
+      <a href="technik.html#fuer-wen">Für wen</a>
+      <a href="mieten.html" class="cur">Technik mieten</a>
+      <a href="technik.html#techniker">Techniker buchen</a>
+      <a href="technik.html#installation">Installation</a>
+      <a href="technik.html#partner">Für Kollegen</a>
+      <a href="technik.html#workshops">Workshops</a>
+      <a href="technik.html#konditionen">Konditionen</a>
+      <a href="index.html" class="switch"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg> Zur DJ-Seite</a>
+      <a href="technik.html#anfrage" class="btn small">Anfragen</a>
+    </div>
+  </div>
+</nav>
+
+<section id="katalog" style="padding-top:120px">
+  <div class="wrap">
+    <div class="kicker">Mietpark</div>
+    <h1 id="rentTitle">Technik mieten</h1>
+    <p class="lead" id="rentText">Von der Anlage für Redenbeiträge bis zu LED-Spots für die Raumdeko – alles gewartet, geprüft und mit kurzer Einweisung bei der Abholung.</p>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:26px">
+      <div><label for="avFrom">Von</label><input type="date" id="avFrom" style="margin:0;width:auto"></div>
+      <div><label for="avTo">Bis</label><input type="date" id="avTo" style="margin:0;width:auto"></div>
+      <button class="btn g" onclick="checkAvail()">Verfügbarkeit prüfen</button>
+      <span class="sub" id="partnerBadge" style="font-size:13px;color:var(--mut)"></span>
+    </div>
+    <div id="priceToggleWrap" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px">
+      <span class="sub" style="font-size:13px">Preise anzeigen als:</span>
+      <button class="btn small" id="ptBrutto" onclick="setPriceMode('brutto')">Privatkunde (inkl. MwSt.)</button>
+      <button class="btn small ghost" id="ptNetto" onclick="setPriceMode('netto')">Firmenkunde (netto)</button>
+    </div>
+
+    <div class="cats" id="catChips"></div>
+
+    <div class="rent-grid" id="rentGrid" style="margin-top:24px"></div>
+    <p class="rent-note" id="priceNote">Alle Preise inkl. MwSt. Ab 1 Woche, 2 Wochen und 1 Monat gelten automatisch günstigere Tagessätze – die Staffel-Gesamtsumme seht ihr live im Tourcase.</p>
+    <div id="kontaktWege" style="margin-top:44px;padding-top:32px;border-top:1px solid var(--line);max-width:640px"></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-in">
+    <a class="logo" href="technik.html#top" style="opacity:.85">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>
+      <span class="wm" style="font-size:15px">lauschgift<i>.</i><small>Veranstaltungstechnik</small></span>
+    </a>
+    <div>© <span id="year"></span> <span id="footOwner">Markus Jankowski · Hemer</span> &nbsp;·&nbsp; <a href="technik.html">Zur Technik-Seite</a></div>
+    <div><a href="#" onclick="openLegal('impressum');return false">Impressum</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('datenschutz');return false">Datenschutz</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('agb');return false">AGB</a> &nbsp;·&nbsp; <a href="#" onclick="openLegal('widerrufsformular');return false">Widerrufsformular</a></div>
+  </div>
+</footer>
+
+<div id="legalBg" style="display:none;position:fixed;inset:0;background:var(--overlay);z-index:200;overflow-y:auto;padding:40px 16px" onclick="if(event.target===this)closeLegal()">
+  <div style="max-width:760px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:5px;padding:36px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h3 class="gro" id="legalTitle" style="font-size:22px"></h3>
+      <button onclick="closeLegal()" style="background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer">✕</button>
+    </div>
+    <div id="legalBody" style="white-space:pre-wrap;font-size:14px;color:var(--mut);line-height:1.75"></div>
+  </div>
+</div>
+
+<!-- Produktfenster: Detailansicht mit Bildergalerie, voller Beschreibung und passendem Zubehör -->
+<div id="prodBg" class="pm-bg" style="display:none" onclick="if(event.target===this)closeProductModal()">
+  <div class="pm-win" role="dialog" aria-modal="true" aria-label="Produktdetails">
+    <button class="pm-close" onclick="closeProductModal()" aria-label="Schließen">✕</button>
+    <div id="prodBody"></div>
+  </div>
+</div>
+
+<!-- Tourcase: schwebender Button + Slide-in-Panel statt fester Warenkorb-Box, damit es auf einer langen Katalogseite mit vielen Kategorien nicht im Weg ist -->
+<div class="tc-backdrop" id="tcBackdrop" onclick="closeTourcase()"></div>
+<button class="tc-fab" id="tcBtn" onclick="toggleTourcase()">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+  Tourcase<span class="tc-count" id="tcCount" style="display:none">0</span>
+</button>
+<div class="tc-panel" id="tcPanel">
+  <div class="tc-head">
+    <h3>Tourcase<span>Merkliste &amp; Anfrage</span></h3>
+    <button class="tc-close" onclick="closeTourcase()">✕</button>
+  </div>
+  <!-- Zeitraum auch hier: Auf dem Handy liegen die Datumsfelder oben auf der Seite weit
+       ausserhalb des Blickfelds, die Fehlermeldung "Zeitraum oben angeben" lief ins Leere. -->
+  <div class="tc-dates">
+    <div><label for="tcFrom">Von</label><input type="date" id="tcFrom" onchange="syncDates('tc')"></div>
+    <div><label for="tcTo">Bis</label><input type="date" id="tcTo" onchange="syncDates('tc')"></div>
+  </div>
+  <div class="sml" id="tcDateHint" style="color:var(--mut);margin-bottom:12px">Zeitraum wählen – dann rechne ich Verfügbarkeit und Preis gleich mit.</div>
+  <div id="cartItems"></div>
+  <div id="cartEmpty" style="display:none;color:var(--mut);font-size:14px;padding:20px 0">Noch nichts im Tourcase – einfach Artikel oder Sets auswählen und hinzufügen.</div>
+  <div id="cartTotalRow" style="display:none;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:15px">
+    <span id="cartTotalLabel">Gesamt (für den gewählten Zeitraum)</span><b id="cartTotal" style="font-size:19px"></b>
+  </div>
+  <div id="cartAuth" style="margin-top:18px"></div>
+  <p class="mut" style="font-size:12px;line-height:1.6;margin-top:14px">Das hier ist erst eine unverbindliche Anfrage, keine Zahlungspflicht. Bei der Übergabe gibt's eine kurze Einweisung, für Beschädigung/Verlust haftet ihr wie üblich beim Verleih – Details dazu in den <a href="#" onclick="openLegal('agb');return false">AGB</a>, die Höhe einer eventuellen Kaution steht spätestens im Angebot.</p>
+  <div class="msg" id="cartMsg" style="margin-top:14px"></div>
+  <div style="margin-top:14px" id="cartSubmitWrap"><button class="btn" id="cartSubmitBtn" onclick="submitCart()" style="width:100%">Anfrage abschicken</button></div>
+</div>
+
+<script>
+var API='api.php';
+document.getElementById('year').textContent=new Date().getFullYear();
+var WA_THEMA='zur Technik';
+var KW=Kontakt.mount(document.getElementById('kontaktWege'),{thema:'zum Mieten',page:'Mietpark',fallbackWa:'491791716970',lead:'Unsicher, was ihr braucht? Am schnellsten per WhatsApp. Oder ihr sagt mir, wann ich anrufen soll.'});
+/* Betreiber-Basisdaten (Name, Inhaber, Telefon, WhatsApp, Anschrift) aus den Einstellungen
+   des Backoffice - die festen Werte im HTML sind nur der Rueckfall fuer den ersten Aufbau. */
+var CO={};
+function coCity(){return String(CO.zip_city||'').replace(/^\d{4,5}\s*/,'')}
+function coWaHref(text){var d=CO.whatsapp_digits||'';return d?'https://wa.me/'+d+'?text='+encodeURIComponent(text):null}
+function coWaText(thema){return 'Hallo'+(CO.owner_first?' '+CO.owner_first:'')+', ich habe eine Frage '+thema+': '}
+function applyCompany(co){
+  CO=co||{};
+  var fo=document.getElementById('footOwner');
+  if(fo&&(CO.owner||coCity()))fo.textContent=[CO.owner,coCity()].filter(Boolean).join(' · ');
+  KW.update(CO);
+  var ad=document.getElementById('cAddr');
+  if(ad&&(CO.street||CO.zip_city))ad.textContent=[CO.street,CO.zip_city].filter(Boolean).join(', ');
+}
+fetch(API+'/public/company').then(function(r){return r.json()}).then(applyCompany).catch(function(){});
+
+
+/* maximumFractionDigits muss mit: Ohne die Angabe rundet der Browser auf 3 Stellen,
+   und die Netto-Umrechnung ergab Beträge wie "294,118 €". */
+/* Bildpfade und Positionsangaben landen in CSS-Deklarationen. Anfuehrungszeichen,
+   Klammern und Semikola dort erlauben es, die Deklaration zu verlassen und weitere
+   Regeln unterzuschieben - deshalb fliegen sie raus. */
+/* Menue auf dem Handy: nach dem Antippen eines Punktes wieder schliessen. Ohne das
+   bleibt es offen ueber dem Ziel liegen - der Besucher springt zum Formular und sieht
+   das Menue statt des Formulars. */
+function navToggle(){document.getElementById('nl').classList.toggle('open')}
+function navClose(){var n=document.getElementById('nl');if(n)n.classList.remove('open')}
+document.addEventListener('click',function(e){
+  var a=e.target.closest?e.target.closest('#nl a'):null;
+  if(a)navClose();
+});
+function cssUrl(u){return String(u==null?'':u).replace(/['"\\();]/g,'')}
+/* Vorschaubild-URL zu einer hochgeladenen Datei (siehe thumb.php) - fuer Kacheln und
+   kleine Sammelbilder, nicht fuer das grosse Hauptbild im Produktfenster. */
+function thumbUrl(u){return u&&u.indexOf('uploads/')>=0?u.replace('uploads/','uploads/.thumbs/'):u}
+function euro(n){return Number(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+/* Sicher als JS-String-Literal in Inline-onclick="fn('…')" – siehe admin.html */
+function jsq(s){return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n'))}
+var LEGAL={};
+
+/* Feather-Icons je Kategorie als Bild-Platzhalter, solange kein echtes Foto hinterlegt ist */
+var CAT_ICONS={
+  'Mischpult':'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  'DJ-Controller':'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>',
+  'Licht':'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+  'Instrumente':'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  'Mikrofon':'<path d="M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/>',
+  'Zubehör':'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  'Lautsprecher':'<rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="14" r="4"/><line x1="12" y1="6" x2="12.01" y2="6"/>',
+  'Nebel/Haze':'<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
+  'Video':'<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'
+};
+var CAT_ICON_DEFAULT='<line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>';
+function catIcon(cat){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(CAT_ICONS[cat]||CAT_ICON_DEFAULT)+'</svg>'}
+/* Auswählbare Platzhalter-Icons (falls kein Foto hinterlegt ist) – müssen mit admin.html übereinstimmen. */
+var PLACEHOLDERS={
+  stativ:{label:'Stativ',p:'<circle cx="12" cy="4" r="2"/><line x1="12" y1="6" x2="12" y2="13"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="12" y1="13" x2="5" y2="21"/><line x1="12" y1="13" x2="19" y2="21"/><line x1="12" y1="13" x2="12" y2="21"/>'},
+  lautsprecher:{label:'Lautsprecher',p:'<rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="15" r="3.5"/><circle cx="12" cy="6" r="1.2"/>'},
+  movinghead:{label:'Moving Head',p:'<rect x="6" y="20" width="12" height="2" rx="1"/><path d="M8 20v-5"/><path d="M16 20v-5"/><circle cx="12" cy="10" r="4"/><line x1="12" y1="6" x2="12" y2="2"/>'},
+  scheinwerfer:{label:'Scheinwerfer',p:'<path d="M4 6h10l4 3v2H4z"/><line x1="18" y1="9" x2="21" y2="7"/><line x1="18" y1="11" x2="21" y2="12"/><line x1="9" y1="13" x2="9" y2="20"/><line x1="6" y1="20" x2="12" y2="20"/>'},
+  kabel:{label:'Kabel',p:'<path d="M6 4v4a3 3 0 0 0 3 3h6a3 3 0 0 1 3 3v6"/><line x1="4" y1="3" x2="4" y2="6"/><line x1="8" y1="3" x2="8" y2="6"/><line x1="16" y1="21" x2="16" y2="18"/><line x1="20" y1="21" x2="20" y2="18"/>'},
+  leinwand:{label:'Leinwand',p:'<line x1="3" y1="4" x2="21" y2="4"/><rect x="4" y="4" width="16" height="11" rx="1"/><line x1="12" y1="15" x2="12" y2="20"/><line x1="8" y1="20" x2="16" y2="20"/>'},
+  nebelmaschine:{label:'Nebelmaschine',p:'<rect x="3" y="12" width="12" height="8" rx="1"/><circle cx="6" cy="16" r="1"/><path d="M15 14c2 0 2-2 4-2s2 2 4 2"/><path d="M15 18c2 0 2-2 4-2"/>'},
+  mikrofon:{label:'Mikrofon',p:'<path d="M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/>'},
+  instrument:{label:'Instrument',p:'<circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M9 18V6l12-2v12"/>'}
+};
+function phIcon(key){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+PLACEHOLDERS[key].p+'</svg>'}
+/* Icon eines Artikels: gewähltes Platzhalter-Icon, sonst Kategorie-Icon. */
+function itemIcon(e){return (e&&e.placeholder&&PLACEHOLDERS[e.placeholder])?phIcon(e.placeholder):catIcon(e&&e.category)}
+
+var EQ=[],SETS=[],SET_ITEMS=[],EQ_ALL={};
+var PARTNER=JSON.parse(sessionStorage.getItem('lg_partner')||'null');
+var AVAIL={};
+var CART=JSON.parse(localStorage.getItem('lg_cart')||'[]');
+var CUST=JSON.parse(localStorage.getItem('lg_cust')||'null');
+var CUR_CAT='Alle';
+
+function partnerPrice(e){
+  if(!PARTNER)return null;
+  if(e.partner_rate!=null)return Number(e.partner_rate);
+  return Math.round(Number(e.day_rate||0)*(100-PARTNER.discount_pct))/100;
+}
+/* Spiegelt die Rabattstaffel aus api.php (rentalPrice()) für die Live-Vorschau; der Server rechnet beim Absenden verbindlich nach. */
+function rentalDaysClient(from,to){
+  if(!to||to<=from)return 1;
+  return Math.round((new Date(to)-new Date(from))/86400000)+1;
+}
+function rentalPriceClient(rate,days,followupPct,weekPct,twoWeekPct,monthPct){
+  if(days<=1)return rate;
+  var total=rate;
+  total+=(Math.min(days,7)-1)*rate*followupPct/100;
+  if(days>=8)total+=(Math.min(days,14)-7)*rate*weekPct/100;
+  if(days>=15)total+=(Math.min(days,30)-14)*rate*twoWeekPct/100;
+  if(days>=31)total+=(days-30)*rate*monthPct/100;
+  return total;
+}
+function priceLabel(dayRate,pp){
+  if(!dayRate&&pp==null)return 'Preis auf Anfrage';
+  var f=priceFactor();
+  return pp!=null?'<span class="old">'+euro((dayRate||0)*f)+'</span>'+euro(pp*f)+' <small>/ Miettag · Partnerpreis</small>':euro((dayRate||0)*f)+' <small>/ Miettag</small>';
+}
+function renderCatChips(){
+  var cats=[];
+  EQ.forEach(function(e){if(e.category&&cats.indexOf(e.category)===-1)cats.push(e.category)});
+  if(SETS.length)cats.push('Sets'); /* Sets ist eine Kategorie wie jede andere - alphabetisch einsortiert, nicht fest angepinnt */
+  cats.sort();
+  document.getElementById('catChips').innerHTML=['Alle'].concat(cats).map(function(c){
+    return '<button type="button" class="cat-chip'+(c===CUR_CAT?' active':'')+'" onclick="setCat(\''+jsq(c)+'\')">'+(c!=='Alle'?catIcon(c):'')+esc(c)+'</button>';
+  }).join('');
+}
+function setCat(c){CUR_CAT=c;renderCatChips();renderRent()}
+/* Feather-Icons für die Verfügbarkeits-Badges */
+function icReq(){return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'}
+function icGone(){return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>'}
+/* Gemeinsamer Verfügbarkeits-Status für Kachel und Produktfenster (eine Quelle, keine Divergenz) */
+function availState(e){
+  var onReq=!!e.on_request;
+  var dateChosen=!!(document.getElementById('avFrom')&&document.getElementById('avFrom').value);
+  /* Am Wunschtermin belegt: Zeitraum gewählt, Verfügbarkeit geladen, nichts frei und NICHT auf Anfrage */
+  var gone=!onReq&&!!e.id&&AVAIL[e.id]!=null&&!(AVAIL[e.id].available>0);
+  /* Solange die Prüfung für diesen Artikel noch läuft, gilt er als „unklar" und ist nicht buchbar
+     (fail-safe statt fail-open) – kein belegter Artikel soll im Ladefenster buchbar sein. */
+  var pending=!onReq&&!!e.id&&dateChosen&&AV_LOADING&&AVAIL[e.id]==null;
+  var inCart=!!e.id&&CART.some(function(c){return c.type!=='set'&&c.id===e.id});
+  return {onReq:onReq,gone:gone,pending:pending,inCart:inCart};
+}
+function availBadge(e,st){
+  if(st.onReq)return '<div class="badge-req">'+icReq()+'auf Anfrage verfügbar</div>';
+  if(st.gone){
+    var g='<div class="badge-gone">'+icGone()+'leider schon vermietet</div>';
+    if(st.inCart)g+='<div class="cart-warn">Liegt im Tourcase, ist aber am Wunschtermin nicht verfügbar.</div>';
+    return g;
+  }
+  if(st.pending)return '<div class="avail checking">Verfügbarkeit wird geprüft …</div>';
+  if(e.id&&AVAIL[e.id]!=null)return '<div class="avail ok">✓ Im Zeitraum verfügbar ('+AVAIL[e.id].available+' von '+AVAIL[e.id].total+')</div>';
+  return '';
+}
+/* Zubehör-Artikel eines Eintrags auflösen (bis 5 aus addon_ids, Fallback addon_id) */
+function allEquip(){
+  var seen={},out=[];
+  EQ.forEach(function(e){if(!seen[e.id]){seen[e.id]=1;out.push(e)}});
+  for(var k in EQ_ALL){if(!seen[k]){seen[k]=1;out.push(EQ_ALL[k])}}
+  return out;
+}
+function relOf(e,ownField,mirrorField){
+  /* Direkte Angabe plus die umgekehrte Angabe anderer Artikel – „passt dazu" und
+     „passend für" spiegeln sich gegenseitig, egal von welcher Seite gepflegt. */
+  var ids=(e[ownField]&&e[ownField].length?e[ownField].slice():(ownField==='addon_ids'&&e.addon_id?[e.addon_id]:[]));
+  allEquip().forEach(function(o){
+    if(o.id===e.id)return;
+    var m=o[mirrorField]||(mirrorField==='addon_ids'&&o.addon_id?[o.addon_id]:[]);
+    if(m&&m.indexOf(e.id)>=0&&ids.indexOf(o.id)<0)ids.push(o.id);
+  });
+  return ids.map(function(id){return EQ_ALL[id]||EQ.find(function(x){return x.id===id})}).filter(Boolean);
+}
+function addonItems(e){return relOf(e,'addon_ids','fits_ids')}   // „passt dazu"
+function fitsItems(e){return relOf(e,'fits_ids','addon_ids')}    // „passend für"
+/* Mindestabnahme: manche Artikel nur im Set (z. B. 6er). */
+function minQty(e){return Math.max(1,Number(e&&e.min_qty)||1)}
+function rentCard(e){
+  var img=e.image_url?' style="background-image:url(\''+cssUrl(thumbUrl(e.image_url))+'\');background-position:'+cssUrl(e.image_focal||'50% 50%')+'"':'';
+  var icon=e.image_url?'':itemIcon(e);
+  var pp=partnerPrice(e);
+  var price=priceLabel(e.day_rate,pp);
+  var st=availState(e);
+  var av=availBadge(e,st),cartCtrl='';
+  /* „Passt dazu"/„Passend für" nehmen zu viel Platz in der Kachel weg – stehen nur noch im Produktfenster. */
+  var addon='';
+  var mq=minQty(e);
+  var setHint=mq>1?'<div class="set-hint">Nur im '+mq+'er-Set (Mindestabnahme '+mq+' Stück, Preis je Stück)</div>':'';
+  /* Belegte und noch ungeprüfte Artikel sind nicht buchbar - keine Mengen-/Buttonzeile.
+     Der Klick auf die Steuerung darf das Produktfenster NICHT öffnen -> stopPropagation. */
+  if(e.id&&!st.gone&&!st.pending){
+    cartCtrl='<div onclick="event.stopPropagation()" style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
+      '<input type="number" min="'+mq+'" step="'+mq+'" value="'+mq+'" id="qty-'+esc(e.id)+'" style="margin:0;width:64px;padding:8px">'+
+      '<button class="btn small'+(st.inCart?' ghost':'')+'" onclick="addToCart(\''+jsq(e.id)+'\')">'+(st.inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>';
+  }
+  addon+=setHint;
+  var open=e.id?' clickable" tabindex="0" role="button" onclick="openProductModal(\''+jsq(e.id)+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openProductModal(\''+jsq(e.id)+'\')}"':'"';
+  /* Name als echter Link auf die eigene Artikel-Adresse (siehe technik-artikel.php) -
+     zaehlt fuer Google und laesst sich gezielt verlinken/empfehlen; Rest der Kachel
+     oeffnet weiterhin schnell das Produktfenster. */
+  var nameHtml=e.slug?'<a href="technik/'+esc(e.slug)+'" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none">'+esc(e.name)+'</a>':esc(e.name);
+  return '<div class="rent reveal vis'+(st.gone?' unavail':'')+open+'><div class="ri"'+img+'>'+icon+'</div><div class="rb">'+
+    (e.category?'<div class="rc">'+esc(e.category)+'</div>':'')+
+    '<h4>'+nameHtml+'</h4><p>'+esc(e.description||'')+'</p>'+
+    '<div class="rp">'+price+'</div>'+av+addon+cartCtrl+'</div></div>';
+}
+/* ---- Produktfenster (Detailansicht) ---- */
+var PROD_OPEN=null,SET_PROD_OPEN=null,GAL_IDX=0;
+/* Nur lokale/relative Bild-URLs zulassen – keine externen Hosts, kein javascript:/data: */
+function localImg(u){return typeof u==='string'&&u.trim()!==''&&!/^[a-z][a-z0-9+.-]*:/i.test(u)&&u.indexOf('//')!==0}
+function prodImages(e){
+  var imgs=(e.images&&e.images.length)?e.images:(e.image_url?[e.image_url]:[]);
+  return imgs.filter(localImg);
+}
+function findEq(id){return EQ_ALL[id]||EQ.find(function(x){return String(x.id)===String(id)})}
+function openProductModal(id){
+  var e=findEq(id);if(!e)return;
+  PROD_OPEN=e.id;SET_PROD_OPEN=null;GAL_IDX=0;
+  renderProductModal();
+  document.getElementById('prodBg').style.display='block';
+  document.body.style.overflow='hidden';
+}
+function closeProductModal(){
+  document.getElementById('prodBg').style.display='none';
+  PROD_OPEN=null;SET_PROD_OPEN=null;document.body.style.overflow='';
+}
+function galSet(i){GAL_IDX=i;renderProductModal()}
+function renderProductModal(){
+  var e=findEq(PROD_OPEN);
+  if(!e){closeProductModal();return}
+  var imgs=prodImages(e);
+  if(GAL_IDX>=imgs.length)GAL_IDX=0;
+  var fallback='<span class="pm-fallback">'+itemIcon(e)+'</span>';
+  var main='<div class="pm-main">'+fallback+
+    (imgs.length?'<img src="'+esc(imgs[GAL_IDX])+'" alt="'+esc(e.name)+'" loading="lazy" onerror="this.remove()">':'')+'</div>';
+  var thumbs='';
+  if(imgs.length>1){
+    thumbs='<div class="pm-thumbs">'+imgs.map(function(u,i){
+      return '<button type="button" class="pm-thumb'+(i===GAL_IDX?' active':'')+'" onclick="galSet('+i+')"><img src="'+esc(thumbUrl(u))+'" data-full="'+esc(u)+'" alt="" loading="lazy" onerror="if(this.dataset.full&&this.src!==this.dataset.full){this.onerror=null;this.src=this.dataset.full}else{this.style.visibility=\'hidden\'}"></button>';
+    }).join('')+'</div>';
+  }
+  var st=availState(e);
+  var price=priceLabel(e.day_rate,partnerPrice(e));
+  var mq=minQty(e);
+  var setHint=mq>1?'<div class="set-hint">Nur im '+mq+'er-Set (Mindestabnahme '+mq+' Stück, Preis je Stück)</div>':'';
+  var cartCtrl='';
+  if(e.id&&!st.gone&&!st.pending){
+    cartCtrl='<div class="pm-cart">'+
+      '<input type="number" min="'+mq+'" step="'+mq+'" value="'+mq+'" id="qty-m-'+esc(e.id)+'">'+
+      '<button class="btn'+(st.inCart?' ghost':'')+'" onclick="addToCart(\''+jsq(e.id)+'\',\'qty-m-'+jsq(e.id)+'\')">'+(st.inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>';
+  }
+  function relSection(title,list){
+    if(!list.length)return '';
+    return '<div class="pm-addons"><div class="pm-h">'+title+'</div><div class="pm-addon-grid">'+list.map(function(a){
+      var ai=prodImages(a)[0];
+      var thumb=ai?'<div class="pm-addon-img" style="background-image:url(\''+cssUrl(thumbUrl(ai))+'\')"></div>':'<div class="pm-addon-img">'+itemIcon(a)+'</div>';
+      var ap=PARTNER?partnerPrice(a):a.day_rate;
+      return '<button type="button" class="pm-addon" onclick="openProductModal(\''+jsq(a.id)+'\')">'+thumb+
+        '<span class="pm-addon-name">'+esc(a.name)+'</span>'+
+        '<span class="pm-addon-price">'+(ap!=null?'+ '+euro(ap*priceFactor())+' <small>/ Tag</small>':'Preis auf Anfrage')+'</span></button>';
+    }).join('')+'</div></div>';
+  }
+  var addonHtml=relSection('Passt dazu',addonItems(e))+relSection('Passend für',fitsItems(e));
+  var inSets=setsWith(e);
+  var setLine=inSets.length?'<div class="set-avail">Auch im Set erhältlich: '+inSets.map(function(s){
+    return '<a class="addon-link" onclick="scrollToSet(\''+jsq(s.id)+'\')"><b>'+esc(s.name)+'</b></a>';
+  }).join(', ')+'</div>':'';
+  document.getElementById('prodBody').innerHTML=
+    '<div class="pm-grid"><div class="pm-gallery">'+main+thumbs+'</div>'+
+    '<div class="pm-info">'+
+      (e.category?'<div class="rc">'+esc(e.category)+'</div>':'')+
+      '<h3>'+esc(e.name)+'</h3>'+
+      '<div class="rp">'+price+'</div>'+
+      availBadge(e,st)+
+      (e.description?'<div class="pm-desc">'+esc(e.description)+'</div>':'')+
+      setHint+setLine+cartCtrl+
+    '</div></div>'+addonHtml;
+}
+/* Sets, die diesen Artikel enthalten. */
+function setsWith(e){
+  if(!e||!e.id||!SETS.length)return [];
+  var seen={};SET_ITEMS.forEach(function(x){if(x.equipment_id===e.id)seen[x.set_id]=1});
+  return SETS.filter(function(s){return seen[s.id]});
+}
+function scrollToSet(id){
+  closeProductModal();
+  setCat('Sets');
+  var grid=document.getElementById('rentGrid');
+  if(grid)grid.scrollIntoView({behavior:'smooth',block:'start'});
+  var card=document.getElementById('qty-set-'+id);
+  if(card){var box=card.closest('.rent');if(box){box.style.transition='box-shadow .3s';box.style.boxShadow='0 0 0 2px var(--acc)';setTimeout(function(){box.style.boxShadow=''},1800);}}
+}
+function byName(a,b){return String(a.name||'').localeCompare(String(b.name||''),'de')}
+function renderRent(){
+  document.getElementById('partnerBadge').innerHTML=PARTNER?('Partnerpreise aktiv für <b style="color:var(--txt)">'+esc(PARTNER.name)+'</b>'):'';
+  var html;
+  if(CUR_CAT==='Alle'){
+    /* Gesamtansicht nach Kategorien gruppiert, damit die Liste scanbar bleibt - Sets als eigene
+       Gruppe wie jede andere Kategorie, nicht mehr fest oben angepinnt. */
+    var cats=[];
+    EQ.forEach(function(e){var c=e.category||'Sonstiges';if(cats.indexOf(c)===-1)cats.push(c)});
+    if(SETS.length)cats.push('Sets');
+    cats.sort();
+    if(cats.indexOf('Sonstiges')>-1){cats.splice(cats.indexOf('Sonstiges'),1);cats.push('Sonstiges')}
+    html=cats.map(function(c){
+      if(c==='Sets')return '<div class="cat-head">Sets<span>'+SETS.length+' Set'+(SETS.length>1?'s':'')+'</span></div>'+SETS.map(setCard).join('');
+      var items=EQ.filter(function(e){return (e.category||'Sonstiges')===c}).sort(byName);
+      return '<div class="cat-head">'+esc(c)+'<span>'+items.length+' Artikel</span></div>'+items.map(rentCard).join('');
+    }).join('');
+  } else if(CUR_CAT==='Sets'){
+    html=SETS.map(setCard).join('');
+  } else {
+    html=EQ.filter(function(e){return e.category===CUR_CAT}).sort(byName).map(rentCard).join('');
+  }
+  document.getElementById('rentGrid').innerHTML=html||'<p class="lead" style="margin-top:6px">In dieser Kategorie ist gerade nichts verfügbar.</p>';
+  renderCart();
+}
+renderRent();
+renderCatChips();
+
+function sfetch(path){
+  return fetch(API+'/rest/'+path).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()});
+}
+sfetch('equipment?select=*&public=eq.true&rentable=eq.true&status=eq.aktiv&order=sort').then(function(r){if(r.length){EQ=r;renderCatChips();renderRent()}}).catch(function(){});
+sfetch('equipment?select=*').then(function(r){r.forEach(function(e){EQ_ALL[e.id]=e})}).catch(function(){});
+
+/* Die hinterlegten Tagespreise sind bereits brutto (inkl. MwSt.) - das sieht der
+   Privatkunde (Standard) direkt. Firmenkunde kann auf netto umschalten, dafür wird
+   heruntergerechnet statt hochgerechnet. Reine Anzeigesache – das eigentliche Angebot
+   entsteht erst im Backoffice. */
+var PRICE_MODE=localStorage.getItem('lg_price_mode')||'brutto';
+var TAX_RATE=19,SMALL_BUSINESS=false;
+function priceFactor(){return(PRICE_MODE==='netto'&&!SMALL_BUSINESS&&TAX_RATE)?1/(1+TAX_RATE/100):1}
+function setPriceMode(m){
+  PRICE_MODE=m;localStorage.setItem('lg_price_mode',m);
+  updatePriceToggleUI();renderRent();renderCart();
+}
+function updatePriceToggleUI(){
+  var b=document.getElementById('ptBrutto'),n=document.getElementById('ptNetto');
+  if(!b)return;
+  b.className='btn small'+(PRICE_MODE==='brutto'?'':' ghost');
+  n.className='btn small'+(PRICE_MODE==='netto'?'':' ghost');
+  var note=document.getElementById('priceNote');
+  if(note)note.textContent=(PRICE_MODE==='brutto'&&!SMALL_BUSINESS?'Alle Preise inkl. MwSt.':'Alle Preise netto.')+' Ab 1 Woche, 2 Wochen und 1 Monat gelten automatisch günstigere Tagessätze – die Staffel-Gesamtsumme seht ihr live im Tourcase.';
+}
+fetch(API+'/public/tax-info').then(function(r){return r.json()}).then(function(j){
+  TAX_RATE=Number(j.tax_rate)||19;SMALL_BUSINESS=!!j.small_business;
+  var wrap=document.getElementById('priceToggleWrap');
+  if(wrap)wrap.style.display=SMALL_BUSINESS?'none':'flex';
+  updatePriceToggleUI();renderRent();renderCart();
+}).catch(function(){});
+
+/* ---- Sets: mehrere Artikel als ein buchbares Paket ---- */
+function setRawSum(s){
+  return SET_ITEMS.filter(function(x){return x.set_id===s.id}).reduce(function(sum,x){
+    var e=EQ_ALL[x.equipment_id];if(!e)return sum;
+    var rate=partnerPrice(e)!=null?partnerPrice(e):Number(e.day_rate||0);
+    return sum+rate*x.qty;
+  },0);
+}
+function setDayRate(s){
+  var raw=setRawSum(s);
+  return s.fixed_price!=null?Number(s.fixed_price):raw*(1-(Number(s.discount_pct)||0)/100);
+}
+/* Hauptbilder der enthaltenen Artikel (eindeutig, in Set-Reihenfolge) - Grundlage für die
+   automatische Collage, wenn das Set kein eigenes Foto hat. */
+function setItemImages(s){
+  var imgs=[];
+  SET_ITEMS.filter(function(x){return x.set_id===s.id}).forEach(function(x){
+    var e=EQ_ALL[x.equipment_id];
+    if(e&&e.image_url&&imgs.indexOf(e.image_url)<0)imgs.push(e.image_url);
+  });
+  return imgs;
+}
+function setImageArea(s){
+  if(s.image_url)
+    return '<div class="ri" style="background-image:url(\''+cssUrl(thumbUrl(s.image_url))+'\');background-position:'+cssUrl(s.image_focal||'50% 50%')+'"></div>';
+  var imgs=setItemImages(s).slice(0,4);
+  if(!imgs.length)return '<div class="ri">'+catIcon('')+'</div>';
+  return '<div class="ri set-collage n'+imgs.length+'">'+imgs.map(function(u){
+    return '<div style="background-image:url(\''+cssUrl(thumbUrl(u))+'\')"></div>';
+  }).join('')+'</div>';
+}
+/* Enthaltene Artikel eines Sets, in Set-Reihenfolge - {qty, e}. */
+function setItemsOf(s){
+  return SET_ITEMS.filter(function(x){return x.set_id===s.id}).map(function(x){
+    return {qty:x.qty,e:EQ_ALL[x.equipment_id]};
+  }).filter(function(it){return it.e});
+}
+/* Set-Hauptbild fürs Produktfenster - eigene Auszeichnung unabhängig von .rent (Kachel). */
+function setImageAreaModal(s){
+  if(s.image_url)
+    return '<div class="pm-main"><img src="'+esc(s.image_url)+'" alt="'+esc(s.name)+'" loading="lazy" style="object-position:'+cssUrl(s.image_focal||'50% 50%')+'" onerror="this.remove()"></div>';
+  var imgs=setItemImages(s).slice(0,4);
+  if(!imgs.length)return '<div class="pm-main"><span class="pm-fallback">'+catIcon('')+'</span></div>';
+  return '<div class="pm-main pm-collage n'+imgs.length+'">'+imgs.map(function(u){
+    return '<div style="background-image:url(\''+cssUrl(thumbUrl(u))+'\')"></div>';
+  }).join('')+'</div>';
+}
+/* Set-Kachel - gleiche Optik wie eine Artikel-Kachel (rentCard), Sets sind eine ganz normale
+   Kategorie ("Sets") und stehen nicht mehr fest über den anderen Kategorien. */
+function setCard(s){
+  var items=setItemsOf(s);
+  var contains=items.map(function(it){return (it.qty>1?it.qty+'× ':'')+it.e.name}).join(', ');
+  var rate=setDayRate(s);
+  var price=rate?euro(rate*priceFactor())+' <small>/ Miettag</small>':'Preis auf Anfrage';
+  var inCart=CART.some(function(c){return c.type==='set'&&c.set_id===s.id});
+  return '<div class="rent reveal vis clickable" tabindex="0" role="button" onclick="openSetProductModal(\''+jsq(s.id)+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openSetProductModal(\''+jsq(s.id)+'\')}">'+setImageArea(s)+'<div class="rb">'+
+    '<div class="rc">SET</div>'+
+    '<h4>'+esc(s.name)+'</h4><p>'+esc(s.description||'')+'</p>'+
+    (contains?'<div class="addon">Enthält: '+esc(contains)+'</div>':'')+
+    '<div class="rp">'+price+'</div>'+
+    '<div onclick="event.stopPropagation()" style="margin-top:10px;display:flex;gap:8px;align-items:center">'+
+    '<input type="number" min="1" value="1" id="qty-set-'+s.id+'" style="margin:0;width:60px;padding:8px">'+
+    '<button class="btn small'+(inCart?' ghost':'')+'" onclick="addSetToCart(\''+jsq(s.id)+'\')">'+(inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>'+
+    '</div></div>';
+}
+/* ---- Set-Produktfenster: volle Beschreibung + Artikelinfos aller enthaltenen Geräte ---- */
+function findSet(id){return SETS.find(function(x){return String(x.id)===String(id)})}
+function openSetProductModal(id){
+  var s=findSet(id);if(!s)return;
+  SET_PROD_OPEN=s.id;PROD_OPEN=null;
+  renderSetProductModal();
+  document.getElementById('prodBg').style.display='block';
+  document.body.style.overflow='hidden';
+}
+function renderSetProductModal(){
+  var s=findSet(SET_PROD_OPEN);
+  if(!s){closeProductModal();return}
+  var rate=setDayRate(s);
+  var price=rate?euro(rate*priceFactor())+' <small>/ Miettag</small>':'Preis auf Anfrage';
+  var inCart=CART.some(function(c){return c.type==='set'&&c.set_id===s.id});
+  var cartCtrl='<div class="pm-cart">'+
+    '<input type="number" min="1" value="1" id="qty-set-m-'+esc(s.id)+'">'+
+    '<button class="btn'+(inCart?' ghost':'')+'" onclick="addSetToCart(\''+jsq(s.id)+'\',\'qty-set-m-'+jsq(s.id)+'\')">'+(inCart?'Im Tourcase ✓':'In den Tourcase')+'</button></div>';
+  var items=setItemsOf(s);
+  var itemsHtml=items.length?'<div class="pm-addons"><div class="pm-h">Enthaltene Artikel</div><div class="pm-items">'+items.map(function(it){
+    var img=prodImages(it.e)[0];
+    var thumb=img?'<div class="pm-item-img" style="background-image:url(\''+cssUrl(img)+'\')"></div>':'<div class="pm-item-img">'+itemIcon(it.e)+'</div>';
+    return '<div class="pm-item" onclick="openProductModal(\''+jsq(it.e.id)+'\')">'+thumb+
+      '<div class="pm-item-txt"><div class="pm-item-name">'+(it.qty>1?it.qty+'× ':'')+esc(it.e.name)+'</div>'+
+      (it.e.description?'<div class="pm-item-desc">'+esc(it.e.description)+'</div>':'')+'</div></div>';
+  }).join('')+'</div></div>':'';
+  document.getElementById('prodBody').innerHTML=
+    '<div class="pm-grid"><div class="pm-gallery">'+setImageAreaModal(s)+'</div>'+
+    '<div class="pm-info">'+
+      '<div class="rc">SET</div>'+
+      '<h3>'+esc(s.name)+'</h3>'+
+      '<div class="rp">'+price+'</div>'+
+      (s.description?'<div class="pm-desc">'+esc(s.description)+'</div>':'')+
+      cartCtrl+
+    '</div></div>'+itemsHtml;
+}
+Promise.all([
+  sfetch('equipment_sets?select=*&public=eq.true&order=sort'),
+  sfetch('equipment_set_items?select=*')
+]).then(function(r){SETS=r[0]||[];SET_ITEMS=r[1]||[];renderCatChips();renderRent()}).catch(function(){});
+
+var AV_LOADING=false;
+/* Verfügbarkeit auch ohne Klick auf "Verfügbarkeit prüfen" laden, sobald ein Zeitraum
+   feststeht - sonst greift die Mengen-Deckelung im Tourcase nicht und im Korb landen
+   Fantasiemengen, die erst beim Absenden abgewiesen werden. */
+['avFrom','avTo'].forEach(function(id){
+  var el=document.getElementById(id);
+  if(el)el.addEventListener('change',function(){
+    syncDates('av');
+    if(document.getElementById('avFrom').value)checkAvail();
+  });
+});
+/* Die Datumsfelder oben auf der Seite und die im Tourcase sind ein und derselbe Zeitraum -
+   wer eines aendert, aendert beide. Quelle 'tc' stoesst die Verfuegbarkeitspruefung selbst an. */
+function syncDates(src){
+  var a=document.getElementById('avFrom'),b=document.getElementById('avTo'),c=document.getElementById('tcFrom'),d=document.getElementById('tcTo');
+  if(!c||!d)return;
+  if(src==='tc'){a.value=c.value;b.value=d.value}else{c.value=a.value;d.value=b.value}
+  var hint=document.getElementById('tcDateHint');
+  if(hint)hint.style.display=a.value?'none':'';
+  if(src==='tc'){if(a.value)checkAvail();else renderCart()}
+}
+function checkAvail(){
+  var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
+  if(!from)return;
+  AVAIL={};AV_LOADING=true;renderRent();   // während der Prüfung sind Artikel „unklar" und nicht buchbar
+  Promise.all(EQ.filter(function(e){return e.id}).map(function(e){
+    return fetch(API+'/portal/availability?eq='+e.id+'&from='+from+'&to='+to)
+      .then(function(r){return r.json()}).then(function(j){AVAIL[e.id]=j}).catch(function(){});
+  })).then(function(){AV_LOADING=false;renderRent()});
+}
+
+/* ---- Tourcase ---- */
+function saveCart(){localStorage.setItem('lg_cart',JSON.stringify(CART));renderTcBadge()}
+function renderTcBadge(){
+  var n=CART.reduce(function(s,c){return s+(Number(c.qty)||0)},0);
+  var badge=document.getElementById('tcCount');
+  badge.textContent=n;badge.style.display=n>0?'inline-block':'none';
+}
+function openTourcase(){document.getElementById('tcPanel').classList.add('open');document.getElementById('tcBackdrop').classList.add('open');document.body.classList.add('tc-open');
+  var closeBtn=document.querySelector('#tcPanel .tc-close');if(closeBtn)closeBtn.focus();}
+function closeTourcase(){document.getElementById('tcPanel').classList.remove('open');document.getElementById('tcBackdrop').classList.remove('open');document.body.classList.remove('tc-open');
+  var btn=document.getElementById('tcBtn');if(btn)btn.focus();}
+function toggleTourcase(){document.getElementById('tcPanel').classList.contains('open')?closeTourcase():openTourcase()}
+var _toastT;
+function toast(txt){
+  var t=document.getElementById('lgToast');
+  if(!t){t=document.createElement('div');t.id='lgToast';
+    t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:220;background:#c0392b;color:#fff;padding:11px 18px;border-radius:4px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:88vw;text-align:center';
+    document.body.appendChild(t);}
+  t.textContent=txt;t.style.display='block';
+  clearTimeout(_toastT);_toastT=setTimeout(function(){t.style.display='none'},3200);
+}
+function addToCart(id,qtyId){
+  var e=EQ.find(function(x){return x.id===id})||EQ_ALL[id];if(!e)return;
+  /* Sicherung: am Wunschtermin belegte (nicht auf Anfrage) Artikel nicht buchen */
+  if(!e.on_request&&AVAIL[id]!=null&&!(AVAIL[id].available>0)){
+    toast('Am Wunschtermin leider nicht verfügbar.');return;
+  }
+  /* Während die Verfügbarkeit noch geprüft wird, nicht buchen (fail-safe) */
+  if(!e.on_request&&AV_LOADING){toast('Einen Moment – die Verfügbarkeit wird noch geprüft.');return;}
+  var qf=document.getElementById(qtyId||('qty-'+id));
+  /* Mindestabnahme beachten: auf ein Vielfaches der Set-Größe aufrunden. */
+  var mq=minQty(e);
+  var qty=Math.max(mq,Number(qf&&qf.value)||mq);
+  qty=Math.ceil(qty/mq)*mq;
+  /* Obergrenze: Mehr als verfügbar darf gar nicht erst in den Korb - sonst steht dort
+     eine Fantasiesumme und die Absage kommt erst beim Absenden. */
+  var frei=(!e.on_request&&AVAIL[id]&&AVAIL[id].available!=null)?Number(AVAIL[id].available):null;
+  /* Ohne gewählten Zeitraum kennen wir die freie Stückzahl nicht - dann wenigstens auf den
+     Gesamtbestand deckeln (steht im öffentlichen Katalog), damit im Korb keine Fantasiesumme
+     steht. Nur wenn selbst der unbekannt ist, greift eine grobe Obergrenze. */
+  if(frei==null){
+    /* Bei "auf Anfrage"-Artikeln sagt der Bestand nichts aus (die besorge ich dazu) - dort
+       gilt dieselbe Obergrenze wie serverseitig, sonst fragt jemand 9999 Stück an und in der
+       Anfrage stehen am Ende stillschweigend 50. */
+    var bestand=e.on_request?null
+      :((AVAIL[id]&&AVAIL[id].total!=null)?Number(AVAIL[id].total)
+        :(e.qty_total!=null?Number(e.qty_total):null));
+    var max=(bestand!=null&&bestand>0)?bestand:50;
+    if(qty>max){
+      toast(bestand!=null&&bestand>0?('Davon habe ich insgesamt '+max+' Stück – Menge angepasst.')
+                  :('Mehr als '+max+' Stück kann ich hier nicht aufnehmen – für größere Mengen ruf mich kurz an.'));
+      qty=Math.max(mq,Math.floor(max/mq)*mq);
+    }
+  }
+  if(frei!=null&&qty>frei){
+    qty=Math.max(mq,Math.floor(frei/mq)*mq);
+    if(qty>frei||qty<mq){toast('Am Wunschtermin sind davon nur '+frei+' Stück frei.');return}
+    toast('Am Wunschtermin sind nur '+frei+' Stück frei – Menge angepasst.');
+  }
+  if(qf)qf.value=qty;
+  var existing=CART.find(function(c){return c.type!=='set'&&c.id===id});
+  if(existing)existing.qty=qty;else CART.push({type:'equipment',id:id,qty:qty});
+  saveCart();
+  /* Aus dem Produktfenster hinzugefügt: Fenster schließen, damit der Tourcase frei sichtbar ist */
+  if(document.getElementById('prodBg').style.display==='block')closeProductModal();
+  renderRent();
+  /* renderRent() zeichnet die Kachel neu und setzt das Mengenfeld dabei zurück - die
+     übernommene (ggf. gekürzte) Menge soll dort aber weiter stehen. */
+  var qf2=document.getElementById('qty-'+id);if(qf2)qf2.value=qty;
+  openTourcase();
+}
+function addSetToCart(setId,qtyId){
+  var qf=document.getElementById(qtyId||('qty-set-'+setId));
+  var qty=Math.max(1,Number(qf&&qf.value)||1);
+  var existing=CART.find(function(c){return c.type==='set'&&c.set_id===setId});
+  if(existing)existing.qty=qty;else CART.push({type:'set',set_id:setId,qty:qty});
+  saveCart();
+  if(document.getElementById('prodBg').style.display==='block')closeProductModal();
+  renderRent();renderCart();openTourcase();
+}
+function removeFromCart(idx){CART.splice(idx,1);saveCart();renderRent()}
+function renderCart(){
+  var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
+  var days=from?rentalDaysClient(from,to):1;
+  var total=0,onRequest=false;
+  function line(rate,qty,e){
+    if(!rate)return null;   // Preis auf Anfrage - fließt nicht in die Summe
+    return rentalPriceClient(rate,days,
+      Number(e&&e.followup_pct!=null?e.followup_pct:50),
+      Number(e&&e.tier_week_pct!=null?e.tier_week_pct:30),
+      Number(e&&e.tier_2week_pct!=null?e.tier_2week_pct:20),
+      Number(e&&e.tier_month_pct!=null?e.tier_month_pct:12))*qty;
+  }
+  var belegt=0;   // Positionen, die im gewählten Zeitraum nicht (mehr) verfügbar sind
+  function row(name,amount,idx,warn){
+    var priceTxt=warn?'<span style="color:var(--red,#e0a0a0)">nicht verfügbar</span>'
+      :(amount==null?'<span style="color:var(--mut2)">auf Anfrage</span>':euro(amount*priceFactor()));
+    return '<div class="tc-item"'+(warn?' style="opacity:.75"':'')+'><span>'+esc(name)+'</span><span>'+priceTxt+
+      ' <a onclick="removeFromCart('+idx+')" style="color:var(--mut2);margin-left:8px" title="Entfernen">✕</a></span></div>';
+  }
+  var html=CART.map(function(c,idx){
+    if(c.type==='set'){
+      var s=SETS.find(function(x){return x.id===c.set_id});if(!s)return'';
+      var sl=rentalPriceClient(setDayRate(s),days,50,30,20,12)*c.qty;
+      total+=sl;
+      return row('Set: '+s.name+' × '+c.qty,sl,idx);
+    }
+    var e=EQ.find(function(x){return x.id===c.id})||EQ_ALL[c.id];if(!e)return'';
+    /* Nach einem Datumswechsel kann eine Position inzwischen belegt sein - dann darf sie
+       weder mitgerechnet noch mitgeschickt werden. */
+    var frei=(!e.on_request&&AVAIL[c.id]&&AVAIL[c.id].available!=null)?Number(AVAIL[c.id].available):null;
+    var warn=frei!=null&&frei<c.qty;
+    var rate=partnerPrice(e)!=null?partnerPrice(e):Number(e.day_rate||0);
+    var l=line(rate,c.qty,e);
+    if(warn)belegt++;
+    else if(l==null)onRequest=true; else total+=l;
+    return row(e.name+' × '+c.qty,l,idx,warn);
+  }).join('');
+  document.getElementById('cartItems').innerHTML=html;
+  document.getElementById('cartEmpty').style.display=CART.length?'none':'block';
+  document.getElementById('cartTotalRow').style.display=CART.length?'flex':'none';
+  document.getElementById('cartSubmitWrap').style.display=CART.length?'block':'none';
+  var sbtn=document.getElementById('cartSubmitWrap').querySelector('button');
+  var hinweisId='cartBelegtHinweis',alt=document.getElementById(hinweisId);
+  if(alt)alt.remove();
+  if(sbtn){
+    sbtn.disabled=belegt>0;
+    if(belegt>0)sbtn.insertAdjacentHTML('beforebegin','<div id="'+hinweisId+'" class="sml" style="color:var(--red,#e0a0a0);margin-bottom:8px">'+
+      belegt+' Position(en) sind im gewählten Zeitraum nicht mehr frei. Bitte entfernen oder den Zeitraum ändern.</div>');
+  }
+  document.getElementById('cartTotal').textContent=euro(total*priceFactor())+(from&&days>1?' · '+days+' Tage':'')+(onRequest?' + Artikel auf Anfrage':'');
+  document.getElementById('cartTotalLabel').textContent='Gesamt ('+(PRICE_MODE==='brutto'&&!SMALL_BUSINESS?'inkl. MwSt.':'netto')+', für den gewählten Zeitraum)';
+  renderTcBadge();
+  renderCartAuth();
+}
+function renderCartAuth(){
+  var el=document.getElementById('cartAuth');
+  if(!CART.length){el.innerHTML='';el.removeAttribute('data-mode');return}
+  if(CUST){
+    var partnerNote=PARTNER?(' · <span style="color:var(--acc)">Partnerpreise aktiv'+(PARTNER.provisional?' (vorläufig, bis zur Prüfung durch '+(CO.owner_first||'den Vermieter')+')':'')+'</span>'):'';
+    el.innerHTML='<div class="sml" style="color:var(--mut);font-size:13px">Eingeloggt als <b style="color:var(--txt)">'+esc(CUST.name)+'</b>'+partnerNote+' · <a onclick="custLogout()">abmelden</a></div>';
+    return;
+  }
+  if(el.dataset.mode)return; // Formular schon offen, nicht überschreiben während der Eingabe
+  el.dataset.mode='login';
+  renderAuthForm();
+}
+function toggleAuthMode(){
+  var el=document.getElementById('cartAuth');
+  el.dataset.mode=el.dataset.mode==='login'?'register':'login';
+  renderAuthForm();
+}
+function renderAuthForm(){
+  var el=document.getElementById('cartAuth');
+  var reg=el.dataset.mode==='register';
+  el.innerHTML='<div style="font-size:13px;color:var(--mut);margin-bottom:10px">'+(reg?'Neu hier? Kurz registrieren, dann geht die Anfrage direkt raus.':'Schon Kunde? Einloggen und Anfrage abschicken.')+'</div>'+
+    (reg?'<label for="authName">Name *</label><input id="authName">':'')+
+    '<label for="authEmail">E-Mail *</label><input id="authEmail" type="email">'+
+    '<label for="authPass">Passwort *</label><input id="authPass" type="password">'+
+    (reg?('<label style="margin-top:8px"><input type="checkbox" id="authPartner" style="width:auto;margin-right:6px" onchange="document.getElementById(\'authPartnerKind\').style.display=this.checked?\'block\':\'none\'">Ich bin DJ/Band/Musiker:in und möchte Partner-Konditionen</label>'+
+      '<select id="authPartnerKind" style="display:none;margin-top:8px"><option value="dj">DJ</option><option value="band">Band</option><option value="musiker">Musiker:in</option></select>'):'')+
+    '<div class="sml" style="margin-top:6px"><a onclick="toggleAuthMode()">'+(reg?'Schon ein Konto? Einloggen':'Noch kein Konto? Registrieren')+'</a></div>';
+}
+function custLogout(){CUST=null;PARTNER=null;localStorage.removeItem('lg_cust');localStorage.removeItem('lg_cust_token');sessionStorage.removeItem('lg_partner');document.getElementById('cartAuth').removeAttribute('data-mode');renderRent();renderCart()}
+function authAndSubmit(){
+  var mode=(document.getElementById('cartAuth').dataset.mode)||'login';
+  var email=v_('authEmail'),pass=v_('authPass');
+  var m=document.getElementById('cartMsg');
+  if(!email||!pass){m.className='msg err';m.textContent='Bitte E-Mail und Passwort angeben.';return Promise.reject()}
+  var body,path;
+  if(mode==='register'){
+    var name=v_('authName');
+    if(!name){m.className='msg err';m.textContent='Bitte auch den Namen angeben.';return Promise.reject()}
+    body={name:name,email:email,password:pass,
+      partner_interest:document.getElementById('authPartner')&&document.getElementById('authPartner').checked,
+      partner_kind:document.getElementById('authPartnerKind')?document.getElementById('authPartnerKind').value:'dj'};
+    path='portal/account/register';
+  } else { body={email:email,password:pass}; path='portal/account/login'; }
+  return fetch(API+'/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      /* Bekannte Adresse beim Registrieren: nicht "bitte einloggen" hinschreiben, sondern
+         gleich die Anmeldemaske mit der Adresse zeigen - der Kunde muss nur noch sein Passwort tippen. */
+      if(res.s===409&&mode==='register'&&/existiert bereits/.test(res.j.error||'')){
+        document.getElementById('cartAuth').dataset.mode='login';renderAuthForm();
+        document.getElementById('authEmail').value=email;
+        m.className='msg ok';m.style.display='block';m.textContent='Dich kenne ich schon – gib einfach dein Passwort ein, dann geht die Anfrage raus.';
+        document.getElementById('authPass').focus();
+        return Promise.reject();
+      }
+      /* Zu der Adresse gibt es schon einen Vorgang ohne Konto: Der Server hat einen
+         Bestaetigungslink gemailt, weiter geht es erst nach dem Klick darauf. */
+      if(res.s===202&&res.j.pending){m.className='msg ok';m.style.display='block';m.textContent=res.j.message||'Ich habe dir einen Bestätigungslink geschickt – bitte schau in dein Postfach.';return Promise.reject()}
+      if(res.s>=400){m.className='msg err';m.textContent=res.j.error||'Anmeldung fehlgeschlagen.';return Promise.reject()}
+      CUST={name:res.j.name};localStorage.setItem('lg_cust',JSON.stringify(CUST));
+      localStorage.setItem('lg_cust_token',res.j.token);
+      PARTNER=res.j.partner||null;
+      if(PARTNER)sessionStorage.setItem('lg_partner',JSON.stringify(PARTNER));else sessionStorage.removeItem('lg_partner');
+      document.getElementById('cartAuth').removeAttribute('data-mode');
+      renderRent();renderCart();   /* Kacheln zeigen sonst weiter die alten Preise */
+    });
+}
+function v_(id){var el=document.getElementById(id);return el?el.value.trim():''}
+function submitCart(){
+  var m=document.getElementById('cartMsg');
+  var from=document.getElementById('avFrom').value,to=document.getElementById('avTo').value||from;
+  if(!from){m.className='msg err';m.style.display='block';m.textContent='Bitte erst den Zeitraum wählen (Von/Bis).';var tf=document.getElementById('tcFrom');if(tf)tf.focus();return}
+  if(!CART.length){m.className='msg err';m.style.display='block';m.textContent='Der Tourcase ist leer.';return}
+  var go=CUST?Promise.resolve():authAndSubmit();
+  go.then(function(){
+    document.getElementById('cartSubmitBtn').disabled=true;
+    return fetch(API+'/portal/cart/submit',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('lg_cust_token')},
+      body:JSON.stringify({items:CART.map(function(c){return c.type==='set'?{type:'set',set_id:c.set_id,qty:c.qty}:{type:'equipment',equipment_id:c.id,qty:c.qty}}),from:from,to:to})})
+      .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+      .then(function(res){
+        document.getElementById('cartSubmitBtn').disabled=false;
+        m.style.display='block';
+        if(res.s>=400){m.className='msg err';m.textContent=res.j.error||'Anfrage fehlgeschlagen – bitte später erneut versuchen.';return}
+        if(window.Stat)Stat.click('mietanfrage');
+        /* Die angefragten Positionen bleiben in der Erfolgsmeldung sichtbar - der Tourcase
+           wird danach geleert, sonst stuende die Anfrage beim naechsten Besuch nochmal drin. */
+        var dtDe=function(x){var p=String(x||'').split('-');return p.length===3?p[2]+'.'+p[1]+'.'+p[0]:x};
+        var von=res.j.from||from,bis=res.j.to||to;
+        var pos=(res.j.items||[]).map(function(l){return '<li>'+esc(l.name)+' × '+l.qty+'</li>'}).join('');
+        m.className='msg ok';
+        m.innerHTML='<b>Danke! Eure Anfrage ist eingegangen.</b> Ihr bekommt in der Regel innerhalb von 24 Stunden eine Antwort mit Verfügbarkeit und Preis – eine Eingangsbestätigung ist gerade per E-Mail rausgegangen.'+
+          '<div style="margin-top:10px">Angefragt für '+esc(dtDe(von))+(bis&&bis!==von?' bis '+esc(dtDe(bis)):'')+':</div>'+
+          (pos?'<ul style="margin:6px 0 0 18px;padding:0">'+pos+'</ul>':'');
+        CART=[];saveCart();renderRent();
+      });
+  }).catch(function(){document.getElementById('cartSubmitBtn').disabled=false});
+}
+renderTcBadge();
+syncDates('av');
+
+sfetch('site_content?select=key,value').then(function(rows){
+  var c={};rows.forEach(function(r){c[r.key]=r.value});
+  if(c.rental){
+    if(c.rental.title)document.getElementById('rentTitle').textContent=c.rental.title;
+    if(c.rental.text)document.getElementById('rentText').textContent=c.rental.text;
+  }
+  if(c.legal)LEGAL=c.legal;
+  /* Farbschema (Technik-Palette) und Schrift ueber theme.js - siehe dort. */
+  var TH=themeFromContent(c,'technik');applyTheme(TH);rememberTheme('technik',TH);
+}).catch(function(){});
+var LEGAL_TITLES={impressum:'Impressum',datenschutz:'Datenschutzerklärung',agb:'AGB',widerrufsformular:'Muster-Widerrufsformular'};
+function openLegal(key){
+  document.getElementById('legalTitle').textContent=LEGAL_TITLES[key]||key;
+  document.getElementById('legalBody').textContent=LEGAL[key]||'Dieser Text wird gerade überarbeitet. Bei Fragen ruft mich gerne direkt an.';
+  document.getElementById('legalBg').style.display='block';
+  document.body.style.overflow='hidden';
+}
+function closeLegal(){document.getElementById('legalBg').style.display='none';document.body.style.overflow=''}
+/* Esc schließt das Produktfenster (Backdrop-Klick und X sind bereits verdrahtet) */
+document.addEventListener('keydown',function(ev){
+  if(ev.key==='Escape'&&document.getElementById('prodBg').style.display==='block')closeProductModal();
+});
+</script>
+<script src="stats.js"></script>
+</body>
+</html>

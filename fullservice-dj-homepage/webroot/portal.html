@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Kundenkonto</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23ff6f5b'%3E%3Crect x='3' y='11' width='5' height='10' rx='2.5'/%3E%3Crect x='10' y='5' width='5' height='22' rx='2.5'/%3E%3Crect x='17' y='9' width='5' height='14' rx='2.5'/%3E%3Crect x='24' y='13' width='5' height='6' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
+<link href="fonts.css" rel="stylesheet">
+<script src="theme.js"></script>
+<script>applyCachedTheme(/[?&]mv=/.test(location.search)?'technik':'dj',{fontSelector:''})</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.ic{width:17px;height:17px;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block}
+
+:root{--bg:#0f1012;--card:#1a1c21;--card2:#212429;--line:#282b32;--acc:#ff6f5b;--acc2:#ff8d7c;
+--txt:#f2f0ec;--mut:#a3a29b;--mut2:#8f8e88;--grn:#5aa05a;
+/* Ab hier: Farben, die theme.js aus dem Website-Design ableitet - Werte hier
+   sind nur der Stand, bis das Design vom Server da ist (oder wenn es nicht laedt).
+   --acc-txt: Akzent als Textfarbe (Links, Summen), notfalls fuer Kontrast nachgedunkelt/
+   aufgehellt. --btn-txt: Schrift auf dem Akzent-Button. --line-soft: zarte Trennlinien. */
+--acc-txt:#ff6f5b;--btn-txt:#16110f;--acc-soft:rgba(255,111,91,.15);--line-soft:rgba(255,255,255,.06);
+--ok-txt:#9fd49f;--err-txt:#e0a0a0;--warn-txt:#f0cf7a;--hf:'Space Grotesk',sans-serif}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--hf);letter-spacing:-.01em}
+a{color:var(--acc-txt);text-decoration:none}
+.wrap{max-width:760px;margin:0 auto;padding:32px 20px 80px}
+.logo{display:flex;align-items:center;gap:9px;margin-bottom:36px}
+.logo svg{width:24px;height:24px}
+.logo b{font-family:var(--hf);font-size:19px}
+.logo b i{font-style:normal;color:var(--acc)}
+/* Kundeninhalte können sehr lange Wörter/URLs enthalten - ohne Umbruchregel
+   schiebt ein einziger Wert die ganze Seite in die Breite. */
+.card,.sub,.items td{overflow-wrap:anywhere}
+.card{background:var(--card);border:1px solid var(--line);border-radius:5px;padding:28px;margin-bottom:18px}
+.kicker{font-family:var(--hf);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--mut);font-weight:600;margin-bottom:8px}
+.kicker::before{content:"";display:inline-block;width:18px;height:2px;background:var(--acc);vertical-align:middle;margin-right:8px}
+h1{font-size:clamp(24px,5vw,32px);margin-bottom:6px}
+.sub{color:var(--mut);font-size:14px}
+label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:14px 0 6px;font-weight:600}
+input,select,textarea{width:100%;padding:12px 14px;background:var(--bg);border:1px solid var(--line);color:var(--txt);font:inherit;font-size:15px;outline:0;border-radius:4px}
+::placeholder{color:var(--mut);font-style:italic;opacity:1}
+input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+textarea{min-height:100px;resize:vertical}
+.btn{display:inline-block;background:var(--acc);color:var(--btn-txt);padding:13px 26px;font-size:13px;font-weight:600;letter-spacing:.03em;border:none;border-radius:4px;cursor:pointer;font-family:var(--hf);transition:background .2s}
+.btn:hover{background:var(--acc2)}
+.btn.g{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.btn.g:hover{border-color:var(--acc);color:var(--acc-txt)}
+.btn.green{background:#4f9a4f;color:#0c150c}
+.btn:disabled{opacity:.5;cursor:default}
+.msg{padding:14px 16px;font-size:14px;border:1px solid;border-radius:4px;margin:14px 0;display:none}
+.msg.ok{display:block;border-color:var(--ok-line,#3d6b3d);background:var(--ok-bg,rgba(60,120,60,.12));color:var(--ok-txt)}
+.msg.err{display:block;border-color:var(--err-line,#7a3535);background:var(--err-bg,rgba(150,60,60,.12));color:var(--err-txt)}
+.msg.warn{display:block;border-color:var(--warn-line,#8a6d1f);background:var(--warn-bg,rgba(200,160,40,.12));color:var(--warn-txt)}
+
+/* Angebots-Tabelle */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut2);text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+td{padding:11px 8px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+.subrow td{padding:1px 8px;border-bottom:none;font-size:11.5px}
+.grouphead td{padding-top:9px;padding-bottom:1px}
+.groupfoot td{padding-top:2px;padding-bottom:7px}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+th.num{text-align:right}
+.pos-desc{position:relative;cursor:default}
+.pos-desc .info{display:inline-block;margin-left:6px;width:17px;height:17px;line-height:17px;text-align:center;border-radius:50%;background:var(--acc-soft);color:var(--acc-txt);font-size:11px;font-weight:700;cursor:help}
+.tip{display:none;position:absolute;left:0;top:100%;z-index:20;background:var(--card2);border:1px solid var(--acc);border-radius:4px;padding:12px 14px;font-size:13px;color:var(--txt);max-width:380px;box-shadow:0 8px 30px var(--shadow,rgba(0,0,0,.5));margin-top:4px}
+.pos-desc:hover .tip,.pos-desc.open .tip{display:block}
+/* Auf schmalen Displays war die Sprechblase nur so breit wie die Positionsspalte und
+   ueberlappte die naechste Zeile - dort ueber die volle Breite und im Fluss. */
+@media(max-width:640px){
+  .pos-desc .tip{position:static;max-width:none;width:100%;margin-top:8px;box-shadow:none}
+}
+.totals td{border-bottom:none;padding:5px 8px}
+.totals .grand{font-family:var(--hf);font-size:18px;font-weight:700;color:var(--acc-txt)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.status-b{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 12px;border-radius:4px;border:1px solid var(--grn);color:var(--grn)}
+.hint{font-size:12px;color:var(--mut2);margin-top:14px}
+footer{font-size:12px;color:var(--mut2);margin-top:34px;text-align:center}
+.hidden{display:none}
+.fade{animation:f .5s ease}@keyframes f{from{opacity:0;transform:translateY(10px)}to{opacity:1}}
+.ups{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:14px}
+.up{background:var(--card2);border:1px solid var(--line);border-radius:4px;padding:18px}
+.up h4{font-size:15px;margin-bottom:5px}
+.up p{font-size:13px;color:var(--mut);margin-bottom:10px}
+.up .upp{font-family:var(--hf);font-weight:700;color:var(--acc-txt);margin-bottom:10px}
+.up button{font-size:12px;padding:8px 14px}
+.up.asked{border-color:var(--grn)}
+#printArea{display:none}
+@media print{
+  html,body{background:#fff!important}
+  body>.wrap{display:none!important}
+  #printArea{display:block!important;background:#fff;color:#111}
+}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--mut);margin:14px 0;text-transform:none;letter-spacing:0;font-weight:400}
+/* Mietvertrag mobil: "Pos" und die Zahlenspalten sollen nicht mitten im Wort umbrechen -
+   die Tabelle bekommt dafuer ihren eigenen Scrollbereich. */
+.items th,.items td:first-child,.items .num{white-space:nowrap}
+.items th:first-child,.items td:first-child{width:1%;padding-right:4px}
+.items-wrap{overflow-x:auto}
+.chk input{width:auto;margin-top:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">
+    <svg viewBox="0 0 32 32"><g fill="var(--acc)"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="10" y="5" width="5" height="22" rx="2.5"/><rect x="17" y="9" width="5" height="14" rx="2.5"/><rect x="24" y="13" width="5" height="6" rx="2.5"/></g></svg>
+    <a href="portal.html" style="display:flex;align-items:center;gap:9px;color:inherit"><b id="hdBrand"><i>.</i></b>&nbsp;<span class="sub">Kundenkonto</span></a>
+  </div>
+  <div id="app"><div class="card"><div class="sub">Wird geladen …</div></div></div>
+  <footer id="foot"></footer>
+</div>
+<div id="printArea"></div>
+
+<script>
+var API='api.php';
+var qs=new URLSearchParams(location.search);
+var OFFER=qs.get('a'),FORM=qs.get('f'),MV=qs.get('mv'),INVITE=qs.get('einladung');
+var REGISTER=qs.get('register'),PREFILL_EMAIL=qs.get('email')||'',PREFILL_NAME=qs.get('name')||'';
+var PLZ=sessionStorage.getItem('portal_plz')||'';
+/* Betreiber-Basisdaten (public/company): Marke im Kopf, Telefon in Hinweisen, Vorname des
+   Inhabers fuer "… prüft das". Im Angebot liefert DOC.company dieselben Felder mit. */
+var CO={};
+fetch(API+'/public/company').then(function(r){return r.json()}).then(function(co){
+  CO=co||{};
+  var h=String(CO.website||'').replace(/^https?:\/\//,'').replace(/\/.*$/,'').replace(/^www\./,'');
+  var wm=h?h.replace(/\.[a-z]+$/i,''):(CO.name||'');
+  var b=document.getElementById('hdBrand');if(b&&wm)b.innerHTML=esc(wm)+'<i>.</i>';
+  if(CO.name)document.title='Kundenkonto – '+CO.name;
+  var ph=document.getElementById('coPhoneHint');if(ph)ph.innerHTML=phoneHint();
+}).catch(function(){});
+function coOf(){return (DOC&&DOC.company)||CO||{}}
+/* ===== Design von der Website uebernehmen =====
+   Quelle sind dieselben site_content-Eintraege, die index.html und technik.html lesen:
+   "theme" (DJ-Seite: primary, bg, font) und "theme_technik" (Technik-Seite: primary, bg).
+   Die Ableitung aller Farben (Karte, Linien, Text, gedaempfter Text, Button-Schrift) und
+   die WCAG-Kontrastpruefung (4,5:1) macht theme.js - gemeinsam mit allen anderen Seiten.
+
+   Welche Palette? Standard ist die DJ-Palette (Hauptseite). Die Technik-Palette gilt nur,
+   wenn der angezeigte Vorgang eindeutig Technik ist: Mietvertrag (?mv=), ein Beleg zu
+   einer Technik-/Miet-Buchung (booking_kind bzw. event_info.kind = technik) oder im
+   Kundenkonto, wenn die neueste Buchung technik/miete ist. "dj_technik" zaehlt als DJ. */
+var DESIGN=null,DESIGN_KIND=MV?'technik':'dj';
+function isTechnikKind(k){return k==='technik'||k==='miete'}
+function docKind(doc){
+  var e=doc&&doc.doc&&doc.doc.event_info;if(typeof e==='string'){try{e=JSON.parse(e)}catch(err){e=null}}
+  return isTechnikKind(doc&&doc.booking_kind)||(e&&isTechnikKind(e.kind))?'technik':'dj';
+}
+function setDesignKind(k){DESIGN_KIND=k==='technik'?'technik':'dj';applyPortalDesign()}
+function applyPortalDesign(){
+  if(!DESIGN)return;
+  var tt=DESIGN.theme_technik||{};
+  /* Ohne eigene Technik-Farben bleibt es bei der DJ-Palette. */
+  var kind=DESIGN_KIND==='technik'&&tt.primary?'technik':'dj';
+  var th=themeFromContent(DESIGN,kind);
+  /* Ueberschriften nutzen hier var(--hf), deshalb keine extra Schrift-Regel (fontSelector leer). */
+  var d=applyTheme(th,{fontSelector:''});rememberTheme(kind,th);
+  var c=d.contrast;
+  /* Fuer Tests/Diagnose: die gepruefte Kontrast-Tabelle. */
+  window.PORTAL_CONTRAST={kind:DESIGN_KIND,txt_bg:c.txt_bg,txt_card:c.txt_card,btn_acc:c.btn_acc,mut_card:c.mut_card,acc_bg:c.acc_bg,acc_card:c.acc_card};
+}
+fetch(API+'/rest/site_content?select=key,value').then(function(r){return r.json()}).then(function(rows){
+  var c={};(rows||[]).forEach(function(x){c[x.key]=x.value});DESIGN=c;applyPortalDesign();
+}).catch(function(){});
+
+/* "Alex prüft das" - ohne Inhaber der Firmenname, ohne beides neutral. */
+function ownerFirstPub(){var c=coOf();return c.owner_first||c.name||'der Veranstalter'}
+function phoneHint(){var c=coOf(),p=(c.phone||'');if(p)return ' Oder ruft mich einfach an: <a href="tel:'+esc(p.replace(/[^\d+]/g,''))+'">'+esc(p)+'</a>.';
+  /* Ohne oeffentliche Nummer (Werbeanrufe) bleibt WhatsApp der schnelle Weg. */
+  return c.whatsapp_digits?' Oder schreibt mir kurz per <a href="https://wa.me/'+esc(c.whatsapp_digits)+'" target="_blank" rel="noopener">WhatsApp</a>.':''}
+function waLink(text){var c=coOf();return c.whatsapp_digits?'https://wa.me/'+esc(c.whatsapp_digits)+'?text='+encodeURIComponent(text||'Hallo'+(c.owner_first?' '+c.owner_first:'')+', '):''}
+/* Kontaktblock im Portal: Wer hier ist, hat schon Kontakt - Telefon plus WhatsApp-Knopf. */
+function contactCard(){
+  var c=coOf(),p=c.phone||'',w=waLink();
+  if(!p&&!w)return '';
+  return '<div class="card"><h2>'+WA_IC+' So erreichst du mich</h2>'+
+    '<p class="sub" style="margin-top:6px">Am schnellsten per WhatsApp. Oder ihr ruft einfach an'+(p?': <a href="tel:'+esc(p.replace(/[^\d+]/g,''))+'"><b>'+esc(p)+'</b></a>':'')+'.</p>'+
+    (w?'<div style="margin-top:10px"><a class="btn g" href="'+w+'" target="_blank" rel="noopener">'+WA_IC+' Per WhatsApp schreiben</a></div>':'')+'</div>';
+}
+var WA_IC='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
+function agencyOn(){var c=coOf();return !!c.agency_enabled&&!!c.agency_name}
+/* Anfuehrungszeichen und Apostrophe mitmaskieren: innerHTML alleine ersetzt nur & < >,
+   damit liesse sich aus einem Attribut ausbrechen (style, onfocus und so weiter). */
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);
+  return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+/* HEIC/HEIF (iPhone-Fotoformat) kann kein Browser anzeigen und laesst sich auch serverseitig
+   nicht umwandeln - deshalb hier im Browser selbst nach JPEG umgewandelt, noch bevor die
+   Datei ueberhaupt hochgeladen wird (gleiches Muster wie in admin.html). Bibliothek
+   (heic2any, MIT-Lizenz) liegt selbst gehostet unter vendor/ und wird nur bei Bedarf
+   nachgeladen. */
+var HEIC_LIB_LOADING=null;
+function loadHeic2Any(){
+  if(window.heic2any)return Promise.resolve();
+  if(HEIC_LIB_LOADING)return HEIC_LIB_LOADING;
+  HEIC_LIB_LOADING=new Promise(function(resolve,reject){
+    var s=document.createElement('script');
+    s.src='vendor/heic2any.min.js';
+    s.onload=function(){resolve()};
+    s.onerror=function(){HEIC_LIB_LOADING=null;reject(new Error('HEIC-Bibliothek konnte nicht geladen werden.'))};
+    document.head.appendChild(s);
+  });
+  return HEIC_LIB_LOADING;
+}
+function isHeicFile(f){
+  var n=(f.name||'').toLowerCase(),t=(f.type||'').toLowerCase();
+  return /\.(heic|heif)$/.test(n)||t.indexOf('heic')>=0||t.indexOf('heif')>=0;
+}
+function heicToJpeg(file){
+  return loadHeic2Any().then(function(){
+    /* heic2any prueft intern strikt auf eine "echte" Blob-Instanz und lehnt ein File-Objekt
+       (aus einem <input type=file>) manchmal ab, obwohl File von Blob erbt - deshalb hier
+       einmal explizit in ein Blob umkopiert. */
+    return window.heic2any({blob:new Blob([file],{type:file.type}),toType:'image/jpeg',quality:0.85});
+  }).then(function(result){
+    var blob=Array.isArray(result)?result[0]:result;
+    var name=file.name.replace(/\.(heic|heif)$/i,'')+'.jpg';
+    return new File([blob],name,{type:'image/jpeg',lastModified:file.lastModified||Date.now()});
+  });
+}
+document.addEventListener('change',function(e){
+  var inp=e.target;
+  if(!inp||inp.tagName!=='INPUT'||inp.type!=='file')return;
+  var accept=(inp.getAttribute('accept')||'').toLowerCase();
+  if(accept.indexOf('image')===-1)return;
+  var files=Array.prototype.slice.call(inp.files||[]);
+  if(!files.some(isHeicFile))return;
+  e.stopPropagation();
+  Promise.all(files.map(function(f){
+    return isHeicFile(f)?heicToJpeg(f).catch(function(err){
+      alert('HEIC-Umwandlung fehlgeschlagen – „'+f.name+'" wird übersprungen.');
+      return null;
+    }):f;
+  })).then(function(converted){
+    var kept=converted.filter(Boolean);
+    if(!kept.length)return;
+    var dt=new DataTransfer();
+    kept.forEach(function(f){dt.items.add(f)});
+    inp.files=dt.files;
+    inp.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+},true);
+/* Nur echte Web-Adressen verlinken - javascript: im Feld waere sonst ausfuehrbar. */
+function safeUrl(u){u=String(u==null?'':u).trim();return /^https?:\/\//i.test(u)?u:''}
+function euro(n){return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
+function dt(d){if(!d)return '–';return new Date(d).toLocaleDateString('de-DE')}
+function rentalPeriodLabel(from,to){
+  if(!from)return '';
+  if(!to||to<=from)return 'Mietzeitraum am '+dt(from);
+  return 'Mietzeitraum vom '+dt(from)+' bis '+dt(to);
+}
+function app(html){document.getElementById('app').innerHTML='<div class="fade">'+html+'</div>'}
+function showMsg(id,cls,txt){var m=document.getElementById(id);m.className='msg '+cls;m.textContent=txt}
+
+/* ===================== ANGEBOT ===================== */
+var DOC=null;
+function loadOffer(){
+  /* Wer schon ein Kundenkonto hat (CTOK gesetzt), schickt den Login-Token mit -
+     dann prueft der Server die Identitaet darueber und die PLZ-Frage entfaellt. */
+  var headers=CTOK?{Authorization:'Bearer '+CTOK}:{};
+  fetch(API+'/portal/offer/'+OFFER+'?plz='+encodeURIComponent(PLZ),{headers:headers})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s===401){renderPlzGate();return}
+      if(res.s===429){renderPlzBlocked(res.j.error,renderPlzGate);return}
+      if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte prüft den Link oder meldet euch direkt bei mir.')+'</p></div>');return}
+      DOC=res.j;setDesignKind(docKind(DOC));renderOffer();
+    }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
+}
+/* Nach zu vielen Fehlversuchen: Hinweis mit Weg zurueck zur Eingabe - vorher blieb nur
+   eine Sackgasse ohne Knopf. */
+function renderPlzBlocked(msg,again){
+  app('<div class="card"><div class="kicker">Eure Unterlagen</div><h1>Kurz gesperrt</h1>'+
+    '<div class="msg warn" style="margin-top:10px">'+esc(msg||'Zu viele Fehlversuche. Bitte in etwa 15 Minuten erneut versuchen.')+'</div>'+
+    '<div style="margin-top:16px"><button class="btn" onclick="'+(again===renderMvGate?'renderMvGate()':'renderPlzGate()')+'">Erneut versuchen</button></div></div>');
+}
+function renderPlzGate(){
+  /* Der Gate steht vor dem Laden des Belegs - welcher Typ dahintersteckt, ist hier
+     noch unbekannt. Deshalb neutral formulieren statt immer "Angebot" zu sagen. */
+  app('<div class="card"><div class="kicker">Eure Unterlagen</div><h1>Kurze Sicherheitsfrage</h1>'+
+    '<p class="sub">Zum Schutz eurer Daten: Gebt bitte die Postleitzahl eurer Rechnungsadresse ein.</p>'+
+    '<div class="msg err" id="gateMsg" style="display:'+(PLZ?'block':'none')+'">Die Postleitzahl passt leider nicht – bitte erneut versuchen.</div>'+
+    '<label for="plzIn">Postleitzahl</label><input id="plzIn" inputmode="numeric" maxlength="10" placeholder="z. B. 58675">'+
+    '<div style="margin-top:16px"><button class="btn" onclick="submitPlz()">Unterlagen öffnen</button></div></div>');
+  var inp=document.getElementById('plzIn');
+  inp.focus();
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter')submitPlz()});
+}
+function submitPlz(){
+  PLZ=document.getElementById('plzIn').value.trim();
+  sessionStorage.setItem('portal_plz',PLZ);
+  loadOffer();
+}
+var TYPE_NAME={angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein',gutschrift:'Gutschrift'};
+/* Eckdaten der Veranstaltung, wie sie am Beleg hinterlegt sind. Kommen als JSON-Text
+   vom Server, deshalb beides annehmen. */
+var EV_KIND_LABEL={dj:'DJ',technik:'Technikvermietung',dj_technik:'DJ + Technik'};
+function eventInfoLine(d){
+  var e=d&&d.event_info;
+  if(typeof e==='string'){try{e=JSON.parse(e)}catch(err){e=null}}
+  if(!e||!Number(e.show))return '';
+  var t=[];
+  if(e.kind&&EV_KIND_LABEL[e.kind])t.push(EV_KIND_LABEL[e.kind]);
+  if(e.occasion)t.push(e.occasion);
+  if(e.date)t.push('am '+dt(e.date)+(e.time_from?', ab '+e.time_from+' Uhr':''));
+  else if(e.time_from)t.push('ab '+e.time_from+' Uhr');
+  if(e.venue||e.address)t.push([e.venue,e.address].filter(Boolean).join(', '));
+  if(e.guests)t.push('ca. '+e.guests+' Gäste');
+  return t.join(' · ');
+}
+/* Rechnungsadresse ueber dem Angebot - stand bisher gar nicht in den vom Server
+   gelieferten Daten, deshalb blieb sie im Angebot immer unsichtbar (siehe
+   portalDoc()/portal/offer in api.php). */
+function custAddressLine(){
+  var a=DOC.customer_address;if(!a)return '';
+  var zc=[a.zip,a.city].filter(Boolean).join(' ');
+  return [a.street,zc].filter(Boolean).map(esc).join('<br>');
+}
+/* Zeigt die Eckdaten der Veranstaltung als klar beschriftete Zeilen statt als ein
+   einzelner, schwer lesbarer Kommasatz - "alle wichtigen Infos" sollen auf einen
+   Blick auffindbar sein, nicht nur irgendwo in einem Fliesstext stehen. */
+function eventInfoRows(d){
+  var e=d&&d.event_info;
+  if(typeof e==='string'){try{e=JSON.parse(e)}catch(err){e=null}}
+  if(!e||!Number(e.show))return '';
+  var rows=[];
+  if(e.kind&&EV_KIND_LABEL[e.kind])rows.push(['Art',EV_KIND_LABEL[e.kind]]);
+  if(e.occasion)rows.push(['Anlass',e.occasion]);
+  if(e.date)rows.push(['Termin',dt(e.date)+(e.time_from?', ab '+e.time_from+' Uhr':'')]);
+  else if(e.time_from)rows.push(['Beginn','ab '+e.time_from+' Uhr']);
+  if(e.venue||e.address)rows.push(['Ort',[e.venue,e.address].filter(Boolean).join(', ')]);
+  if(e.guests)rows.push(['Gäste','ca. '+e.guests]);
+  if(!rows.length)return '';
+  return rows.map(function(r){return '<div><b>'+esc(r[0])+':</b> '+esc(r[1])+'</div>'}).join('');
+}
+function lineTotal(it){
+  if(it.is_header)return 0; /* reine Kopfzeile (Artikel/Stückzahl/Tagespreis) - Summe steckt in den Unterpositionen */
+  var g=(Number(it.qty)||0)*(Number(it.unit_price)||0);
+  var dd=Number(it.discount_value)||0;
+  if(!dd)return g;
+  return it.discount_type==='eur'?Math.max(0,g-dd):g*(1-Math.min(100,dd)/100);
+}
+/* Gruppiert Haupt-/Unterpositionen (Miettage-Rabattstaffel) anhand von is_header/group_pos -
+   siehe admin.html equipTierLineItems()/saveDoc() für die Erzeugung. */
+function groupDocItems(items){
+  var headerAt={};
+  items.forEach(function(it,i){if(it.is_header)headerAt[it.pos]=i});
+  var subsOf={};
+  items.forEach(function(it,i){
+    if(it.group_pos!=null&&headerAt[it.group_pos]!=null)(subsOf[it.group_pos]=subsOf[it.group_pos]||[]).push(i);
+  });
+  var consumed={};
+  Object.keys(subsOf).forEach(function(gp){subsOf[gp].forEach(function(i){consumed[i]=true})});
+  var groups=[];
+  items.forEach(function(it,i){
+    if(consumed[i])return;
+    groups.push({main:i,subs:it.is_header?(subsOf[it.pos]||[]):[]});
+  });
+  return groups;
+}
+function groupTotal(items,g){
+  var t=function(it){return it.optional?0:lineTotal(it)};
+  return g.subs.reduce(function(s,i){return s+t(items[i])},t(items[g.main]));
+}
+/* Bei einer Rabattstaffel-Unterposition steckt in it.qty Stückzahl × Tage dieser Stufe (für die
+   korrekte Summe). Angezeigt wird die tatsächliche Stückzahl - es bleiben ja immer gleich viele
+   Geräte, egal wie viele Miettage - die Tage stehen in der Einheit ("Stk. (N Tage)"). */
+function subMenge(it){
+  var m=(it.unit||'').match(/\((\d+) Tage\)/);
+  if(!m)return it.qty;
+  var days=Number(m[1]);
+  return days?Math.round((it.qty/days)*100)/100:it.qty;
+}
+function docRowsHtml(items,f){
+  var groups=groupDocItems(items);
+  return groups.map(function(g,gi){
+    var it=items[g.main],label=String(gi+1);
+    if(!g.subs.length){
+      var info=it.note?'<span class="info">i</span><span class="tip">'+esc(it.note)+'</span>':'';
+      var rab=Number(it.discount_value)?'<div style="font-size:11px;color:var(--grn)">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):Number(it.discount_value)+' %')+'</div>':'';
+      var opt=it.optional?'<div style="font-size:11px;color:var(--mut2)">optional – nicht in der Gesamtsumme enthalten</div>':'';
+      return '<tr><td class="num">'+label+'</td>'+
+        '<td class="pos-desc" onclick="this.classList.toggle(\'open\')">'+esc(it.description)+info+rab+opt+'</td>'+
+        '<td class="num">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
+        '<td class="num">'+euro(lineTotal(it)*f)+'</td></tr>';
+    }
+    var head='<tr class="grouphead"><td class="num" style="font-weight:700">'+label+'</td>'+
+      '<td style="font-weight:700">'+esc(it.description)+
+      '<div style="font-size:10.5px;color:var(--mut2);font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
+      '<td class="num"></td><td class="num"></td></tr>';
+    var subs=g.subs.map(function(si,k){
+      var sit=items[si];
+      var info=sit.note?'<span class="info">i</span><span class="tip">'+esc(sit.note)+'</span>':'';
+      return '<tr class="subrow" style="color:var(--mut)"><td class="num">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
+        '<td class="pos-desc" style="padding-left:18px" onclick="this.classList.toggle(\'open\')">'+esc(sit.description)+info+'</td>'+
+        '<td class="num">'+subMenge(sit)+' '+esc(sit.unit||'')+'</td>'+
+        '<td class="num">'+euro(lineTotal(sit)*f)+'</td></tr>';
+    }).join('');
+    var foot='<tr class="groupfoot"><td></td><td colspan="2" style="text-align:right;font-weight:700;font-size:12.5px">Gesamtsumme der Position</td>'+
+      '<td class="num" style="font-weight:700;font-size:12.5px">'+euro(groupTotal(items,g)*f)+'</td></tr>';
+    return head+subs+foot;
+  }).join('');
+}
+function renderOffer(){
+  var d=DOC.doc,items=DOC.items;
+  var brutto=d.price_mode==='brutto'&&!d.is_small_business;
+  var f=brutto?1:(Number(d.tax_rate)?1/(1+Number(d.tax_rate)/100):1);
+  document.getElementById('foot').innerHTML=esc(DOC.company.name||'')+' · '+esc(DOC.company.owner||'')+
+    (DOC.company.phone?' · '+esc(DOC.company.phone):'');
+  var rows=docRowsHtml(items,f);
+  var totals='';
+  var sub=items.reduce(function(s,it){return s+(it.optional?0:lineTotal(it))},0);
+  var dv=Number(d.discount_value)||0;
+  var disc=dv?(d.discount_type==='eur'?Math.min(sub,dv):sub*Math.min(100,dv)/100):0;
+  if(disc)totals+='<tr class="totals"><td colspan="3" class="num">Zwischensumme</td><td class="num">'+euro(sub*f)+'</td></tr>'+
+    '<tr class="totals"><td colspan="3" class="num" style="color:var(--grn)">Euer Rabatt'+(d.discount_type==='pct'?' ('+dv+' %)':'')+'</td><td class="num" style="color:var(--grn)">−'+euro(disc*f)+'</td></tr>';
+  if(brutto){
+    totals+='<tr class="totals"><td colspan="3" class="num"><b>Gesamt inkl. USt.</b></td><td class="num grand">'+euro(d.total_gross)+'</td></tr>'+
+      '<tr class="totals"><td colspan="3" class="num" style="color:var(--mut2)">darin enthaltene USt. '+Number(d.tax_rate)+' %</td><td class="num" style="color:var(--mut2)">'+euro(d.total_tax)+'</td></tr>';
+  }else{
+    totals+='<tr class="totals"><td colspan="3" class="num">Netto</td><td class="num">'+euro(d.total_net)+'</td></tr>';
+    if(!d.is_small_business)totals+='<tr class="totals"><td colspan="3" class="num">USt. '+Number(d.tax_rate)+' %</td><td class="num">'+euro(d.total_tax)+'</td></tr>';
+    totals+='<tr class="totals"><td colspan="3" class="num"><b>Gesamt</b></td><td class="num grand">'+euro(d.total_gross)+'</td></tr>';
+  }
+  /* Schlussrechnung: erhaltene Zahlungen (Abschlaege, Teilzahlungen) sind verrechnet -
+     ohne diese Zeilen stand beim Kunden die volle Auftragssumme. */
+  if(Number(d.deposit_deducted)>0)
+    totals+='<tr class="totals"><td colspan="3" class="num">abzüglich erhaltener Zahlungen</td><td class="num">−'+euro(d.deposit_deducted)+'</td></tr>'+
+      '<tr class="totals"><td colspan="3" class="num"><b>Verbleibender Restbetrag</b></td><td class="num grand">'+euro(Number(d.total_gross)-Number(d.deposit_deducted))+'</td></tr>';
+  /* Nur ein Angebot wird angenommen oder abgelehnt. Bei einer Rechnung gehört dorthin
+     kein "unverbindlich"-Text und kein Unterschriftsfeld, sondern nur der Nachrichtenweg. */
+  var istAngebot=d.doc_type==='angebot';
+  var decided=!istAngebot||['angenommen','abgelehnt','bezahlt','storniert'].indexOf(d.status)>=0;
+  /* Sonderfaelle der Annahme (kommen vom Server, damit sie auch nach Neuladen stimmen):
+     Termin war inzwischen belegt bzw. Angebot war schon abgelaufen. Dazu der Hinweis
+     VOR der Annahme, wenn die Gueltigkeit vorbei ist - Serverdatum, nicht Geraeteuhr. */
+  var konflikt=istAngebot&&DOC.annahme==='konflikt'&&d.status==='storniert';
+  var nachAblauf=istAngebot&&DOC.annahme==='abgelaufen'&&d.status==='angenommen';
+  var abgelaufen=istAngebot&&!decided&&!!d.valid_until&&(DOC.today||new Date().toISOString().slice(0,10))>String(d.valid_until).slice(0,10);
+  /* Versionsstand: Markus kann ein versendetes Angebot nachbessern - der Kunde sieht unter
+     demselben Link dann den neuen Stand. Damit das nicht stillschweigend passiert, steht
+     die Version dabei, und wer schon einen aelteren Stand gesehen hat, bekommt einen Hinweis.
+     Gemerkt wird die zuletzt gesehene Version im Browser (localStorage, je Link) - der
+     Kunde kommt in der Regel per Mail in einem neuen Tab wieder, sessionStorage waere da leer. */
+  var ver=Number(d.version)||1,verKey='portal_ver_'+OFFER;
+  try{
+    var seen=Number(localStorage.getItem(verKey)||0);
+    if(seen&&seen<ver)VER_UPDATED=true;
+    localStorage.setItem(verKey,String(ver));
+  }catch(e){}
+  var verLine=ver>1?' · Version '+ver+(d.version_at?' (aktualisiert am '+dt(d.version_at.slice(0,10))+')':''):'';
+  /* Storno und Gutschrift muessen auch hier eindeutig sein: Banner "STORNIERT am ..." (plus
+     Korrekturbelege), Gutschrift mit "zu Rechnung ... vom ..." - und bei Storno keine
+     Zahlungsaufforderung ("Zahlbar bis") mehr. */
+  var bz=DOC.bezug||{},storniert=d.status==='storniert';
+  var stornoBox=storniert?'<div class="msg err" style="margin:0 0 12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Storniert'+(d.storno_at?' am '+dt(d.storno_at.slice(0,10)):'')+
+    ((bz.korrigiert_durch||[]).length?'<div style="font-weight:400;letter-spacing:0;text-transform:none;margin-top:3px">Korrigiert durch '+bz.korrigiert_durch.map(function(x){return (TYPE_NAME[x.doc_type]||'Beleg')+' '+esc(x.number)}).join(', ')+' – dieser Beleg ist nicht mehr zu bezahlen.</div>':
+      '<div style="font-weight:400;letter-spacing:0;text-transform:none;margin-top:3px">Dieser Beleg ist ungültig und nicht zu bezahlen.</div>')+'</div>':'';
+  var parentLine=d.doc_type==='gutschrift'&&bz.parent?' · zu '+(TYPE_NAME[bz.parent.doc_type]||'Rechnung')+' '+esc(bz.parent.number)+' vom '+dt(bz.parent.doc_date):'';
+  var statusLine=d.status==='angenommen'?'<span class="status-b">'+(nachAblauf?'Angenommen – wird noch geprüft':'✓ Angenommen – danke euch!')+'</span>':
+    (d.status==='abgelehnt'?'<span class="status-b" style="border-color:var(--mut2);color:var(--mut)">Abgelehnt</span>':'');
+  /* Wer aus dem eigenen Kundenkonto kommt (CTOK gesetzt), soll ohne Browser-Zurück
+     wieder in seine Unterlagen finden - ohne Konto gibt es dieses Ziel nicht. */
+  app(
+    (CTOK?'<p class="sub" style="margin:0 0 14px"><a href="portal.html">← Zurück zu meinen Unterlagen</a></p>':'')+
+    '<div class="card">'+stornoBox+'<div class="kicker">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+verLine+parentLine+'</div>'+
+    (VER_UPDATED?'<div class="msg warn" style="margin-top:0">Dieses Angebot wurde seit deinem letzten Besuch aktualisiert – jetzt Version '+ver+'.</div>':'')+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
+    '<div><h1>Hallo '+esc(DOC.customer)+'!</h1>'+
+    (custAddressLine()?'<p class="sub">'+custAddressLine()+'</p>':'')+
+    '<p class="sub">vom '+dt(d.doc_date)+(d.valid_until&&!storniert?' · gültig bis '+dt(d.valid_until):'')+(d.status==='bezahlt'&&d.doc_type!=='gutschrift'?(d.settled_by?' · verrechnet in der Schlussrechnung'+(DOC.settled_by_number?' '+esc(DOC.settled_by_number):''):' · bezahlt'+(d.paid_at?' am '+dt(d.paid_at.slice(0,10)):'')):(d.due_date&&!storniert&&d.doc_type!=='gutschrift'?' · zahlbar bis '+dt(d.due_date):''))+(rentalPeriodLabel(d.rental_from,d.rental_to)?' · '+rentalPeriodLabel(d.rental_from,d.rental_to):'')+'</p>'+
+    /* Teilzahlung: der Kunde soll den Rest sehen, nicht noch einmal den vollen Betrag */
+    (Number(DOC.paid_sum)>0&&d.status!=='bezahlt'&&!storniert&&['rechnung','abschlag','schluss'].indexOf(d.doc_type)>=0
+      ?'<p class="sub" style="margin-top:6px"><b>Erhalten '+euro(DOC.paid_sum)+' · Rest '+euro(DOC.open_amount)+' offen</b> – danke für die Anzahlung.</p>':'')+'</div>'+
+    '<button class="btn g" onclick="downloadPdf()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Als PDF speichern</button></div>'+
+    (eventInfoRows(d)?'<div class="sub" style="margin-top:12px;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:9px 12px">'+eventInfoRows(d)+'</div>':'')+
+    (statusLine?'<div style="margin-top:12px">'+statusLine+'</div>':'')+
+    (d.intro_text?'<p style="margin-top:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
+    '</div>'+
+    (!DOC.has_account?
+      '<div class="card" style="padding:14px 24px"><p class="sub" style="margin:0">Noch keinen Zugang zu deinem Kundenkonto? '+
+      '<a href="portal.html?register=1">Kundenkonto anlegen</a> – du bekommst dann einen Link zum Passwort setzen per E-Mail. Danach musst du dich nicht mehr mit der Postleitzahl ausweisen und hast alle Unterlagen an einem Ort.</p></div>':'')+
+    (d.doc_type==='lieferschein'
+      ?'<div class="card"><table><thead><tr><th class="num">#</th><th>Artikel</th><th class="num">Menge</th></tr></thead><tbody>'+lsRowsHtml(items,false)+'</tbody></table>'+
+       '<p class="hint">Übergabeprotokoll – die Preise stehen im Angebot bzw. auf der Rechnung.</p></div>'
+      :'<div class="card"><table><thead><tr><th class="num">#</th><th>Leistung</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>'+
+    '<p class="hint">Tipp: Tippt auf eine Position mit dem <b style="color:var(--acc)">i</b> – dort erkläre ich, was genau dahintersteckt.</p></div>')+
+    ((DOC.upsells&&DOC.upsells.length&&!decided)?
+      '<div class="card"><h3 style="margin-bottom:4px">Noch eine Schippe drauf?</h3>'+
+      '<p class="sub">Falls ihr noch überlegt: Diese Extras werden oft dazugebucht. Klickt an, was euch interessiert – ich sage euch, was es für euren Termin kostet.</p>'+
+      '<div class="ups">'+DOC.upsells.map(function(u){
+        return '<div class="up" id="up-'+u.id+'"><h4>'+esc(u.title)+'</h4><p>'+esc(u.description||'')+'</p>'+
+        '<div class="upp">+ '+euro(u.price_net)+' <small style="font-weight:400;color:var(--mut2)">inkl. USt.</small></div>'+
+        '<button class="btn g" onclick="askUpsell(\''+u.id+'\',this)">Interessiert mich</button></div>';
+      }).join('')+'</div></div>':'')+
+    (d.outro_text?'<div class="card"><p style="white-space:pre-wrap" class="sub">'+esc(d.outro_text)+'</p></div>':'')+
+    agreementsHtml(false)+
+    (function(){
+      var rv=DOC.reviews||{};if(!rv.google_url)return '';
+      return '<div class="card" style="padding:16px 24px;font-size:13px;color:var(--mut)">'+
+        (rv.tagline?'<b style="color:var(--txt)">'+esc(rv.tagline)+'</b> – ':'')+
+        'Ihr wollt wissen, wie andere ihre Feier mit mir erlebt haben? '+
+        (safeUrl(rv.google_url)
+          ? '<a href="'+esc(safeUrl(rv.google_url))+'" target="_blank" rel="noopener noreferrer">★ Google-Bewertungen ↗</a>'
+          : '')+'</div>';
+    })()+
+    '<div class="card" id="actionCard">'+
+    (konflikt?konfliktCard():decided?
+      (DOC.bande&&istAngebot&&d.status==='abgelehnt'?bandeDoneHtml():'')+
+      (nachAblauf?'<div class="msg warn">Danke – das Angebot war allerdings schon abgelaufen (gültig bis '+dt(d.valid_until)+'). '+esc(ownerFirstPub())+' prüft es jetzt persönlich und meldet sich kurz – der Termin ist bis dahin noch nicht fest.</div>':'')+
+      '<p class="sub">'+(!istAngebot?('Fragen zu'+(d.doc_type==='bestaetigung'?'r Auftragsbestätigung':'r Rechnung')+'? Schreibt mir einfach hier, ich melde mich:')
+        :(d.status==='angenommen'?(nachAblauf?'Wenn euch bis dahin noch etwas einfällt, schreibt mir hier:':'Ich melde mich zeitnah bei euch mit den nächsten Schritten. Wenn euch noch etwas einfällt, schreibt mir hier:'):'Ihr habt Fragen oder wollt doch nochmal sprechen? Schreibt mir gerne:'))+'</p>'+
+      '<div class="msg" id="aMsg"></div>'+
+      '<label for="cmt">Nachricht</label><textarea id="cmt"></textarea>'+
+      '<div class="actions" style="margin-top:12px"><button class="btn g" onclick="act(\'comment\')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Nachricht senden</button></div>'
+      :
+      '<h3 style="margin-bottom:6px">Wie möchtet ihr weitermachen?</h3>'+
+      '<p class="sub">Alles unverbindlich bis zur Annahme – und Fragen kosten nichts.</p>'+
+      (abgelaufen?'<div class="msg warn" id="expiredHint">Dieses Angebot ist seit dem '+dt(d.valid_until)+' abgelaufen – annehmen geht trotzdem, '+esc(ownerFirstPub())+' prüft es dann nochmal.</div>':'')+
+      '<div class="msg" id="aMsg"></div>'+
+      '<div class="actions" style="margin-top:16px">'+
+      '<button class="btn green" onclick="confirmAccept()">✓ Angebot annehmen</button>'+
+      '<button class="btn g" onclick="toggle(\'cmtBox\')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Frage / Anmerkung</button>'+
+      '<button class="btn g" onclick="toggle(\'cbBox\')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Rückruf wünschen</button>'+
+      '<button class="btn g" onclick="toggle(\'declBox\')">Eher nicht …</button>'+
+      (waLink('Hallo'+(ownerFirstPub()?' '+ownerFirstPub():'')+', es geht um das Angebot '+d.number+': ')?'<a class="btn g" href="'+waLink('Hallo'+(ownerFirstPub()?' '+ownerFirstPub():'')+', es geht um das Angebot '+d.number+': ')+'" target="_blank" rel="noopener">'+WA_IC+' Per WhatsApp</a>':'')+'</div>'+
+      '<div id="accBox" class="hidden"><h3 style="font-size:16px;margin:8px 0 4px">Verbindlich beauftragen</h3>'+
+      '<p class="sub" style="font-size:13px">'+(abgelaufen?'Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an – weil es schon abgelaufen ist, schaut '+esc(ownerFirstPub())+' danach noch einmal drüber und meldet sich bei euch.':'Mit Name und Unterschrift nehmt ihr das Angebot verbindlich an – danach ist euer Termin fest reserviert und ihr bekommt eine Bestätigung.')+'</p>'+
+      '<label for="accName">Vor- und Nachname</label><input id="accName" autocomplete="name">'+
+      '<label>Unterschrift (mit Finger oder Maus)</label>'+
+      '<canvas id="accSig" style="width:100%;height:150px;background:#fff;border-radius:4px;touch-action:none;cursor:crosshair"></canvas>'+
+      '<div style="margin-top:6px"><a onclick="accClear()" style="cursor:pointer;font-size:13px">↺ Feld leeren</a></div>'+
+      '<div style="margin-top:12px"><button class="btn green" onclick="doAccept()">✓ Jetzt verbindlich annehmen</button></div></div>'+
+      '<div id="cmtBox" class="hidden"><label for="cmt">Eure Frage oder Anmerkung</label><textarea id="cmt"></textarea>'+
+      '<div style="margin-top:10px"><button class="btn" onclick="act(\'comment\')">Senden</button></div></div>'+
+      '<div id="cbBox" class="hidden"><label for="cbPhone">Telefonnummer & wann ihr gut erreichbar seid</label><input id="cbPhone" placeholder="z. B. 0171 1234567, abends ab 18 Uhr">'+
+      '<div style="margin-top:10px"><button class="btn" onclick="act(\'callback\')">Rückruf anfordern</button></div></div>'+
+      '<div id="declBox" class="hidden">'+
+      '<label for="declMsg">Mögt ihr kurz sagen, woran es liegt? (optional)</label><textarea id="declMsg" placeholder="z. B. Budget, anderer Stil, Termin geändert …" style="min-height:70px"></textarea>'+
+      bandeOptHtml()+
+      '<div style="margin-top:10px"><button class="btn" onclick="decline()">Absagen'+(agencyOn()?' &amp; ggf. Vorschläge erhalten':'')+'</button></div></div>'
+    )+'</div>');
+}
+/* Einwilligung zur DJ-Vermittlung - dieselbe Formulierung bei der Absage und beim
+   Terminkonflikt, damit der Kunde in beiden Faellen genau dasselbe zusagt. */
+function bandeOptHtml(){
+  /* Ohne eingerichtete Partner-Agentur (Backoffice -> Einstellungen -> Betreiber) gibt es
+     keine Vermittlung - dann erscheint der Haken gar nicht erst. */
+  if(!agencyOn())return '';
+  var c=coOf(),ag=c.agency_name+(c.agency_city?', '+c.agency_city:'');
+  return '<label class="chk"><input type="checkbox" id="bandeOpt"><span><b style="color:var(--txt)">Trotzdem einen richtig guten DJ finden – kostenlos.</b> Ich wähle persönlich bis zu fünf passende Kollegen aus meinem Partner-Netzwerk aus, die zu eurer Feier und eurem Budget passen – die Vorschläge bekommt ihr direkt von mir. Die Agentur hat deutschlandweit geprüfte DJs – der Kollege für eure Feier kommt aus eurer Gegend, nicht automatisch vom Sitz der Agentur. Mit dem Haken willigt ihr ein, dass ich eure Eckdaten dafür an meine Partner-Agentur ('+esc(ag)+') weitergebe.</span></label>';
+}
+/* Der Kunde wollte annehmen, aber der Termin ist seit dem Angebot anderweitig fest
+   geworden - ehrlich sagen und gleich die Vermittlung anbieten, statt nur "storniert". */
+function konfliktCard(){
+  var phone=DOC.company&&DOC.company.phone;
+  return '<h3 style="margin-bottom:6px">Ups – der Termin ist inzwischen leider vergeben</h3>'+
+    '<p class="sub">Ihr wolltet gerade annehmen, aber seit dem Angebot ist bei mir an dem Tag eine andere Feier fest geworden. Das tut mir wirklich leid – so kann ich das Angebot nicht mehr erfüllen.'+(agencyOn()?' Allein lasse ich euch damit aber nicht: Über mein Partner-Netzwerk finde ich euch gern einen richtig guten DJ.':'')+'</p>'+
+    '<div class="msg" id="aMsg"></div>'+
+    (!agencyOn()?'':DOC.bande
+      ?bandeDoneHtml()
+      :'<div id="bandeBox">'+bandeOptHtml()+'<div style="margin-top:10px"><button class="btn" onclick="bandeRequest()">Vorschläge anfordern</button></div></div>')+
+    '<p class="sub" style="margin-top:14px">Oder ruft mich einfach an'+(phone?': '+esc(phone):'')+' – wir finden eine Lösung.</p>';
+}
+/* Nach dem Opt-in: Dank plus Link zum Vorauswahl-Bogen, den der Server gerade angelegt und
+   gemailt hat - so kann der Kunde sofort loslegen, ohne erst ins Postfach zu schauen. */
+function bandeDoneHtml(){
+  return '<div class="msg ok" id="bandeDone">Danke – eure Anfrage nach Vorschlägen ist bei mir. Ich suche passende Kollegen raus und melde mich bei euch.'+
+    (DOC.bande_link?'<br><br>Damit die Vorschläge wirklich passen: <a href="'+esc(DOC.bande_link)+'"><b>Kurzen Vorauswahl-Bogen ausfüllen</b></a> (keine 5 Minuten) – den Link habt ihr auch per E-Mail bekommen.':'')+'</div>';
+}
+function bandeRequest(){
+  if(!document.getElementById('bandeOpt').checked){showMsg('aMsg','err','Bitte setzt den Haken – ohne eure Einwilligung darf ich eure Daten nicht weitergeben.');return}
+  sendAction('bande','Kunde wünscht nach Terminkonflikt DJ-Bande-Vorschläge (Einwilligung zur Datenweitergabe erteilt).',null,function(j){
+    DOC.bande=true;if(j&&j.form_link)DOC.bande_link=j.form_link;
+    if(j&&j.form_link)openFormInline(j.form_link);else renderOffer()});
+}
+/* Nach dem Opt-in sofort in den Vorauswahl-Bogen - auf derselben Seite, ohne Umweg
+   ueber das Postfach (die Mail mit dem Link bleibt als Rueckfall). Der Bogen liest den
+   Token aus dem Link; die Adresszeile wird mitgezogen, damit ein Neuladen im Bogen bleibt. */
+function openFormInline(link){
+  var m=/[?&]f=([a-f0-9]+)/.exec(link||'');
+  if(!m){location.href=link;return}
+  FORM=m[1];
+  try{history.replaceState(null,'','portal.html?f='+FORM)}catch(e){}
+  window.scrollTo(0,0);
+  loadForm();
+}
+function toggle(id){['accBox','cmtBox','cbBox','declBox'].forEach(function(x){
+  var el=document.getElementById(x);if(!el)return;
+  el.classList.toggle('hidden',x!==id||!el.classList.contains('hidden'))})}
+var accDirty=false,VER_UPDATED=false;
+function confirmAccept(){
+  toggle('accBox');
+  if(!document.getElementById('accBox').classList.contains('hidden'))accInit();
+}
+function accInit(){
+  var c=document.getElementById('accSig'),ctx=c.getContext('2d'),draw=false,lx=0,ly=0;
+  c.width=c.clientWidth;c.height=150;accDirty=false;
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+  ctx.strokeStyle='#1a2233';ctx.lineWidth=2.2;ctx.lineCap='round';ctx.lineJoin='round';
+  function pos(e){var r=c.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
+  c.onpointerdown=function(e){e.preventDefault();c.setPointerCapture(e.pointerId);draw=true;var p=pos(e);lx=p[0];ly=p[1]};
+  c.onpointermove=function(e){if(!draw)return;e.preventDefault();var p=pos(e);
+    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(p[0],p[1]);ctx.stroke();lx=p[0];ly=p[1];accDirty=true};
+  c.onpointerup=c.onpointercancel=function(){draw=false};
+}
+function accClear(){
+  var c=document.getElementById('accSig'),ctx=c.getContext('2d');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);accDirty=false;
+}
+/* Jede Aktion schickt dieselben Kopfzeilen wie loadOffer(): Wer per Kundenkonto
+   eingeloggt ist, weist sich über den Token aus – sonst verlangt der Server die PLZ,
+   die der eingeloggte Kunde aber nie eingegeben hat. */
+function offerHeaders(){var h={'Content-Type':'application/json'};if(CTOK)h.Authorization='Bearer '+CTOK;return h}
+function doAccept(){
+  var name=document.getElementById('accName').value.trim();
+  if(!name){showMsg('aMsg','err','Bitte Vor- und Nachnamen eintragen.');return}
+  if(!accDirty){showMsg('aMsg','err','Bitte im Unterschriftsfeld unterschreiben.');return}
+  fetch(API+'/portal/offer/'+OFFER+'/action',{
+    method:'POST',headers:offerHeaders(),
+    body:JSON.stringify({plz:PLZ,action:'accept',message:'',phone:'',name:name,
+      signature:document.getElementById('accSig').toDataURL('image/png')})
+  /* Die Erklärung des Servers durchreichen: Sonst sieht der Kunde bei jeder Absage nur
+     "Senden fehlgeschlagen" und erfährt nie, woran es lag. */
+  }).then(function(r){
+    if(r.ok){loadOffer();return}
+    return r.json().catch(function(){return null}).then(function(j){
+      throw new Error((j&&j.error)||'Senden fehlgeschlagen – bitte erneut versuchen.');
+    });
+  }).catch(function(e){showMsg('aMsg','err',e.message||'Senden fehlgeschlagen – bitte erneut versuchen.')});
+}
+function decline(){
+  var optEl=document.getElementById('bandeOpt'),opt=!!(optEl&&optEl.checked);
+  /* Erst das Opt-in melden, dann neu laden: Sonst kommt die Seite ohne den frisch
+     angelegten Vorauswahl-Bogen zurueck. */
+  /* bande:true sagt dem Server, dass gleich die Vermittlungs-Mail folgt - dann verschickt
+     er zur Absage keine eigene Bestaetigung, sonst kaemen zwei Mails in derselben Minute. */
+  sendAction('decline',document.getElementById('declMsg').value,null,function(){
+    if(opt)sendAction('bande','Kunde wünscht DJ-Bande-Vorschläge (Einwilligung zur Datenweitergabe erteilt).',null,function(j){
+      if(j&&j.form_link){DOC.bande_link=j.form_link;openFormInline(j.form_link)}else loadOffer()});
+    else loadOffer();
+  },{bande:opt});
+}
+function act(kind,msg,phone,after){
+  msg=msg!==undefined&&msg!==null?msg:(document.getElementById('cmt')?document.getElementById('cmt').value:'');
+  phone=phone||(document.getElementById('cbPhone')?document.getElementById('cbPhone').value:'');
+  if(kind==='comment'&&!msg.trim()){showMsg('aMsg','err','Bitte erst eine Nachricht eintragen.');return}
+  if(kind==='callback'&&!phone.trim()){showMsg('aMsg','err','Bitte Telefonnummer angeben.');return}
+  sendAction(kind,msg,phone,function(){
+    if(kind==='accept'||kind==='decline'){loadOffer()}
+    else showMsg('aMsg','ok',kind==='callback'?'Rückruf-Wunsch ist angekommen – ich melde mich!':'Nachricht ist angekommen – ich melde mich zeitnah!');
+    if(after)after();
+  });
+}
+function sendAction(kind,msg,phone,cb,extra){
+  fetch(API+'/portal/offer/'+OFFER+'/action',{
+    method:'POST',headers:offerHeaders(),
+    body:JSON.stringify(Object.assign({plz:PLZ,action:kind,message:msg||'',phone:phone||''},extra||{}))
+  }).then(function(r){
+    if(r.ok)return r.json().catch(function(){return null}).then(function(j){if(cb)cb(j)});
+    return r.json().catch(function(){return null}).then(function(j){
+      throw new Error((j&&j.error)||'Senden fehlgeschlagen – bitte erneut versuchen oder ruft mich direkt an.');
+    });
+  }).catch(function(e){showMsg('aMsg','err',e.message||'Senden fehlgeschlagen – bitte erneut versuchen oder ruft mich direkt an.')});
+}
+
+function askUpsell(id,btn){
+  var u=(DOC.upsells||[]).find(function(x){return x.id===id});if(!u)return;
+  sendAction('comment','Interesse an Extra: '+u.title+' (+ '+euro(u.price_net)+' brutto)',null,function(){
+    btn.textContent='✓ Angefragt – ich melde mich!';btn.disabled=true;
+    document.getElementById('up-'+id).classList.add('asked');
+  });
+}
+/* Wie docRowsHtml(), aber für die statische PDF-Ansicht: Erklärung steht direkt unter der
+   Position statt in einem Hover-Tooltip. */
+function docRowsHtmlPrint(items,f){
+  var groups=groupDocItems(items);
+  return groups.map(function(g,gi){
+    var it=items[g.main],label=String(gi+1);
+    if(!g.subs.length){
+      var rab=Number(it.discount_value)?'<div style="font-size:10px;color:#666">Rabatt: −'+(it.discount_type==='eur'?euro(it.discount_value*f):Number(it.discount_value)+' %')+'</div>':'';
+      var opt=it.optional?'<div style="font-size:10px;color:#666">optional – nicht in der Gesamtsumme enthalten</div>':'';
+      return '<tr><td style="padding:6px;border-bottom:1px solid #ddd">'+label+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd">'+esc(it.description)+rab+opt+
+      (it.note?'<div style="font-size:10px;color:#666;margin-top:2px">'+esc(it.note)+'</div>':'')+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+Number(it.qty)+' '+esc(it.unit||'')+'</td>'+
+      '<td style="padding:6px;border-bottom:1px solid #ddd;text-align:right;white-space:nowrap">'+euro(lineTotal(it)*f)+'</td></tr>';
+    }
+    var head='<tr><td style="padding:5px 6px 1px;font-weight:700">'+label+'</td>'+
+      '<td style="padding:5px 6px 1px;font-weight:700">'+esc(it.description)+
+      '<div style="font-size:9px;color:#666;font-weight:400">'+it.qty+' Stk. · Stückpreis '+euro(it.unit_price*f)+' / Tag</div></td>'+
+      '<td style="padding:5px 6px 1px"></td><td style="padding:5px 6px 1px"></td></tr>';
+    var subs=g.subs.map(function(si,k){
+      var sit=items[si];
+      return '<tr style="font-size:9px;color:#555"><td style="padding:0 6px 0 18px">'+label+'.'+String.fromCharCode(65+k)+'</td>'+
+      '<td style="padding:0 6px">'+esc(sit.description)+
+      (sit.note?'<div style="font-size:8px;color:#888">'+esc(sit.note)+'</div>':'')+'</td>'+
+      '<td style="padding:0 6px;text-align:right;white-space:nowrap">'+subMenge(sit)+' '+esc(sit.unit||'')+'</td>'+
+      '<td style="padding:0 6px;text-align:right;white-space:nowrap">'+euro(lineTotal(sit)*f)+'</td></tr>';
+    }).join('');
+    var foot='<tr><td></td><td colspan="2" style="padding:2px 6px 5px;text-align:right;font-weight:700;border-bottom:1px solid #ddd;font-size:10.5px">Gesamtsumme der Position</td>'+
+      '<td style="padding:2px 6px 5px;text-align:right;font-weight:700;border-bottom:1px solid #ddd;font-size:10.5px">'+euro(groupTotal(items,g)*f)+'</td></tr>';
+    return head+subs+foot;
+  }).join('');
+}
+/* Lieferschein: Uebergabeprotokoll ohne Preise - nur Artikel und Mengen (Bildschirm + PDF). */
+function lsRowsHtml(items,print){
+  var td=print?'padding:6px;border-bottom:1px solid #ddd':'';
+  return items.filter(function(it){return it.description&&!Number(it.is_header)}).map(function(it,i){
+    return '<tr><td class="num" style="'+td+'">'+(i+1)+'</td><td style="'+td+'">'+esc(it.description)+(it.note?'<div style="font-size:11px;color:'+(print?'#666':'var(--mut2)')+'">'+esc(it.note)+'</div>':'')+'</td>'+
+      '<td class="num" style="'+td+(print?';text-align:right;white-space:nowrap':'')+'">'+Number(it.qty)+' '+esc(it.unit||'')+'</td></tr>';
+  }).join('');
+}
+/* "Vereinbarungen" (Angebot/AB) bzw. "Zahlungsbedingungen" (Rechnungen), fertig vom Server */
+function agreementsTitle(d){return ['rechnung','abschlag','schluss'].indexOf(d.doc_type)>=0?'Zahlungsbedingungen':'Vereinbarungen'}
+function agreementsHtml(print){
+  var a=DOC.agreements;if(!a||DOC.doc.status==='storniert')return '';
+  var html=esc(a).replace(/(https?:\/\/[^\s<]+)/g,function(u){return '<a href="'+u+'" target="_blank" rel="noopener"'+(print?' style="color:#111"':'')+'>'+u+'</a>'});
+  if(print)return '<div style="margin:16px 0 14px;padding:10px 12px;border:1px solid #ddd;border-left:3px solid #111;border-radius:4px;font-size:10.5px;color:#333;line-height:1.5;page-break-inside:avoid">'+
+    '<div style="font-weight:700;margin-bottom:4px;font-size:11px">'+agreementsTitle(DOC.doc)+'</div><div style="white-space:pre-wrap">'+html+'</div></div>';
+  return '<div class="card"><h3 style="margin-bottom:6px">'+agreementsTitle(DOC.doc)+'</h3><div class="sub" style="white-space:pre-wrap;font-size:13px">'+html+'</div></div>';
+}
+function downloadPdf(){
+  var d=DOC.doc,c=DOC.company;
+  var brutto=d.price_mode==='brutto'&&!d.is_small_business;
+  var f=brutto?1:(Number(d.tax_rate)?1/(1+Number(d.tax_rate)/100):1);
+  var rows=docRowsHtmlPrint(DOC.items,f);
+  var sub=DOC.items.reduce(function(s,it){return s+(it.optional?0:lineTotal(it))},0);
+  var dv=Number(d.discount_value)||0;
+  var disc=dv?(d.discount_type==='eur'?Math.min(sub,dv):sub*Math.min(100,dv)/100):0;
+  var totals='';
+  if(disc)totals+='<tr><td colspan="3" style="text-align:right;padding:6px">Zwischensumme</td><td style="text-align:right;padding:6px">'+euro(sub*f)+'</td></tr>'+
+    '<tr><td colspan="3" style="text-align:right;padding:6px">Rabatt'+(d.discount_type==='pct'?' ('+dv+' %)':'')+'</td><td style="text-align:right;padding:6px">−'+euro(disc*f)+'</td></tr>';
+  if(brutto){
+    totals+='<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700">Gesamtbetrag</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(d.total_gross)+'</td></tr>'+
+      '<tr><td colspan="3" style="text-align:right;padding:6px;color:#666">darin enthaltene USt. '+Number(d.tax_rate)+' %</td><td style="text-align:right;padding:6px;color:#666">'+euro(d.total_tax)+'</td></tr>';
+  }else{
+    totals+='<tr><td colspan="3" style="text-align:right;padding:6px">Netto</td><td style="text-align:right;padding:6px">'+euro(d.total_net)+'</td></tr>';
+    if(!d.is_small_business)totals+='<tr><td colspan="3" style="text-align:right;padding:6px">USt. '+Number(d.tax_rate)+' %</td><td style="text-align:right;padding:6px">'+euro(d.total_tax)+'</td></tr>';
+    totals+='<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700">Gesamt</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(d.total_gross)+'</td></tr>';
+  }
+  if(Number(d.deposit_deducted)>0)
+    totals+='<tr><td colspan="3" style="text-align:right;padding:6px">abzüglich erhaltener Zahlungen</td><td style="text-align:right;padding:6px">−'+euro(d.deposit_deducted)+'</td></tr>'+
+      '<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">Verbleibender Restbetrag</td><td style="text-align:right;padding:6px;font-weight:700;border-top:2px solid #111">'+euro(Number(d.total_gross)-Number(d.deposit_deducted))+'</td></tr>';
+  if(Number(DOC.paid_sum)>0&&d.status!=='bezahlt'&&['rechnung','abschlag','schluss'].indexOf(d.doc_type)>=0)
+    totals+='<tr><td colspan="3" style="text-align:right;padding:6px">davon bereits erhalten</td><td style="text-align:right;padding:6px">'+euro(DOC.paid_sum)+'</td></tr>'+
+      '<tr><td colspan="3" style="text-align:right;padding:6px;font-weight:700">Noch offen</td><td style="text-align:right;padding:6px;font-weight:700">'+euro(DOC.open_amount)+'</td></tr>';
+  var bz=DOC.bezug||{},storniert=d.status==='storniert';
+  var banner=storniert?'<div style="border:2px solid #b00000;color:#b00000;padding:8px 12px;margin-bottom:18px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:13px">Storniert'+(d.storno_at?' am '+dt(d.storno_at.slice(0,10)):'')+
+    ((bz.korrigiert_durch||[]).length?'<div style="font-weight:400;letter-spacing:0;text-transform:none;font-size:11px;margin-top:2px">Korrigiert durch '+bz.korrigiert_durch.map(function(x){return (TYPE_NAME[x.doc_type]||'Beleg')+' '+esc(x.number)}).join(', ')+'</div>':'')+'</div>':'';
+  var parentSub=d.doc_type==='gutschrift'&&bz.parent?'<div style="color:#555;font-size:11px">zu '+(TYPE_NAME[bz.parent.doc_type]||'Rechnung')+' '+esc(bz.parent.number)+' vom '+dt(bz.parent.doc_date)+'</div>':'';
+  document.getElementById('printArea').innerHTML=
+  '<div style="max-width:720px;margin:0 auto;padding:40px 20px;font-family:Inter,Arial,sans-serif;font-size:12px;line-height:1.55;color:#111">'+banner+
+  '<div style="display:flex;justify-content:space-between;margin-bottom:36px"><div>'+
+  '<div style="font-size:20px;font-weight:700">'+esc(c.name||'')+'</div>'+
+  '<div style="color:#555">'+esc(c.owner||'')+'</div></div>'+
+  '<div style="text-align:right;color:#555">'+esc(c.street||'')+'<br>'+esc(c.zip_city||'')+'<br>'+esc(c.phone||'')+'<br>'+esc(c.email||'')+'</div></div>'+
+  '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px">'+
+  '<div><div style="font-size:17px;font-weight:700">'+(TYPE_NAME[d.doc_type]||'Dokument')+' '+esc(d.number)+'</div>'+parentSub+'</div>'+
+  '<div style="text-align:right;color:#555">Für: '+esc(DOC.customer)+'<br>Datum: '+dt(d.doc_date)+((Number(d.version)||1)>1?'<br>Version '+d.version+(d.version_at?' vom '+dt(d.version_at.slice(0,10)):''):'')+
+  (d.valid_until&&!storniert?'<br>Gültig bis: '+dt(d.valid_until):'')+(d.due_date&&!storniert?'<br>Zahlbar bis: '+dt(d.due_date):'')+'</div></div>'+
+  (eventInfoLine(d)?'<div style="border:1px solid #ddd;border-left:3px solid #111;border-radius:4px;padding:7px 10px;margin-bottom:16px;color:#333">'+esc(eventInfoLine(d))+'</div>':'')+
+  (d.intro_text?'<p style="margin-bottom:16px;white-space:pre-wrap">'+esc(d.intro_text)+'</p>':'')+
+  (d.doc_type==='lieferschein'
+    ?'<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2"><th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Artikel</th><th style="padding:6px;text-align:right">Menge</th></tr></thead><tbody>'+lsRowsHtml(DOC.items,true)+'</tbody></table>'
+    :'<table style="width:100%;border-collapse:collapse;margin-bottom:8px"><thead><tr style="background:#f2f2f2">'+
+  '<th style="padding:6px;text-align:left">Pos</th><th style="padding:6px;text-align:left">Leistung</th><th style="padding:6px;text-align:right">Menge</th><th style="padding:6px;text-align:right">Gesamt'+(brutto?' brutto':' netto')+'</th></tr></thead>'+
+  '<tbody>'+rows+'</tbody><tfoot>'+totals+'</tfoot></table>')+
+  (d.is_small_business&&d.doc_type!=='lieferschein'?'<p style="color:#555;margin-bottom:12px">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>':'')+
+  (d.outro_text?'<p style="margin-bottom:20px;white-space:pre-wrap">'+esc(d.outro_text)+'</p>':'')+
+  agreementsHtml(true)+
+  '<div style="margin-top:36px;padding-top:10px;border-top:1px solid #ccc;font-size:10px;color:#666;display:flex;justify-content:space-between;gap:20px">'+
+  '<div>'+esc(c.name||'')+(c.tax_id?'<br>St.-Nr.: '+esc(c.tax_id):'')+'</div>'+
+  /* Bankverbindung nicht auf einem stornierten Beleg - da soll niemand mehr ueberweisen. */
+  '<div>'+(storniert?'':(c.bank?esc(c.bank)+'<br>':'')+(c.iban?'IBAN: '+esc(c.iban)+'<br>':'')+(c.bic?'BIC: '+esc(c.bic):''))+'</div>'+
+  '<div>'+esc(c.phone||'')+'<br>'+esc(c.email||'')+'</div></div></div>';
+  window.print();
+}
+
+/* ===================== FRAGEBOGEN ===================== */
+var FDEF=null;
+function loadForm(){
+  fetch(API+'/portal/form/'+FORM).then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte meldet euch kurz bei mir'+(CO.phone?': '+CO.phone:'')+'.')+'</p></div>');return}
+      FDEF=res.j;renderForm();
+    });
+}
+function renderForm(){
+  if(FDEF.done){
+    /* Beantworteter Bogen: Antworten zum Nachlesen (aus dem Kundenkonto "Ansehen"),
+       statt nur "wurde bereits beantwortet" ohne Inhalt. */
+    var ans=FDEF.answers||[];
+    app('<div class="card"><div class="kicker">Ein paar Fragen</div><h1>'+esc(FDEF.title)+'</h1>'+
+      '<p class="sub" style="margin-top:8px">'+(FDEF.bande?'Der Bogen ist schon bei mir (abgeschickt am '+dt(FDEF.submitted_at)+') – danke euch! Die Anfrage liegt bei '+esc(FDEF.agentur||'meiner Partner-Agentur')+', ich suche die DJs persönlich vor und alles Weitere läuft dann direkt über die Agentur.':'Beantwortet am '+dt(FDEF.submitted_at)+' – danke euch! Ich melde mich mit den nächsten Schritten.')+' Hier sind eure Antworten zum Nachlesen:</p>'+
+      '<div style="margin-top:14px">'+(FDEF.fields||[]).map(function(f,i){
+        return '<div class="form-answer" style="padding:9px 0;border-bottom:1px solid var(--line-soft)"><div class="sub" style="font-size:12.5px">'+esc(f.label)+'</div><div style="white-space:pre-wrap">'+esc(ans[i]||'–')+'</div></div>';
+      }).join('')+'</div>'+
+      (CTOK?'<p class="sub" style="margin-top:14px"><a href="portal.html">← Zurück zu meinen Unterlagen</a></p>':'')+'</div>');
+    return;
+  }
+  var req=function(f){return f.required?' <span style="color:var(--acc)" title="Pflichtfrage">*</span>':''};
+  /* Vorbelegung aus Kundendaten (fields[].key -> prefill[key]): Datum als JJJJ-MM-TT fuer
+     Datumsfelder, sonst als TT.MM.JJJJ. Die Felder bleiben frei aenderbar. */
+  var pre=FDEF.prefill||{};
+  var pv=function(f){
+    if(!f.key||pre[f.key]==null||pre[f.key]==='')return '';
+    var val=String(pre[f.key]);
+    if(f.key==='event_date'&&/^\d{4}-\d{2}-\d{2}/.test(val)){
+      if((f.type||'text')==='date')return val.slice(0,10);
+      return val.slice(8,10)+'.'+val.slice(5,7)+'.'+val.slice(0,4);
+    }
+    return val;
+  };
+  var fields=(FDEF.fields||[]).map(function(f,i){
+    var t=f.type||'text',val=pv(f);
+    if(t==='textarea')return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><textarea id="qf'+i+'" data-i="'+i+'">'+esc(val)+'</textarea>';
+    if(t==='select'){
+      var opts=(f.options||[]).slice(),hit=opts.filter(function(o){return o.toLowerCase()===val.toLowerCase()})[0];
+      /* Der bekannte Wert steht nicht in der Liste (z. B. "Polterabend"): als eigene
+         Option dazu, damit die Vorbelegung nicht still verloren geht. */
+      if(val&&!hit){opts.push(val);hit=val}
+      return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><select id="qf'+i+'" data-i="'+i+'"><option value="">– bitte wählen –</option>'+
+        opts.map(function(o){return '<option'+(o===hit?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select>';
+    }
+    if(t==='multiselect')return '<div class="qlbl" style="margin-top:14px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut2)">'+esc(f.label)+req(f)+'</div><div data-i="'+i+'" data-multi="1">'+
+      (f.options||[]).map(function(o){return '<label class="chk" style="margin:6px 0;text-transform:none;letter-spacing:0;font-weight:400"><input type="checkbox" value="'+esc(o)+'"><span>'+esc(o)+'</span></label>'}).join('')+'</div>';
+    if(t==='checkbox')return '<label class="chk"><input type="checkbox" data-i="'+i+'"><span>'+esc(f.label)+req(f)+'</span></label>';
+    if(t==='date')return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><input type="date" id="qf'+i+'" data-i="'+i+'" value="'+esc(val)+'">';
+    return '<label for="qf'+i+'">'+esc(f.label)+req(f)+'</label><input type="text" id="qf'+i+'" data-i="'+i+'" value="'+esc(val)+'">';
+  }).join('');
+  var hasReq=(FDEF.fields||[]).some(function(f){return f.required});
+  app('<div class="card"><div class="kicker">Ein paar Fragen</div><h1>'+esc(FDEF.title)+'</h1>'+
+    (FDEF.intro?'<p class="sub" style="margin-top:8px">'+esc(FDEF.intro)+'</p>':'')+
+    (hasReq?'<p class="sub" style="font-size:12.5px">Fragen mit <span style="color:var(--acc)">*</span> brauche ich auf jeden Fall.</p>':'')+
+    '<div class="msg" id="fMsg"></div><div style="margin-top:6px" id="fFields">'+fields+'</div>'+
+    '<div style="margin-top:22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap"><button class="btn" id="fSend" onclick="submitForm()">Antworten absenden</button>'+
+    '<span class="sub" id="fProgress" style="font-size:13px"></span></div></div>');
+  var box=document.getElementById('fFields');
+  box.addEventListener('input',formProgress);box.addEventListener('change',formProgress);
+  formProgress();
+}
+/* Antworten einsammeln - Mehrfachauswahl als Liste, Haken als Ja/Nein. */
+function formAnswers(){
+  return (FDEF.fields||[]).map(function(f,i){
+    var el=document.querySelector('[data-i="'+i+'"]');
+    if(!el)return '';
+    if(el.getAttribute('data-multi'))return Array.prototype.map.call(el.querySelectorAll('input:checked'),function(x){return x.value});
+    if(el.type==='checkbox')return el.checked?'Ja':'Nein';
+    return el.value.trim();
+  });
+}
+function formAnswered(f,a){
+  if(Array.isArray(a))return a.length>0;
+  if((f.type||'text')==='checkbox')return a==='Ja';
+  return a!=='';
+}
+function formProgress(){
+  var el=document.getElementById('fProgress');if(!el||!FDEF)return;
+  var fs=FDEF.fields||[],a=formAnswers(),n=fs.filter(function(f,i){return formAnswered(f,a[i])}).length;
+  el.textContent=n+' von '+fs.length+' beantwortet';
+}
+function submitForm(){
+  var fs=FDEF.fields||[],answers=formAnswers();
+  /* Pflichtfragen vorab pruefen - der Server prueft nochmal, aber die Meldung hier
+     nennt gleich die Frage und springt hin. */
+  for(var i=0;i<fs.length;i++){
+    if(fs[i].required&&!formAnswered(fs[i],answers[i])){
+      showMsg('fMsg','err','Bitte beantwortet noch „'+fs[i].label+'“ – die Frage brauche ich für die Planung.');
+      var el=document.querySelector('[data-i="'+i+'"]');if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
+      if(el&&el.focus&&!el.getAttribute('data-multi'))el.focus();
+      return;
+    }
+  }
+  var btn=document.getElementById('fSend');btn.disabled=true;btn.textContent='Wird gesendet …';
+  fetch(API+'/portal/form/'+FORM,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers:answers})})
+    .then(function(r){return r.json().catch(function(){return {}}).then(function(j){return {ok:r.ok,j:j}})})
+    .then(function(res){
+      /* Den Text des Servers zeigen ("Bitte fülle wenigstens eine Frage aus …") statt
+         eines pauschalen "Senden fehlgeschlagen". */
+      if(!res.ok)throw new Error((res.j&&res.j.error)||'Senden fehlgeschlagen – bitte erneut versuchen.');
+      var ag=res.j&&res.j.bande?(res.j.agentur||'meine Partner-Agentur'):'';
+      app('<div class="card"><h1>Danke euch!</h1><p class="sub" style="margin-top:8px">'+(ag
+        ?'Danke – die Anfrage geht jetzt an '+esc(ag)+'. Ich suche persönlich bis zu fünf passende DJs aus, alles Weitere läuft dann direkt über '+esc(ag)+'.'
+        :'Eure Antworten sind angekommen. Ich melde mich in der Regel innerhalb von 24 Stunden mit den nächsten Schritten.')+'</p>'+
+        (CTOK?'<p class="sub" style="margin-top:14px"><a href="portal.html">← Zurück zu meinen Unterlagen</a></p>':'')+'</div>');
+      window.scrollTo(0,0);
+    }).catch(function(e){btn.disabled=false;btn.textContent='Antworten absenden';showMsg('fMsg','err',e.message||'Senden fehlgeschlagen – bitte erneut versuchen.')});
+}
+
+/* ===================== DIGITALER MIETVERTRAG ===================== */
+var MVDATA=null,mvFront=null,mvBack=null,sigDirty=false;
+function loadRental(){
+  fetch(API+'/portal/rental/'+MV+'?plz='+encodeURIComponent(PLZ))
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s===401){renderMvGate();return}
+      if(res.s===429){renderPlzBlocked(res.j.error,renderMvGate);return}
+      if(res.s!==200){app('<div class="card"><h2>'+(res.s===404?'Link nicht gefunden':'Das klappt gerade nicht')+'</h2><p class="sub" style="margin-top:8px">'+esc(res.j.error||'Bitte prüft den Link oder meldet euch direkt bei mir.')+'</p></div>');return}
+      MVDATA=res.j;setDesignKind('technik');renderRental();
+    }).catch(function(){app('<div class="card"><p class="sub">Verbindungsfehler – bitte später erneut versuchen.</p></div>')});
+}
+function renderMvGate(){
+  app('<div class="card"><div class="kicker">Euer Mietvertrag</div><h1>Kurze Sicherheitsfrage</h1>'+
+    '<p class="sub">Zum Schutz eurer Daten: Gebt bitte die Postleitzahl eurer Rechnungsadresse ein.</p>'+
+    '<div class="msg err" id="gateMsg" style="display:'+(PLZ?'block':'none')+'">Die Postleitzahl passt leider nicht – bitte erneut versuchen.</div>'+
+    '<label for="plzIn">Postleitzahl</label><input id="plzIn" inputmode="numeric" maxlength="10" placeholder="z. B. 58675">'+
+    '<div style="margin-top:16px"><button class="btn" onclick="submitMvPlz()">Mietvertrag öffnen</button></div></div>');
+  var inp=document.getElementById('plzIn');inp.focus();
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter')submitMvPlz()});
+}
+function submitMvPlz(){
+  PLZ=document.getElementById('plzIn').value.trim();
+  sessionStorage.setItem('portal_plz',PLZ);
+  loadRental();
+}
+function renderRental(){
+  var d=MVDATA,b=d.booking,total=d.items.reduce(function(s,it){return s+it.price},0);
+  if(d.status==='unterschrieben'){
+    /* Der Kunde muss seine Ausfertigung behalten können: Mietsachen, Zeitraum, Summe,
+       Kaution und Bedingungen bleiben abrufbar und ausdruckbar. */
+    var rowsU=d.items.map(function(it,i){
+      return '<tr><td>'+(i+1)+'</td><td>'+esc(it.name)+'</td><td class="num">'+it.qty+'</td><td class="num">'+euro(it.price)+'</td></tr>';
+    }).join('');
+    app('<div class="card"><h1>Vielen Dank!</h1><p class="sub" style="margin-top:8px">Der Mietvertrag wurde am '+
+      dt(d.signed_at)+' digital unterschrieben von <b>'+esc(d.signed_name)+'</b>. Ihr müsst nichts weiter tun – bis bald bei der Übergabe!</p>'+
+      '<div style="margin-top:10px"><button class="btn" onclick="window.print()">Vertrag drucken oder als PDF sichern</button></div></div>'+
+      '<div class="card"><div class="kicker">'+esc(d.company.name||'')+'</div><h2>Eure Ausfertigung</h2>'+
+      '<p class="sub" style="margin-top:6px">'+esc(b.title||'Vermietung')+' · Mietzeitraum: <b>'+dt(b.event_date)+(b.end_date?' bis '+dt(b.end_date):'')+'</b> ('+b.days+' Miettag'+(b.days>1?'e':'')+')</p>'+
+      '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:14px 0">'+
+      '<div style="flex:1;min-width:200px"><div class="kicker">Vermieter</div>'+esc(d.company.name||'')+'<br>'+esc(d.company.owner||'')+'<br>'+esc(d.company.street||'')+'<br>'+esc(d.company.zip_city||'')+(d.company.phone?'<br>Tel. '+esc(d.company.phone):'')+(d.company.email?'<br>'+esc(d.company.email):'')+'</div>'+
+      '<div style="flex:1;min-width:200px"><div class="kicker">Mieter</div>'+esc(d.customer.name)+'<br>'+esc(d.customer.street||'')+'<br>'+esc(d.customer.zip_city||'')+'</div></div>'+
+      (d.items.length?('<div class="items-wrap"><table class="items"><thead><tr><th>Pos</th><th>Mietgegenstand</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead><tbody>'+rowsU+
+        '</tbody></table></div><div style="text-align:right;margin:8px 0 4px"><b>Gesamt: '+euro(total)+' inkl. MwSt.</b></div>'):'')+
+      (d.deposit_amount?('<div style="text-align:right;margin:0 0 4px">Vereinbarte Kaution: <b>'+euro(d.deposit_amount)+'</b> · wird bei vollständiger, unbeschädigter Rückgabe erstattet</div>'):'')+
+      '<details style="margin:14px 0"><summary style="cursor:pointer;font-weight:600">Vertragsbedingungen anzeigen</summary>'+
+      '<div class="sub" style="white-space:pre-wrap;margin-top:10px;font-size:13px">'+esc(d.terms)+'</div></details></div>');
+    return;
+  }
+  var rows=d.items.map(function(it,i){
+    return '<tr><td>'+(i+1)+'</td><td>'+esc(it.name)+'</td><td class="num">'+it.qty+'</td><td class="num">'+euro(it.price)+'</td></tr>';
+  }).join('');
+  app('<div class="card"><div class="kicker">'+esc(d.company.name||'')+'</div><h1>Mietvertrag über Veranstaltungstechnik</h1>'+
+    '<p class="sub" style="margin-top:6px">'+esc(b.title||'Vermietung')+' · Mietzeitraum: <b>'+dt(b.event_date)+(b.end_date?' bis '+dt(b.end_date):'')+'</b> ('+b.days+' Miettag'+(b.days>1?'e':'')+')</p>'+
+    '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:14px 0">'+
+    '<div style="flex:1;min-width:200px"><div class="kicker">Vermieter</div>'+esc(d.company.name||'')+'<br>'+esc(d.company.owner||'')+'<br>'+esc(d.company.street||'')+'<br>'+esc(d.company.zip_city||'')+(d.company.phone?'<br>Tel. '+esc(d.company.phone):'')+(d.company.email?'<br>'+esc(d.company.email):'')+'</div>'+
+    '<div style="flex:1;min-width:200px"><div class="kicker">Mieter</div>'+esc(d.customer.name)+'<br>'+esc(d.customer.street||'')+'<br>'+esc(d.customer.zip_city||'')+'</div></div>'+
+    (d.items.length?('<div class="items-wrap"><table class="items"><thead><tr><th>Pos</th><th>Mietgegenstand</th><th class="num">Menge</th><th class="num">Preis</th></tr></thead><tbody>'+rows+
+      '</tbody></table></div><div style="text-align:right;margin:8px 0 4px"><b>Gesamt: '+euro(total)+' inkl. MwSt.</b></div>'):'')+
+    (d.deposit_amount?('<div style="text-align:right;margin:0 0 4px">Vereinbarte Kaution: <b>'+euro(d.deposit_amount)+'</b> · wird bei vollständiger, unbeschädigter Rückgabe erstattet</div>'):'')+
+    '<details style="margin:14px 0"><summary style="cursor:pointer;font-weight:600">Vertragsbedingungen anzeigen</summary>'+
+    '<div class="sub" style="white-space:pre-wrap;margin-top:10px;font-size:13px">'+esc(d.terms)+'</div></details></div>'+
+
+    '<div class="card"><h2>1 · Ausweis fotografieren</h2>'+
+    '<p class="sub" style="margin-top:6px">Zur Absicherung der Vermietung brauche ich einmalig eine Kopie eures Personalausweises – Vorder- und Rückseite. Einfach mit der Kamera abfotografieren. Ihr dürft alles schwärzen oder abkleben, was nicht benötigt wird (z. B. Zugangsnummer, Ausweisnummer) – lesbar bleiben müssen Name, Anschrift und Foto.</p>'+
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px">'+
+    '<div style="flex:1;min-width:180px"><label for="mvFront">Vorderseite</label><input type="file" id="mvFront" accept="image/*" capture="environment" onchange="mvPhoto(this,\'front\')"><img id="pvFront" style="display:none;max-width:100%;border-radius:3px;margin-top:8px"></div>'+
+    '<div style="flex:1;min-width:180px"><label for="mvBack">Rückseite</label><input type="file" id="mvBack" accept="image/*" capture="environment" onchange="mvPhoto(this,\'back\')"><img id="pvBack" style="display:none;max-width:100%;border-radius:3px;margin-top:8px"></div></div></div>'+
+
+    '<div class="card"><h2>2 · Unterschreiben</h2>'+
+    '<p class="sub" style="margin-top:6px">Mit dem Finger oder Stift direkt hier im Feld unterschreiben – auf dem Smartphone am besten quer halten.</p>'+
+    '<canvas id="sigPad" style="width:100%;height:170px;background:#fff;border-radius:4px;touch-action:none;margin-top:10px;cursor:crosshair"></canvas>'+
+    '<div style="margin-top:6px"><a onclick="sigClear()" style="cursor:pointer;font-size:13px">↺ Feld leeren</a></div>'+
+    '<label style="margin-top:14px">Vor- und Nachname (wie im Ausweis)</label><input id="mvName" autocomplete="name">'+
+    '<label style="display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-weight:400;font-size:13px;cursor:pointer;text-transform:none;letter-spacing:normal;color:var(--mut,inherit)">'+
+    '<input type="checkbox" id="mvConsent" style="width:auto;margin-top:3px">'+
+    '<span>Ich willige ein, dass die Ausweiskopie zur Absicherung dieses Mietvertrags gespeichert wird. Sie wird nach vollständiger, unbeschädigter Rückgabe der Mietsachen gelöscht. Mit meiner Unterschrift schließe ich den oben stehenden Mietvertrag verbindlich ab.</span></label>'+
+    '<div class="msg err" id="mvMsg" style="display:none"></div>'+
+    '<div style="margin-top:16px"><button class="btn" id="mvSend" onclick="submitRental()">Vertrag verbindlich abschließen</button></div></div>');
+  sigInit();
+}
+function mvPhoto(inp,side){
+  var f=inp.files&&inp.files[0];if(!f)return;
+  var img=new Image(),url=URL.createObjectURL(f);
+  img.onload=function(){
+    var mx=1600,sc=Math.min(1,mx/Math.max(img.width,img.height));
+    var c=document.createElement('canvas');c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    URL.revokeObjectURL(url);
+    var data=c.toDataURL('image/jpeg',0.85);
+    if(side==='front')mvFront=data;else mvBack=data;
+    var pv=document.getElementById(side==='front'?'pvFront':'pvBack');
+    pv.src=data;pv.style.display='block';
+  };
+  img.onerror=function(){URL.revokeObjectURL(url);alert('Das Bild konnte nicht gelesen werden – bitte erneut versuchen.')};
+  img.src=url;
+}
+function sigInit(){
+  var c=document.getElementById('sigPad'),ctx=c.getContext('2d'),draw=false,lx=0,ly=0;
+  c.width=c.clientWidth;c.height=170;
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+  ctx.strokeStyle='#1a2233';ctx.lineWidth=2.2;ctx.lineCap='round';ctx.lineJoin='round';
+  function pos(e){var r=c.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
+  c.addEventListener('pointerdown',function(e){e.preventDefault();c.setPointerCapture(e.pointerId);draw=true;var p=pos(e);lx=p[0];ly=p[1]});
+  c.addEventListener('pointermove',function(e){if(!draw)return;e.preventDefault();var p=pos(e);
+    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(p[0],p[1]);ctx.stroke();lx=p[0];ly=p[1];sigDirty=true});
+  c.addEventListener('pointerup',function(){draw=false});
+  c.addEventListener('pointercancel',function(){draw=false});
+}
+function sigClear(){
+  var c=document.getElementById('sigPad'),ctx=c.getContext('2d');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);sigDirty=false;
+}
+function submitRental(){
+  var err=function(t){var m=document.getElementById('mvMsg');m.style.display='block';m.textContent=t};
+  if(!mvFront||!mvBack){err('Bitte beide Seiten des Ausweises fotografieren (Schritt 1).');return}
+  if(!sigDirty){err('Bitte im Unterschriftsfeld unterschreiben.');return}
+  var name=document.getElementById('mvName').value.trim();
+  if(!name){err('Bitte Vor- und Nachnamen eintragen.');return}
+  if(!document.getElementById('mvConsent').checked){err('Bitte der Speicherung der Ausweiskopie zustimmen.');return}
+  document.getElementById('mvSend').disabled=true;
+  fetch(API+'/portal/rental/'+MV+'/sign',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({plz:PLZ,signed_name:name,consent:true,
+      signature:document.getElementById('sigPad').toDataURL('image/png'),
+      id_front:mvFront,id_back:mvBack})})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s>=400)throw new Error(res.j.error||'Senden fehlgeschlagen.');
+      app('<div class="card"><h1>Vertrag abgeschlossen</h1><p class="sub" style="margin-top:8px">Danke, '+esc(name)+'! Der Mietvertrag ist digital unterschrieben, die Ausweiskopie ist sicher gespeichert und wird nach der Rückgabe gelöscht. Bis bald bei der Übergabe!</p></div>');
+    }).catch(function(e){document.getElementById('mvSend').disabled=false;err(e.message)});
+}
+
+/* ===================== KUNDENKONTO ===================== */
+var CTOK=localStorage.getItem('cust_tok')||'',ME=null;
+function cfetch(p,opt){opt=opt||{};opt.headers=Object.assign({},opt.headers||{},{Authorization:'Bearer '+CTOK});return fetch(API+'/'+p,opt)}
+/* Einladungslink erst serverseitig pruefen: verbraucht oder falsch -> sofort "geht nicht
+   mehr" statt erst nach dem Eintippen des Passworts. */
+function loadInvite(){
+  app('<div class="card"><p class="sub">Einen Moment …</p></div>');
+  fetch(API+'/portal/account/invite?invite='+encodeURIComponent(INVITE))
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s===404||res.s===410){renderInviteGone();return}
+      if(res.s>=400)throw new Error(res.j.error||'Fehlgeschlagen.');
+      renderSetPw();
+    }).catch(function(){renderSetPw()});
+}
+function renderSetPw(){
+  app('<div class="card"><div class="kicker">Dein Kundenkonto</div><h1>Passwort festlegen</h1>'+
+    '<p class="sub">Einmal ein Passwort setzen – danach kommst du jederzeit mit E-Mail und Passwort an alle Unterlagen.</p>'+
+    '<div class="msg err" id="spMsg" style="display:none"></div>'+
+    '<label for="spPw1">Passwort (min. 8 Zeichen)</label><input type="password" id="spPw1">'+
+    '<label for="spPw2">Passwort wiederholen</label><input type="password" id="spPw2">'+
+    '<div style="margin-top:16px"><button class="btn" onclick="doSetPw()">Zugang aktivieren</button></div></div>');
+}
+function doSetPw(){
+  var p1=document.getElementById('spPw1').value,p2=document.getElementById('spPw2').value,m=document.getElementById('spMsg');
+  function err(t){m.style.display='block';m.textContent=t}
+  if(p1.length<8){err('Bitte mindestens 8 Zeichen.');return}
+  if(p1!==p2){err('Die Passwörter stimmen nicht überein.');return}
+  fetch(API+'/portal/account/set_password',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({invite:INVITE,password:p1})})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      /* Verbrauchter oder abgelaufener Link: Meist hat der Kunde sein Passwort laengst
+         gesetzt und klickt die alte Mail nochmal an - dann soll er direkt zur Anmeldung. */
+      if(res.s===404||res.s===410){renderInviteGone();return}
+      if(res.s>=400)throw new Error(res.j.error||'Fehlgeschlagen.');
+      CTOK=res.j.token;localStorage.setItem('cust_tok',CTOK);
+      history.replaceState(null,'',location.pathname);
+      loadAccount();
+    }).catch(function(e){err(e.message)});
+}
+function renderInviteGone(){
+  app('<div class="card"><div class="kicker">Dein Kundenkonto</div><h1>Der Link geht nicht mehr</h1>'+
+    '<p class="sub">Der Link wurde schon benutzt oder ist abgelaufen. Wenn du dein Passwort schon gesetzt hast, melde dich hier an:</p>'+
+    '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="inviteToLogin()">Zur Anmeldung</button>'+
+    '<a href="#" onclick="inviteToLogin(true);return false" style="font-size:13px">Passwort vergessen? Neuen Link anfordern</a></div></div>');
+}
+function inviteToLogin(forgot){
+  INVITE=null;history.replaceState(null,'',location.pathname);
+  renderLogin(forgot?'Trag deine E-Mail-Adresse ein und klick auf „Passwort vergessen?" – dann schicke ich dir einen frischen Link.':'');
+  if(forgot){var m=document.getElementById('liMsg');if(m)m.className='msg warn'}
+  var em=document.getElementById('liMail');if(em)em.focus();
+}
+function renderLogin(msg){
+  if(REGISTER){renderRegister(msg);return}
+  app('<div class="card"><div class="kicker">Dein Kundenkonto</div><h1>Anmelden</h1>'+
+    '<p class="sub">Alle Unterlagen an einem Ort: Angebote, Rechnungen, Verträge – plus Programmablauf, Musikwünsche und Fotos eurer Location.</p>'+
+    '<div class="msg err" id="liMsg" style="display:'+(msg?'block':'none')+'">'+esc(msg||'')+'</div>'+
+    '<label for="liMail">E-Mail</label><input type="email" id="liMail" autocomplete="email">'+
+    '<label for="liPw">Passwort</label><input type="password" id="liPw" autocomplete="current-password">'+
+    '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="doLogin()">Anmelden</button>'+
+    '<a href="#" onclick="doForgot();return false" style="font-size:13px">Passwort vergessen?</a></div>'+
+    '<p class="sub" style="margin-top:18px;font-size:13px">Noch keinen Zugang? <a href="#" onclick="REGISTER=1;renderRegister();return false">Kostenlos registrieren</a> oder den persönlichen Einladungslink von mir nutzen.</p></div>');
+  document.getElementById('liPw').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
+}
+function renderRegister(msg){
+  app('<div class="card"><div class="kicker">Kostenloses Kundenkonto</div><h1>Registrieren</h1>'+
+    '<p class="sub">Alle Unterlagen an einem Ort und du kannst Details zu eurer Feier direkt selbst eintragen – kostenlos, jederzeit kündbar.</p>'+
+    '<div class="msg err" id="liMsg" style="display:'+(msg?'block':'none')+'">'+esc(msg||'')+'</div>'+
+    '<label for="reName">Name</label><input id="reName" value="'+esc(PREFILL_NAME)+'" autocomplete="name">'+
+    '<label for="reMail">E-Mail</label><input type="email" id="reMail" value="'+esc(PREFILL_EMAIL)+'" autocomplete="email">'+
+    '<label for="rePhone">Telefon <span class="mut" style="font-weight:400">(freiwillig)</span></label><input id="rePhone" autocomplete="tel">'+
+    '<label for="reStreet">Straße und Hausnummer <span class="mut" style="font-weight:400">(freiwillig)</span></label><input id="reStreet" autocomplete="street-address">'+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1 1 110px"><label for="reZip">PLZ</label><input id="reZip" inputmode="numeric" autocomplete="postal-code"></div>'+
+    '<div style="flex:2 1 180px"><label for="reCity">Ort</label><input id="reCity" autocomplete="address-level2"></div></div>'+
+    '<p class="sub" style="font-size:12.5px;margin:6px 0 0">Die Anschrift brauche ich nur, wenn du Technik mietest oder eine Rechnung bekommst. Du kannst sie auch später im Konto nachtragen.</p>'+
+    '<label for="rePw" style="margin-top:14px">Passwort (mind. 8 Zeichen)</label><input type="password" id="rePw" autocomplete="new-password">'+
+    '<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="doRegister()">Konto anlegen</button>'+
+    '<a href="#" onclick="REGISTER=null;renderLogin();return false" style="font-size:13px">Ich habe schon ein Konto</a></div></div>');
+  document.getElementById('rePw').addEventListener('keydown',function(e){if(e.key==='Enter')doRegister()});
+}
+function val(id){var el=document.getElementById(id);return el?el.value.trim():''}
+function doRegister(){
+  var name=document.getElementById('reName').value.trim(),email=document.getElementById('reMail').value.trim(),pw=document.getElementById('rePw').value;
+  var m=document.getElementById('liMsg');
+  if(!name||!email){m.style.display='block';m.textContent='Bitte Name und E-Mail angeben.';return}
+  if(pw.length<8){m.style.display='block';m.textContent='Das Passwort braucht mindestens 8 Zeichen.';return}
+  fetch(API+'/portal/account/register',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name,email:email,password:pw,
+      phone:val('rePhone'),street:val('reStreet'),zip:val('reZip'),city:val('reCity')})})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s>=400)throw new Error(res.j.error||'Registrierung fehlgeschlagen.');
+      /* Gab es zu der Adresse schon einen Vorgang, kommt kein Token, sondern ein
+         Bestätigungslink per Mail - so kommt niemand Fremdes an bestehende Unterlagen. */
+      if(res.j.pending){
+        m.style.display='block';m.className='msg ok';
+        m.textContent=res.j.message||'Ich habe dir einen Bestätigungslink geschickt – bitte schau in dein Postfach.';
+        return;
+      }
+      CTOK=res.j.token;localStorage.setItem('cust_tok',CTOK);REGISTER=null;loadAccount();
+    }).catch(function(e){m.style.display='block';m.className='msg err';m.textContent=e.message});
+}
+function doLogin(){
+  fetch(API+'/portal/account/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:document.getElementById('liMail').value.trim(),password:document.getElementById('liPw').value})})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s>=400)throw new Error(res.j.error||'Anmeldung fehlgeschlagen.');
+      CTOK=res.j.token;localStorage.setItem('cust_tok',CTOK);loadAccount();
+    }).catch(function(e){var m=document.getElementById('liMsg');m.style.display='block';m.textContent=e.message});
+}
+function doForgot(){
+  var mail=document.getElementById('liMail').value.trim();
+  if(!mail){var m=document.getElementById('liMsg');m.style.display='block';m.textContent='Bitte erst deine E-Mail-Adresse eintragen, dann auf „Passwort vergessen" klicken.';return}
+  fetch(API+'/portal/account/forgot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:mail})})
+    .then(function(){var m=document.getElementById('liMsg');m.className='msg ok';m.style.display='block';
+      m.textContent='Wenn zu dieser Adresse ein Zugang existiert, ist gerade eine E-Mail mit einem Link unterwegs.'});
+}
+function logout(){CTOK='';localStorage.removeItem('cust_tok');renderLogin()}
+var TYPE_LABEL={angebot:'Angebot',bestaetigung:'Auftragsbestätigung',rechnung:'Rechnung',abschlag:'Abschlagsrechnung',schluss:'Schlussrechnung',lieferschein:'Lieferschein',gutschrift:'Gutschrift'};
+function loadAccount(){
+  cfetch('portal/account/me').then(function(r){
+    if(r.status===401){renderLogin();return null}
+    return r.json();
+  }).then(function(me){
+    if(!me)return;
+    ME=me;if(me.company)CO=Object.assign({},CO,me.company);setDesignKind(me.bookings&&me.bookings[0]&&isTechnikKind(me.bookings[0].kind)?'technik':'dj');renderAccount();
+  }).catch(function(){renderLogin('Verbindungsfehler – bitte später erneut versuchen.')});
+}
+/* ===== Veranstaltungsplaner =====
+   Leere Felder darf der Kunde direkt speichern, bereits gesetzte nur als Änderung vorschlagen
+   (siehe plan-suggest in api.php - Server entscheidet endgültig, das hier ist nur die Anzeige-
+   Logik dafür). PLAN_STATE hält je Zeile Buchungs-ID/Feldpfad/Label/Art, damit die onclick-
+   Handler nicht mit escapten Werten hantieren müssen. */
+var PLAN_STATE={};
+function fmtPlaylists(list){
+  if(!Array.isArray(list)||!list.length)return '';
+  return list.map(function(pl){
+    var u=safeUrl(pl.url),txt=esc(pl.label||pl.url);
+    return u?('<a href="'+esc(u)+'" target="_blank" rel="noopener noreferrer">'+txt+'</a>'):txt;
+  }).join('<br>');
+}
+function parsePlaylists(text){
+  return (text||'').split('\n').map(function(l){return l.trim()}).filter(Boolean).map(function(l){
+    var m=l.split('|');
+    if(m.length>1)return {label:m[0].trim(),url:m.slice(1).join('|').trim()};
+    return {label:'Playlist',url:l};
+  });
+}
+function playlistsToText(list){return (Array.isArray(list)?list:[]).map(function(pl){return (pl.label&&pl.label!=='Playlist'?pl.label+' | ':'')+pl.url}).join('\n')}
+function fmtTimetable(list){
+  if(!Array.isArray(list)||!list.length)return '';
+  return '<table>'+list.map(function(t){return '<tr><td style="padding:2px 10px 2px 0;color:var(--mut);white-space:nowrap">'+esc(t.time||'')+'</td><td>'+esc(t.label||'')+'</td></tr>'}).join('')+'</table>';
+}
+function parseTimetable(text){
+  return (text||'').split('\n').map(function(l){return l.trim()}).filter(Boolean).map(function(l){
+    var m=l.match(/^(\d{1,2}[:.]\d{2})\s+(.*)$/);
+    return m?{time:m[1].replace('.',':'),label:m[2]}:{time:'',label:l};
+  });
+}
+function timetableToText(list){return (Array.isArray(list)?list:[]).map(function(t){return (t.time?t.time+' ':'')+t.label}).join('\n')}
+function planRow(bookingId,key,path,label,cfg){
+  cfg=cfg||{};
+  PLAN_STATE[key]={bookingId:bookingId,path:path,label:label,kind:cfg.kind||'text',empty:!!cfg.empty};
+  var display=cfg.displayHtml!=null?cfg.displayHtml:esc(String(cfg.val!=null?cfg.val:''));
+  var editVal=cfg.editVal!=null?cfg.editVal:(cfg.val!=null?cfg.val:'');
+  /* Leere Felder speichern sich selbst, sobald der Kunde sie verlaesst (change feuert
+     beim Verlassen) - 19 einzelne Speichern-Knoepfe waren zu viel des Guten. */
+  var auto=cfg.empty?' onchange="planSubmit(\''+key+'\',true)"':'';
+  var box=cfg.multiline?('<textarea id="in_'+key+'" style="min-height:'+(cfg.rows||70)+'px"'+auto+'>'+esc(editVal)+'</textarea>')
+    :('<input id="in_'+key+'" value="'+esc(editVal)+'"'+auto+'>');
+  if(cfg.locked){
+    return '<div style="padding:6px 0;border-bottom:1px solid var(--line-soft)"><b>'+esc(label)+':</b> '+(cfg.empty?'<span class="sub">–</span>':display)+'</div>';
+  }
+  if(cfg.empty){
+    return '<div style="padding:6px 0;border-bottom:1px solid var(--line-soft)"><label style="margin:4px 0 2px" for="in_'+key+'">'+esc(label)+
+      ' <span id="ok_'+key+'" style="color:var(--ok-txt);text-transform:none;letter-spacing:0" hidden>· gespeichert ✓</span></label>'+box+'</div>';
+  }
+  return '<div style="padding:6px 0;border-bottom:1px solid var(--line-soft)"><b>'+esc(label)+':</b> '+display+
+    ' <a onclick="planToggle(\''+key+'\')" style="cursor:pointer;font-size:13px">Änderung vorschlagen</a>'+
+    '<div id="ed_'+key+'" hidden style="margin-top:4px">'+box+
+    '<div style="margin-top:4px"><button class="btn" style="padding:6px 12px" onclick="planSubmit(\''+key+'\')">Vorschlag senden</button> <span id="ok_'+key+'" style="color:var(--ok-txt);font-size:13px;display:none">Vorschlag gesendet ✓</span></div></div></div>';
+}
+/* Merkt sich, welche Felder in dieser Sitzung schon abgeschickt wurden - ihr Inhalt
+   darf ein spaeteres Neuladen nicht mehr blockieren. */
+var PLAN_GESENDET={};
+/* Felder, deren Anfrage gerade unterwegs ist: Verlaesst der Kunde ein Feld direkt per
+   Klick auf "Alles speichern", feuert erst change (Auto-Speichern) und dann der Klick -
+   ohne diese Sperre ginge dasselbe Feld zweimal raus, das zweite Mal als Aenderungsvorschlag. */
+var PLAN_LAEUFT={};
+function planToggle(key){var el=document.getElementById('ed_'+key);el.hidden=!el.hidden}
+function planSubmit(key,auto){
+  var st=PLAN_STATE[key];if(!st||PLAN_LAEUFT[key])return;
+  var raw=document.getElementById('in_'+key).value;
+  if(auto&&String(raw||'').trim()==='')return;   /* leeres Feld verlassen: nichts zu speichern */
+  var val=raw;
+  if(st.kind==='playlists')val=parsePlaylists(raw);
+  else if(st.kind==='timetable')val=parseTimetable(raw);
+  PLAN_LAEUFT[key]=true;
+  cfetch('portal/account/booking/'+st.bookingId+'/plan-suggest',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({field_path:st.path,field_label:st.label,value:val})})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      PLAN_LAEUFT[key]=false;
+      if(res.s>=400){alert(res.j.error||'Das hat nicht geklappt – bitte später erneut versuchen.');return}
+      var ok=document.getElementById('ok_'+key);
+      if(ok){
+        /* Hat der Server Zeilen verworfen (z.B. Links ohne https), gehört das dem Kunden
+           gesagt - sonst denkt er, alles sei angekommen. Und wurde ein inzwischen gefuelltes
+           Feld erneut geaendert, ist es kein Speichern mehr, sondern ein Vorschlag. */
+        if(res.j.hinweis){ok.textContent=res.j.hinweis;ok.style.color='var(--acc)'}
+        else if(st.empty&&res.j.applied===false)ok.textContent='· als Änderungsvorschlag gesendet ✓';
+        ok.hidden=false;ok.style.display='';
+      }
+      /* Nach dem Speichern wurde bisher immer die ganze Seite neu geladen - hatte der
+         Kunde parallel ein weiteres Feld getippt und noch nicht abgeschickt, war die
+         Eingabe kommentarlos weg. Also nur neu laden, wenn nirgends sonst etwas steht,
+         das noch nicht gespeichert wurde. Gilt fuer beide Formen: die Eingabefelder
+         leerer Angaben und die aufgeklappten Vorschlagsfelder. */
+      PLAN_GESENDET[key]=true;
+      var offen=[].slice.call(document.querySelectorAll('[id^="in_"]')).some(function(inp){
+        var k=inp.id.slice(3);
+        if(k===key||PLAN_GESENDET[k])return false;
+        if(String(inp.value||'').trim()==='')return false;
+        var ed=document.getElementById('ed_'+k);
+        return ed?!ed.hidden:true;   /* Vorschlagsfeld nur, wenn es aufgeklappt ist */
+      });
+      /* Beim Auto-Speichern tippt der Kunde meist schon im naechsten Feld - dann darf die
+         Seite nicht unter ihm neu laden. Neu geladen wird erst, wenn er den Planer verlaesst. */
+      var tippt=!!(document.activeElement&&/^in_/.test(document.activeElement.id||''));
+      if(offen||tippt){
+        var el=document.getElementById('ed_'+key);if(el)el.hidden=true;
+        return;
+      }
+      setTimeout(function(){loadAccount()},res.j.hinweis?4000:1200);
+    }).catch(function(){PLAN_LAEUFT[key]=false;alert('Verbindungsfehler – bitte später erneut versuchen.')});
+}
+/* Rueckfall-Knopf am Ende des Planers: schickt alles ab, was eingetragen, aber noch
+   nicht gespeichert ist (z.B. wenn ein Feld nie verlassen wurde). */
+function planSaveAll(i){
+  var n=0;
+  Object.keys(PLAN_STATE).forEach(function(key){
+    if(key.indexOf('p'+i+'_')!==0)return;
+    var st=PLAN_STATE[key];if(!st.empty||PLAN_GESENDET[key]||PLAN_LAEUFT[key])return;
+    var inp=document.getElementById('in_'+key);
+    if(!inp||String(inp.value||'').trim()==='')return;
+    planSubmit(key,true);n++;
+  });
+  var ok=document.getElementById('allok_'+i);
+  if(ok){ok.textContent=n?'Wird gespeichert …':'Alles gespeichert ✓';ok.hidden=false}
+}
+/* Leere Rechnungsadress-Felder im Planer mit den Kundendaten vorbefuellen - die gleiche
+   Angabe soll nicht doppelt eingetippt werden muessen. Ein bereits gesetztes Planer-Feld
+   bleibt unangetastet. */
+function planInvoiceDefaults(inv,cust){
+  cust=cust||{};
+  return{
+    company:inv.company||cust.company||'',
+    name:inv.name||((cust.first_name||'')+' '+(cust.last_name||'')).trim(),
+    street:inv.street||cust.street||'',
+    zip_city:inv.zip_city||[cust.zip,cust.city].filter(Boolean).join(' ')
+  };
+}
+/* Countdown + "das fehlt noch": gleiche Idee wie im Backoffice (admin.html
+   eventPrepMilestones) - der Kunde soll sehen, wie viel Zeit noch bleibt und woran es
+   noch hakt, statt eines Tages ueberrascht zu werden, dass der Ablaufplan schon gesperrt
+   ist. Reine Anzeige aus schon vorhandenen Daten, kein neues Feld. */
+function planPrepHtml(b){
+  var pl=b.event_plan||{},bas=pl.basics||{},mus=pl.music||{};
+  var today=new Date();today.setHours(0,0,0,0);
+  var evDate=b.event_date?new Date(b.event_date+'T00:00:00'):null;
+  var daysLeft=evDate?Math.round((evDate-today)/86400000):null;
+  if(daysLeft==null||daysLeft<0)return '';
+  var basicsDone=!!(bas.venue_name&&bas.guest_count!=null);
+  var musicDone=!!(mus.musts||mus.nogos||(Array.isArray(mus.playlists)&&mus.playlists.length));
+  var planDone=Array.isArray(pl.timetable)&&pl.timetable.length>0;
+  var items=[
+    {label:'Location & Gästezahl',done:basicsDone},
+    {label:'Musikwünsche & No-Gos',done:musicDone},
+    {label:'Ablaufplan',done:planDone}
+  ];
+  var days=daysLeft===0?'Heute ist es soweit!':'Noch '+daysLeft+' Tag'+(daysLeft===1?'':'e')+' bis zur Feier';
+  return '<div class="card" style="margin-top:14px;padding:14px"><b>'+days+'</b>'+
+    (b.plan_locked?' <span class="mut sml">– der Ablaufplan ist final</span>':
+      '<div class="sub" style="font-size:12.5px;margin-top:4px">Am entspanntesten wird es, wenn ihr Musikwünsche spätestens 2 Wochen vorher eintragt – danach wird der Ablaufplan irgendwann final.</div>')+
+    '<ul style="margin:8px 0 0 20px;padding:0;font-size:13px">'+items.map(function(it){
+      return '<li style="color:'+(it.done?'var(--ok-txt,#3fae5c)':'var(--mut)')+'">'+
+        (it.done?'✓ ':'– ')+esc(it.label)+'</li>';
+    }).join('')+'</ul></div>';
+}
+function planCard(b,i){
+  var pl=b.event_plan||{},bas=pl.basics||{},invRaw=pl.invoice||{},inv=planInvoiceDefaults(invRaw,ME.customer),mus=pl.music||{},locked=!!b.plan_locked;
+  var k=function(s){return 'p'+i+'_'+s};
+  var rows=
+    planRow(b.id,k('partner'),'basics.partner_name','Partner/in',{val:bas.partner_name,empty:!bas.partner_name,locked:locked})+
+    planRow(b.id,k('occasion'),'basics.occasion','Anlass',{val:bas.occasion,empty:!bas.occasion,locked:locked})+
+    planRow(b.id,k('venue'),'basics.venue_name','Location',{val:bas.venue_name,empty:!bas.venue_name,locked:locked})+
+    planRow(b.id,k('addr'),'basics.venue_address','Adresse',{val:bas.venue_address,empty:!bas.venue_address,locked:locked})+
+    planRow(b.id,k('guests'),'basics.guest_count','Gästezahl',{val:bas.guest_count,empty:bas.guest_count==null,locked:locked})+
+    planRow(b.id,k('arrival'),'basics.arrival_time','Ankunft Gäste',{val:bas.arrival_time,empty:!bas.arrival_time,locked:locked})+
+    planRow(b.id,k('vcontact'),'basics.venue_contact_name','Ansprechpartner Location',{val:bas.venue_contact_name,empty:!bas.venue_contact_name,locked:locked})+
+    planRow(b.id,k('vphone'),'basics.venue_contact_phone','Telefon Location',{val:bas.venue_contact_phone,empty:!bas.venue_contact_phone,locked:locked})+
+    planRow(b.id,k('setup'),'basics.setup_from','Aufbau ab',{val:bas.setup_from,empty:!bas.setup_from,locked:locked})+
+    planRow(b.id,k('teardown'),'basics.teardown_until','Abbau bis',{val:bas.teardown_until,empty:!bas.teardown_until,locked:locked})+
+    planRow(b.id,k('invcompany'),'invoice.company','Firma (Rechnung/Angebot)',{val:inv.company,empty:!invRaw.company,locked:locked})+
+    planRow(b.id,k('invname'),'invoice.name','Name (Rechnung/Angebot)',{val:inv.name,empty:!invRaw.name,locked:locked})+
+    planRow(b.id,k('invstreet'),'invoice.street','Straße',{val:inv.street,empty:!invRaw.street,locked:locked})+
+    planRow(b.id,k('invzip'),'invoice.zip_city','PLZ Ort',{val:inv.zip_city,empty:!invRaw.zip_city,locked:locked})+
+    planRow(b.id,k('musts'),'music.musts','Musik-Musts',{val:mus.musts,empty:!mus.musts,locked:locked})+
+    planRow(b.id,k('nogos'),'music.nogos','No-Gos',{val:mus.nogos,empty:!mus.nogos,locked:locked})+
+    planRow(b.id,k('playlists'),'music.playlists','Spotify-Playlists',{
+      empty:!(Array.isArray(mus.playlists)&&mus.playlists.length),locked:locked,multiline:true,rows:60,kind:'playlists',
+      displayHtml:fmtPlaylists(mus.playlists),editVal:playlistsToText(mus.playlists)})+
+    planRow(b.id,k('timetable'),'timetable','Ablaufplan',{
+      empty:!(Array.isArray(pl.timetable)&&pl.timetable.length),locked:locked,multiline:true,rows:90,kind:'timetable',
+      displayHtml:fmtTimetable(pl.timetable),editVal:timetableToText(pl.timetable)})+
+    planRow(b.id,k('freitext'),'freitext','Freitext',{val:pl.freitext,empty:!pl.freitext,locked:locked,multiline:true,rows:70});
+  return planPrepHtml(b)+
+    '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">Veranstaltungsplaner <span style="color:var(--mut);font-size:13px;font-weight:400">· '+esc(b.title||'Termin')+'</span></h2>'+
+    '<p class="sub" style="font-size:13px;margin:6px 0 10px">Du musst hier nichts ausfüllen – ich kümmere mich sonst darum und melde mich, wenn ich Fragen habe. Es hilft aber, Missverständnisse zu vermeiden, wenn du schon einträgst, was du weißt.</p>'+
+    (locked?'<p class="msg err" style="display:block;font-size:13px">Der Ablaufplan ist jetzt final – Änderungswünsche bitte direkt mit mir klären.</p>':'')+
+    rows+
+    (locked?'':'<div style="margin-top:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" style="padding:8px 14px" onclick="planSaveAll('+i+')">Alles speichern</button>'+
+      '<span id="allok_'+i+'" style="color:var(--ok-txt);font-size:13px" hidden></span>'+
+      '<span class="sub" style="font-size:12.5px">Neue Angaben speichere ich automatisch, sobald du ein Feld verlässt.</span></div>')+
+    '</div>';
+}
+function renderAccount(){
+  var me=ME;
+  var docs=me.documents.map(function(d){
+    /* Termin dazu, wenn erkennbar: bei mehreren Buchungen sonst nicht zu sehen,
+       zu welcher Veranstaltung ein Beleg gehoert. */
+    var termin=d.event_date?' · Termin '+dt(d.event_date):'';
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-soft);flex-wrap:wrap">'+
+    '<div><b>'+(TYPE_LABEL[d.doc_type]||d.doc_type)+' '+esc(d.number)+'</b> <span style="color:var(--mut);font-size:13px">· '+dt(d.doc_date)+termin+' · '+d.status+
+      (Number(d.paid_sum)>0&&d.status!=='bezahlt'&&d.open_amount!=null?' · erhalten '+euro(d.paid_sum)+' · Rest '+euro(d.open_amount)+' offen':'')+'</span></div>'+
+    '<a href="?a='+d.token+'">Ansehen / PDF →</a></div>';
+  }).join('')||(me.bookings.length||(me.rentals||[]).length
+    ?'<p class="sub">Noch keine Unterlagen.</p>'
+    :'<p class="sub">Hier ist noch nichts – das ist ganz normal. Sobald ich dir ein Angebot schicke, erscheint es hier, und du kannst es direkt online ansehen, Fragen dazu stellen und annehmen. Rechnungen und Verträge landen später am selben Ort.</p>');
+  var rentals=(me.rentals||[]).map(function(r){
+    return '<div style="padding:9px 0;border-bottom:1px solid var(--line-soft)"><b>Mietvertrag</b> <span style="color:var(--mut);font-size:13px">· Termin '+dt(r.event_date)+' · '+(r.status==='unterschrieben'?'unterschrieben ✓':'offen')+'</span> &nbsp;<a href="?mv='+r.token+'">Öffnen →</a></div>';
+  }).join('');
+  var forms=(me.forms||[]).map(function(f){
+    return '<div style="padding:9px 0;border-bottom:1px solid var(--line-soft)"><b>'+esc(f.title)+'</b> <span style="color:var(--mut);font-size:13px">· '+(f.status==='beantwortet'?'beantwortet am '+dt(f.submitted_at):'noch offen')+'</span> &nbsp;<a href="?f='+f.token+'">'+(f.status==='beantwortet'?'Ansehen':'Jetzt ausfüllen')+' →</a></div>';
+  }).join('');
+  var books=me.bookings.map(function(b,i){
+    var n=b.notes||{};
+    /* Das alte Freitext-Feld fragt dasselbe ab wie der Veranstaltungsplaner darüber
+       (Ablaufplan, Musikwünsche, Sonstiges). Zwei Kästen mit denselben Fragen verwirren -
+       deshalb erscheint dieser Kasten nur noch, wenn dort schon etwas drinsteht. */
+    var hatNotizen=!!(n.schedule||n.music||n.agreements);
+    if(!hatNotizen)return planCard(b,i);
+    return planCard(b,i)+
+    '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">Ältere Notizen <span style="color:var(--mut);font-size:13px;font-weight:400">· '+esc(b.title||'Termin')+'</span></h2>'+
+    '<p class="sub" style="font-size:13px;margin:6px 0 4px">Das hast du eingetragen, bevor es den Planer gab. Ich lese beides – du kannst es hier stehen lassen oder oben in den Planer übertragen.</p>'+
+    '<label for="nS'+i+'">Programmablauf (Zeiten, Reden, Programmpunkte)</label><textarea id="nS'+i+'" style="min-height:80px" placeholder="z. B. 18:00 Empfang · 19:00 Essen · 20:30 Rede Chef · 21:00 Party …">'+esc(n.schedule||'')+'</textarea>'+
+    '<label for="nM'+i+'">Musikwünsche &amp; No-Gos</label><textarea id="nM'+i+'" style="min-height:80px" placeholder="Wünsche, Lieblingslieder, was auf keinen Fall laufen darf …">'+esc(n.music||'')+'</textarea>'+
+    '<label for="nA'+i+'">Vereinbarungen &amp; Sonstiges</label><textarea id="nA'+i+'" style="min-height:60px" placeholder="Was wir besprochen haben, Ansprechpartner vor Ort, Besonderheiten …">'+esc(n.agreements||'')+'</textarea>'+
+    '<div style="margin-top:12px;display:flex;gap:12px;align-items:center"><button class="btn" onclick="saveNotes('+i+')">Speichern</button><span id="nOk'+i+'" style="color:var(--ok-txt);font-size:13px;display:none">Gespeichert ✓</span></div></div>';
+  }).join('');
+  var files=(me.files||[]).map(function(f){
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-soft)">'+
+    '<div>'+(f.kind==='foto'?'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>')+' '+esc(f.name)+' <span style="color:var(--mut);font-size:12px">('+Math.max(1,Math.round(f.size/1024))+' KB)</span></div>'+
+    '<div><a onclick="openFile(\''+f.id+'\')" style="cursor:pointer">Öffnen</a> &nbsp;<a onclick="delFile(\''+f.id+'\')" style="cursor:pointer;color:var(--err-txt)">Löschen</a></div></div>';
+  }).join('')||'<p class="sub" style="font-size:13px">Noch keine Dateien – ladet gern Fotos eurer Location oder Dokumente hoch.</p>';
+  app('<div class="card"><div class="kicker">Dein Kundenkonto</div><h1>Hallo, '+esc(me.customer.name)+'!</h1>'+
+    '<p class="sub">Hier findet ihr alle Unterlagen und könnt alles für eure Termine pflegen. <a onclick="logout()" style="cursor:pointer">Abmelden</a></p></div>'+
+    '<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Meine Unterlagen</h2>'+docs+rentals+'</div>'+
+    profileCard()+
+    contactCard()+
+    (forms?'<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Fragebögen</h2>'+forms+'</div>':'')+
+    books+
+    '<div class="card"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Fotos &amp; Dokumente</h2>'+
+    '<p class="sub" style="font-size:13px">Locationfotos helfen mir enorm bei der Planung – Raum, Bühne, Stromanschlüsse, Parkplatz. Auch Dokumente (z. B. Ablaufpläne als PDF) sind willkommen.</p>'+
+    '<div id="fileList">'+files+'</div>'+
+    '<div style="margin-top:12px"><input type="file" id="fUp" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" onchange="uploadFiles(this)">'+
+    '<div class="msg" id="fUpMsg" style="display:none;margin-top:8px"></div></div></div>');
+}
+/* Telefon und Anschrift sind das Einzige, was der Kunde an seinen Stammdaten selbst
+   pflegt (Name und E-Mail bleiben bei Markus). Ist die Anschrift komplett, bleibt die
+   Karte zugeklappt - sonst steht sie offen, weil sie fuer Rechnung und PLZ-Login fehlt. */
+function profileCard(){
+  var c=ME.customer||{};
+  var filled=!!(c.street&&c.zip&&c.city);
+  var summary=[c.phone,c.street,[c.zip,c.city].filter(Boolean).join(' ')].filter(Boolean).map(esc).join(' · ');
+  return '<div class="card" id="profCard"><h2><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Mein Profil</h2>'+
+    '<p class="sub" style="font-size:13px">Telefon und Anschrift brauche ich für Rechnungen und Mietverträge – und mit deiner Postleitzahl öffnest du meine Angebots-Links.</p>'+
+    (filled?'':'<div class="msg warn" style="margin-top:0"><b>Bitte Anschrift ergänzen</b> – ohne vollständige Adresse (Straße, PLZ, Ort) kann ich dir kein Angebot rausschicken.</div>')+
+    (filled?'<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0"><span>'+summary+'</span><a onclick="profToggle()" style="cursor:pointer;font-size:13px">bearbeiten</a></div>':'')+
+    '<div id="profEdit"'+(filled?' hidden':'')+' style="margin-top:8px">'+
+    '<label for="pfPhone">Telefon</label><input id="pfPhone" value="'+esc(c.phone||'')+'" autocomplete="tel">'+
+    '<label for="pfStreet">Straße und Hausnummer</label><input id="pfStreet" value="'+esc(c.street||'')+'" autocomplete="street-address">'+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1 1 110px"><label for="pfZip">PLZ</label><input id="pfZip" value="'+esc(c.zip||'')+'" inputmode="numeric" autocomplete="postal-code"></div>'+
+    '<div style="flex:2 1 180px"><label for="pfCity">Ort</label><input id="pfCity" value="'+esc(c.city||'')+'" autocomplete="address-level2"></div></div>'+
+    '<div class="msg err" id="pfMsg" style="display:none"></div>'+
+    '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" onclick="saveProfile()">Profil speichern</button><span id="pfOk" style="color:var(--ok-txt);font-size:13px" hidden>Gespeichert ✓</span></div></div></div>';
+}
+function profToggle(){var e=document.getElementById('profEdit');e.hidden=!e.hidden;if(!e.hidden)document.getElementById('pfPhone').focus()}
+function saveProfile(){
+  var body={phone:val('pfPhone'),street:val('pfStreet'),zip:val('pfZip'),city:val('pfCity')},m=document.getElementById('pfMsg');
+  cfetch('portal/account/profile',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json().then(function(j){return {s:r.status,j:j}})})
+    .then(function(res){
+      if(res.s>=400)throw new Error(res.j.error||'Speichern fehlgeschlagen.');
+      Object.assign(ME.customer,res.j.customer||body);
+      var ok=document.getElementById('pfOk');ok.hidden=false;
+      /* Nur die Profilkarte neu zeichnen - ein Neuaufbau der ganzen Seite wuerde
+         angefangene Eingaben im Planer darunter wegwerfen. */
+      setTimeout(function(){var card=document.getElementById('profCard');if(card)card.outerHTML=profileCard()},1200);
+    }).catch(function(e){m.style.display='block';m.textContent=e.message});
+}
+function saveNotes(i){
+  var b=ME.bookings[i];
+  cfetch('portal/account/booking/'+b.id+'/notes',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({schedule:document.getElementById('nS'+i).value,music:document.getElementById('nM'+i).value,agreements:document.getElementById('nA'+i).value})})
+    .then(function(r){if(!r.ok)throw new Error();
+      var ok=document.getElementById('nOk'+i);ok.style.display='';setTimeout(function(){ok.style.display='none'},2500);
+    }).catch(function(){alert('Speichern fehlgeschlagen – bitte erneut versuchen.')});
+}
+function uploadFiles(inp){
+  var files=Array.from(inp.files||[]);inp.value='';
+  var m=document.getElementById('fUpMsg');
+  var chain=Promise.resolve();
+  files.forEach(function(f){
+    chain=chain.then(function(){
+      return (f.type.indexOf('image/')===0?shrinkImage(f):Promise.resolve(f)).then(function(blob){
+        return cfetch('portal/account/upload?name='+encodeURIComponent(f.name),{method:'POST',body:blob})
+          .then(function(r){return r.json()}).then(function(j){if(j.error)throw new Error(j.error)});
+      });
+    });
+  });
+  chain.then(function(){m.style.display='block';m.className='msg ok';m.textContent='Hochgeladen ✓';loadAccount()})
+    .catch(function(e){m.style.display='block';m.className='msg err';m.textContent=e.message||'Upload fehlgeschlagen.'});
+}
+function shrinkImage(f){
+  return new Promise(function(res){
+    var img=new Image(),url=URL.createObjectURL(f);
+    img.onload=function(){
+      var mx=2000,sc=Math.min(1,mx/Math.max(img.width,img.height));
+      var c=document.createElement('canvas');c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function(b){res(b||f)},'image/jpeg',0.87);
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);res(f)};
+    img.src=url;
+  });
+}
+function openFile(id){
+  cfetch('portal/account/file/'+id).then(function(r){if(!r.ok)throw new Error();return r.blob()})
+    .then(function(b){window.open(URL.createObjectURL(b),'_blank')}).catch(function(){alert('Datei konnte nicht geladen werden.')});
+}
+function delFile(id){
+  if(!confirm('Datei wirklich löschen?'))return;
+  cfetch('portal/account/file/'+id,{method:'DELETE'}).then(function(){loadAccount()});
+}
+
+/* Ein abgeschnittener Link (z.B. "portal.html?a=" ohne Kennung) landete bisher wortlos
+   auf der Anmeldemaske - der Kunde sucht dann den Fehler bei sich. */
+var LEER=['a','f','mv','einladung'].filter(function(k){return qs.has(k)&&!qs.get(k)});
+if(OFFER)loadOffer();
+else if(FORM)loadForm();
+else if(MV)loadRental();
+else if(INVITE)loadInvite();
+else if(LEER.length)
+  app('<div class="card"><h1>Der Link ist unvollständig</h1>'+
+    '<p class="sub">Da fehlt das Stück hinter dem Gleichheitszeichen – beim Kopieren aus einer E-Mail geht das leicht verloren. '+
+    'Kopier den Link bitte noch einmal komplett.<span id="coPhoneHint"></span></p>'+
+    '<p class="sub" style="margin-top:14px">Du hast ein Kundenkonto? <a href="portal.html">Hier geht es zur Anmeldung.</a></p></div>');
+else if(CTOK)loadAccount();
+else renderLogin();
+</script>
+</body>
+</html>

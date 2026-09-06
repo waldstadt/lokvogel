@@ -1,0 +1,63 @@
+# Sicherheits-Header fuer die gesamte Seite (Backoffice, Portal, oeffentliche Seiten,
+# API). Greift nur auf Apache mit aktivem mod_headers (All-Inkl-Produktion) - im
+# Entwicklungs-Server (php -S) werden .htaccess-Dateien ignoriert, siehe UPLOAD_HTACCESS
+# in api.php fuer denselben Sachverhalt an anderer Stelle im Projekt.
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+  # Nur eigene Ressourcen: keine Fremd-Skripte/-Schriften/-Frames moeglich, selbst wenn an
+  # anderer Stelle versehentlich welche eingebaut wuerden (CLAUDE.md verbietet ohnehin
+  # externe CDNs). 'unsafe-inline' fuer Skript/Stil ist noetig, weil die Seiten mit
+  # Inline-onclick-Handlern und Inline-<style> arbeiten - kein Nonce-System vorhanden.
+  # frame-src erlaubt zusaetzlich open.spotify.com: bewusste, mit Markus abgestimmte
+  # Ausnahme von "keine externen Dienste" fuer eingebettete Playlists im Backstage-Bereich
+  # (siehe backstage.php) - alles andere bleibt 'self'.
+  # worker-src erlaubt zusaetzlich blob: - die HEIC-Umwandlung (heic2any, siehe admin.html)
+  # startet ihren Bilddecoder als Web-Worker aus einer blob:-URL; ohne dieses Zugestaendnis
+  # faellt worker-src auf script-src zurueck (kein blob: dort erlaubt) und der Worker laesst
+  # sich gar nicht erst erzeugen - mit Playwright/Chromium samt dieser CSP nachgestellt und
+  # bestaetigt: Chrome meldet dann exakt "Refused to create a worker from 'blob:...'" und die
+  # Umwandlung haengt sich lautlos auf (kein Fehler, kein Fortschritt) - deckt sich mit dem
+  # beobachteten Verhalten in Safari (iPhone und Mac). 'unsafe-eval' in script-src ist
+  # zusaetzlich noetig, weil dieser Worker seinen WebAssembly-Bilddecoder (libheif) ueber
+  # eval()-basierten Code initialisiert - 'wasm-unsafe-eval' allein (WebAssembly ohne
+  # generelles eval) reichte im selben Nachbau nicht, Chrome blockierte dort noch mit
+  # "Refused to evaluate a string as JavaScript ... 'unsafe-eval' is not an allowed source".
+  # Erst mit beidem zusammen kommt die Umwandlung tatsaechlich bis zur echten Bilddecoder-
+  # Pruefung durch. Bewusster, begrenzter Kompromiss nur wegen dieser einen Bibliothek - die
+  # Seite arbeitet ohnehin schon mit 'unsafe-inline' (Inline-onclick-Handler, kein Nonce-
+  # System), diese CSP ist also primaer ein Riegel gegen fremde/externe Ressourcen, keine
+  # strikte XSS-Haertung.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' https://open.spotify.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+  # Nur wirksam, wenn ueber HTTPS ausgeliefert (Browser ignorieren HSTS ueber HTTP ohnehin).
+  Header always set Strict-Transport-Security "max-age=15552000; includeSubDomains"
+</IfModule>
+
+# Aktionsseiten (Kampagnen-Minipages): serverseitig gerendert statt reiner JS-Huelle,
+# damit Suchmaschinen-Crawler ohne JavaScript-Ausfuehrung H1/Text/Aufzaehlungen sehen
+# (siehe campaign-render.php). Die URL bleibt .html, nur die Ausfuehrung wechselt auf
+# PHP - alle anderen .html-Dateien (admin.html, portal.html, index.html usw.) bleiben
+# normales statisches HTML.
+<FilesMatch "^(hochzeit|vereinsfest-technik|abiball|firmensommerfest|betriebsversammlung|seminartechnik|messe|objektbeleuchtung|instore-dj|produktpraesentation|tagesparty|technik-check|workshops|technik-vor-ort)\.html$">
+  SetHandler application/x-httpd-php
+</FilesMatch>
+
+# Backstage (persoenliche Einblicke): huebsche URLs ohne Dateiendung, damit im Backoffice
+# frei angelegte Beitraege keine eigene Datei brauchen (siehe backstage.php). Greift nur mit
+# aktivem mod_rewrite; backstage.php?slug=... funktioniert notfalls auch direkt.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^backstage/([a-z0-9-]+)/?$ backstage.php?slug=$1 [L,QSA]
+  RewriteRule ^backstage/?$ backstage.php [L,QSA]
+  # Technik-Artikel: eigene Adresse je Vermiet-Artikel fuer Google und zum gezielten
+  # Verlinken/Empfehlen einzelner Geraete (siehe technik-artikel.php).
+  RewriteRule ^technik/([a-z0-9-]+)/?$ technik-artikel.php?slug=$1 [L,QSA]
+  # Vorschaubilder fuer Kacheln (Medienpool, Galerie, Technik-/Produktkarten, ...): beim
+  # ersten Aufruf per PHP erzeugt und ab dann als ganz normale Datei ausgeliefert (siehe
+  # thumb.php). RewriteCond sorgt dafuer, dass eine schon erzeugte Miniatur direkt von
+  # Apache kommt, ohne nochmal PHP zu bemuehen.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^uploads/\.thumbs/(.+)$ thumb.php?f=$1 [L,QSA]
+</IfModule>
