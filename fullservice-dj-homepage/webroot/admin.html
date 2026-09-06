@@ -1318,11 +1318,6 @@ tr.neu td{background:rgba(255,111,91,.14)}
           <div id="bkLatest" style="margin-bottom:6px"></div>
           <div id="bkList" class="sml mut">–</div>
         </div>
-        <div class="card"><h3>60-Minuten-Alarm</h3>
-          <div class="sml mut" style="margin-bottom:8px">Damit der Alarm bei neuen Anfragen auch dann kommt, wenn du gerade nicht im Backoffice bist, diese URL zusätzlich als eigenen Cronjob beim Hoster anlegen – alle 5 bis 10 Minuten aufrufen (gleicher Schlüssel wie die Datensicherung oben, unabhängig davon ausgeführt):</div>
-          <input id="slaUrl" readonly onclick="this.select()" style="font-size:11px">
-          <div class="sml mut" style="margin-top:8px">Ohne diesen Cronjob läuft der Alarm trotzdem mit, aber nur solange du selbst im Backoffice aktiv bist (Prüfung alle 10 Minuten bei jedem Klick) – bist du länger raus, kommt die Warnung erst, wenn du zurückkommst. Ein-/Ausschalten und die Vorwarnzeit stellst du unten bei „Automatische Mails" ein.</div>
-        </div>
         <div class="card"><h3>KI-Textassistent</h3>
           <div class="sml mut" style="margin-bottom:8px">Wird genutzt, um aus Stichpunkten fertige Texte zu machen (z. B. Artikelbeschreibungen). Der eingegebene Text wird dafür an den hier eingestellten KI-Anbieter gesendet.</div>
           <label>Anbieter</label>
@@ -8098,8 +8093,6 @@ function loadBackups(){
   fetch('api.php/backup/list',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(j){
     if(!j||!j.key)return;
     document.getElementById('bkUrl').value=location.origin+location.pathname.replace(/[^\/]*$/,'')+'api.php/cron/backup?key='+j.key;
-    var slaEl=document.getElementById('slaUrl');
-    if(slaEl)slaEl.value=location.origin+location.pathname.replace(/[^\/]*$/,'')+'api.php/cron/sla-check?key='+j.key;
     var latest=document.getElementById('bkLatest');
     if(latest)latest.innerHTML=(j.files&&j.files.length)?'<a class="btn g sm" onclick="dlBackup(\''+j.files[0].name+'\')">Neuestes Backup herunterladen</a> <span class="mut sml">'+esc(j.files[0].name)+'</span>':'';
     document.getElementById('bkList').innerHTML=(j.files&&j.files.length)?j.files.map(function(f){
@@ -8240,15 +8233,11 @@ function tgTest(){
    jeweils schon bestehenden Frist (Nachfassen-Frist, Erinnerungsfrist, Faelligkeit) laeuft,
    bevor das Backoffice von selbst verschickt. Absage bewusst nicht dabei - siehe Karte. */
 var MAIL_AUTO_LABEL={nachfass:'Nachfassen bei Angeboten ohne Reaktion',
-  form_reminder:'Erinnerung bei offenen Fragebögen',mahnung:'Zahlungserinnerung bei überfälligen Rechnungen',
-  sla_alert:'Alarm an dich, wenn eine Anfrage das 60-Minuten-Versprechen zu reißen droht'};
-/* sla_alert ist als einzige Art standardmaessig AN (45 Minuten) - siehe mailAutoConfig()
-   in api.php, dieselbe Vorbelegung auch hier, solange noch nichts gespeichert wurde. */
-var MAIL_AUTO_DEFAULT={sla_alert:{enabled:true,delay:45,unit:'minutes'}};
+  form_reminder:'Erinnerung bei offenen Fragebögen',mahnung:'Zahlungserinnerung bei überfälligen Rechnungen'};
 function renderMailAuto(){
   var cfg=S.mail_auto||{};
   document.getElementById('mailAutoRows').innerHTML=Object.keys(MAIL_AUTO_LABEL).map(function(k){
-    var c=cfg[k]||MAIL_AUTO_DEFAULT[k]||{};
+    var c=cfg[k]||{};
     return '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)">'+
       '<label style="flex:1;min-width:220px;margin:0"><input type="checkbox" id="ma_'+k+'_on" style="width:auto;margin-right:6px"'+(c.enabled?' checked':'')+'>'+MAIL_AUTO_LABEL[k]+'</label>'+
       '<span class="sml mut">zusätzlich warten:</span>'+

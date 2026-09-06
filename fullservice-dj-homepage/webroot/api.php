@@ -1281,11 +1281,12 @@ function upgrade(PDO $p): void {
   }
   if ($v < 117) {
     /* v117: Antwortversprechen von "innerhalb von 24 Stunden" auf "innerhalb von 60
-       Minuten" verschaerft (Markus kann das jetzt auch tatsaechlich einhalten/ueberwachen,
-       siehe mailAutoSlaAlert). Betrifft schon veroeffentlichte Inhalte (Ablauf-Schritt,
-       Kampagnenseiten-Formulartexte) - reine Quelltext-Aenderung wirkt dort nicht, weil
-       diese Zeilen laengst in der Datenbank stehen. Nur Zeilen anfassen, die noch
-       woertlich den alten Text enthalten - eigene Anpassungen von Markus bleiben unberuehrt. */
+       Minuten" verschaerft - konkret die Frage "ist der Termin noch frei?", die das
+       System seither selbst und sofort beantwortet (siehe inquiryAvailabilityLine()).
+       Betrifft schon veroeffentlichte Inhalte (Ablauf-Schritt, Kampagnenseiten-
+       Formulartexte) - reine Quelltext-Aenderung wirkt dort nicht, weil diese Zeilen
+       laengst in der Datenbank stehen. Nur Zeilen anfassen, die noch woertlich den
+       alten Text enthalten - eigene Anpassungen von Markus bleiben unberuehrt. */
     try {
       $p->exec("update process_steps set text = replace(text, 'innerhalb von 24 Stunden', 'innerhalb von 60 Minuten')
         where text like '%innerhalb von 24 Stunden%'");
@@ -2727,7 +2728,7 @@ function docFollowupSubject(array $doc): string {
    (mail_auto_log), und nur, wenn die Bedingung (versendet/offen/unbezahlt) im Moment
    des Versands noch zutrifft - reagiert der Kunde inzwischen doch noch, faellt er beim
    naechsten Tick automatisch aus der Kandidatenliste. */
-const MAIL_AUTO_KINDS = ['nachfass', 'form_reminder', 'mahnung', 'sla_alert'];
+const MAIL_AUTO_KINDS = ['nachfass', 'form_reminder', 'mahnung'];
 function mailAutoDdl(): string {
   return "create table if not exists mail_auto_log (id text primary key, kind text not null,
     ref_id text not null, sent_at text);
@@ -2736,13 +2737,9 @@ function mailAutoDdl(): string {
 function mailAutoConfig(): array {
   $j = json_decode((string)db()->query("select value from settings where key='mail_auto'")->fetchColumn() ?: '{}', true);
   $cfg = is_array($j) ? $j : [];
-  /* sla_alert ist die einzige Art, die standardmaessig AN ist: die anderen drei sind eine
-     Kann-Automatisierung, die der 60-Minuten-Alarm nicht ist - Markus hat ihn ausdruecklich
-     verlangt ("das koennen wir ja automatisieren"), nicht nur als Option angeboten bekommen. */
-  $defaults = ['sla_alert' => ['enabled' => true, 'delay' => 45, 'unit' => 'minutes']];
   $out = [];
   foreach (MAIL_AUTO_KINDS as $k) {
-    $def = $defaults[$k] ?? ['enabled' => false, 'delay' => 3, 'unit' => 'days'];
+    $def = ['enabled' => false, 'delay' => 3, 'unit' => 'days'];
     $row = is_array($cfg[$k] ?? null) ? $cfg[$k] : null;
     $unit = (string)($row['unit'] ?? $def['unit']);
     $out[$k] = ['enabled' => $row !== null ? !empty($row['enabled']) : $def['enabled'],
@@ -2859,27 +2856,6 @@ function mailAutoMahnung(PDO $p, array $cfg): void {
     if (sendMailSafe($d['email'], $subject, $bodyText)) mailAutoFinish($p, 'mahnung', $d['id'], $d['customer_id'], $subject, $bodyText);
   }
 }
-/* 60-Minuten-Antwortversprechen: Markus soll gewarnt werden, BEVOR er es reisst, nicht
-   erst danach - deshalb greift der Alarm schon vor Ablauf der vollen Frist (Standard 45
-   von versprochenen 60 Minuten), nicht erst wenn die Anfrage schon ueberfaellig ist.
-   "Beantwortet" heisst hier: Status ist nicht mehr 'neu' (siehe viewInq() in admin.html -
-   jedes Oeffnen der Anfrage setzt sie auf 'gesehen'). Je Anfrage nur ein Alarm, auch wenn
-   sie danach noch laenger unbeantwortet bleibt - sonst piept es alle paar Minuten erneut. */
-function mailAutoSlaAlert(PDO $p, array $cfg): void {
-  $grenze = gmdate('Y-m-d\TH:i:s\Z', time() - mailAutoDelaySeconds($cfg));
-  $rows = $p->prepare("select id, name, event_type, event_date, created_at from inquiries
-      where status = 'neu' and created_at <= ?");
-  $rows->execute([$grenze]);
-  foreach ($rows->fetchAll() as $i) {
-    if (mailAutoAlreadySent($p, 'sla_alert', $i['id'])) continue;
-    $mins = max(1, (int)round((time() - (strtotime((string)$i['created_at']) ?: time())) / 60));
-    $was = trim(($i['event_type'] ?: '') . ($i['event_date'] ? ' am ' . deDate($i['event_date']) : ''));
-    notifyOwner('Achtung: 60-Minuten-Versprechen läuft – ' . $i['name'],
-      'Die Anfrage von ' . $i['name'] . ($was !== '' ? ' (' . $was . ')' : '') . ' ist seit ' . $mins . ' Minuten offen und noch nicht angesehen. Kurz antworten oder wenigstens öffnen, damit die Zusage von 60 Minuten hält.',
-      'inquiries');
-    mailAutoMarkSent($p, 'sla_alert', $i['id']);
-  }
-}
 /* Zustand nur fuers Drosseln - kein Cronjob auf All-Inkl vorhanden, deshalb wird bei
    jedem angemeldeten Zugriff kurz geprueft, ob der letzte Lauf laenger als 10 Minuten
    her ist; wenn ja, laeuft ein neuer Durchgang. */
@@ -2897,7 +2873,6 @@ function mailAutomationTick(PDO $p): void {
   if ($cfg['nachfass']['enabled']) { try { mailAutoNachfass($p, $cfg['nachfass']); } catch (Throwable $e) {} }
   if ($cfg['form_reminder']['enabled']) { try { mailAutoFormReminder($p, $cfg['form_reminder']); } catch (Throwable $e) {} }
   if ($cfg['mahnung']['enabled']) { try { mailAutoMahnung($p, $cfg['mahnung']); } catch (Throwable $e) {} }
-  if ($cfg['sla_alert']['enabled']) { try { mailAutoSlaAlert($p, $cfg['sla_alert']); } catch (Throwable $e) {} }
   /* Weiterleitung: nur Konten mit eingerichtetem IMAP-Zugang UND eingeschalteter
      Weiterleitung abrufen - ohne echten Cronjob ist "automatisch" hier "spaetestens beim
      naechsten angemeldeten Zugriff, gedrosselt auf 10 Minuten", nicht sofort bei Eingang. */
@@ -2975,6 +2950,24 @@ function bookingConflicts(PDO $p, array $booking): array {
       $out[] = ($c['title'] ?: 'Kalender-Blocker') . ' am ' . date('d.m.Y', strtotime((string)$c['start_date']));
   } catch (PDOException $e) {}
   return $out;
+}
+
+/* Genau die Frage, fuer die das 60-Minuten-Versprechen gilt ("ist mein Wunschtermin noch
+   frei?") kann das System selbst beantworten - das ist eine reine Kalenderabfrage, die
+   Markus nicht persoenlich treffen muss (siehe bookingConflicts, dieselbe Pruefung, die
+   auch bei der Angebotsannahme entscheidet, ob ein Termin noch gehalten werden kann).
+   Ohne Datum in der Anfrage gibt es nichts zu pruefen - dann bleibt es bei Markus'
+   persoenlicher Antwort. WICHTIG: bookingConflicts() liefert Titel/Anlass FREMDER Kunden
+   zurueck (fuer Markus' eigene Uebersicht gedacht) - die duerfen einem wildfremden
+   Interessenten niemals angezeigt werden, deshalb wird hier nur das Ja/Nein ausgewertet,
+   nie der Text selbst. */
+function inquiryAvailabilityLine(PDO $p, array $row): ?string {
+  $date = trim((string)($row['event_date'] ?? ''));
+  if ($date === '') return null;
+  $de = date('d.m.Y', strtotime($date) ?: time());
+  $frei = empty(bookingConflicts($p, ['id' => '', 'event_date' => $date, 'end_date' => null, 'kind' => 'dj']));
+  if ($frei) return 'Schon mal die wichtigste Nachricht vorab: Der ' . $de . ' ist bei mir aktuell noch frei!';
+  return 'Ehrlich vorab: Der ' . $de . ' ist bei mir nach aktuellem Stand schon vergeben – ich schaue trotzdem persönlich, was sich machen lässt (z. B. ein anderer Termin oder eine Empfehlung).';
 }
 
 /* Legt automatisch einen Technik-Check an, sobald ein Angebot mit dem Produkt
@@ -4800,7 +4793,10 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         "Name: {$row['name']}\nE-Mail: " . ($row['email'] ?? '–') . "\nTelefon: " . ($row['phone'] ?? '–') .
         "\nAnlass: " . ($row['event_type'] ?? '–') . "\nDatum: " . ($row['event_date'] ?? '–') .
         "\nOrt: " . ($row['location'] ?? '–') . "\n\n" . ($row['message'] ?? ''), 'inq');
-      /* Warme Eingangsbestätigung an den Interessenten – jeder soll sich sofort gut aufgehoben fühlen */
+      /* Warme Eingangsbestätigung an den Interessenten – jeder soll sich sofort gut aufgehoben fühlen.
+         Das 60-Minuten-Versprechen gilt konkret der Frage "ist der Termin noch frei?" - die kann das
+         System selbst und sofort beantworten (siehe inquiryAvailabilityLine()), ganz ohne auf Markus
+         zu warten. Alles andere (Preis, Details) bleibt bei Markus persoenlich. */
       if (!empty($row['email'])) {
         $comp = json_decode($p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true);
         /* Anrede ueber den (eben angelegten oder gefundenen) Kunden - Vereine und
@@ -4809,9 +4805,11 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         $cst->execute([$row['id']]);
         $anrede = anredeFor(($cst->fetch() ?: []) + ['name' => (string)$row['name']]);
         $waDigits = publicCompany($comp)['whatsapp_digits'];
+        $availLine = inquiryAvailabilityLine($p, $row);
         sendMailSafe((string)$row['email'], 'Deine Anfrage ist angekommen',
           "$anrede,\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet!\n\n" .
-          "Ich melde mich persönlich bei dir, in der Regel innerhalb von 60 Minuten. " .
+          ($availLine !== null ? $availLine . "\n\n" : '') .
+          "Alles Weitere (Preis, Details) melde ich mich persönlich bei dir. " .
           "Das hier ist die einzige automatische Mail, die du von mir bekommst – ab jetzt schreibst du direkt mit mir.\n\n" .
           (($comp['phone'] ?? '') !== '' ?
             "Wenn es eilig ist, erreichst du mich unter " . $comp['phone'] . " – am schnellsten per WhatsApp:\n" .
@@ -8278,20 +8276,6 @@ try {
     $r['digest'] = dailyDigest();
     $r['guide_digest'] = monthlyGuideSuggestions();
     out($r);
-  }
-  /* Gleicher Schluessel wie cron/backup (keine zweite Geheimzahl zum Verwalten), aber ein
-     eigener, viel haeufiger aufrufbarer Endpunkt: cron/backup macht taeglich einen
-     Datenbank-Schnappschuss (nur 14 werden behalten) - riefe man ihn alle 5-10 Minuten auf,
-     waeren die Backups im Kreis weg, bevor sie was nuetzen. Dieser Endpunkt macht nur den
-     schon bestehenden mailAutomationTick()-Durchlauf (Nachfassen/Erinnerungen/60-Minuten-
-     Alarm), der sich selbst auf hoechstens einmal alle 10 Minuten drosselt - haeufigeres
-     Aufrufen schadet also nicht, seltener als alle 10 Minuten sollte der Cronjob trotzdem
-     nicht sein, sonst kommt der 60-Minuten-Alarm zu spaet. */
-  if ($path === 'cron/sla-check' && $method === 'GET') {
-    $key = (string)($_GET['key'] ?? '');
-    if ($key === '' || !hash_equals(backupKey(), $key)) { usleep(500000); fail('Ungültiger Schlüssel.', 401); }
-    try { mailAutomationTick(db()); } catch (Throwable $e) {}
-    out(['ok' => true]);
   }
   /* Kalender-Abos (iCal): drei Feeds – Anfragen, feste DJ-Buchungen, Technikvermietung */
   if (preg_match('#^ical/([a-f0-9]{32})/(anfragen|buchungen|technik)\.ics$#', $path, $m) && $method === 'GET') {
