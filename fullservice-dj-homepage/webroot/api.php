@@ -2567,8 +2567,12 @@ function deDate(?string $d): string {
   return $t ? date('d.m.Y', $t) : $d;
 }
 
-function autoInquiryPlanner(PDO $p, array $row): void {
-  if (empty($row['email'])) return;
+/* Rueckgabe (customer_id/booking_id) wird gebraucht, um bei einem nicht mehr freien
+   Wunschtermin sofort in derselben Eingangsbestaetigung die DJ-Vermittlung anbieten zu
+   koennen (siehe inquiryAvailabilityInfo) - vorher stand das Ergebnis nur lokal in dieser
+   Funktion und ging beim Rueckkehren verloren. */
+function autoInquiryPlanner(PDO $p, array $row): array {
+  if (empty($row['email'])) return ['customer_id' => null, 'booking_id' => null];
   $email = mb_substr(strtolower(trim((string)$row['email'])), 0, 160);
   /* Zwei Kunden mit derselben Adresse sind moeglich (von Hand doppelt angelegt). Ohne
      feste Reihenfolge entscheidet der Zufall, an welchem die Anfrage haengt - deshalb
@@ -2615,15 +2619,16 @@ function autoInquiryPlanner(PDO $p, array $row): void {
     $formLink = autoTechCheckInvite($p, $custId, $row);
     if ($formLink) $GLOBALS['_techCheckFormLink'] = $formLink;
   }
-  if (empty($row['event_date'])) return;
+  if (empty($row['event_date'])) return ['customer_id' => $custId, 'booking_id' => null];
   /* Termine in der Vergangenheit (Tippfehler im Datumsfeld) erzeugen keine Buchung -
      sonst hängt ein Geisterauftrag dauerhaft in der Liste. Die Anfrage selbst bleibt. */
-  if ($row['event_date'] < gmdate('Y-m-d')) return;
+  if ($row['event_date'] < gmdate('Y-m-d')) return ['customer_id' => $custId, 'booking_id' => null];
   /* Schickt jemand dieselbe Anfrage mehrfach ab (Ungeduld, Zurück-Taste), darf daraus
-     nicht jedes Mal eine weitere Buchung samt Planer entstehen. */
-  $dupe = $p->prepare("select count(*) from bookings where customer_id = ? and event_date = ? and status = 'anfrage'");
+     nicht jedes Mal eine weitere Buchung samt Planer entstehen - die schon vorhandene
+     Buchung wird trotzdem zurueckgegeben, damit die DJ-Vermittlung sich darauf beziehen kann. */
+  $dupe = $p->prepare("select id from bookings where customer_id = ? and event_date = ? and status = 'anfrage' limit 1");
   $dupe->execute([$custId, $row['event_date']]);
-  if ((int)$dupe->fetchColumn()) return;
+  if ($existingBookingId = $dupe->fetchColumn()) return ['customer_id' => $custId, 'booking_id' => $existingBookingId];
   $guests = is_numeric($row['guests'] ?? null) ? (int)$row['guests'] : null;
   $basics = array_filter([
     'venue_name' => $row['location'] ?? null, 'venue_address' => $row['location'] ?? null,
@@ -2639,6 +2644,7 @@ function autoInquiryPlanner(PDO $p, array $row): void {
       $row['location'] ?? null, null, $guests,   /* Adresse bleibt leer statt den Ortsnamen zu doppeln */
       json_encode(['basics' => $basics], JSON_UNESCAPED_UNICODE), now(), now()]);
   applyDefaultSet($p, $bookingId, $kind);
+  return ['customer_id' => $custId, 'booking_id' => $bookingId];
 }
 
 /* Spiegelt die Entscheidung zum Angebot auf den Termin - dieselben Regeln wie
@@ -2961,13 +2967,26 @@ function bookingConflicts(PDO $p, array $booking): array {
    zurueck (fuer Markus' eigene Uebersicht gedacht) - die duerfen einem wildfremden
    Interessenten niemals angezeigt werden, deshalb wird hier nur das Ja/Nein ausgewertet,
    nie der Text selbst. */
-function inquiryAvailabilityLine(PDO $p, array $row): ?string {
+function inquiryAvailabilityLine(PDO $p, array $row, ?string $custId, ?string $bookingId): ?string {
   $date = trim((string)($row['event_date'] ?? ''));
   if ($date === '') return null;
   $de = date('d.m.Y', strtotime($date) ?: time());
   $frei = empty(bookingConflicts($p, ['id' => '', 'event_date' => $date, 'end_date' => null, 'kind' => 'dj']));
   if ($frei) return 'Schon mal die wichtigste Nachricht vorab: Der ' . $de . ' ist bei mir aktuell noch frei!';
-  return 'Ehrlich vorab: Der ' . $de . ' ist bei mir nach aktuellem Stand schon vergeben – ich schaue trotzdem persönlich, was sich machen lässt (z. B. ein anderer Termin oder eine Empfehlung).';
+  $txt = 'Ehrlich vorab: Der ' . $de . ' ist bei mir nach aktuellem Stand schon vergeben.';
+  /* Termin vergeben UND Vermittlung eingerichtet: Statt den Interessenten erst auf eine
+     spaetere persoenliche Antwort warten zu lassen, direkt den Vorauswahl-Bogen anbieten -
+     derselbe Bogen, der sonst erst beim Ablehnen/Konflikt eines Angebots entsteht (siehe
+     bandeFormFor), hier nur schon beim allerersten Kontakt. Ohne custId (z.B. Anfrage ohne
+     E-Mail) oder ohne eingerichtete Agentur bleibt es bei der reinen Ehrlichkeits-Zeile. */
+  if ($custId && agencyEnabled()) {
+    try {
+      $form = bandeFormFor($p, $custId, $bookingId);
+      if ($form) $txt .= ' Über meine Partner-Agentur ' . agencyName() . ' kann ich euch trotzdem gern persönlich einen passenden DJ raussuchen – kostenlos, ihr müsst nur kurz zustimmen:' . "\n" . $form['link'];
+    } catch (Throwable $e) {}
+  }
+  if (strpos($txt, "\n") === false) $txt .= ' Ich schaue trotzdem persönlich, was sich machen lässt.';
+  return $txt;
 }
 
 /* Legt automatisch einen Technik-Check an, sobald ein Angebot mit dem Produkt
@@ -4788,7 +4807,8 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         implode(',', array_fill(0, count($cols), '?')) . ")")->execute(array_values($row));
       /* Fehler beim automatischen Anlegen des Veranstaltungsplaners dürfen die Anfrage selbst
          nie verhindern - das ist ein Service-Extra, kein kritischer Pfad. */
-      try { autoInquiryPlanner($p, $row); } catch (Throwable $e) {}
+      $auto = ['customer_id' => null, 'booking_id' => null];
+      try { $auto = autoInquiryPlanner($p, $row); } catch (Throwable $e) {}
       notifyOwner('Neue Anfrage: ' . $row['name'] . (($row['event_type'] ?? '') ? ' – ' . $row['event_type'] : ''),
         "Name: {$row['name']}\nE-Mail: " . ($row['email'] ?? '–') . "\nTelefon: " . ($row['phone'] ?? '–') .
         "\nAnlass: " . ($row['event_type'] ?? '–') . "\nDatum: " . ($row['event_date'] ?? '–') .
@@ -4805,7 +4825,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         $cst->execute([$row['id']]);
         $anrede = anredeFor(($cst->fetch() ?: []) + ['name' => (string)$row['name']]);
         $waDigits = publicCompany($comp)['whatsapp_digits'];
-        $availLine = inquiryAvailabilityLine($p, $row);
+        $availLine = inquiryAvailabilityLine($p, $row, $auto['customer_id'] ?? null, $auto['booking_id'] ?? null);
         sendMailSafe((string)$row['email'], 'Deine Anfrage ist angekommen',
           "$anrede,\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet!\n\n" .
           ($availLine !== null ? $availLine . "\n\n" : '') .
