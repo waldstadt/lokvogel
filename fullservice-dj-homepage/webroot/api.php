@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 116;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 117;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1279,6 +1279,30 @@ function upgrade(PDO $p): void {
       }
     } catch (PDOException $e) {}
   }
+  if ($v < 117) {
+    /* v117: Antwortversprechen von "innerhalb von 24 Stunden" auf "innerhalb von 60
+       Minuten" verschaerft (Markus kann das jetzt auch tatsaechlich einhalten/ueberwachen,
+       siehe mailAutoSlaAlert). Betrifft schon veroeffentlichte Inhalte (Ablauf-Schritt,
+       Kampagnenseiten-Formulartexte) - reine Quelltext-Aenderung wirkt dort nicht, weil
+       diese Zeilen laengst in der Datenbank stehen. Nur Zeilen anfassen, die noch
+       woertlich den alten Text enthalten - eigene Anpassungen von Markus bleiben unberuehrt. */
+    try {
+      $p->exec("update process_steps set text = replace(text, 'innerhalb von 24 Stunden', 'innerhalb von 60 Minuten')
+        where text like '%innerhalb von 24 Stunden%'");
+    } catch (PDOException $e) {}
+    try {
+      $p->exec("update campaign_pages set form_lead = replace(form_lead, 'innerhalb von 24 Stunden', 'innerhalb von 60 Minuten')
+        where form_lead like '%innerhalb von 24 Stunden%'");
+    } catch (PDOException $e) {}
+    try {
+      $p->exec("update site_content set value = replace(value, 'innerhalb von 24 Stunden', 'innerhalb von 60 Minuten')
+        where value like '%innerhalb von 24 Stunden%'");
+    } catch (PDOException $e) {}
+    try {
+      $p->exec("update email_templates set body = replace(body, 'innerhalb von 24 Stunden', 'innerhalb von 60 Minuten')
+        where body like '%innerhalb von 24 Stunden%'");
+    } catch (PDOException $e) {}
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1702,7 +1726,7 @@ function seedProcessSteps(PDO $p): void {
   $ins = $p->prepare('insert into process_steps (id, sort, title, text, public, created_at) values (?,?,?,?,1,?)');
   $has = $p->prepare('select count(*) from process_steps where title = ?');
   foreach ([
-    [1, 'Anfragen', 'Formular ausfüllen oder kurz anrufen. Ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort – auch wenn der Termin schon vergeben ist.'],
+    [1, 'Anfragen', 'Formular ausfüllen oder kurz anrufen. Ihr bekommt innerhalb von 60 Minuten eine ehrliche Antwort – auch wenn der Termin schon vergeben ist.'],
     [2, 'Kennenlernen', 'Telefonat oder Treffen: Wir sprechen über den Ablauf, eure Musik – und darüber, was auf keinen Fall laufen darf.'],
     [3, 'Angebot', 'Ihr bekommt ein klares Angebot mit festen Posten für Dauer und Technik. Keine versteckten Kosten, kein Kleingedrucktes.'],
     [4, 'Feiern', 'Ich bin rechtzeitig da, die Technik steht, bevor eure Gäste kommen – und dann gehört die Tanzfläche euch.'],
@@ -2189,7 +2213,7 @@ function seedExtraTemplates(PDO $p): void {
     /* Eingangsbestaetigung zur Miet-Anfrage aus dem Tourcase: Bisher ging nur eine Mail an
        Markus - der Kunde sah nach dem Absenden nichts mehr von seiner Anfrage. */
     [100, 'Miet-Anfrage eingegangen', 'Deine Miet-Anfrage ist da – {zeitraum}',
-      "Hallo {vorname},\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet. Das hast du angefragt:\n\nZeitraum: {zeitraum}\n{positionen}\n\nIch schaue mir das an und melde mich innerhalb von 24 Stunden mit Verfügbarkeit und Preis. Die Anfrage findest du jederzeit in deinem Kundenkonto:\n{link}\n\nWenn es eilig ist: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nBis gleich!\n{inhaber}"],
+      "Hallo {vorname},\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet. Das hast du angefragt:\n\nZeitraum: {zeitraum}\n{positionen}\n\nIch schaue mir das an und melde mich innerhalb von 60 Minuten mit Verfügbarkeit und Preis. Die Anfrage findest du jederzeit in deinem Kundenkonto:\n{link}\n\nWenn es eilig ist: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nBis gleich!\n{inhaber}"],
     /* Der Kunde hat im Portal der DJ-Vermittlung zugestimmt - jetzt braucht Markus die
        Eckdaten, um passende Kollegen auszusuchen. Der Bogen wird automatisch angelegt. */
     [101, 'DJ-Vermittlung – Vorauswahl-Bogen', 'Damit ich euch die passenden DJs raussuchen kann',
@@ -2199,7 +2223,7 @@ function seedExtraTemplates(PDO $p): void {
     [102, 'Absage erhalten', 'Danke für eure Rückmeldung zu Angebot {nummer}',
       "Hallo {vorname},\n\ndanke, dass ihr mir ehrlich Bescheid gegeben habt – das ist mir lieber als Funkstille. Ich habe das Angebot {nummer} als abgesagt vermerkt, {termin} ist bei mir damit wieder frei.\n\nFalls sich bei euch doch noch etwas ändert oder ihr eine andere Idee habt: Die Tür bleibt offen. Ruft einfach an ({telefon}) oder antwortet auf diese Mail.\n\nAlles Gute für eure Feier!\n{inhaber}"],
     [103, 'Frage erhalten', 'Eure Frage zu Angebot {nummer} ist angekommen',
-      "Hallo {vorname},\n\neure Nachricht zum Angebot {nummer} ist bei mir gelandet – ich antworte meist innerhalb von 24 Stunden.\n\nDas habt ihr geschrieben:\n{nachricht}\n\nWenn es eilig ist: einfach anrufen ({telefon}).\n\nViele Grüße\n{inhaber}"],
+      "Hallo {vorname},\n\neure Nachricht zum Angebot {nummer} ist bei mir gelandet – ich antworte meist innerhalb von 60 Minuten.\n\nDas habt ihr geschrieben:\n{nachricht}\n\nWenn es eilig ist: einfach anrufen ({telefon}).\n\nViele Grüße\n{inhaber}"],
     [104, 'Rückruf notiert', 'Rückruf notiert – ich melde mich',
       "Hallo {vorname},\n\nalles klar, ich rufe euch an: {rueckruf}\n\nFällt euch vorher noch etwas ein, antwortet einfach auf diese Mail. Das Angebot {nummer} findet ihr weiterhin hier:\n{link}\n\nBis gleich am Telefon!\n{inhaber}"],
     [92, 'Workshop-Bestätigung (Zahlung eingegangen)', 'Dein Platz ist fix!',
@@ -2635,6 +2659,45 @@ function syncBookingFromDoc(PDO $p, array $doc, string $newStatus): void {
   $p->prepare('update bookings set status=?, updated_at=? where id=?')->execute([$neu, now(), $doc['booking_id']]);
 }
 
+/* Pauschale Anzahlung (Einstellungen -> Vorgaben), Standard 100 Euro. 0 = ausgeschaltet -
+   dann legt syncBookingFromDoc()/die Annahme keinen Anzahlungs-Entwurf an. */
+function depositAmount(PDO $p): float {
+  $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
+  return max(0, (float)($defs['deposit_amount'] ?? 100));
+}
+/* Anzahlungs-Rechnung als ENTWURF anlegen, sobald ein Angebot angenommen wird (Markus
+   entscheidet bewusst pro Buchung, ob/wann er sie tatsaechlich verschickt - siehe
+   acceptConfirmationMail(), die dem Kunden schon "ihr bekommt noch eine Abschlagsrechnung"
+   ankuendigt). Nie ein zweites Mal fuer dieselbe Buchung anlegen (z. B. falls ein Angebot
+   nach Ablehnung/Storno erneut angenommen werden koennte). */
+function createDepositDraft(PDO $p, array $doc): ?string {
+  if (empty($doc['booking_id']) || empty($doc['customer_id'])) return null;
+  $amount = depositAmount($p);
+  if ($amount <= 0) return null;
+  $st = $p->prepare("select 1 from documents where booking_id = ? and doc_type = 'abschlag' and status != 'storniert' limit 1");
+  $st->execute([$doc['booking_id']]);
+  if ($st->fetchColumn()) return null;
+  $comp = json_decode((string)$p->query("select value from settings where key='company'")->fetchColumn() ?: '{}', true) ?: [];
+  $small = !empty($comp['small_business']);
+  $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
+  $rate = $small ? 0.0 : (float)($defs['tax_rate'] ?? 19);
+  $gross = round($amount, 2);
+  $net = $rate ? round($gross / (1 + $rate / 100), 2) : $gross;
+  $tax = round($gross - $net, 2);
+  $docId = uuid(); $token = bin2hex(random_bytes(24));
+  $number = allocDocNumber($p, 'abschlag');
+  $p->prepare('insert into documents (id, share_token, doc_type, number, customer_id, booking_id, status, doc_date,
+      tax_rate, is_small_business, price_mode, total_net, total_tax, total_gross, created_at)
+      values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    ->execute([$docId, $token, 'abschlag', $number, $doc['customer_id'], $doc['booking_id'], 'entwurf', gmdate('Y-m-d'),
+      $rate, $small ? 1 : 0, 'brutto', $net, $tax, $gross, now()]);
+  $p->prepare('insert into document_items (id, document_id, pos, description, qty, unit, unit_price)
+      values (?,?,?,?,?,?,?)')
+    ->execute([uuid(), $docId, 1, 'Anzahlung zu Angebot ' . ($doc['number'] ?? ''), 1, 'pauschal', $gross]);
+  docAudit($p, $docId, 'erstellt', $number . ' (abschlag, automatisch nach Annahme von ' . ($doc['number'] ?? '') . ' – als Entwurf, noch nicht verschickt)');
+  return $number;
+}
+
 /* Nachfassen-Frist in Tagen (Einstellungen -> Nachfassen nach), Standard 7. */
 function followupDays(PDO $p): int {
   $defs = json_decode((string)$p->query("select value from settings where key='defaults'")->fetchColumn() ?: '{}', true) ?: [];
@@ -2664,7 +2727,7 @@ function docFollowupSubject(array $doc): string {
    (mail_auto_log), und nur, wenn die Bedingung (versendet/offen/unbezahlt) im Moment
    des Versands noch zutrifft - reagiert der Kunde inzwischen doch noch, faellt er beim
    naechsten Tick automatisch aus der Kandidatenliste. */
-const MAIL_AUTO_KINDS = ['nachfass', 'form_reminder', 'mahnung'];
+const MAIL_AUTO_KINDS = ['nachfass', 'form_reminder', 'mahnung', 'sla_alert'];
 function mailAutoDdl(): string {
   return "create table if not exists mail_auto_log (id text primary key, kind text not null,
     ref_id text not null, sent_at text);
@@ -2673,12 +2736,18 @@ function mailAutoDdl(): string {
 function mailAutoConfig(): array {
   $j = json_decode((string)db()->query("select value from settings where key='mail_auto'")->fetchColumn() ?: '{}', true);
   $cfg = is_array($j) ? $j : [];
+  /* sla_alert ist die einzige Art, die standardmaessig AN ist: die anderen drei sind eine
+     Kann-Automatisierung, die der 60-Minuten-Alarm nicht ist - Markus hat ihn ausdruecklich
+     verlangt ("das koennen wir ja automatisieren"), nicht nur als Option angeboten bekommen. */
+  $defaults = ['sla_alert' => ['enabled' => true, 'delay' => 45, 'unit' => 'minutes']];
   $out = [];
   foreach (MAIL_AUTO_KINDS as $k) {
-    $row = is_array($cfg[$k] ?? null) ? $cfg[$k] : [];
-    $unit = (string)($row['unit'] ?? 'days');
-    $out[$k] = ['enabled' => !empty($row['enabled']), 'delay' => max(0, (int)($row['delay'] ?? 3)),
-      'unit' => in_array($unit, ['minutes', 'hours', 'days'], true) ? $unit : 'days'];
+    $def = $defaults[$k] ?? ['enabled' => false, 'delay' => 3, 'unit' => 'days'];
+    $row = is_array($cfg[$k] ?? null) ? $cfg[$k] : null;
+    $unit = (string)($row['unit'] ?? $def['unit']);
+    $out[$k] = ['enabled' => $row !== null ? !empty($row['enabled']) : $def['enabled'],
+      'delay' => max(0, (int)($row['delay'] ?? $def['delay'])),
+      'unit' => in_array($unit, ['minutes', 'hours', 'days'], true) ? $unit : $def['unit']];
   }
   return $out;
 }
@@ -2790,6 +2859,27 @@ function mailAutoMahnung(PDO $p, array $cfg): void {
     if (sendMailSafe($d['email'], $subject, $bodyText)) mailAutoFinish($p, 'mahnung', $d['id'], $d['customer_id'], $subject, $bodyText);
   }
 }
+/* 60-Minuten-Antwortversprechen: Markus soll gewarnt werden, BEVOR er es reisst, nicht
+   erst danach - deshalb greift der Alarm schon vor Ablauf der vollen Frist (Standard 45
+   von versprochenen 60 Minuten), nicht erst wenn die Anfrage schon ueberfaellig ist.
+   "Beantwortet" heisst hier: Status ist nicht mehr 'neu' (siehe viewInq() in admin.html -
+   jedes Oeffnen der Anfrage setzt sie auf 'gesehen'). Je Anfrage nur ein Alarm, auch wenn
+   sie danach noch laenger unbeantwortet bleibt - sonst piept es alle paar Minuten erneut. */
+function mailAutoSlaAlert(PDO $p, array $cfg): void {
+  $grenze = gmdate('Y-m-d\TH:i:s\Z', time() - mailAutoDelaySeconds($cfg));
+  $rows = $p->prepare("select id, name, event_type, event_date, created_at from inquiries
+      where status = 'neu' and created_at <= ?");
+  $rows->execute([$grenze]);
+  foreach ($rows->fetchAll() as $i) {
+    if (mailAutoAlreadySent($p, 'sla_alert', $i['id'])) continue;
+    $mins = max(1, (int)round((time() - (strtotime((string)$i['created_at']) ?: time())) / 60));
+    $was = trim(($i['event_type'] ?: '') . ($i['event_date'] ? ' am ' . deDate($i['event_date']) : ''));
+    notifyOwner('Achtung: 60-Minuten-Versprechen läuft – ' . $i['name'],
+      'Die Anfrage von ' . $i['name'] . ($was !== '' ? ' (' . $was . ')' : '') . ' ist seit ' . $mins . ' Minuten offen und noch nicht angesehen. Kurz antworten oder wenigstens öffnen, damit die Zusage von 60 Minuten hält.',
+      'inquiries');
+    mailAutoMarkSent($p, 'sla_alert', $i['id']);
+  }
+}
 /* Zustand nur fuers Drosseln - kein Cronjob auf All-Inkl vorhanden, deshalb wird bei
    jedem angemeldeten Zugriff kurz geprueft, ob der letzte Lauf laenger als 10 Minuten
    her ist; wenn ja, laeuft ein neuer Durchgang. */
@@ -2807,6 +2897,7 @@ function mailAutomationTick(PDO $p): void {
   if ($cfg['nachfass']['enabled']) { try { mailAutoNachfass($p, $cfg['nachfass']); } catch (Throwable $e) {} }
   if ($cfg['form_reminder']['enabled']) { try { mailAutoFormReminder($p, $cfg['form_reminder']); } catch (Throwable $e) {} }
   if ($cfg['mahnung']['enabled']) { try { mailAutoMahnung($p, $cfg['mahnung']); } catch (Throwable $e) {} }
+  if ($cfg['sla_alert']['enabled']) { try { mailAutoSlaAlert($p, $cfg['sla_alert']); } catch (Throwable $e) {} }
   /* Weiterleitung: nur Konten mit eingerichtetem IMAP-Zugang UND eingeschalteter
      Weiterleitung abrufen - ohne echten Cronjob ist "automatisch" hier "spaetestens beim
      naechsten angemeldeten Zugriff, gedrosselt auf 10 Minuten", nicht sofort bei Eingang. */
@@ -3123,7 +3214,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Was kostet das? Ehrliche Antwort: Es hängt von Dauer, Technik und Termin ab. Nach dem Kennenlerngespräch bekommt ihr einen Festpreis, in dem jeder Posten einzeln draufsteht – und der gilt dann auch.',
    'form_kicker' => 'Termin sichern', 'form_h2' => 'Wann ist euer großer Tag?',
-   'form_lead' => 'Schreibt mir kurz, was ihr plant – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort. Auch wenn der Termin bei mir schon vergeben ist: Dann sage ich euch das direkt und helfe euch trotzdem weiter.',
+   'form_lead' => 'Schreibt mir kurz, was ihr plant – ihr bekommt innerhalb von 60 Minuten eine ehrliche Antwort. Auch wenn der Termin bei mir schon vergeben ist: Dann sage ich euch das direkt und helfe euch trotzdem weiter.',
    'form_cfg' => ['event_types' => ['Hochzeit'], 'name_label' => 'Namen (Brautpaar) *', 'show_guests' => true,
      'location_label' => 'Location / Ort', 'location_ph' => 'z. B. Schloss, Scheune, Hemer …',
      'msg_label' => 'Erzählt kurz von eurer Feier', 'msg_ph' => 'z. B. freie Trauung vor Ort, Dinner, danach Party bis 2 Uhr, Musikrichtung …',
@@ -3156,7 +3247,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Ihr bekommt ein klares Angebot, bevor ihr euch entscheidet. Und falls die fest eingebaute Anlage in eurem Vereinsheim sowieso schon länger Ärger macht: Das ist ein Thema für sich – schaut dafür mal auf meiner [Technik-Seite](technik.html) vorbei.',
    'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Was braucht euer Fest?',
-   'form_lead' => 'Schreibt mir kurz, was ihr vorhabt – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort mit Verfügbarkeit und Preisrahmen. Kostet nichts und verpflichtet zu nichts.',
+   'form_lead' => 'Schreibt mir kurz, was ihr vorhabt – ihr bekommt innerhalb von 60 Minuten eine ehrliche Antwort mit Verfügbarkeit und Preisrahmen. Kostet nichts und verpflichtet zu nichts.',
    'form_cfg' => ['event_types' => ['Technik mieten', 'Techniker inkl. Technik buchen', 'Beratung / Sonstiges'],
      'type_label' => 'Was braucht ihr?', 'company_label' => 'Verein / Organisation',
      'location_label' => 'Ort / Vereinsheim', 'location_ph' => 'z. B. Vereinsheim in Hemer, Turnhalle …',
@@ -3190,7 +3281,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Sagt mir Termin, Location und ungefähre Gästezahl – dann bekommt ihr ein Festpreis-Angebot, mit dem ihr in die Orga-Sitzung gehen könnt.',
    'form_kicker' => 'Termin sichern', 'form_h2' => 'Wann ist euer Abiball?',
-   'form_lead' => 'Kurz eintragen – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort mit Verfügbarkeit und Preisrahmen. Kostet nichts, verpflichtet zu nichts.',
+   'form_lead' => 'Kurz eintragen – ihr bekommt innerhalb von 60 Minuten eine ehrliche Antwort mit Verfügbarkeit und Preisrahmen. Kostet nichts, verpflichtet zu nichts.',
    'form_cfg' => ['event_types' => ['Abiball'], 'name_label' => 'Name (Ansprechpartner) *',
      'company_label' => 'Schule / Jahrgangsstufe', 'show_guests' => true, 'guests_ph' => 'z. B. 150',
      'location_label' => 'Location', 'location_ph' => 'z. B. Aula, Stadthalle, Festsaal …',
@@ -3225,7 +3316,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Sommerfeste liegen oft auf einem Donnerstag oder Freitagnachmittag – genau die Termine, die ich günstiger anbieten kann als einen Samstagabend in der Hochsaison. Nennt mir euren Wunschtermin, ich rechne es ehrlich durch.',
    'form_kicker' => 'Termin sichern', 'form_h2' => 'Wann feiert ihr?',
-   'form_lead' => 'Schreibt mir kurz, was ihr plant – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort mit Verfügbarkeit und Preisrahmen. Unverbindlich, versteht sich.',
+   'form_lead' => 'Schreibt mir kurz, was ihr plant – ihr bekommt innerhalb von 60 Minuten eine ehrliche Antwort mit Verfügbarkeit und Preisrahmen. Unverbindlich, versteht sich.',
    'form_cfg' => ['event_types' => ['Firmenfeier'], 'company_label' => 'Firma', 'show_guests' => true, 'guests_ph' => 'z. B. 100',
      'location_label' => 'Ort / Location', 'location_ph' => 'z. B. Betriebsgelände, Garten, Vereinsplatz …',
      'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. Grillen ab 15 Uhr, Ansprache der Geschäftsführung, danach Party im Freien …',
@@ -3259,7 +3350,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Termine unter der Woche und tagsüber sind mein Alltag, kein Zuschlag-Fall – genau solche Einsätze sind bei mir günstiger als jede Samstagnacht. Ihr bekommt vorher einen Festpreis.',
    'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist eure Versammlung?',
-   'form_lead' => 'Schreibt mir Termin, Ort und ungefähre Teilnehmerzahl – ihr bekommt innerhalb von 24 Stunden eine klare Antwort mit Festpreis. Auch kurzfristig lohnt sich das Fragen.',
+   'form_lead' => 'Schreibt mir Termin, Ort und ungefähre Teilnehmerzahl – ihr bekommt innerhalb von 60 Minuten eine klare Antwort mit Festpreis. Auch kurzfristig lohnt sich das Fragen.',
    'form_cfg' => ['event_types' => ['Betriebsversammlung'], 'company_label' => 'Firma',
      'show_guests' => true, 'guests_label' => 'Teilnehmer (ca.)', 'guests_ph' => 'z. B. 120',
      'location_label' => 'Ort / Halle', 'location_ph' => 'z. B. Werkhalle in Hemer, Kantine …',
@@ -3293,7 +3384,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Seminare liegen naturgemäß unter der Woche und tagsüber – genau die Termine, die ich am günstigsten anbieten kann. Sagt mir Raum, Dauer und Teilnehmerzahl, ihr bekommt einen Festpreis.',
    'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist euer Seminar?',
-   'form_lead' => 'Kurz eintragen – ihr bekommt innerhalb von 24 Stunden eine klare Antwort. Auch für Seminarreihen mit mehreren Terminen lohnt sich das Fragen, das kalkuliere ich als Paket.',
+   'form_lead' => 'Kurz eintragen – ihr bekommt innerhalb von 60 Minuten eine klare Antwort. Auch für Seminarreihen mit mehreren Terminen lohnt sich das Fragen, das kalkuliere ich als Paket.',
    'form_cfg' => ['event_types' => ['Seminar / Fortbildung'], 'company_label' => 'Firma / Institut',
      'show_guests' => true, 'guests_label' => 'Teilnehmer (ca.)', 'guests_ph' => 'z. B. 40',
      'location_label' => 'Ort / Raum', 'location_ph' => 'z. B. Tagungsraum im Hotel, Schulungsraum …',
@@ -3328,7 +3419,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Messen laufen werktags – für mich die besten Termine im Kalender, und das merkt ihr am Preis. Sagt mir Messe, Standgröße und was ihr vorhabt, ihr bekommt einen Festpreis.',
    'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist eure Messe?',
-   'form_lead' => 'Schreibt mir Messe, Termin und Standgröße – ihr bekommt innerhalb von 24 Stunden eine klare Antwort mit Preisrahmen.',
+   'form_lead' => 'Schreibt mir Messe, Termin und Standgröße – ihr bekommt innerhalb von 60 Minuten eine klare Antwort mit Preisrahmen.',
    'form_cfg' => ['event_types' => ['Messe / Ausstellung'], 'company_label' => 'Firma',
      'location_label' => 'Messe / Halle', 'location_ph' => 'z. B. Messe Dortmund, Halle 4, Stand 12 m² …',
      'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. drei Messetage, Produktvideo mit Ton, zwei Kurzpräsentationen täglich …',
@@ -3361,7 +3452,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Ich schaue mir das Objekt vorher an – bei Dämmerung, wenn es sein muss – und ihr bekommt einen Festpreis. Dauerhafte Festinstallationen sind auch möglich, das ist ein Thema für die [Technik-Seite](technik.html).',
    'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Was soll leuchten?',
-   'form_lead' => 'Beschreibt mir kurz Objekt und Anlass – ihr bekommt innerhalb von 24 Stunden eine ehrliche Einschätzung, was sich lohnt und was es kostet.',
+   'form_lead' => 'Beschreibt mir kurz Objekt und Anlass – ihr bekommt innerhalb von 60 Minuten eine ehrliche Einschätzung, was sich lohnt und was es kostet.',
    'form_cfg' => ['event_types' => ['Objektbeleuchtung'], 'company_label' => 'Firma / Verein',
      'location_label' => 'Objekt / Adresse', 'location_ph' => 'z. B. Firmengebäude in Hemer, Vereinsheim mit Garten …',
      'msg_label' => 'Was ihr vorhabt', 'msg_ph' => 'z. B. Firmenjubiläum im Oktober, Fassade und Einfahrt beleuchten, Firmenfarbe Blau …',
@@ -3394,7 +3485,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Store-Termine sind Tages- und Wochenendgeschäft zu Ladenöffnungszeiten – dafür kalkuliere ich spürbar freundlicher als für eine Samstagnacht. Sagt mir Anlass und Öffnungszeiten, ihr bekommt einen Festpreis.',
    'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist eure Aktion?',
-   'form_lead' => 'Schreibt mir kurz, was ihr plant – ihr bekommt innerhalb von 24 Stunden eine klare Antwort. Auch für wiederkehrende Termine, etwa jeden ersten Samstag, lohnt sich das Fragen.',
+   'form_lead' => 'Schreibt mir kurz, was ihr plant – ihr bekommt innerhalb von 60 Minuten eine klare Antwort. Auch für wiederkehrende Termine, etwa jeden ersten Samstag, lohnt sich das Fragen.',
    'form_cfg' => ['event_types' => ['Instore-DJ / Store-Event'], 'company_label' => 'Geschäft / Marke',
      'location_label' => 'Store / Adresse', 'location_ph' => 'z. B. Modegeschäft in der Innenstadt von Iserlohn …',
      'msg_label' => 'Was ihr plant', 'msg_ph' => 'z. B. Sale-Samstag von 11 bis 18 Uhr, junge Zielgruppe, Ecke im Eingangsbereich frei …',
@@ -3428,7 +3519,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Solche Termine liegen fast immer unter der Woche – für mich die besten Termine im Kalender, und das rechnet sich für euch. Nennt mir Anlass und Rahmen, ihr bekommt einen Festpreis.',
    'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Wann ist euer Termin?',
-   'form_lead' => 'Schreibt mir kurz Anlass, Ort und ungefähre Gästezahl – ihr bekommt innerhalb von 24 Stunden eine klare Antwort mit Preisrahmen.',
+   'form_lead' => 'Schreibt mir kurz Anlass, Ort und ungefähre Gästezahl – ihr bekommt innerhalb von 60 Minuten eine klare Antwort mit Preisrahmen.',
    'form_cfg' => ['event_types' => ['Produktpräsentation / Firmenevent'], 'company_label' => 'Firma',
      'show_guests' => true, 'guests_ph' => 'z. B. 60',
      'location_label' => 'Ort / Location', 'location_ph' => 'z. B. Autohaus, Showroom, Firmengebäude …',
@@ -3462,7 +3553,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Tagestermine kann ich deutlich günstiger anbieten als eine Samstagnacht – diese Stunden gehören sonst niemandem. Wer also immer dachte, ein richtiger DJ sei zu teuer für eine private Feier: Nachmittags stimmt das oft nicht mehr.',
    'form_kicker' => 'Termin sichern', 'form_h2' => 'Wann wird gefeiert?',
-   'form_lead' => 'Schreibt mir kurz, was ihr euch vorstellt – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort mit Preisrahmen. Auch spontane Termine klappen tagsüber öfter, als man denkt.',
+   'form_lead' => 'Schreibt mir kurz, was ihr euch vorstellt – ihr bekommt innerhalb von 60 Minuten eine ehrliche Antwort mit Preisrahmen. Auch spontane Termine klappen tagsüber öfter, als man denkt.',
    'form_cfg' => ['event_types' => ['Tagesparty'], 'show_guests' => true, 'guests_ph' => 'z. B. 40',
      'location_label' => 'Ort / Location', 'location_ph' => 'z. B. Garten in Hemer, Terrasse, gemietete Scheune …',
      'msg_label' => 'Was ihr euch vorstellt', 'msg_ph' => 'z. B. 40. Geburtstag, ab 14 Uhr im Garten, entspannt mit Tanzen zum Abend …',
@@ -3501,7 +3592,7 @@ function campaignPageRows(): array {
      'location_label' => 'Ort / Gebäude', 'location_ph' => 'z. B. Vereinsheim in Hemer, Gemeindehaus …',
      'msg_label' => 'Was stört euch?', 'msg_ph' => 'z. B. Brummen sobald das Mischpult an ist, Reden versteht man hinten nicht …',
      'wa_text' => 'Hallo {inhaber}, es geht um einen Technik-Check unserer Anlage: ',
-     'success_text' => 'Danke! Eure Anfrage ist angekommen – schaut gleich in euer Postfach, dort wartet schon der kurze Vorab-Fragebogen. Ich melde mich innerhalb von 24 Stunden für die Terminabstimmung.'],
+     'success_text' => 'Danke! Eure Anfrage ist angekommen – schaut gleich in euer Postfach, dort wartet schon der kurze Vorab-Fragebogen. Ich melde mich innerhalb von 60 Minuten für die Terminabstimmung.'],
    'footer_target' => 'technik'],
 
   ['slug' => 'workshops', 'sort' => 130, 'accent' => '#b9a7ff', 'accent2' => '#d0c4ff', 'btn_txt' => '#151030',
@@ -3530,7 +3621,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Die aktuellen offenen Termine mit freien Plätzen findet ihr auf der [Technik-Seite](technik.html#workshops). Für einen eigenen Termin mit eurem Team schreibt mir einfach unten – dann stimmen wir Inhalt und Ort auf euch ab.',
    'form_kicker' => 'Anfragen', 'form_h2' => 'Workshop für euer Team?',
-   'form_lead' => 'Schreibt mir kurz, wer ihr seid und was ihr lernen wollt – ihr bekommt innerhalb von 24 Stunden einen Vorschlag mit Termin-Optionen und Preis.',
+   'form_lead' => 'Schreibt mir kurz, wer ihr seid und was ihr lernen wollt – ihr bekommt innerhalb von 60 Minuten einen Vorschlag mit Termin-Optionen und Preis.',
    'form_cfg' => ['event_types' => ['Workshop besuchen'], 'company_label' => 'Verein / Einrichtung',
      'show_date' => false,
      'location_label' => 'Ort', 'location_ph' => 'z. B. bei euch im Vereinsheim oder bei mir …',
@@ -3564,7 +3655,7 @@ function campaignPageRows(): array {
    ],
    'pricenote' => 'Was das kostet, hängt von Größe und Häufigkeit ab. Nach einem kurzen Termin bei euch vor Ort bekommt ihr ein Angebot mit allen Posten einzeln – einmalig oder als feste Größe für mehrere Abende.',
    'form_kicker' => 'Jetzt anfragen', 'form_h2' => 'Was braucht euer Abend?',
-   'form_lead' => 'Schreibt mir kurz, worum es geht – ihr bekommt innerhalb von 24 Stunden eine ehrliche Antwort.',
+   'form_lead' => 'Schreibt mir kurz, worum es geht – ihr bekommt innerhalb von 60 Minuten eine ehrliche Antwort.',
    'form_cfg' => ['event_types' => ['Technik für einen Abend', 'Technik als feste Anlage', 'Sound-Support für Live-Musik', 'Sonstiges'],
      'type_label' => 'Worum geht es?', 'company_label' => 'Bar / Location',
      'location_label' => 'Adresse der Location', 'location_ph' => 'z. B. eure Bar, Kneipe oder Location',
@@ -4720,7 +4811,7 @@ function handleRest(string $t, string $method, array $q, $body, array $prefer): 
         $waDigits = publicCompany($comp)['whatsapp_digits'];
         sendMailSafe((string)$row['email'], 'Deine Anfrage ist angekommen',
           "$anrede,\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet!\n\n" .
-          "Ich melde mich persönlich bei dir, in der Regel innerhalb von 24 Stunden. " .
+          "Ich melde mich persönlich bei dir, in der Regel innerhalb von 60 Minuten. " .
           "Das hier ist die einzige automatische Mail, die du von mir bekommst – ab jetzt schreibst du direkt mit mir.\n\n" .
           (($comp['phone'] ?? '') !== '' ?
             "Wenn es eilig ist, erreichst du mich unter " . $comp['phone'] . " – am schnellsten per WhatsApp:\n" .
@@ -5929,7 +6020,7 @@ function rentalRequestMail(PDO $p, array $me, string $bookingId, string $from, s
   $map = ['{vorname}' => anredeVorname($me), '{name}' => trim((string)($me['company'] ?? '')) ?: trim(($me['first_name'] ?? '') . ' ' . ($me['last_name'] ?? '')),
     '{zeitraum}' => $zeitraum, '{positionen}' => $pos, '{link}' => baseUrl() . '/portal.html'] + tplMap();
   $subject = 'Deine Miet-Anfrage ist da – {zeitraum}';
-  $body = "Hallo {vorname},\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet. Das hast du angefragt:\n\nZeitraum: {zeitraum}\n{positionen}\n\nIch schaue mir das an und melde mich innerhalb von 24 Stunden mit Verfügbarkeit und Preis. Die Anfrage findest du jederzeit in deinem Kundenkonto:\n{link}\n\nWenn es eilig ist: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nBis gleich!\n{inhaber}";
+  $body = "Hallo {vorname},\n\ndanke für deine Anfrage – sie ist sicher bei mir gelandet. Das hast du angefragt:\n\nZeitraum: {zeitraum}\n{positionen}\n\nIch schaue mir das an und melde mich innerhalb von 60 Minuten mit Verfügbarkeit und Preis. Die Anfrage findest du jederzeit in deinem Kundenkonto:\n{link}\n\nWenn es eilig ist: einfach anrufen ({telefon}) oder auf diese Mail antworten.\n\nBis gleich!\n{inhaber}";
   if ($tpl = tplByKey($p, 'miete_eingang')) { $subject = (string)$tpl['subject']; $body = (string)$tpl['body']; }
   $subject = strtr($subject, $map); $body = strtr($body, $map);
   $to_ = trim((string)($me['email'] ?? ''));
@@ -6132,7 +6223,7 @@ function portalReactionMail(PDO $p, array $d, string $kind, string $msg, string 
       'decline' => ['reaction_decline', 'Danke für eure Rückmeldung zu Angebot {nummer}',
         "Hallo {vorname},\n\ndanke, dass ihr mir ehrlich Bescheid gegeben habt. Ich habe das Angebot {nummer} als abgesagt vermerkt, {termin} ist bei mir damit wieder frei.\n\nFalls sich doch noch etwas ändert: Die Tür bleibt offen – ruft einfach an ({telefon}) oder antwortet auf diese Mail.\n\nAlles Gute für eure Feier!\n{inhaber}"],
       'comment' => ['reaction_comment', 'Eure Frage zu Angebot {nummer} ist angekommen',
-        "Hallo {vorname},\n\neure Nachricht zum Angebot {nummer} ist bei mir gelandet – ich antworte meist innerhalb von 24 Stunden.\n\nDas habt ihr geschrieben:\n{nachricht}\n\nWenn es eilig ist: einfach anrufen ({telefon}).\n\nViele Grüße\n{inhaber}"],
+        "Hallo {vorname},\n\neure Nachricht zum Angebot {nummer} ist bei mir gelandet – ich antworte meist innerhalb von 60 Minuten.\n\nDas habt ihr geschrieben:\n{nachricht}\n\nWenn es eilig ist: einfach anrufen ({telefon}).\n\nViele Grüße\n{inhaber}"],
       'callback' => ['reaction_callback', 'Rückruf notiert – ich melde mich',
         "Hallo {vorname},\n\nalles klar, ich rufe euch an: {rueckruf}\n\nDas Angebot {nummer} findet ihr weiterhin hier:\n{link}\n\nBis gleich am Telefon!\n{inhaber}"],
     ];
@@ -7016,6 +7107,10 @@ function handlePortal(string $path, string $method, $body): never {
           $resp['expired'] = true;
         } else {
           syncBookingFromDoc($p, $d, 'angenommen');
+          try {
+            $depositNr = createDepositDraft($p, $d);
+            if ($depositNr) $ownerExtra .= "\n\nAnzahlungsrechnung $depositNr liegt als Entwurf bereit – prüfen und verschicken.";
+          } catch (Throwable $e) {}
           $bestMail = acceptConfirmationMail($p, $d);
         }
       }
@@ -8183,6 +8278,20 @@ try {
     $r['digest'] = dailyDigest();
     $r['guide_digest'] = monthlyGuideSuggestions();
     out($r);
+  }
+  /* Gleicher Schluessel wie cron/backup (keine zweite Geheimzahl zum Verwalten), aber ein
+     eigener, viel haeufiger aufrufbarer Endpunkt: cron/backup macht taeglich einen
+     Datenbank-Schnappschuss (nur 14 werden behalten) - riefe man ihn alle 5-10 Minuten auf,
+     waeren die Backups im Kreis weg, bevor sie was nuetzen. Dieser Endpunkt macht nur den
+     schon bestehenden mailAutomationTick()-Durchlauf (Nachfassen/Erinnerungen/60-Minuten-
+     Alarm), der sich selbst auf hoechstens einmal alle 10 Minuten drosselt - haeufigeres
+     Aufrufen schadet also nicht, seltener als alle 10 Minuten sollte der Cronjob trotzdem
+     nicht sein, sonst kommt der 60-Minuten-Alarm zu spaet. */
+  if ($path === 'cron/sla-check' && $method === 'GET') {
+    $key = (string)($_GET['key'] ?? '');
+    if ($key === '' || !hash_equals(backupKey(), $key)) { usleep(500000); fail('Ungültiger Schlüssel.', 401); }
+    try { mailAutomationTick(db()); } catch (Throwable $e) {}
+    out(['ok' => true]);
   }
   /* Kalender-Abos (iCal): drei Feeds – Anfragen, feste DJ-Buchungen, Technikvermietung */
   if (preg_match('#^ical/([a-f0-9]{32})/(anfragen|buchungen|technik)\.ics$#', $path, $m) && $method === 'GET') {

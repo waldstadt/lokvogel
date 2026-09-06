@@ -1216,7 +1216,8 @@ tr.neu td{background:rgba(255,111,91,.14)}
           </div>
           <div class="grid2">
             <div><label>Fragebogen-Erinnerung nach (Tage ohne Antwort)</label><input type="number" id="sFormRemind" min="1"></div>
-            <div></div>
+            <div><label>Anzahlung bei Auftragsbestätigung (€)</label><input type="number" id="sDeposit" min="0" step="1">
+              <div class="mut sml" style="margin-top:3px">Wird als Entwurf angelegt, sobald ein Kunde ein Angebot annimmt – 0 schaltet das ab.</div></div>
           </div>
           <div class="grid2">
             <div><label>Standard-Technik bei DJ-Gigs</label><select id="sDjSet"><option value="">– keine –</option></select>
@@ -1316,6 +1317,11 @@ tr.neu td{background:rgba(255,111,91,.14)}
           <div class="sml mut" style="margin:8px 0 4px">Wichtig: Backups liegen auf demselben Server – lade dir regelmäßig eins herunter (externe Kopie).</div>
           <div id="bkLatest" style="margin-bottom:6px"></div>
           <div id="bkList" class="sml mut">–</div>
+        </div>
+        <div class="card"><h3>60-Minuten-Alarm</h3>
+          <div class="sml mut" style="margin-bottom:8px">Damit der Alarm bei neuen Anfragen auch dann kommt, wenn du gerade nicht im Backoffice bist, diese URL zusätzlich als eigenen Cronjob beim Hoster anlegen – alle 5 bis 10 Minuten aufrufen (gleicher Schlüssel wie die Datensicherung oben, unabhängig davon ausgeführt):</div>
+          <input id="slaUrl" readonly onclick="this.select()" style="font-size:11px">
+          <div class="sml mut" style="margin-top:8px">Ohne diesen Cronjob läuft der Alarm trotzdem mit, aber nur solange du selbst im Backoffice aktiv bist (Prüfung alle 10 Minuten bei jedem Klick) – bist du länger raus, kommt die Warnung erst, wenn du zurückkommst. Ein-/Ausschalten und die Vorwarnzeit stellst du unten bei „Automatische Mails" ein.</div>
         </div>
         <div class="card"><h3>KI-Textassistent</h3>
           <div class="sml mut" style="margin-bottom:8px">Wird genutzt, um aus Stichpunkten fertige Texte zu machen (z. B. Artikelbeschreibungen). Der eingegebene Text wird dafür an den hier eingestellten KI-Anbieter gesendet.</div>
@@ -2797,6 +2803,19 @@ function delCust(id){
 /* ===== Buchungen ===== */
 var curBook=null,calBase=new Date();
 function bookBadge(st){return {anfrage:'gold',angebot:'blue',gebucht:'green',abgeschlossen:'grey',storniert:'red'}[st]||'grey'}
+/* Kurz vor knapp und der Ablaufplan ist noch leer: genau der Fall aus dem Frontend-/
+   Auftragsabwicklungs-Audit ("was ist bei welchem Gig noch offen, ohne jeden einzeln zu
+   oeffnen"). Nur bei fest gebuchten, noch bevorstehenden Terminen relevant. */
+function bookPrepWarn(b){
+  if(b.status!=='gebucht'||!b.event_date)return '';
+  var lockDays=(S.defaults||{}).plan_lock_days;
+  var m=eventPrepMilestones(b,lockDays);
+  if(m.daysLeft==null||m.daysLeft<0)return '';
+  var planItem=m.items[m.items.length-1];
+  if(planItem.done)return '';
+  var soon=lockDays!=null?m.daysLeft<=lockDays+7:m.daysLeft<=10;
+  return soon?' <span class="b" style="background:var(--yel);color:#141414" title="Ablaufplan noch nicht ausgefüllt, Termin rückt näher">Ablaufplan offen</span>':'';
+}
 function renderBook(){
   renderCal();
   var rows=CACHE.bookings.slice().sort(function(a,b){return a.event_date<b.event_date?1:-1});
@@ -2805,7 +2824,7 @@ function renderBook(){
     '<td><b>'+esc(b.title||b.event_type||'Gig')+'</b><br><span class="mut sml">'+esc(custName(custOf(b)))+'</span></td>'+
     '<td>'+({dj:'DJ',technik:'Technik',dj_technik:'DJ + Technik'}[b.kind]||b.kind)+'</td>'+
     '<td>'+esc(b.venue_name||'–')+'</td><td class="num">'+(bookingValue(b)?euro(bookingValue(b)):'–')+'</td>'+
-    '<td><span class="b '+bookBadge(b.status)+'">'+b.status+'</span></td></tr>';
+    '<td><span class="b '+bookBadge(b.status)+'">'+b.status+'</span>'+bookPrepWarn(b)+'</td></tr>';
   }).join('')||'<tr><td colspan="6" class="mut">Noch keine Gigs.</td></tr>';
 }
 /* Erst auf den Monatsersten setzen: sonst wird aus dem 31. August beim Weiterblaettern
@@ -3601,6 +3620,36 @@ function parseTimetable(text){
   });
 }
 function timetableToText(list){return (Array.isArray(list)?list:[]).map(function(t){return (t.time?t.time+' ':'')+t.label}).join('\n')}
+/* Countdown + "das fehlt noch" - fuer Markus (hier) und den Kunden (portal.html,
+   gleiche Grundidee) gedacht, damit beide sehen, wie viel Zeit noch bleibt und woran
+   es noch hakt, statt das bei jedem Gig einzeln im Kopf durchzurechnen. Reine Anzeige
+   aus schon vorhandenen Daten (event_date, event_plan, plan_lock_days) - kein neues
+   Datenfeld, keine Serveranfrage. */
+function eventPrepMilestones(b,lockDays){
+  var pl=planOf(b),bas=pl.basics||{},mus=pl.music||{};
+  var today=new Date();today.setHours(0,0,0,0);
+  var evDate=b.event_date?new Date(b.event_date+'T00:00:00'):null;
+  var daysLeft=evDate?Math.round((evDate-today)/86400000):null;
+  var basicsDone=!!(bas.venue_name&&bas.guest_count!=null);
+  var musicDone=!!(mus.musts||mus.nogos||(Array.isArray(mus.playlists)&&mus.playlists.length));
+  var planDone=Array.isArray(pl.timetable)&&pl.timetable.length>0;
+  return {daysLeft:daysLeft,locked:!!b.plan_locked,lockDays:lockDays,items:[
+    {label:'Location & Gästezahl',done:basicsDone,hint:'am besten gleich zu Beginn'},
+    {label:'Musikwünsche & No-Gos',done:musicDone,hint:'empfohlen bis ca. 2 Wochen vorher'},
+    {label:'Ablaufplan',done:planDone,hint:lockDays!=null?'endgültig '+lockDays+' Tage vorher – danach gesperrt':'wird vor dem Termin gesperrt'}
+  ]};
+}
+function eventPrepHtml(b,lockDays){
+  var m=eventPrepMilestones(b,lockDays);
+  if(m.daysLeft==null)return '';
+  var days=m.daysLeft<0?'Termin ist vorbei':(m.daysLeft===0?'Heute ist der Termin':'Noch '+m.daysLeft+' Tag'+(m.daysLeft===1?'':'e')+' bis zum Termin');
+  return '<div class="card" style="margin-top:10px;padding:12px"><b>'+days+'</b>'+
+    (m.locked?' <span class="mut sml">– Ablaufplan ist final</span>':'')+
+    '<ul style="margin:8px 0 0 20px;padding:0;font-size:13px">'+m.items.map(function(it){
+      return '<li style="color:'+(it.done?'var(--ok-txt,#3fae5c)':'var(--mut)')+'">'+
+        (it.done?'✓ ':'– ')+esc(it.label)+(it.done?'':' <span class="mut sml">('+esc(it.hint)+')</span>')+'</li>';
+    }).join('')+'</ul></div>';
+}
 function renderPlan(){
   var b=curBook,pl=planOf(b),bas=pl.basics||{},inv=pl.invoice||{},mus=pl.music||{};
   var filled=Object.keys(pl).length>0;
@@ -3619,7 +3668,7 @@ function renderPlan(){
     (Array.isArray(pl.timetable)&&pl.timetable.length?'<div style="margin-top:6px"><b>Ablaufplan</b>'+fmtTimetable(pl.timetable)+'</div>':'')+
     (pl.freitext?'<div style="margin-top:6px">'+row('Freitext',pl.freitext)+'</div>':'')
     :'Noch kein Planer ausgefüllt – mit „Öffnen" alles Wichtige erfassen, das sonst mühsam am Telefon herausgefunden werden müsste.';
-  document.getElementById('bdPlan').innerHTML=html;
+  document.getElementById('bdPlan').innerHTML=eventPrepHtml(b,(S.defaults||{}).plan_lock_days)+html;
   renderPlanChanges();
 }
 function planChangeValueText(fieldPath,raw){
@@ -8049,6 +8098,8 @@ function loadBackups(){
   fetch('api.php/backup/list',{headers:{Authorization:'Bearer '+TOKEN}}).then(function(r){return r.json()}).then(function(j){
     if(!j||!j.key)return;
     document.getElementById('bkUrl').value=location.origin+location.pathname.replace(/[^\/]*$/,'')+'api.php/cron/backup?key='+j.key;
+    var slaEl=document.getElementById('slaUrl');
+    if(slaEl)slaEl.value=location.origin+location.pathname.replace(/[^\/]*$/,'')+'api.php/cron/sla-check?key='+j.key;
     var latest=document.getElementById('bkLatest');
     if(latest)latest.innerHTML=(j.files&&j.files.length)?'<a class="btn g sm" onclick="dlBackup(\''+j.files[0].name+'\')">Neuestes Backup herunterladen</a> <span class="mut sml">'+esc(j.files[0].name)+'</span>':'';
     document.getElementById('bkList').innerHTML=(j.files&&j.files.length)?j.files.map(function(f){
@@ -8189,11 +8240,15 @@ function tgTest(){
    jeweils schon bestehenden Frist (Nachfassen-Frist, Erinnerungsfrist, Faelligkeit) laeuft,
    bevor das Backoffice von selbst verschickt. Absage bewusst nicht dabei - siehe Karte. */
 var MAIL_AUTO_LABEL={nachfass:'Nachfassen bei Angeboten ohne Reaktion',
-  form_reminder:'Erinnerung bei offenen Fragebögen',mahnung:'Zahlungserinnerung bei überfälligen Rechnungen'};
+  form_reminder:'Erinnerung bei offenen Fragebögen',mahnung:'Zahlungserinnerung bei überfälligen Rechnungen',
+  sla_alert:'Alarm an dich, wenn eine Anfrage das 60-Minuten-Versprechen zu reißen droht'};
+/* sla_alert ist als einzige Art standardmaessig AN (45 Minuten) - siehe mailAutoConfig()
+   in api.php, dieselbe Vorbelegung auch hier, solange noch nichts gespeichert wurde. */
+var MAIL_AUTO_DEFAULT={sla_alert:{enabled:true,delay:45,unit:'minutes'}};
 function renderMailAuto(){
   var cfg=S.mail_auto||{};
   document.getElementById('mailAutoRows').innerHTML=Object.keys(MAIL_AUTO_LABEL).map(function(k){
-    var c=cfg[k]||{};
+    var c=cfg[k]||MAIL_AUTO_DEFAULT[k]||{};
     return '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)">'+
       '<label style="flex:1;min-width:220px;margin:0"><input type="checkbox" id="ma_'+k+'_on" style="width:auto;margin-right:6px"'+(c.enabled?' checked':'')+'>'+MAIL_AUTO_LABEL[k]+'</label>'+
       '<span class="sml mut">zusätzlich warten:</span>'+
@@ -8326,6 +8381,7 @@ function renderSet(){
   document.getElementById('sValidDays').value=d.quote_valid_days!=null?d.quote_valid_days:30;
   document.getElementById('sPlanLock').value=d.plan_lock_days!=null?d.plan_lock_days:3;
   document.getElementById('sFollowDays').value=d.followup_days!=null?d.followup_days:7;
+  document.getElementById('sDeposit').value=d.deposit_amount!=null?d.deposit_amount:100;
   document.getElementById('sFormRemind').value=d.form_reminder_days!=null?d.form_reminder_days:7;
   document.getElementById('sAgree').value=d.agreements_text||'';
   document.getElementById('sPayTerms').value=d.payment_terms_text||'';
@@ -8393,6 +8449,7 @@ function saveNumbering(){
   if(v('sFormRemind')!==''&&!(Number(v('sFormRemind'))>=1)){toast('Fragebogen-Erinnerung: bitte mindestens 1 Tag eintragen.',1);document.getElementById('sFormRemind').focus();return}
   var d=S.defaults||{};d.payment_days=Number(v('sPayDays'))||14;d.quote_valid_days=Number(v('sValidDays'))||30;
   d.plan_lock_days=Number(v('sPlanLock'))||0;d.followup_days=Number(v('sFollowDays'))||7;d.form_reminder_days=Number(v('sFormRemind'))||7;
+  d.deposit_amount=Math.max(0,Number(v('sDeposit'))||0);
   d.agreements_text=document.getElementById('sAgree').value;d.payment_terms_text=document.getElementById('sPayTerms').value;
   d.tax_rate=Number(v('sTaxRate'))||19;d.partner_discount_pct=Number(v('sPartnerPct'))||20;
   d.tier_week_pct=Number(v('sTierWeek'))||0;d.tier_2week_pct=Number(v('sTier2Week'))||0;d.tier_month_pct=Number(v('sTierMonth'))||0;

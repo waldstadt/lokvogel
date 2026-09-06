@@ -1284,6 +1284,33 @@ function planInvoiceDefaults(inv,cust){
     zip_city:inv.zip_city||[cust.zip,cust.city].filter(Boolean).join(' ')
   };
 }
+/* Countdown + "das fehlt noch": gleiche Idee wie im Backoffice (admin.html
+   eventPrepMilestones) - der Kunde soll sehen, wie viel Zeit noch bleibt und woran es
+   noch hakt, statt eines Tages ueberrascht zu werden, dass der Ablaufplan schon gesperrt
+   ist. Reine Anzeige aus schon vorhandenen Daten, kein neues Feld. */
+function planPrepHtml(b){
+  var pl=b.event_plan||{},bas=pl.basics||{},mus=pl.music||{};
+  var today=new Date();today.setHours(0,0,0,0);
+  var evDate=b.event_date?new Date(b.event_date+'T00:00:00'):null;
+  var daysLeft=evDate?Math.round((evDate-today)/86400000):null;
+  if(daysLeft==null||daysLeft<0)return '';
+  var basicsDone=!!(bas.venue_name&&bas.guest_count!=null);
+  var musicDone=!!(mus.musts||mus.nogos||(Array.isArray(mus.playlists)&&mus.playlists.length));
+  var planDone=Array.isArray(pl.timetable)&&pl.timetable.length>0;
+  var items=[
+    {label:'Location & Gästezahl',done:basicsDone},
+    {label:'Musikwünsche & No-Gos',done:musicDone},
+    {label:'Ablaufplan',done:planDone}
+  ];
+  var days=daysLeft===0?'Heute ist es soweit!':'Noch '+daysLeft+' Tag'+(daysLeft===1?'':'e')+' bis zur Feier';
+  return '<div class="card" style="margin-top:14px;padding:14px"><b>'+days+'</b>'+
+    (b.plan_locked?' <span class="mut sml">– der Ablaufplan ist final</span>':
+      '<div class="sub" style="font-size:12.5px;margin-top:4px">Am entspanntesten wird es, wenn ihr Musikwünsche spätestens 2 Wochen vorher eintragt – danach wird der Ablaufplan irgendwann final.</div>')+
+    '<ul style="margin:8px 0 0 20px;padding:0;font-size:13px">'+items.map(function(it){
+      return '<li style="color:'+(it.done?'var(--ok-txt,#3fae5c)':'var(--mut)')+'">'+
+        (it.done?'✓ ':'– ')+esc(it.label)+'</li>';
+    }).join('')+'</ul></div>';
+}
 function planCard(b,i){
   var pl=b.event_plan||{},bas=pl.basics||{},invRaw=pl.invoice||{},inv=planInvoiceDefaults(invRaw,ME.customer),mus=pl.music||{},locked=!!b.plan_locked;
   var k=function(s){return 'p'+i+'_'+s};
@@ -1311,7 +1338,8 @@ function planCard(b,i){
       empty:!(Array.isArray(pl.timetable)&&pl.timetable.length),locked:locked,multiline:true,rows:90,kind:'timetable',
       displayHtml:fmtTimetable(pl.timetable),editVal:timetableToText(pl.timetable)})+
     planRow(b.id,k('freitext'),'freitext','Freitext',{val:pl.freitext,empty:!pl.freitext,locked:locked,multiline:true,rows:70});
-  return '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">Veranstaltungsplaner <span style="color:var(--mut);font-size:13px;font-weight:400">· '+esc(b.title||'Termin')+'</span></h2>'+
+  return planPrepHtml(b)+
+    '<div class="card" style="margin-top:14px"><h2 style="font-size:17px">Veranstaltungsplaner <span style="color:var(--mut);font-size:13px;font-weight:400">· '+esc(b.title||'Termin')+'</span></h2>'+
     '<p class="sub" style="font-size:13px;margin:6px 0 10px">Du musst hier nichts ausfüllen – ich kümmere mich sonst darum und melde mich, wenn ich Fragen habe. Es hilft aber, Missverständnisse zu vermeiden, wenn du schon einträgst, was du weißt.</p>'+
     (locked?'<p class="msg err" style="display:block;font-size:13px">Der Ablaufplan ist jetzt final – Änderungswünsche bitte direkt mit mir klären.</p>':'')+
     rows+
