@@ -29,7 +29,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 /* Videos duerfen groesser sein als Bilder - ein kurzer Header-Clip liegt sonst schon
    ueber der Grenze. Trotzdem gedeckelt: was hier hochgeht, muss jeder Besucher laden. */
 const MAX_UPLOAD_VIDEO = 24 * 1024 * 1024;
-const SCHEMA_VERSION = 117;   // frisches Schema in migrate() muss diesem Stand entsprechen
+const SCHEMA_VERSION = 118;   // frisches Schema in migrate() muss diesem Stand entsprechen
 /* Telegram-Bot-API: Basis-URL als define(), damit eine Testumgebung sie per auto_prepend
    auf einen lokalen Stub umbiegen kann. Produktiv ist nichts vorgeschaltet - dann gilt
    immer api.telegram.org. Die Nachrichten selbst gehen nur raus, wenn in den
@@ -1304,6 +1304,24 @@ function upgrade(PDO $p): void {
         where body like '%innerhalb von 24 Stunden%'");
     } catch (PDOException $e) {}
   }
+  if ($v < 118) {
+    /* v118: "DJ-Vorauswahl für eure Feier" -> "Meine DJ-Empfehlungen für euch" (persoenlicher,
+       auf Markus' Wunsch) plus kompakterer Einleitungstext. Nur anfassen, was noch exakt dem
+       alten Stand entspricht - hat Markus Titel oder Text im Backoffice schon selbst
+       angepasst, bleibt seine Fassung stehen (gleiches Muster wie upgradeBandeForm() bei
+       v91). Namensvergleich bewusst auf den alten VOLLEN Titel, nicht nur ein Praefix -
+       eine eigene Umbenennung durch Markus (die zufaellig auch mit "DJ-Vorauswahl" anfaengt)
+       soll nicht ueberschrieben werden. */
+    try {
+      $tpl = $p->query("select id, name, intro from form_templates where name like 'DJ-Vorauswahl%' or name like " . $p->quote(BANDE_TPL_NAME . '%') . " order by sort limit 1")->fetch();
+      if ($tpl) {
+        $name = $tpl['name'] === 'DJ-Vorauswahl für eure Feier' ? BANDE_TPL_NAME : $tpl['name'];
+        $intro = $tpl['intro'] === bandeFormIntroV117() ? bandeFormIntro() : $tpl['intro'];
+        if ($name !== $tpl['name'] || $intro !== $tpl['intro'])
+          $p->prepare('update form_templates set name = ?, intro = ? where id = ?')->execute([$name, $intro, $tpl['id']]);
+      }
+    } catch (PDOException $e) {}
+  }
   $p->exec('PRAGMA user_version=' . SCHEMA_VERSION);
 }
 
@@ -1951,13 +1969,13 @@ function docMarkAccepted(PDO $p, string $docId): void {
 }
 
 /* ---------- DJ-Vermittlung: Vorauswahl-Bogen ----------
-   Sobald der Kunde im Portal der Vermittlung zustimmt, soll er nicht auf Markus warten
-   muessen: Der Bogen "DJ-Vorauswahl" wird sofort angelegt und gemailt (bisher ging das
-   nur von Hand ueber die Mailvorlage "Termin belegt"). Je Kunde nur ein offener Bogen -
+   Sobald der Kunde der Vermittlung zustimmt (im Portal oder direkt in der Eingangsbestaetigung
+   einer Anfrage), soll er nicht auf Markus warten muessen: der Bogen "Meine DJ-Empfehlungen
+   fuer euch" (BANDE_TPL_NAME) wird sofort angelegt und gemailt. Je Kunde nur ein offener Bogen -
    ein zweites Opt-in (z. B. Absage und spaeter nochmal) liefert denselben Link zurueck.
    Rueckgabe: ['link' => ..., 'created' => bool] oder null (keine Bogen-Vorlage vorhanden). */
 function bandeFormFor(PDO $p, string $custId, ?string $bookingId = null, ?string $docId = null): ?array {
-  $tpl = $p->query("select * from form_templates where name like 'DJ-Vorauswahl%' order by sort limit 1")->fetch();
+  $tpl = $p->query("select * from form_templates where name like " . $p->quote(BANDE_TPL_NAME . '%') . " order by sort limit 1")->fetch();
   if (!$tpl) return null;
   $st = $p->prepare("select token from forms where customer_id = ? and title = ? and status = 'offen' order by created_at desc limit 1");
   $st->execute([$custId, $tpl['name']]);
@@ -2033,11 +2051,22 @@ function formPrefill(PDO $p, array $f): array {
   return $out;
 }
 /* Ist das der Vermittlungs-Bogen? Gleiche Namenskonvention wie bandeFormFor(). */
-function isBandeForm(array $f): bool { return stripos((string)($f['title'] ?? ''), 'DJ-Vorauswahl') === 0; }
+function isBandeForm(array $f): bool { return stripos((string)($f['title'] ?? ''), 'Meine DJ-Empfehlungen') === 0; }
 
+/* Name der Vorlage: eine Konstante statt ueberall denselben String zu wiederholen, damit
+   ein weiterer Umbenennungswunsch nicht wieder an sechs verschiedenen Stellen im File
+   nachgezogen werden muss. Nur der Anfang zaehlt (LIKE-Praefix) - Markus darf den Rest
+   im Backoffice frei anpassen (z.B. eine eigene Anrede ergaenzen), ohne dass die
+   Automatik den Bogen nicht mehr findet. */
+const BANDE_TPL_NAME = 'Meine DJ-Empfehlungen für euch';
 /* Vorauswahl-Bogen: Intro und Felder der Seed-Vorlage - eine Quelle fuer seedFormTemplates()
    und den Upgrade-Schritt. Platzhalter werden beim Anlegen des Bogens gefuellt. */
 function bandeFormIntro(): string {
+  return "Ihr wollt DJ-Empfehlungen von mir? Gern – ich schaue mich dafür bei meiner Partner-Agentur {agentur} um (Sitz {agentur_ort}, DJs deutschlandweit) und wähle persönlich bis zu fünf passende Kollegen für euch aus. Alles Weitere – Gespräch, Preis, Vertrag – läuft danach direkt über die {agentur_name} bzw. den DJ, nicht mehr über mich. Ihr bucht hier noch nichts, ihr sagt mir nur, wonach ich suchen soll. Dauert keine 5 Minuten.";
+}
+/* Der lange Einleitungstext bis v117 - nur zum Vergleich im Upgrade (siehe v118), damit
+   eine eigene Anpassung von Markus nicht ueberschrieben wird. */
+function bandeFormIntroV117(): string {
   return "Ihr wollt, dass ich euch DJs raussuche – gern. So läuft das: Eure Anfrage geht an meine Partner-Agentur {agentur}, bei der ich selbst als DJ unterwegs bin. Die {agentur_name} sitzt in {agentur_ort}, ihre DJs sind aber deutschlandweit unterwegs – geprüfte Kollegen, die ich passend zu eurer Feier und eurer Gegend auswähle. Dort wähle ich persönlich bis zu fünf Kollegen vor, die zu eurer Feier passen. Alles Weitere – Infogespräch, Preis, Vertrag – läuft danach direkt über die {agentur_name} bzw. den DJ, nicht mehr über mich. Ihr bucht hier also noch nichts, ihr sagt mir nur, wonach ich suchen soll. Dauert keine 5 Minuten.";
 }
 function bandeFormFields(): array {
@@ -4477,7 +4506,7 @@ Viele Grüße und alles Gute
 
 function seedFormTemplates(PDO $p): void {
   $tpls = [
-    [1, 'DJ-Vorauswahl für eure Feier', bandeFormIntro(), bandeFormFields()],
+    [1, BANDE_TPL_NAME, bandeFormIntro(), bandeFormFields()],
     [2, 'Hochzeits-Planungsbogen',
      "Je besser ich eure Feier kenne, desto besser wird der Abend. Nehmt euch ein paar Minuten – es lohnt sich.",
      [
@@ -7025,7 +7054,7 @@ function handlePortal(string $path, string $method, $body): never {
       /* Link zum offenen Vorauswahl-Bogen (nach Opt-in), damit er auch nach Neuladen dasteht */
       'bande_link' => (function () use ($p, $d) {
         $st = $p->prepare("select f.token from forms f join form_templates t on t.name = f.title
-          where f.customer_id = ? and f.status = 'offen' and t.name like 'DJ-Vorauswahl%' order by f.created_at desc limit 1");
+          where f.customer_id = ? and f.status = 'offen' and t.name like " . $p->quote(BANDE_TPL_NAME . '%') . " order by f.created_at desc limit 1");
         $st->execute([$d['customer_id']]);
         $tok = $st->fetchColumn();
         return $tok ? baseUrl() . '/portal.html?f=' . $tok : null;
